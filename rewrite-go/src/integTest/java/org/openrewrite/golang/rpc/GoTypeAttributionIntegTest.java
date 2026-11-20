@@ -212,6 +212,42 @@ class GoTypeAttributionIntegTest implements RewriteTest {
     }
 
     @Test
+    void genericInstantiationIsParameterized() {
+        List<JavaType> types = new ArrayList<>();
+        rewriteRun(
+                go(
+                        """
+                                package main
+
+                                type Stack[T any] struct{ items []T }
+
+                                func f(s Stack[string]) {
+                                }
+                                """,
+                        spec -> spec.afterRecipe(cu -> {
+                            new JavaIsoVisitor<ExecutionContext>() {
+                                @Override
+                                public J.ParameterizedType visitParameterizedType(J.ParameterizedType type, ExecutionContext ctx) {
+                                    types.add(type.getType());
+                                    return super.visitParameterizedType(type, ctx);
+                                }
+                            }.visit(cu, new InMemoryExecutionContext());
+
+                            assertThat(types).singleElement().isInstanceOfSatisfying(JavaType.Parameterized.class, t -> {
+                                assertThat(t.getFullyQualifiedName()).isEqualTo("main.Stack");
+                                assertThat(t.getTypeParameters()).singleElement()
+                                        .extracting(TypeUtils::asFullyQualified)
+                                        .extracting(JavaType.FullyQualified::getFullyQualifiedName)
+                                        .isEqualTo("string");
+                                assertThat(t.getType().getTypeParameters()).singleElement()
+                                        .isInstanceOf(JavaType.GenericTypeVariable.class);
+                            });
+                        })
+                )
+        );
+    }
+
+    @Test
     void aTypeSpellingThatIsNotAConversionTargetCarriesItsTypeToo() {
         List<JavaType> types = new ArrayList<>();
         rewriteRun(

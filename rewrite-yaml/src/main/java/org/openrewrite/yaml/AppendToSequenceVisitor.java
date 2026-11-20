@@ -21,7 +21,6 @@ import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.marker.AlreadyReplaced;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.yaml.tree.Yaml;
 
@@ -49,12 +48,7 @@ public class AppendToSequenceVisitor extends YamlIsoVisitor<ExecutionContext> {
     @Override
     public Yaml.Sequence visitSequence(Yaml.Sequence existingSeq, ExecutionContext ctx) {
         Cursor parent = getCursor().getParent();
-        if (matcher.matches(parent) &&
-                existingSeq.getMarkers()
-                        .findAll(AlreadyReplaced.class).stream()
-                        .map(AlreadyReplaced::getFind)
-                        .noneMatch(value::equals) &&
-                checkExistingSequenceValues(existingSeq, parent)) {
+        if (matcher.matches(parent) && checkExistingSequenceValues(existingSeq, parent)) {
             return appendToSequence(existingSeq, this.value, ctx);
         }
         return super.visitSequence(existingSeq, ctx);
@@ -122,7 +116,7 @@ public class AppendToSequenceVisitor extends YamlIsoVisitor<ExecutionContext> {
         Yaml.Block newItem = parseYamlValue(value, itemPrefix, entryPrefix, style);
         Yaml.Sequence.Entry newEntry = new Yaml.Sequence.Entry(randomId(), entryPrefix, Markers.EMPTY, newItem, hasDash, entryTrailingCommaPrefix);
         entries.add(newEntry);
-        return newSequence.withMarkers(existingSequence.getMarkers().addIfAbsent(new AlreadyReplaced(randomId(), value, value)));
+        return newSequence;
     }
 
     private Yaml.Block parseYamlValue(String value, String itemPrefix, String entryPrefix, Yaml.Scalar.Style style) {

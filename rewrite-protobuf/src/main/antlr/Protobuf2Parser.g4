@@ -84,7 +84,7 @@ enumDefinition
   ;
 
 enumBody
-  : LBRACE (optionDef | enumField | emptyStatement)* RBRACE
+  : LBRACE (optionDef | enumField | reserved | emptyStatement)* RBRACE
   ;
 
 enumField

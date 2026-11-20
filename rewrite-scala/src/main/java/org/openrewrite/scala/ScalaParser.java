@@ -22,10 +22,13 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.internal.DefaultJavaTypeFactory;
+import org.openrewrite.java.internal.HashMapJavaTypeCache;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.internal.JavaTypeFactory;
+import org.openrewrite.java.internal.JdkClassSharingTypeFactory;
 import org.openrewrite.scala.internal.ScalaCompilerCache;
 import org.openrewrite.scala.internal.ScalaCompilerContext;
+import org.openrewrite.scala.internal.ScalaWarning;
 import org.openrewrite.scala.tree.S;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.tree.ParseError;
@@ -132,6 +135,13 @@ public class ScalaParser implements Parser {
                             parseResult = compilerContext.parse(input);
                         }
 
+                        List<ScalaWarning> syntaxErrors = parseResult.getParseResult().syntaxErrors();
+                        if (!syntaxErrors.isEmpty()) {
+                            throw new IllegalArgumentException(syntaxErrors.stream()
+                                    .map(e -> "Syntax error at line " + e.line() + ":" + e.column() + " " + e.message())
+                                    .collect(Collectors.joining("\n")));
+                        }
+
                         // Convert the Scala AST to OpenRewrite's LST
                         EncodingDetectingInputStream source = input.getSource(ctx);
                         String sourceStr = source.readFully();
@@ -188,6 +198,14 @@ public class ScalaParser implements Parser {
         return prefix.resolve(derivedRelativePath(sourceCode));
     }
 
+    /**
+     * A source can declare a class in a {@code scala.*} package, so the class must also be one the Scala library has.
+     */
+    private static boolean isScalaLibraryClass(String fqn) {
+        return fqn.startsWith("scala.") &&
+               ScalaParser.class.getClassLoader().getResource(fqn.replace('.', '/') + ".class") != null;
+    }
+
     public static ScalaParser.Builder builder() {
         return new Builder();
     }
@@ -203,6 +221,8 @@ public class ScalaParser implements Parser {
         protected @Nullable Collection<String> artifactNames = Collections.emptyList();
 
         private JavaTypeCache typeCache = new JavaTypeCache();
+
+        private boolean typeCacheConfigured;
 
         @Nullable
         private JavaTypeFactory typeFactory;
@@ -221,6 +241,7 @@ public class ScalaParser implements Parser {
             this.classpath = base.classpath;
             this.artifactNames = base.artifactNames;
             this.typeCache = base.typeCache;
+            this.typeCacheConfigured = base.typeCacheConfigured;
             this.typeFactory = base.typeFactory;
             this.logCompilationWarningsAndErrors = base.logCompilationWarningsAndErrors;
             this.styles.addAll(base.styles);
@@ -282,6 +303,7 @@ public class ScalaParser implements Parser {
         @SuppressWarnings("unused")
         public Builder typeCache(JavaTypeCache typeCache) {
             this.typeCache = typeCache;
+            this.typeCacheConfigured = true;
             return this;
         }
 
@@ -309,7 +331,16 @@ public class ScalaParser implements Parser {
         @Override
         public ScalaParser build() {
             Collection<Path> cp = resolvedClasspath();
+            boolean configured = typeCacheConfigured || typeFactory != null;
+            // The classpath decides which Scala library a parse maps, as the caller's jars come before the bridge's
+            List<Object> parserKind = Arrays.asList(getClass(),
+                    cp == null ? Collections.emptyList() : new ArrayList<>(cp));
+            typeCache = HashMapJavaTypeCache.forParser(JdkClassSharingTypeFactory.cacheForParser(
+                    typeCache, parserKind, configured, ScalaParser::isScalaLibraryClass), configured);
             JavaTypeFactory factory = typeFactory;
+            if (factory == null && !configured) {
+                factory = JdkClassSharingTypeFactory.forParser(typeCache);
+            }
             if (factory == null) {
                 factory = new DefaultJavaTypeFactory(typeCache);
             }

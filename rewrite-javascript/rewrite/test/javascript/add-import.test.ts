@@ -611,6 +611,109 @@ describe('AddImport visitor', () => {
                 )
             );
         });
+
+        test('a comment ending the line before a new import or require stays on that line', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: "b", member: "b", onlyIfReferenced: false}));
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        import {a} from "a"; /* x */ // note
+                        // calls a
+                        a();
+                    `,
+                    `
+                        import {a} from "a"; /* x */ // note
+                        import {b} from "b";
+                        // calls a
+                        a();
+                    `
+                ),
+                // The import ends the file
+                //language=typescript
+                typescript(
+                    `
+                        import {a} from "a"; // note
+                    `,
+                    `
+                        import {a} from "a"; // note
+                        import {b} from "b";
+                    `
+                ),
+                // Code shares the import's line, so its block comment goes with it
+                //language=typescript
+                typescript(
+                    `
+                        import {a} from "a"; /* x */ a();
+                    `,
+                    `
+                        import {a} from "a";
+                        import {b} from "b";
+                        /* x */ a();
+                    `
+                ),
+                //language=typescript
+                typescript(
+                    `
+                        'use strict'; // note
+
+                        a();
+                    `,
+                    `
+                        'use strict'; // note
+
+                        import {b} from 'b';
+
+                        a();
+                    `
+                ),
+                // A shebang ends its own line, so the comment below it belongs to the code
+                //language=typescript
+                typescript(
+                    `
+                        #!/usr/bin/env node
+                        // runs a
+                        a();
+                    `,
+                    `
+                        #!/usr/bin/env node
+
+                        import {b} from 'b';
+
+                        // runs a
+                        a();
+                    `
+                ),
+                //language=javascript
+                javascript(
+                    `
+                        const {a} = require("a"); // note
+                        a();
+                    `,
+                    `
+                        const {a} = require("a"); // note
+                        const {b} = require("b");
+                        a();
+                    `
+                ),
+                //language=javascript
+                javascript(
+                    `
+                        'use strict'; // note
+                        /// <reference path="./types.d.ts" />
+                        module.exports = 1;
+                    `,
+                    `
+                        'use strict'; // note
+                        /// <reference path="./types.d.ts" />
+                        const {b} = require('b');
+
+                        module.exports = 1;
+                    `
+                )
+            );
+        });
     });
 
     describe('merging imports from same module', () => {
@@ -1037,6 +1140,25 @@ describe('AddImport visitor', () => {
                 typescript(
                     `import React, {} from 'react';\n`,
                     `import React, {useState} from 'react';\n`
+                )
+            );
+        });
+
+        test('should merge only into an import of the module that carries no attributes', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new AddImport({module: 'm', member: 'b', onlyIfReferenced: false}));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                    import {a} from 'm' with {type: 'json'};
+                    import {c} from 'm';
+                    `,
+                    `
+                    import {a} from 'm' with {type: 'json'};
+                    import {b, c} from 'm';
+                    `
                 )
             );
         });

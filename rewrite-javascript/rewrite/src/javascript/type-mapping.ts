@@ -16,7 +16,7 @@
 import ts from "typescript";
 import * as path from "path";
 import {Type} from "../java";
-import {moduleName, packageNameOf} from "./package-name";
+import {moduleName, moduleOfFile, packageNameOf} from "./package-name";
 import {escapeLoneSurrogates} from "./parser-utils";
 import FUNCTION_TYPE_NAME = Type.FUNCTION_TYPE_NAME;
 import OBJECT_TYPE_NAME = Type.OBJECT_TYPE_NAME;
@@ -873,13 +873,12 @@ export class JavaScriptTypeMapping {
      * as TypeScript names the module of an export. A function declared in the file is declared on it.
      */
     private sourceModuleType(sourceFile: ts.SourceFile): Type.FullyQualified {
-        return this.moduleType(this.sourceModuleName(sourceFile));
+        return moduleClass(this.sourceModuleName(sourceFile));
     }
 
     private sourceModuleName(sourceFile: ts.SourceFile): string {
         const fileName = sourceFile.fileName;
-        const relative = this.sourceRoot && path.isAbsolute(fileName) ? path.relative(this.sourceRoot, fileName) : fileName;
-        return relative.replace(/\.[^/.]+$/, '');
+        return moduleOfFile(this.sourceRoot && path.isAbsolute(fileName) ? path.relative(this.sourceRoot, fileName) : fileName);
     }
 
     /**
@@ -913,7 +912,7 @@ export class JavaScriptTypeMapping {
     private functionOwner(declaration: ts.FunctionDeclaration): Type.FullyQualified {
         const namespace = this.enclosingNamespace(declaration);
         return namespace ?
-            this.moduleType(this.namespaceName(namespace)) :
+            moduleClass(this.namespaceName(namespace)) :
             this.sourceModuleType(declaration.getSourceFile());
     }
 
@@ -928,14 +927,6 @@ export class JavaScriptTypeMapping {
         }
         return (ts.isMethodDeclaration(declaration) || ts.isAccessor(declaration)) &&
             !!(ts.getCombinedModifierFlags(declaration) & ts.ModifierFlags.Static);
-    }
-
-    private moduleType(module: string): Type.FullyQualified {
-        return {
-            kind: Type.Kind.Class,
-            flags: 0, // TODO - determine flags
-            fullyQualifiedName: module
-        } as Type.FullyQualified;
     }
 
     /**
@@ -1116,7 +1107,7 @@ export class JavaScriptTypeMapping {
             // Calling a module itself, as in `require('m')()`, calls its default export.
             const calledModule = ts.isCallExpression(node) ? this.loadedModule(node.expression) : undefined;
             if (calledModule) {
-                return this.createMethodType(signature, node, this.moduleType(calledModule), '<default>');
+                return this.createMethodType(signature, node, moduleClass(calledModule), '<default>');
             }
 
             let symbol = this.checker.getSymbolAtLocation(node.expression);
@@ -1145,11 +1136,7 @@ export class JavaScriptTypeMapping {
                     const moduleName = this.moduleOfExpression(node.expression.expression);
 
                     // Use the inferred type or fall back to unknown
-                    declaringType = moduleName ? {
-                        kind: Type.Kind.Class,
-                        flags: 0, // TODO - determine flags
-                        fullyQualifiedName: moduleName
-                    } as Type.FullyQualified : Type.unknownType as Type.FullyQualified;
+                    declaringType = moduleName ? moduleClass(moduleName) : Type.unknownType as Type.FullyQualified;
 
                     // Create the method type using the helper
                     return this.createMethodType(signature, node, declaringType, methodName);
@@ -1181,18 +1168,21 @@ export class JavaScriptTypeMapping {
                 // A namespace import of an ES module is typed as its anonymous namespace object, so the
                 // module is what declares its members, and its `default` is the default export. One
                 // declared as a TypeScript namespace (`export = React`) keeps that namespace's name.
+                // An installed module's object is named after its package, so where the receiver is an
+                // import's alias, which resolves to the module its specifier names, the specifier wins.
                 const receiverBinding = this.bindingOf(node.expression.expression);
                 const anonymous = !mappedType || mappedType.kind !== Type.Kind.Class ||
-                    (mappedType as Type.Class).fullyQualifiedName.startsWith('{');
+                    (mappedType as Type.Class).fullyQualifiedName.startsWith('{') ||
+                    (isImport && this.isInstalledModuleObject(exprType));
 
                 const declaringClass = this.declaringClassOf(symbol);
                 if (declaringClass) {
                     declaringType = declaringClass;
                 } else if (declaringNamespace) {
                     // A callable module's receiver is typed as its function, which names no declaration
-                    declaringType = this.moduleType(this.namespaceName(declaringNamespace));
+                    declaringType = moduleClass(this.namespaceName(declaringNamespace));
                 } else if (receiverBinding?.kind === 'namespace' && anonymous) {
-                    declaringType = this.moduleType(receiverBinding.module);
+                    declaringType = moduleClass(receiverBinding.module);
                     if (methodName === 'default') {
                         methodName = '<default>';
                     }
@@ -1213,11 +1203,7 @@ export class JavaScriptTypeMapping {
                 // A `require()` result, and an import of a package without type declarations, is typed
                 // `any`, so nothing above identifies the module; the specifier in the call or import does.
                 if (declaringType === Type.unknownType && receiverBinding && receiverBinding.kind !== 'named') {
-                    declaringType = {
-                        kind: Type.Kind.Class,
-                        flags: 0, // TODO - determine flags
-                        fullyQualifiedName: receiverBinding.module
-                    } as Type.FullyQualified;
+                    declaringType = moduleClass(receiverBinding.module);
                 }
 
                 // For string methods like 'hello'.split(), ensure we have a proper declaring type for primitives
@@ -1272,11 +1258,7 @@ export class JavaScriptTypeMapping {
                     methodName = declared.name ? declared.name.text : "<anonymous>";
                 } else if (moduleSpecifier) {
                     // This is an imported function - use the module specifier as declaring type
-                    declaringType = {
-                        kind: Type.Kind.Class,
-                        flags: 0, // TODO - determine flags
-                        fullyQualifiedName: moduleSpecifier
-                    } as Type.FullyQualified;
+                    declaringType = moduleClass(moduleSpecifier);
                     // Calling a default export or a whole module calls the default export, whose aliased symbol
                     // carries its internal name (e.g. `e` for express), so represent it as `<default>`. Named
                     // bindings keep the exported name.
@@ -1292,7 +1274,7 @@ export class JavaScriptTypeMapping {
                     }
                 } else if (declaringNamespace) {
                     // A local holding a namespace's function, as `const utc = moment.utc`, calls that function
-                    declaringType = this.moduleType(this.namespaceName(declaringNamespace));
+                    declaringType = moduleClass(this.namespaceName(declaringNamespace));
                     methodName = ts.getNameOfDeclaration(signature.getDeclaration())?.getText() ?? methodName;
                 } else {
                     // Fall back to the original logic for non-imported functions
@@ -1305,11 +1287,7 @@ export class JavaScriptTypeMapping {
 
                         if (lastDot > 0) {
                             // For functions from modules, use the module part as declaring type
-                            declaringType = {
-                                kind: Type.Kind.Class,
-                                flags: 0, // TODO - determine flags
-                                fullyQualifiedName: fqn.substring(0, lastDot)
-                            } as Type.FullyQualified;
+                            declaringType = moduleClass(fqn.substring(0, lastDot));
                         } else {
                             // No dots in the name - the type IS the module itself
                             declaringType = funcType as Type.FullyQualified;
@@ -1548,6 +1526,8 @@ export class JavaScriptTypeMapping {
     /**
      * The project module whose top level holds a declaration local to it, such as a class it does not
      * export. TypeScript names that as bare as a global, so a module's own `class Array` needs the module.
+     * A declaration file's are named the same way, since a bundler writes `declare class X` and `export {X}`
+     * beside code that declares `X` in the module. What `export =` gives is named as its consumers name it.
      */
     private sourceModuleOf(declaration: ts.Declaration): string | undefined {
         if (!declaration.parent || !ts.isSourceFile(declaration.parent) || isGlobalAugmentation(declaration) ||
@@ -1556,8 +1536,22 @@ export class JavaScriptTypeMapping {
         }
         const sourceFile = declaration.parent;
         const isModule = ts.isExternalModule(sourceFile) || (sourceFile as any).commonJsModuleIndicator !== undefined;
-        return isModule && !sourceFile.isDeclarationFile && !this.isInstalled(sourceFile.fileName) ?
-            this.sourceModuleName(sourceFile) : undefined;
+        if (!isModule || this.isInstalled(sourceFile.fileName) ||
+            sourceFile.isDeclarationFile && this.isExportAssigned(declaration)) {
+            return undefined;
+        }
+        return this.sourceModuleName(sourceFile);
+    }
+
+    /** Whether `export =` gives what a declaration declares, as `export = React` gives the namespace `React`. */
+    private isExportAssigned(declaration: ts.Declaration): boolean {
+        return declaration.getSourceFile().statements.some(statement =>
+            ts.isExportAssignment(statement) && statement.isExportEquals &&
+            this.checker.getSymbolAtLocation(statement.expression)?.declarations?.includes(declaration) === true);
+    }
+
+    private isInstalledModuleObject(type: ts.Type): boolean {
+        return !!type.getSymbol()?.declarations?.some(d => ts.isSourceFile(d) && this.isInstalled(d.fileName));
     }
 
     /** Whether a path is in a package installed under the source, where a package's own files are not. */

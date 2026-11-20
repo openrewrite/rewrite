@@ -127,3 +127,10 @@ tasks.named<Test>("compatibilityTest") {
 tasks.named("check") {
     dependsOn(testing.suites.named("compatibilityTest"))
 }
+
+val legacyRuntime17 = javaToolchains.launcherFor {
+    languageVersion.set(JavaLanguageVersion.of(17))
+}
+tasks.named<Test>("test") {
+    systemProperty("org.openrewrite.java17.home", legacyRuntime17.get().metadata.installationPath.asFile.absolutePath)
+}

@@ -32,15 +32,34 @@ public class CSharpParser
         SemanticModel? semanticModel = null, bool charsetBomMarked = false,
         Dictionary<ISymbol, JavaType>? typeCache = null)
     {
+        if (source.StartsWith('\uFEFF'))
+        {
+            source = source[1..];
+            charsetBomMarked = true;
+            semanticModel = WithoutByteOrderMark(semanticModel);
+        }
         _charsetBomMarked = charsetBomMarked;
         var symbols = PreprocessorSourceTransformer.ExtractSymbols(source);
-        if (symbols.Count == 0)
+        var directiveLines = PreprocessorSourceTransformer.GetDirectivePositions(source);
+        if (symbols.Count == 0 && directiveLines.All(d => d.Kind != PreprocessorDirectiveKind.If))
             return ParseSingle(source, sourcePath, semanticModel, typeCache);
 
-        var cu = ParseMulti(source, sourcePath, semanticModel, symbols, typeCache);
+        var cu = ParseMulti(source, sourcePath, semanticModel, symbols, directiveLines, typeCache);
         return cu.WithMarkers(cu.Markers.Add(new CSharpLanguageVersion(Tree.RandomId(),
             ((CSharpParseOptions?)semanticModel?.SyntaxTree.Options ?? CSharpParseOptions.Default)
             .LanguageVersion.ToDisplayString())));
+    }
+
+    private static SemanticModel? WithoutByteOrderMark(SemanticModel? semanticModel)
+    {
+        if (semanticModel == null)
+            return null;
+        var tree = semanticModel.SyntaxTree;
+        var text = tree.GetText();
+        if (text.Length == 0 || text[0] != '\uFEFF')
+            return semanticModel;
+        var stripped = tree.WithChangedText(text.Replace(0, 1, ""));
+        return semanticModel.Compilation.ReplaceSyntaxTree(tree, stripped).GetSemanticModel(stripped);
     }
 
     /// <summary>
@@ -166,11 +185,9 @@ public class CSharpParser
     }
 
     private CompilationUnit ParseMulti(string source, string sourcePath,
-        SemanticModel? semanticModel, HashSet<string> symbols,
+        SemanticModel? semanticModel, HashSet<string> symbols, List<DirectiveLine> directiveLines,
         Dictionary<ISymbol, JavaType>? typeCache = null)
     {
-        var directiveLines = PreprocessorSourceTransformer.GetDirectivePositions(source);
-
         // Build mapping from line number to directive index for ghost comment emission
         var directiveLineToIndex = new Dictionary<int, int>();
         for (int idx = 0; idx < directiveLines.Count; idx++)

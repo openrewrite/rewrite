@@ -19,16 +19,14 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.ToBeRemoved;
-import org.openrewrite.yaml.MultilineScalarChanged;
 import org.openrewrite.yaml.YamlIsoVisitor;
+import org.openrewrite.yaml.internal.MultilineScalarIndents;
 import org.openrewrite.yaml.style.IndentsStyle;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -82,7 +80,7 @@ public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
             if (y instanceof Yaml.Sequence.Entry) {
                 indent = getCursor().getParentOrThrow().getMessage("sequenceEntryIndent", indent);
 
-                int seqIndentOffset = evaluate(() -> style.isIndentedSequences(), true) ? style.getIndentSize() : 0;
+                int seqIndentOffset = style.isIndentedSequences() ? style.getIndentSize() : 0;
                 int dashColumn = indent + seqIndentOffset;
                 y = y.withPrefix(indentTo(y.getPrefix(), dashColumn));
 
@@ -121,22 +119,30 @@ public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
                     getCursor().putMessage("lastIndent", entryIndent);
                 }
             }
-        } else if (y instanceof Yaml.Scalar && y.getMarkers().findFirst(MultilineScalarChanged.class).isPresent()) {
-            int indentValue = indent;
-            if (!y.getMarkers().findFirst(MultilineScalarChanged.class).get().isAdded() && indent != 0) {
-                indentValue += style.getIndentSize();
-            }
-            indentValue += y.getMarkers().findFirst(MultilineScalarChanged.class).get().getIndent();
-
-            String[] lines = LINE_BREAK.split(((Yaml.Scalar) y).getValue());
-            String newValue = lines[0] +
-                    ("\n" + StringUtils.trimIndent(String.join("\n", Arrays.copyOfRange(lines, 1, lines.length))))
-                            .replaceAll("\\R", "\n" + StringUtils.repeat(" ", indentValue));
-
-            y = ((Yaml.Scalar) y).withValue(newValue);
+        } else if (y instanceof Yaml.Scalar) {
+            y = indentMultilineScalar((Yaml.Scalar) y, indent);
         }
 
         return y;
+    }
+
+    private Yaml.Scalar indentMultilineScalar(Yaml.Scalar scalar, int indent) {
+        MultilineScalarIndents.Indent multilineIndent = MultilineScalarIndents.find(getCursor(), scalar);
+        if (multilineIndent == null) {
+            return scalar;
+        }
+        int indentValue = indent;
+        if (!multilineIndent.isAdded() && indent != 0) {
+            indentValue += style.getIndentSize();
+        }
+        indentValue += multilineIndent.getIndent();
+
+        String[] lines = LINE_BREAK.split(scalar.getValue());
+        String newValue = lines[0] +
+                ("\n" + StringUtils.trimIndent(String.join("\n", Arrays.copyOfRange(lines, 1, lines.length))))
+                        .replaceAll("\\R", "\n" + StringUtils.repeat(" ", indentValue));
+
+        return scalar.withValue(newValue);
     }
 
     private boolean isUnindentedTopLevel() {
@@ -231,16 +237,6 @@ public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
             }
         }
         return size;
-    }
-
-    @ToBeRemoved(after = "2026-06-01", reason = "All parent runtimes have had few weeks to update")
-    private <T> T evaluate(Supplier<T> supplier, T defaultValue) {
-        try {
-            return supplier.get();
-        } catch (NoSuchMethodError | NoSuchFieldError e) {
-            // Handle newly introduced method calls on style that are not part of lst yet
-            return defaultValue;
-        }
     }
 
     private String firstIndent(Yaml yaml) {

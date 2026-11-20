@@ -22,6 +22,7 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.xml.format.AutoFormatVisitor;
+import org.openrewrite.xml.internal.LineStart;
 import org.openrewrite.xml.tree.Xml;
 
 import javax.annotation.CheckReturnValue;
@@ -53,7 +54,10 @@ public class XmlVisitor<P> extends TreeVisitor<Xml, P> {
         if (before != after) {
             FormattingListener.beforeFormat(after, stopAfter, cursor);
             //noinspection unchecked
-            return (X) new AutoFormatVisitor<>(stopAfter).visitNonNull(after, p, cursor);
+            X formatted = (X) new AutoFormatVisitor<>(stopAfter).visitNonNull(after, p, cursor);
+            // what changed in place keeps the indentation of the line it starts, however the document is indented
+            //noinspection unchecked
+            return (X) formatted.withPrefix(LineStart.keep(formatted.getPrefix(), before.getPrefix(), after.getPrefix()));
         }
         return after;
     }

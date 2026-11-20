@@ -30,7 +30,6 @@ import org.openrewrite.toml.tree.TomlValue;
 import java.util.ArrayList;
 import java.util.List;
 
-import static java.util.Collections.emptyList;
 import static org.openrewrite.toml.SemanticallyEqual.areEqual;
 
 @Value
@@ -57,18 +56,26 @@ public class MergeTableRow extends Recipe {
     String description = "Merge a TOML row into an array table. If a row with the same identifying property exists, merge the values. Otherwise, insert a new row.";
 
     @Override
+    public Validated<Object> validate() {
+        return super.validate().and(Validated.test("row", "Could not parse as TOML key-values", row,
+                r -> r != null && TomlSnippets.keyValuesWithNulls(r) != null));
+    }
+
+    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
+        // A row that is not TOML changes nothing, rather than what error recovery made of part of it
+        List<Toml.KeyValue> rowKeyValues = TomlSnippets.keyValuesWithNulls(row);
         return new TomlVisitor<ExecutionContext>() {
             @Override
             public Toml visitDocument(Toml.Document document, ExecutionContext ctx) {
                 Toml.Document doc = (Toml.Document) super.visitDocument(document, ctx);
                 if (doc != document) {
-                    return doc;
+                    return TableRowMatcher.keepCommentsOnLastLines(doc);
                 }
 
                 // Parse the incoming row to get identifying value
-                List<Toml.KeyValue> keyValues = parseTomlRow(row);
-                if (keyValues.isEmpty()) {
+                List<Toml.KeyValue> keyValues = rowKeyValues;
+                if (keyValues == null || keyValues.isEmpty()) {
                     return doc;
                 }
 
@@ -83,7 +90,7 @@ public class MergeTableRow extends Recipe {
                         continue;
                     }
                     Toml.Table table = (Toml.Table) value;
-                    if (table.getName() != null && tableName.equals(table.getName().getName())) {
+                    if (TableRowMatcher.isNamed(table, tableName)) {
                         String tableIdentifyingValue = TableRowMatcher.getKeyValue(table, identifyingKey);
                         if (identifyingValue.equals(tableIdentifyingValue)) {
                             return doc;
@@ -101,7 +108,7 @@ public class MergeTableRow extends Recipe {
                 );
 
                 List<TomlRightPadded<Toml>> values = new ArrayList<>();
-                for (Toml.KeyValue kv : keyValues) {
+                for (Toml.KeyValue kv : ListUtils.filter(keyValues, kv -> !TomlSnippets.isNull(kv))) {
                     Toml.KeyValue kvWithPrefix = kv.withPrefix(Space.format("\n"));
                     values.add(new TomlRightPadded<>(kvWithPrefix, Space.EMPTY, Markers.EMPTY));
                 }
@@ -124,15 +131,15 @@ public class MergeTableRow extends Recipe {
 
             @Override
             public Toml visitTable(Toml.Table table, ExecutionContext ctx) {
-                if (table.getName() == null || !tableName.equals(table.getName().getName())) {
+                if (!TableRowMatcher.isNamed(table, tableName)) {
                     return super.visitTable(table, ctx);
                 }
 
                 // Parse the incoming row
-                List<Toml.KeyValue> incomingKeyValues = parseTomlRow(row);
-                if (incomingKeyValues.isEmpty()) {
+                if (rowKeyValues == null || rowKeyValues.isEmpty()) {
                     return super.visitTable(table, ctx);
                 }
+                List<Toml.KeyValue> incomingKeyValues = new ArrayList<>(rowKeyValues);
 
                 // Get the identifying property value from the incoming row
                 String identifyingValue = TableRowMatcher.getKeyValue(incomingKeyValues, identifyingKey);
@@ -145,59 +152,33 @@ public class MergeTableRow extends Recipe {
 
                 if (identifyingValue.equals(tableIdentifyingValue)) {
                     // Merge the values
-                    return table.withValues(
-                            ListUtils.concatAll(
-                                    ListUtils.map(table.getValues(), value -> {
-                                        if (!(value instanceof Toml.KeyValue)) {
-                                            return value;
-                                        }
-                                        Toml.KeyValue existingKv = (Toml.KeyValue) value;
+                    List<Toml> merged = ListUtils.map(table.getValues(), value -> {
+                        if (!(value instanceof Toml.KeyValue)) {
+                            return value;
+                        }
+                        Toml.KeyValue existingKv = (Toml.KeyValue) value;
 
-                                        // Check if any incoming key-value matches this one
-                                        for (int i = 0; i < incomingKeyValues.size(); i++) {
-                                            Toml.KeyValue incomingKv = incomingKeyValues.get(i);
-                                            if (areEqual(existingKv.getKey(), incomingKv.getKey())) {
-                                                incomingKeyValues.remove(i);
+                        // Check if any incoming key-value matches this one
+                        for (int i = 0; i < incomingKeyValues.size(); i++) {
+                            Toml.KeyValue incomingKv = incomingKeyValues.get(i);
+                            if (areEqual(existingKv.getKey(), incomingKv.getKey())) {
+                                incomingKeyValues.remove(i);
 
-                                                //noinspection ConstantConditions
-                                                if (incomingKv.getValue() == null) {
-                                                    return null; // Remove the key-value pair
-                                                } else if (!areEqual(existingKv.getValue(), incomingKv.getValue())) {
-                                                    return existingKv.withValue(incomingKv.getValue());
-                                                }
-                                                return existingKv; // No change needed
-                                            }
-                                        }
-                                        return existingKv;
-                                    }),
-                                    ListUtils.filter(incomingKeyValues, kv -> kv.getValue() != null)
-                            )
-                    );
+                                if (TomlSnippets.isNull(incomingKv)) {
+                                    return null; // Remove the key-value pair
+                                } else if (!areEqual(existingKv.getValue(), incomingKv.getValue())) {
+                                    return existingKv.withValue(incomingKv.getValue());
+                                }
+                                return existingKv; // No change needed
+                            }
+                        }
+                        return existingKv;
+                    });
+                    return TableRowMatcher.append(table, merged,
+                            ListUtils.filter(incomingKeyValues, kv -> !TomlSnippets.isNull(kv)));
                 }
 
                 return super.visitTable(table, ctx);
-            }
-
-            private List<Toml.KeyValue> parseTomlRow(@Language("toml") String tomlContent) {
-                try {
-                    Toml.Document doc = new TomlParser().parse(tomlContent)
-                            .findFirst()
-                            .map(Toml.Document.class::cast)
-                            .orElse(null);
-
-                    if (doc != null && !doc.getValues().isEmpty()) {
-                        List<Toml.KeyValue> result = new ArrayList<>();
-                        for (TomlValue value : doc.getValues()) {
-                            if (value instanceof Toml.KeyValue) {
-                                result.add((Toml.KeyValue) value);
-                            }
-                        }
-                        return result;
-                    }
-                } catch (Exception e) {
-                    // Failed to parse, return empty list
-                }
-                return emptyList();
             }
         };
     }

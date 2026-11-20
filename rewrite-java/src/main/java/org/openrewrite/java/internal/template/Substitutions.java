@@ -23,6 +23,7 @@ import org.openrewrite.Cursor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.ParenthesizeVisitor;
@@ -59,6 +60,7 @@ public class Substitutions {
     private final Map<Integer, JavaType> declaredParameterTypes = new HashMap<>();
     private final Map<String, @Nullable JavaType> typeVariableBindings = new HashMap<>();
     private final Set<UUID> splicedParameterIds = new HashSet<>();
+    private final Map<UUID, Expression> splicedExpressions = new HashMap<>();
 
     /**
      * Parameters are spliced into the parsed template verbatim, so a node serving more than one
@@ -66,9 +68,38 @@ public class Substitutions {
      */
     private J spliceParameter(int index) {
         J parameter = (J) parameters[index];
-        return splicedParameterIds.add(parameter.getId()) ?
+        J spliced = splicedParameterIds.add(parameter.getId()) ?
                 parameter :
                 new RandomizeIdVisitor<Integer>().visitNonNull(parameter, 0);
+        if (spliced instanceof Expression) {
+            splicedExpressions.put(spliced.getId(), (Expression) spliced);
+        }
+        return spliced;
+    }
+
+    @SuppressWarnings("unchecked")
+    <J2 extends J> J2 restoreExpressionTrivia(J2 formatted) {
+        if (splicedExpressions.isEmpty()) {
+            return formatted;
+        }
+        return (J2) new JavaIsoVisitor<Integer>() {
+            @Override
+            public J preVisit(J tree, Integer p) {
+                Expression original = splicedExpressions.get(tree.getId());
+                if (original == null || !isSingleLine(original) || !isSingleLine(tree)) {
+                    return tree;
+                }
+                stopAfterPreVisit();
+                // Keep the caller's horizontal spacing without changing how the new site wraps
+                // or indents the expression. The outer prefix continues to belong to the new slot.
+                return original.withPrefix(tree.getPrefix()).withMarkers(tree.getMarkers());
+            }
+
+            private boolean isSingleLine(J tree) {
+                String source = tree.withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
+                return source.indexOf('\n') < 0 && source.indexOf('\r') < 0;
+            }
+        }.visitNonNull(formatted, 0);
     }
 
     public boolean isParameter(J j) {

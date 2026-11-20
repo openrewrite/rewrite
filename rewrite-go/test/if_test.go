@@ -67,3 +67,35 @@ func TestParseIfElseIf(t *testing.T) {
 			}
 		`))
 }
+
+func TestParseIfElseWithCommentMentioningElse(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			func check(x int) string {
+				if x == 0 {
+					return "zero"
+				} /* or else */ else {
+					return "nonzero"
+				}
+			}
+		`))
+}
+
+func TestParseIfElseIfWithCommentMentioningElse(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			func check(x int) string {
+				if x < 0 {
+					return "negative"
+				} /* elsewhere */ else if x == 0 {
+					return "zero"
+				} /* else */ else {
+					return "positive"
+				}
+			}
+		`))
+}

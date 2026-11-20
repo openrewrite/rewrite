@@ -500,4 +500,51 @@ class UseStaticImportTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void keepQualifiedWhereAnAnonymousClassDeclaresTheMethod() {
+        rewriteRun(
+          spec -> spec.recipe(new UseStaticImport("java.util.Collections emptyList()")),
+          java(
+            """
+              import java.util.Collections;
+              import java.util.List;
+
+              class Test {
+                  void m() {
+                      Object o = new Object() {
+                          List<Object> emptyList() {
+                              return null;
+                          }
+
+                          List<Object> list() {
+                              return Collections.emptyList();
+                          }
+                      };
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepQualifiedWhereAnEnumHasTheMethodWithoutDeclaringIt() {
+        rewriteRun(
+          spec -> spec.recipe(new UseStaticImport("java.util.concurrent.TimeUnit values()")),
+          java(
+            """
+              import java.util.concurrent.TimeUnit;
+
+              enum Level {
+                  LOW, HIGH;
+
+                  static int units() {
+                      return TimeUnit.values().length;
+                  }
+              }
+              """
+          )
+        );
+    }
 }

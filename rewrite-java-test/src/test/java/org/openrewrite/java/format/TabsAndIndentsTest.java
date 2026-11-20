@@ -1274,6 +1274,7 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void moreAnnotations() {
         rewriteRun(
+          spec -> spec.parser(JavaParser.fromJavaVersion().classpath("lombok")),
           java(
             """
               import lombok.EqualsAndHashCode;
@@ -2365,7 +2366,6 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void alignBlockPrefixes() {
         rewriteRun(
-          spec -> spec.recipe(new AutoFormat(null)),
           java(
             """
               public class Test {

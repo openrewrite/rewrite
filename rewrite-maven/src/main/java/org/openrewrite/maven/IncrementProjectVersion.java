@@ -21,7 +21,6 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.ScanningRecipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.maven.marker.AlreadyIncremented;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.xml.tree.Xml;
@@ -32,7 +31,6 @@ import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 @Value
@@ -78,6 +76,11 @@ public class IncrementProjectVersion extends ScanningRecipe<Map<GroupArtifact, I
                "[semver](https://semver.org/). Other versioning schemes are not supported.";
 
     @Override
+    public int maxCycles() {
+        return 1;
+    }
+
+    @Override
     public Map<GroupArtifact, VersionChange> getInitialValue(ExecutionContext ctx) {
         return new HashMap<>();
     }
@@ -91,7 +94,7 @@ public class IncrementProjectVersion extends ScanningRecipe<Map<GroupArtifact, I
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
 
-                if (!isProjectTag() || t.getMarkers().findFirst(AlreadyIncremented.class).isPresent()) {
+                if (!isProjectTag()) {
                     return t;
                 }
                 ResolvedPom resolvedPom = getResolutionResult().getPom();
@@ -172,9 +175,6 @@ public class IncrementProjectVersion extends ScanningRecipe<Map<GroupArtifact, I
             }
 
             private Xml.Tag incrementProjectVersion(Xml.Tag t) {
-                if (t.getMarkers().findFirst(AlreadyIncremented.class).isPresent()) {
-                    return t;
-                }
                 ResolvedPom resolvedPom = getResolutionResult().getPom();
                 VersionChange change = isProjectTag() ?
                         acc.get(new GroupArtifact(resolvedPom.getGroupId(), resolvedPom.getArtifactId())) :
@@ -182,8 +182,7 @@ public class IncrementProjectVersion extends ScanningRecipe<Map<GroupArtifact, I
                 if (change == null || change.getNewVersion().equals(t.getChildValue("version").orElse(null))) {
                     return t;
                 }
-                return t.withChildValue("version", change.getNewVersion())
-                        .withMarkers(t.getMarkers().add(new AlreadyIncremented(randomId())));
+                return t.withChildValue("version", change.getNewVersion());
             }
 
             private Xml.Tag incrementSiblingVersion(Xml.Tag t) {

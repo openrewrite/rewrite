@@ -2149,7 +2149,6 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void fullyQualifiedJavadocLink() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("a.A1", "a.A2", true)),
           java(
             """
               package a;
@@ -2180,7 +2179,6 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void fullyQualifiedJavadocSee() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("a.A1", "a.A2", true)),
           java(
             """
               package a;
@@ -2211,7 +2209,6 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void fullyQualifiedJavadocMemberLink() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("a.A1", "a.A2", true)),
           java(
             """
               package a;
@@ -3086,7 +3083,6 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void noChangeToVariableNameWithoutChangeToType() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("a.A1", "a.A2", true)),
           java(
             """
               package a;
@@ -4761,6 +4757,176 @@ class ChangeTypeTest implements RewriteTest {
 
               class Test {
                   Outer.New o;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeAnnotationOnRecordComponentWhenBlankLinesPrecedePackage() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("org.springframework.lang.Nullable", "org.jspecify.annotations.Nullable", null))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+              """
+                package org.springframework.lang;
+                public @interface Nullable {}
+                """,
+              """
+                package org.jspecify.annotations;
+                public @interface Nullable {}
+                """
+            )),
+          java(
+            """
+
+              package com.example;
+
+              import org.springframework.lang.Nullable;
+
+              record Pair(@Nullable String key, String value) {
+              }
+              """,
+            """
+
+              package com.example;
+
+              import org.jspecify.annotations.Nullable;
+
+              record Pair(@Nullable String key, String value) {
+              }
+              """,
+            SourceSpec::noTrim
+          )
+        );
+    }
+
+    @Test
+    void visitorChangesASubtreeToAnAttributedTarget() {
+        JavaType.FullyQualified linkedList = JavaParser.fromJavaVersion().build().findType("java.util.LinkedList");
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                  if (!"changed".equals(method.getSimpleName())) {
+                      return method;
+                  }
+                  maybeAddImport("java.util.LinkedList");
+                  return (J.MethodDeclaration) ChangeType.visitor("java.util.ArrayList", linkedList, false)
+                    .visitNonNull(method, ctx, getCursor().getParentOrThrow());
+              }
+          })).afterRecipe(run -> {
+              var cu = (J.CompilationUnit) run.getChangeset().getAllResults().getFirst().getAfter();
+              var changed = (J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().getFirst();
+              assertThat(TypeUtils.isAssignableTo("java.util.Deque", ((J.VariableDeclarations) changed.getParameters().getFirst()).getType()))
+                .as("The parameter has the target's supertypes, which a type built from its name lacks")
+                .isTrue();
+          }),
+          java(
+            """
+              import java.util.ArrayList;
+
+              class Test {
+                  void changed(ArrayList<String> list) {
+                      Object o = list;
+                  }
+                  void kept(ArrayList<String> list) {
+                  }
+              }
+              """,
+            """
+              import java.util.ArrayList;
+              import java.util.LinkedList;
+
+              class Test {
+                  void changed(LinkedList<String> list) {
+                      Object o = list;
+                  }
+                  void kept(ArrayList<String> list) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void visitorReusedOnPartsOfTwoFiles() {
+        JavaVisitor<ExecutionContext> changeType = ChangeType.visitor("java.util.ArrayList",
+          JavaParser.fromJavaVersion().build().findType("java.util.LinkedList"), false);
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                  return (J.MethodDeclaration) changeType.visitNonNull(method, ctx, getCursor().getParentOrThrow());
+              }
+          })),
+          java(
+            """
+              package a;
+
+              import java.util.ArrayList;
+
+              class A {
+                  void m(ArrayList<String> list) {
+                  }
+              }
+              class LinkedList {
+              }
+              """,
+            """
+              package a;
+
+              import java.util.ArrayList;
+
+              class A {
+                  void m(java.util.LinkedList<String> list) {
+                  }
+              }
+              class LinkedList {
+              }
+              """
+          ),
+          java(
+            """
+              import java.util.*;
+
+              class B {
+                  void m(ArrayList<String> list) {
+                  }
+              }
+              """,
+            """
+              import java.util.*;
+
+              class B {
+                  void m(LinkedList<String> list) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void visitorKeepsADefinitionInAPartWhenAsked() {
+        JavaType.FullyQualified linkedList = JavaParser.fromJavaVersion().build().findType("java.util.LinkedList");
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                  return (J.ClassDeclaration) ChangeType.visitor("a.Old", linkedList, true)
+                    .visitNonNull(classDecl, ctx, getCursor().getParentOrThrow());
+              }
+          })),
+          java(
+            """
+              package a;
+
+              public class Old {
+                  Old copy() {
+                      return this;
+                  }
               }
               """
           )

@@ -110,7 +110,8 @@ func IsAssignableToType(from, to java.JavaType) bool {
 	// whether by carrying its methods or by a relation a peer model recorded.
 	if iface := AsClass(to); iface != nil && iface.Kind == "Interface" {
 		fqn := GetFullyQualifiedName(to)
-		return hasMethodSet(from, iface.Methods) || (fqn != "" && IsAssignableTo(from, fqn))
+		_, parameterized := to.(*java.JavaTypeParameterized)
+		return hasMethodSet(from, to, iface) || (!parameterized && fqn != "" && IsAssignableTo(from, fqn))
 	}
 	return false
 }
@@ -118,41 +119,89 @@ func IsAssignableToType(from, to java.JavaType) bool {
 // hasMethodSet reports whether from carries every method of an interface. The
 // empty one asks for nothing, which is what makes `any` a target every
 // attributed type reaches.
-func hasMethodSet(from java.JavaType, methods []*java.JavaTypeMethod) bool {
-	if len(methods) == 0 {
+func hasMethodSet(from, to java.JavaType, iface *java.JavaTypeClass) bool {
+	if len(iface.Methods) == 0 {
 		return true
 	}
 	cls := AsClass(from)
 	if cls == nil {
 		return false
 	}
-	for _, want := range methods {
-		if !hasMethod(cls, want) {
+	typeArgs := typeArgsOf(from, cls)
+	wantArgs := typeArgsOf(to, iface)
+	for _, want := range iface.Methods {
+		if !hasMethod(cls, want, typeArgs, wantArgs) {
 			return false
 		}
 	}
 	return true
 }
 
-func hasMethod(cls *java.JavaTypeClass, want *java.JavaTypeMethod) bool {
+// typeArgsOf binds a generic's type parameters to the arguments an
+// instantiation of it supplies, since its methods are declared in terms of
+// the parameters.
+func typeArgsOf(t java.JavaType, cls *java.JavaTypeClass) map[string]java.JavaType {
+	p, ok := t.(*java.JavaTypeParameterized)
+	if !ok || len(p.TypeParameters) != len(cls.TypeParameters) {
+		return nil
+	}
+	bound := make(map[string]java.JavaType, len(p.TypeParameters))
+	for i, tp := range cls.TypeParameters {
+		if v, ok := tp.(*java.JavaTypeGenericTypeVariable); ok {
+			bound[v.Name] = p.TypeParameters[i]
+		}
+	}
+	return bound
+}
+
+func hasMethod(cls *java.JavaTypeClass, want *java.JavaTypeMethod, typeArgs, wantArgs map[string]java.JavaType) bool {
 	for _, have := range cls.Methods {
-		if have.Name == want.Name && sameSignature(have, want) {
+		if have.Name == want.Name && sameSignature(have, want, typeArgs, wantArgs) {
 			return true
 		}
 	}
 	return false
 }
 
-func sameSignature(a, b *java.JavaTypeMethod) bool {
+func sameSignature(a, b *java.JavaTypeMethod, typeArgs, wantArgs map[string]java.JavaType) bool {
 	if len(a.ParameterTypes) != len(b.ParameterTypes) {
 		return false
 	}
 	for i := range a.ParameterTypes {
-		if !IsSameGoType(a.ParameterTypes[i], b.ParameterTypes[i]) {
+		if !IsSameGoType(substitute(a.ParameterTypes[i], typeArgs), substitute(b.ParameterTypes[i], wantArgs)) {
 			return false
 		}
 	}
-	return IsSameGoType(a.ReturnType, b.ReturnType)
+	return IsSameGoType(substitute(a.ReturnType, typeArgs), substitute(b.ReturnType, wantArgs))
+}
+
+func substitute(t java.JavaType, typeArgs map[string]java.JavaType) java.JavaType {
+	if len(typeArgs) == 0 {
+		return t
+	}
+	switch v := t.(type) {
+	case *java.JavaTypeGenericTypeVariable:
+		if arg, ok := typeArgs[v.Name]; ok {
+			return arg
+		}
+	case *java.JavaTypeArray:
+		return &java.JavaTypeArray{ElemType: substitute(v.ElemType, typeArgs), Annotations: v.Annotations}
+	case *java.JavaTypeParameterized:
+		params := make([]java.JavaType, len(v.TypeParameters))
+		for i, tp := range v.TypeParameters {
+			params[i] = substitute(tp, typeArgs)
+		}
+		return &java.JavaTypeParameterized{Type: v.Type, TypeParameters: params}
+	case *java.JavaTypeMethod:
+		sub := *v
+		sub.ParameterTypes = make([]java.JavaType, len(v.ParameterTypes))
+		for i, pt := range v.ParameterTypes {
+			sub.ParameterTypes[i] = substitute(pt, typeArgs)
+		}
+		sub.ReturnType = substitute(v.ReturnType, typeArgs)
+		return &sub
+	}
+	return t
 }
 
 // Implements checks if the type implements the given interface FQN.

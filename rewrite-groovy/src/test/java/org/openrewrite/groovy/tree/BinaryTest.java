@@ -22,6 +22,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.groovy.GroovyVisitor;
+import org.openrewrite.groovy.marker.NullSafe;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RewriteTest;
@@ -38,6 +39,7 @@ class BinaryTest implements RewriteTest {
     @ParameterizedTest
     @ValueSource(strings = {
       "a[0,1]",
+      "a?[0,1]",
       "a[0,1][2]",
       "a[[0,1], [2,3]]",
       "a[(0),1]",
@@ -69,6 +71,24 @@ class BinaryTest implements RewriteTest {
     void singleIndexAccessAndListLiteral(String source) {
         rewriteRun(
           groovy(source)
+        );
+    }
+
+    @Test
+    void safeIndexAccessIsMarkedNullSafe() {
+        rewriteRun(
+          groovy(
+            """
+              def y = [1]
+              def a = y?[0]
+              """,
+            spec -> spec.beforeRecipe(cu -> {
+                var a = (J.VariableDeclarations) cu.getStatements().getLast();
+                var access = (G.Binary) requireNonNull(a.getVariables().getFirst().getInitializer());
+                assertThat(access.getOperator()).isEqualTo(G.Binary.Type.Access);
+                assertThat(access.getMarkers().findFirst(NullSafe.class)).isPresent();
+            })
+          )
         );
     }
 

@@ -16,6 +16,7 @@
 package org.openrewrite.internal.lang;
 
 import javax.annotation.meta.TypeQualifierDefault;
+import org.jspecify.annotations.NonNull;
 import java.lang.annotation.*;
 
 /**
@@ -33,7 +34,7 @@ import java.lang.annotation.*;
 @Target({ElementType.PACKAGE, ElementType.TYPE})
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
-@org.jspecify.annotations.NonNull
+@NonNull
 @TypeQualifierDefault(ElementType.FIELD)
 public @interface NonNullFields {
 }

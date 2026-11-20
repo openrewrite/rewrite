@@ -23,6 +23,7 @@ import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.python.marker.PythonResolutionResult;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import java.io.ByteArrayInputStream;
@@ -44,6 +45,12 @@ import static org.openrewrite.python.Assertions.uvLock;
  * to what uv 0.10.11 wrote for the same edit.
  */
 class UpgradeDependencyVersionUvLockTest implements RewriteTest {
+
+  @Override
+  public void defaults(RecipeSpec spec) {
+    spec.recipe(new UpgradeDependencyVersion("six", "==1.17.0", null, null))
+      .executionContext(ctx);
+  }
 
     ExecutionContext ctx;
     final Map<String, String> routes = new HashMap<>();
@@ -72,8 +79,6 @@ class UpgradeDependencyVersionUvLockTest implements RewriteTest {
     @Timeout(120)
     void markerResolvedDependenciesUpdatedAfterEdit() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("six", "==1.17.0", null, null))
-            .executionContext(ctx),
           pyproject(
             """
               [project]
@@ -145,8 +150,6 @@ class UpgradeDependencyVersionUvLockTest implements RewriteTest {
           default = true
           """;
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("six", "==1.17.0", null, null))
-            .executionContext(ctx),
           pyproject(pyproject.formatted("1.16.0"), pyproject.formatted("1.17.0")),
           uvLock(
             resource("i-minimal-update/uv.lock.v1"),

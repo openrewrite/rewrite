@@ -340,6 +340,12 @@ class ReloadableJava25TypeMapping implements JavaTypeMapping<Tree> {
             return annotatedArray((JCTree.JCAnnotatedType) tree);
         } else if (tree instanceof JCTree.JCRecordPattern) {
             symbol = ((JCTree.JCRecordPattern) tree).record;
+        } else if (tree instanceof JCTree.JCFieldAccess) {
+            JCTree.JCFieldAccess select = (JCTree.JCFieldAccess) tree;
+            // A class literal that javac marks erroneous because of its context still has `Class<X>` on its symbol
+            if (select.type instanceof Type.ErrorType && select.sym != null && select.name.contentEquals("class")) {
+                return type(select.sym.type);
+            }
         }
 
         return type(((JCTree) tree).type, symbol);
