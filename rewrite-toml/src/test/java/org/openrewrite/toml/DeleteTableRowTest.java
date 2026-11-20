@@ -56,6 +56,70 @@ class DeleteTableRowTest implements RewriteTest {
     }
 
     @Test
+    void deleteTheSubtablesOfTheRow() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteTableRow("bin", "name", "b", null)),
+          toml(
+            """
+              [[bin]]
+              name = "a"
+              [bin.meta]
+              k = 1
+
+              [[bin]]
+              name = "b"
+              [bin.meta]
+              k = 2
+
+              [[bin]]
+              name = "c"
+              [bin.meta]
+              k = 3
+              """,
+            """
+              [[bin]]
+              name = "a"
+              [bin.meta]
+              k = 1
+
+              [[bin]]
+              name = "c"
+              [bin.meta]
+              k = 3
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepTablesOutsideTheRowAfterIt() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteTableRow("bin", "name", "b", null)),
+          toml(
+            """
+              [[bin]]
+              name = "a"
+
+              [[bin]]
+              name = "b"
+              [bin.meta]
+              k = 2
+
+              [other]
+              x = 1
+              """,
+            """
+              [[bin]]
+              name = "a"
+
+              [other]
+              x = 1
+              """
+          )
+        );
+    }
+
+    @Test
     void deleteMultipleMatchingRows() {
         rewriteRun(
           spec -> spec.recipe(new DeleteTableRow("team", "role", "developer", null)),

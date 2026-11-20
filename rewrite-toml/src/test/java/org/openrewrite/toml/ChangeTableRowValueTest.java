@@ -449,6 +449,96 @@ class ChangeTableRowValueTest implements RewriteTest {
     }
 
     @Test
+    void doNotAddAPropertyAnInlineTableHolds() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeTableRowValue("package", "name", "a", null, "source.registry", "\"new\"", true)),
+          toml(
+            """
+              [[package]]
+              name = "a"
+              source = { registry = "x" }
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeAPropertyQuotedInTheOption() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeTableRowValue("pkg", "name", "a", null, "\"my key\"", "2", true)),
+          toml(
+            """
+              [[pkg]]
+              name = "a"
+              "my key" = 1
+              """,
+            """
+              [[pkg]]
+              name = "a"
+              "my key" = 2
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeADottedPropertyWrittenWithQuotes() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeTableRowValue("pkg", "name", "a", null, "meta.url", "\"new\"", true)),
+          toml(
+            """
+              [[pkg]]
+              name = "a"
+              meta."url" = "u"
+              """,
+            """
+              [[pkg]]
+              name = "a"
+              meta."url" = "new"
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotAddAPropertyASubtableOfTheRowHolds() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeTableRowValue("pkg", "name", "a", null, "meta.url", "\"new\"", true)),
+          toml(
+            """
+              [[pkg]]
+              name = "a"
+              [pkg.meta]
+              url = "u"
+
+              [[pkg]]
+              name = "b"
+              """
+          )
+        );
+    }
+
+    @Test
+    void addADottedPropertyBesideAnotherInTheSameTable() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeTableRowValue("pkg", "name", "a", null, "meta.url", "\"new\"", true)),
+          toml(
+            """
+              [[pkg]]
+              name = "a"
+              meta.home = "h"
+              """,
+            """
+              [[pkg]]
+              name = "a"
+              meta.home = "h"
+              meta.url = "new"
+              """
+          )
+        );
+    }
+
+    @Test
     void addAValueThatIsNotTomlAsAString() {
         rewriteRun(
           spec -> spec.recipe(new ChangeTableRowValue("pkg", "name", "a", null, "version", "2.0.0", true)),

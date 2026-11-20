@@ -24,10 +24,18 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.toml.internal.TomlKeyParts;
 import org.openrewrite.toml.internal.TomlString;
 import org.openrewrite.toml.tree.Toml;
+import org.openrewrite.toml.tree.TomlValue;
+
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 
 import static java.util.Collections.singletonList;
+import static java.util.Objects.requireNonNull;
 
 
 @Value
@@ -98,8 +106,11 @@ public class ChangeTableRowValue extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new TomlVisitor<ExecutionContext>() {
+            final List<String> property = TomlKeyParts.split(propertyKey);
+
             @Override
             public Toml visitDocument(Toml.Document document, ExecutionContext ctx) {
+                getCursor().putMessage(ROWS_WITH_PROPERTY_IN_SUBTABLE, rowsWithPropertyInSubtable(document));
                 return TableRowMatcher.keepCommentsOnLastLines((Toml.Document) super.visitDocument(document, ctx));
             }
 
@@ -115,7 +126,7 @@ public class ChangeTableRowValue extends Recipe {
                     return super.visitTable(table, ctx);
                 }
 
-                if (newValue != null && Boolean.TRUE.equals(addIfMissing) && TomlTableValue.find(table.getValues(), propertyKey) == null) {
+                if (newValue != null && Boolean.TRUE.equals(addIfMissing) && isMissing(table)) {
                     Toml.KeyValue added = parseKeyValue();
                     return added == null ? table : TableRowMatcher.append(table, table.getValues(), singletonList(added));
                 }
@@ -126,7 +137,7 @@ public class ChangeTableRowValue extends Recipe {
                     }
                     Toml.KeyValue kv = (Toml.KeyValue) value;
                     if (kv.getKey() instanceof Toml.Identifier &&
-                            propertyKey.equals(((Toml.Identifier) kv.getKey()).getName())) {
+                            TomlKeyParts.of((Toml.Identifier) kv.getKey()).equals(property)) {
                         if (newValue == null) {
                             return null; // Remove the key-value pair
                         }
@@ -138,6 +149,52 @@ public class ChangeTableRowValue extends Recipe {
                     }
                     return value;
                 }));
+            }
+
+            /**
+             * Whether adding the property to the row keeps it valid TOML: no key-value of the row, and no subtable of it,
+             * already defines the property, a table holding it, or a key under it.
+             */
+            private boolean isMissing(Toml.Table row) {
+                Set<UUID> rows = getCursor().getNearestMessage(ROWS_WITH_PROPERTY_IN_SUBTABLE);
+                if (rows != null && rows.contains(row.getId())) {
+                    return false;
+                }
+                for (Toml value : row.getValues()) {
+                    if (value instanceof Toml.KeyValue && ((Toml.KeyValue) value).getKey() instanceof Toml.Identifier &&
+                        overlaps(TomlKeyParts.of((Toml.Identifier) ((Toml.KeyValue) value).getKey()))) {
+                        return false;
+                    }
+                }
+                return true;
+            }
+
+            /**
+             * The rows followed by a subtable, such as {@code [pkg.meta]} after {@code [[pkg]]}, that defines the
+             * property, a table holding it, or a key under it.
+             */
+            private Set<UUID> rowsWithPropertyInSubtable(Toml.Document document) {
+                List<String> rowName = TomlKeyParts.split(tableName);
+                Set<UUID> rows = new HashSet<>();
+                Toml.Table row = null;
+                for (TomlValue value : document.getValues()) {
+                    if (!(value instanceof Toml.Table) || ((Toml.Table) value).getName() == null) {
+                        continue;
+                    }
+                    Toml.Table table = (Toml.Table) value;
+                    List<String> name = TomlKeyParts.of(requireNonNull(table.getName()));
+                    if (name.equals(rowName)) {
+                        row = table;
+                    } else if (row != null && startsWith(name, rowName) &&
+                               overlaps(name.subList(rowName.size(), name.size()))) {
+                        rows.add(row.getId());
+                    }
+                }
+                return rows;
+            }
+
+            private boolean overlaps(List<String> key) {
+                return startsWith(key, property) || startsWith(property, key);
             }
 
             /**
@@ -156,5 +213,11 @@ public class ChangeTableRowValue extends Recipe {
                 return kv.withValue(TomlSnippets.valueOrString(newValue).withPrefix(kv.getValue().getPrefix()));
             }
         };
+    }
+
+    private static final String ROWS_WITH_PROPERTY_IN_SUBTABLE = "ROWS_WITH_PROPERTY_IN_SUBTABLE";
+
+    private static boolean startsWith(List<String> key, List<String> prefix) {
+        return key.size() >= prefix.size() && key.subList(0, prefix.size()).equals(prefix);
     }
 }
