@@ -91,10 +91,12 @@ Scala or Groovy would allow.
 `canReference` asks each language what a static context is. It applies Java's rules for capturing a
 local, as `lambdaCanCapture` does, for a forward reference to a field, and for an enum's static field
 read while a constant is constructed, in every language. Groovy and Kotlin refuse such a read too,
-though not in the same places as Java, and Scala allows it. A Kotlin `init` block is not taken for an
-initializer, so `canReference` allows a read there that Kotlin refuses. An enum constant's body binds
-none of the members it inherits from its enum, so `canReference` refuses a field of the enum there
-that the body could read.
+though not in the same places as Java, and Scala allows it. A Kotlin `init` block is an instance
+initializer to these rules. In a Kotlin enum, `canReference` refuses every member of the companion
+object while an entry is constructed and in an entry's arguments, a `const val` and a function too.
+Kotlin allows such a read in a lambda, as in `by lazy { }`, where `canReference` refuses it. An enum
+constant's body binds none of the members it inherits from its enum, so `canReference` refuses a
+field of the enum there that the body could read.
 
 `canEvaluateBefore` looks at names and assignments only. It does not see a method called in between
 that changes a field or an object the expression reads, nor what the expression itself changes.

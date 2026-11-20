@@ -31,7 +31,7 @@ import java.util.*;
 /**
  * Kotlin's binding rules where they part from Java's. A {@code when} subject is visible only in its branches.
  * A lambda without parameters binds {@code it}. A {@code val} or {@code var} primary constructor parameter is a
- * property of its class.
+ * property of its class. An {@code init} block is an instance initializer.
  */
 @Incubating(since = "8.113.0")
 public class KotlinScopeService extends ScopeService {
@@ -96,7 +96,10 @@ public class KotlinScopeService extends ScopeService {
 
     @Override
     public boolean isStaticContext(Cursor cursor) {
-        if (cursor.getValue() instanceof J.ClassDeclaration
+        if (cursor.getValue() instanceof J.Block) {
+            // The parser flags an `init` block static so that the printer writes the keyword
+            return false;
+        } else if (cursor.getValue() instanceof J.ClassDeclaration
                 && cursor.getParentTreeCursor().getValue() instanceof J.Block) {
             Object outer = cursor.getParentTreeCursor().getParentTreeCursor().getValue();
             if (outer instanceof J.ClassDeclaration) {

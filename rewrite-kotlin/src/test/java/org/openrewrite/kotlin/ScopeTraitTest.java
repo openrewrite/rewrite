@@ -15,22 +15,35 @@
  */
 package org.openrewrite.kotlin;
 
+import com.tschuchort.compiletesting.KotlinCompilation;
+import com.tschuchort.compiletesting.SourceFile;
+import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
-import org.openrewrite.ExecutionContext;
 import org.openrewrite.Cursor;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.trait.Scope;
 import org.openrewrite.java.trait.VariableAccess;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
 
+import java.io.OutputStream;
 import java.util.Arrays;
+import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.function.Function;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static java.util.stream.Collectors.joining;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
@@ -433,5 +446,111 @@ class ScopeTraitTest implements RewriteTest {
                 return "here".equals(m.getSimpleName()) ? SearchResult.found(m, question.apply(Scope.at(getCursor()))) : m;
             }
         });
+    }
+
+    @Test
+    void initBlockIsAnInstanceInitializer() {
+        @Language("kotlin") String source =
+          """
+            fun use(row: String, read: Any?): Int = 0
+            class C {
+                val earlier = 1
+                init {
+                    use("readsProperty", earlier)
+                    use("readsLaterProperty", later)
+                    use("readsCompanionProperty", logger)
+                }
+                val later = 1
+                companion object {
+                    val logger = Any()
+                }
+            }
+            """;
+        assertThat(readsRefused(source)).containsExactly("readsLaterProperty");
+        assertThat(rowsKotlincRejects(source)).isEqualTo(readsRefused(source));
+    }
+
+    @Test
+    void enumUsesNoCompanionMemberOrEntryWhileAnEntryIsConstructed() {
+        @Language("kotlin") String source =
+          """
+            fun use(row: String, read: Any?): Int = 0
+            enum class E(val n: Int) {
+                A(use("entryArgument", logger)),
+                B(use("entryArgumentReadsEarlierEntry", A));
+                init {
+                    use("initBlock", logger)
+                    use("initBlockReadsConst", X)
+                    use("initBlockCallsCompanionFunction", helper())
+                    use("initBlockReadsEntry", A)
+                    use("initBlockReadsProperty", n)
+                }
+                fun m() = use("method", logger)
+                companion object {
+                    val logger = Any()
+                    const val X = 1
+                    fun helper() = 0
+                }
+            }
+            """;
+        assertThat(readsRefused(source)).containsExactly(
+          "entryArgument",
+          "initBlock",
+          "initBlockCallsCompanionFunction",
+          "initBlockReadsConst",
+          "initBlockReadsEntry");
+        assertThat(rowsKotlincRejects(source)).isEqualTo(readsRefused(source));
+    }
+
+    private static final Pattern USE_ROW = Pattern.compile("use\\(\"(\\w+)\"");
+
+    /**
+     * The rows of a source whose second argument to {@code use(row, read)} names something
+     * {@link Scope#canReference(Scope.Binding)} refuses there, in alphabetical order.
+     */
+    private static Set<String> readsRefused(@Language("kotlin") String source) {
+        Set<String> refused = new TreeSet<>();
+        new JavaIsoVisitor<Integer>() {
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                if ("use".equals(method.getSimpleName())) {
+                    Expression read = method.getArguments().get(1);
+                    J.Identifier name = read instanceof J.MethodInvocation call ? call.getName() : (J.Identifier) read;
+                    Cursor at = Scope.cursorTo(getCursor(), name);
+                    Scope scope = Scope.at(at);
+                    Scope.Binding binding = scope.lookup(name.getSimpleName(), Scope.service(at).namespaceOf(at)).orElseThrow();
+                    if (!scope.canReference(binding)) {
+                        refused.add((String) ((J.Literal) method.getArguments().getFirst()).getValue());
+                    }
+                }
+                return super.visitMethodInvocation(method, p);
+            }
+        }.visit(KotlinParser.builder().classpath(JavaParser.runtimeClasspath()).build()
+          .parse(new InMemoryExecutionContext(), source).findFirst().orElseThrow(), 0);
+        return refused;
+    }
+
+    /**
+     * The rows in which kotlinc reports an error, in alphabetical order. A row starts at the line that names it.
+     */
+    private static Set<String> rowsKotlincRejects(@Language("kotlin") String source) {
+        KotlinCompilation compilation = new KotlinCompilation();
+        compilation.setSources(List.of(SourceFile.Companion.kotlin("Rows.kt", source, false)));
+        compilation.setInheritClassPath(true);
+        compilation.setMessageOutputStream(OutputStream.nullOutputStream());
+        String[] lines = source.split("\n");
+        Set<String> rejected = new TreeSet<>();
+        Matcher error = Pattern.compile("^e: .*Rows\\.kt:(\\d+):\\d+ ", Pattern.MULTILINE)
+          .matcher(compilation.compile().getMessages());
+        while (error.find()) {
+            for (int line = Integer.parseInt(error.group(1)) - 1; line >= 0; line--) {
+                Matcher row = USE_ROW.matcher(lines[line]);
+                if (row.find()) {
+                    rejected.add(row.group(1));
+                    break;
+                }
+            }
+        }
+        return rejected;
     }
 }

@@ -187,9 +187,9 @@ public class Scope implements Trait<J> {
      * language accepts. It could not where another binding shadows this one, where an instance member or a class's
      * type parameter is named from a {@link ScopeService#isStaticContext(Cursor) static context}, where an
      * initializer names a field declared after it, where a constructor or instance initializer of an enum names a
-     * static field of the enum that is no constant, or where a local that is not effectively final is read from
-     * inside a lambda or a class body. Whether a local declared without an initializer has been assigned by then is
-     * not checked.
+     * static field of the enum that is no constant, where such code or a constant's arguments name a member of the
+     * enum's Kotlin companion object, or where a local that is not effectively final is read from inside a lambda
+     * or a class body. Whether a local declared without an initializer has been assigned by then is not checked.
      */
     public boolean canReference(Binding binding) {
         Binding innermost = lookup(binding.name, binding.namespace).orElse(null);
@@ -228,6 +228,7 @@ public class Scope implements Trait<J> {
         }
         J declarator = null;
         J member = null;
+        Cursor memberAt = position;
         for (Cursor c = position; c != null && !isTree(c, body); c = c.getParent()) {
             if (c.getValue() instanceof J) {
                 if (c.getValue() instanceof J.ClassDeclaration ||
@@ -236,11 +237,12 @@ public class Scope implements Trait<J> {
                 }
                 declarator = member;
                 member = c.getValue();
+                memberAt = c;
             }
         }
         boolean initializesStatic;
         if (member instanceof J.Block) {
-            initializesStatic = ((J.Block) member).isStatic();
+            initializesStatic = service.isStaticContext(memberAt);
         } else if (member instanceof J.VariableDeclarations) {
             initializesStatic = ((J.VariableDeclarations) member).hasModifier(J.Modifier.Type.Static);
         } else if (member instanceof J.EnumValueSet) {
@@ -275,26 +277,36 @@ public class Scope implements Trait<J> {
      * Whether the position reads an enum's own static field while a constant of the enum is constructed, which is
      * before the field is assigned (JLS 8.9.2). That is in a constructor, an instance initializer or an instance
      * variable initializer of the enum or of the body of one of its constants, unless the field is a constant
-     * variable. Any other class body in between lifts the restriction.
+     * variable. Any other class body in between lifts the restriction. A member of a Kotlin companion object is
+     * read through the object, which the enum assigns after its constants. So no member of it is in reach there or
+     * in a constant's arguments, not even a constant or a function.
      */
     private boolean isEnumFieldReadDuringConstruction(Binding field) {
-        if (field.namespace != Namespace.VARIABLE || !(field.scope.getValue() instanceof J.ClassDeclaration)) {
+        if (!(field.scope.getValue() instanceof J.ClassDeclaration)) {
             return false;
         }
         J.ClassDeclaration enumClass = field.scope.getValue();
-        if (enumClass.getKind() != J.ClassDeclaration.Kind.Type.Enum || !isStatic(field) || isConstantVariable(field)) {
+        if (enumClass.getKind() != J.ClassDeclaration.Kind.Type.Enum) {
             return false;
         }
-        // A field the body does not declare is the enum's own only where attribution says so
-        if (!(field.getTree() instanceof J.Identifier) && !(field.type instanceof JavaType.Variable &&
-              TypeUtils.isOfType(((JavaType.Variable) field.type).getOwner(), enumClass.getType()))) {
-            return false;
+        boolean companionMember = isCompanionMember(field);
+        if (!companionMember) {
+            if (field.namespace != Namespace.VARIABLE || !isStatic(field) || isConstantVariable(field)) {
+                return false;
+            }
+            // A field the body does not declare is the enum's own only where attribution says so
+            if (!(field.getTree() instanceof J.Identifier) && !(field.type instanceof JavaType.Variable &&
+                  TypeUtils.isOfType(((JavaType.Variable) field.type).getOwner(), enumClass.getType()))) {
+                return false;
+            }
         }
         J member = null;
+        Cursor memberAt = position;
         Cursor body = position;
         while (!(body.getValue() instanceof J.Block && isClassBody(body))) {
             if (body.getValue() instanceof J) {
                 member = body.getValue();
+                memberAt = body;
             }
             body = body.getParent();
             if (body == null) {
@@ -310,9 +322,26 @@ public class Scope implements Trait<J> {
             return false;
         }
         return member instanceof J.MethodDeclaration && isConstructor((J.MethodDeclaration) member) ||
-               member instanceof J.Block && !((J.Block) member).isStatic() ||
+               member instanceof J.Block && !service.isStaticContext(memberAt) ||
                member instanceof J.VariableDeclarations &&
-               !((J.VariableDeclarations) member).hasModifier(J.Modifier.Type.Static);
+               !((J.VariableDeclarations) member).hasModifier(J.Modifier.Type.Static) ||
+               companionMember && member instanceof J.EnumValueSet;
+    }
+
+    /**
+     * Whether the member is declared in a class nested in the class that binds it, which is how a Kotlin class
+     * binds the members of its companion object.
+     */
+    private static boolean isCompanionMember(Binding member) {
+        if (member.namespace == Namespace.TYPE || !(member.getTree() instanceof J.Identifier)) {
+            return false;
+        }
+        for (Cursor c = member.cursor.getParent(); c != null && !isTree(c, member.scope); c = c.getParent()) {
+            if (c.getValue() instanceof J.ClassDeclaration) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
