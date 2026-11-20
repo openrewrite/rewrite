@@ -40,6 +40,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.BiFunction;
 
+import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
 
@@ -91,12 +92,29 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
     @Override
     public Toml.Document visitDocument(TomlParser.DocumentContext ctx) {
         List<TomlValue> elements = new ArrayList<>();
+        // A table rule matches only its header, so each key-value goes to the table whose header precedes it
+        Toml.@Nullable Table table = null;
+        List<TomlRightPadded<Toml>> tableValues = new ArrayList<>();
         for (TomlParser.ExpressionContext expr: ctx.expression()) {
             TomlValue element = (TomlValue) visit(expr);
             //noinspection ConstantValue
-            if (element != null) {
+            if (element == null) {
+                continue;
+            }
+            if (element instanceof Toml.Table) {
+                if (table != null) {
+                    elements.add(table.getPadding().withValues(tableValues));
+                    tableValues = new ArrayList<>();
+                }
+                table = (Toml.Table) element;
+            } else if (table != null) {
+                tableValues.add(TomlRightPadded.build(element));
+            } else {
                 elements.add(element);
             }
+        }
+        if (table != null) {
+            elements.add(table.getPadding().withValues(tableValues));
         }
 
         return new Toml.Document(
@@ -420,19 +438,12 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
             sourceBefore("[");
             Toml.Identifier tableName = visitKey(c.key());
             TomlRightPadded<Toml.Identifier> nameRightPadded = TomlRightPadded.build(tableName).withAfter(sourceBefore("]"));
-
-            List<TomlParser.KeyValueContext> values = c.keyValue();
-            List<TomlRightPadded<Toml>> elements = new ArrayList<>();
-            for (TomlParser.KeyValueContext value : values) {
-                elements.add(TomlRightPadded.build(visit(value)));
-            }
-
             return new Toml.Table(
                     randomId(),
                     prefix,
                     Markers.EMPTY,
                     nameRightPadded,
-                    elements
+                    emptyList()
             );
         });
     }
@@ -443,19 +454,12 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
             sourceBefore("[[");
             Toml.Identifier tableName = visitKey(c.key());
             TomlRightPadded<Toml.Identifier> nameRightPadded = TomlRightPadded.build(tableName).withAfter(sourceBefore("]]"));
-
-            List<TomlParser.KeyValueContext> values = c.keyValue();
-            List<TomlRightPadded<Toml>> elements = new ArrayList<>();
-            for (TomlParser.KeyValueContext value : values) {
-                elements.add(TomlRightPadded.build(visit(value)));
-            }
-
             return new Toml.Table(
                     randomId(),
                     prefix,
                     Markers.build(singletonList(new ArrayTable(randomId()))),
                     nameRightPadded,
-                    elements
+                    emptyList()
             );
         });
     }

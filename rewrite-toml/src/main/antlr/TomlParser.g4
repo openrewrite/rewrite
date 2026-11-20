@@ -122,8 +122,10 @@ table
     | arrayTable
     ;
 
+// A table rule matches only its header, and the key-values after it are the document's own expressions.
+// So no prediction has to choose between the table and the document, and a key-value needs a line of its own.
 standardTable
-    : L_BRACKET key R_BRACKET (commentOrNl* keyValue)*
+    : L_BRACKET key R_BRACKET
     ;
 
 inlineTable
@@ -132,5 +134,5 @@ inlineTable
     ;
 
 arrayTable
-    : DOUBLE_L_BRACKET key DOUBLE_R_BRACKET (commentOrNl* keyValue)*
+    : DOUBLE_L_BRACKET key DOUBLE_R_BRACKET
     ;
