@@ -24,7 +24,7 @@ public class ByteOrderMarkTests : RewriteTest
     public void LeadingByteOrderMarkSetsCharsetBomMarked()
     {
         // given
-        var source = "﻿class Foo { }";
+        var source = "\uFEFFclass Foo { }";
 
         // when
         var cu = new CSharpParser().Parse(source);
@@ -36,10 +36,24 @@ public class ByteOrderMarkTests : RewriteTest
     }
 
     [Fact]
+    public void LeadingByteOrderMarkWithSemanticModelOfTheSameText()
+    {
+        // given
+        var source = "\uFEFFclass Foo { int Bar() => 1; }";
+
+        // when
+        var cu = Parse(source);
+
+        // then
+        Assert.True(cu.CharsetBomMarked);
+        Assert.Equal("class Foo { int Bar() => 1; }", new CSharpPrinter<int>().Print(cu));
+    }
+
+    [Fact]
     public void RoundTripsByteOrderMark()
     {
         RewriteRun(
-            CSharp("﻿class Foo { }")
+            CSharp("\uFEFFclass Foo { }")
         );
     }
 
@@ -48,7 +62,7 @@ public class ByteOrderMarkTests : RewriteTest
     {
         RewriteRun(
             CSharp(
-                "﻿" +
+                "\uFEFF" +
                 """
                 #if DEBUG
                 class Foo { }
@@ -63,7 +77,7 @@ public class ByteOrderMarkTests : RewriteTest
     {
         RewriteRun(
             spec => spec.SetReferenceAssemblies(Assemblies.Net90),
-            CSharp("﻿class Foo { int Bar() => 1; }")
+            CSharp("\uFEFFclass Foo { int Bar() => 1; }")
         );
     }
 }

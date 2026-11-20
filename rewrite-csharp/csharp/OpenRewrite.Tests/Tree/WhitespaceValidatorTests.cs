@@ -902,6 +902,19 @@ public class WhitespaceValidatorTests
     }
 
     [Fact]
+    public void EndifLineInsideRawStringLiteral()
+    {
+        AssertNoViolations(
+            """"
+            class Foo {
+                string s = """
+            #endif
+            """;
+            }
+            """");
+    }
+
+    [Fact]
     public void ByteOrderMark()
     {
         AssertNoViolations("\uFEFFclass Foo { }");
