@@ -112,7 +112,7 @@ public class WhitespaceValidator : CSharpVisitor<List<WhitespaceViolation>>
 
     private static bool IsCSharpWhitespace(char c) => c switch
     {
-        '\t' or '\v' or '\f' or '\r' or '\n' or '\u0085' or '\u2028' or '\u2029' => true,
+        ' ' or '\t' or '\v' or '\f' or '\r' or '\n' or '\u0085' or '\u2028' or '\u2029' or '\ufeff' or '\u001A' => true,
         _ => char.GetUnicodeCategory(c) == System.Globalization.UnicodeCategory.SpaceSeparator
     };
 

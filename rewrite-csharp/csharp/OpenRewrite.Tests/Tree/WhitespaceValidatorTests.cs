@@ -1065,4 +1065,10 @@ public class WhitespaceValidatorTests
     {
         AssertNoViolations("class Foo\u2028{\u2029int x;\u0085}");
     }
+
+    [Fact]
+    public void ByteOrderMarkAndControlZTreatedAsWhitespaceByRoslyn()
+    {
+        AssertNoViolations("class Foo {\ufeff}\n\u001A");
+    }
 }

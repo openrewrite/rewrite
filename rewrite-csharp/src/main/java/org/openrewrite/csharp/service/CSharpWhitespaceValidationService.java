@@ -39,6 +39,7 @@ public class CSharpWhitespaceValidationService implements WhitespaceValidationSe
         for (int i = 0; i < whitespace.length(); i++) {
             char c = whitespace.charAt(i);
             switch (c) {
+                case ' ':
                 case '\t':
                 case '\u000B':
                 case '\f':
@@ -47,6 +48,8 @@ public class CSharpWhitespaceValidationService implements WhitespaceValidationSe
                 case '\u0085':
                 case '\u2028':
                 case '\u2029':
+                case '\ufeff':
+                case '\u001A':
                     continue;
                 default:
                     if (Character.getType(c) != Character.SPACE_SEPARATOR) {

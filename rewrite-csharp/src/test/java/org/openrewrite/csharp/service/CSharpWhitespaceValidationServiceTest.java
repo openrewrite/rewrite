@@ -30,7 +30,7 @@ import static org.openrewrite.Tree.randomId;
 class CSharpWhitespaceValidationServiceTest {
 
     @ParameterizedTest
-    @ValueSource(strings = {" \t\f\u000B\r\n", " ", " ", " ", "　", "\u0085", " ", " "})
+    @ValueSource(strings = {" \t\f\u000B\r\n", "\u00A0", "\u2007", "\u202F", "\u3000", "\u0085", "\u2028", "\u2029", "\uFEFF", "\u001A"})
     void acceptsCSharpWhitespace(String whitespace) {
         // given
         J.Identifier ident = identifier(whitespace);
@@ -43,7 +43,7 @@ class CSharpWhitespaceValidationServiceTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"x", " ;", "​", "﻿"})
+    @ValueSource(strings = {"x", " ;", "\u200B", "\u001C"})
     void rejectsNonWhitespace(String whitespace) {
         // given
         J.Identifier ident = identifier(whitespace);
