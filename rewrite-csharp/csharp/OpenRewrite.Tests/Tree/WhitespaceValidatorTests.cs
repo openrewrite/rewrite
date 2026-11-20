@@ -1047,4 +1047,28 @@ public class WhitespaceValidatorTests
             class Foo { }
             """);
     }
+
+    [Fact]
+    public void NonBreakingSpace()
+    {
+        AssertNoViolations("class\u00A0Foo\u00A0{\u00A0int\u00A0x;\u00A0}");
+    }
+
+    [Fact]
+    public void UnicodeSpaceSeparators()
+    {
+        AssertNoViolations("class\u2002Foo\u3000{\u202Fint\u2009x;\u1680}");
+    }
+
+    [Fact]
+    public void UnicodeLineSeparators()
+    {
+        AssertNoViolations("class Foo\u2028{\u2029int x;\u0085}");
+    }
+
+    [Fact]
+    public void ByteOrderMarkAndControlZTreatedAsWhitespaceByRoslyn()
+    {
+        AssertNoViolations("class Foo {\ufeff}\n\u001A");
+    }
 }
