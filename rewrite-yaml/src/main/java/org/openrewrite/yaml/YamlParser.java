@@ -861,6 +861,14 @@ public class YamlParser implements org.openrewrite.Parser {
                 result.append('#');
                 result.append(lineContent, start, lineContent.length());
                 commentedUuids.add(firstUuid);
+            } else if ((firstUuid = templatesOutputtingEntries(source, i, lineEnd, helmUuids)) != null) {
+                // The templates end a "key:" line and more entries for the key follow, so the templates output
+                // entries too. Commenting them out leaves "key:" holding the entries written in the file
+                int start = lineContent.indexOf(firstUuid);
+                result.append(lineContent, 0, start);
+                result.append('#');
+                result.append(lineContent, start, lineContent.length());
+                commentedUuids.add(firstUuid);
             } else {
                 result.append(lineContent);
                 if (isBlockScalarIndicator(trimmed)) {
@@ -897,6 +905,95 @@ public class YamlParser implements org.openrewrite.Parser {
             i = end;
         }
         return first;
+    }
+
+    /**
+     * Finds Helm templates that output mapping or sequence entries in place of a key's value, as in Bitnami's
+     * <pre>
+     * labels: {{- include "common.labels.standard" . | nindent 4 }}
+     *   app.kubernetes.io/component: broker
+     * </pre>
+     * where the template outputs the standard labels and the line below adds another. With the template as a
+     * placeholder value, the entry below it is invalid YAML. A sequence entry such as
+     * {@code - {{ toYaml $constraint | nindent 8 | trim }}}, with more of the item's entries below it, is the same.
+     *
+     * @return the first placeholder, if the line is a {@code key:} or {@code -} followed only by placeholders, and
+     * the next line holding anything else is indented further than the key or dash and holds a mapping or sequence
+     * entry; otherwise null
+     */
+    private static @Nullable String templatesOutputtingEntries(String source, int lineStart, int lineEnd,
+                                                               Set<String> helmUuids) {
+        String line = source.substring(lineStart, lineEnd);
+        int keyColumn = keyColumn(line);
+        // The entries that follow must be indented further than this
+        int parentColumn = keyColumn;
+        String first = null;
+        for (int colon = line.indexOf(':', keyColumn); colon >= 0; colon = line.indexOf(':', colon + 1)) {
+            if (colon + 1 < line.length() && (line.charAt(colon + 1) == ' ' || line.charAt(colon + 1) == '\t')) {
+                first = onlyHelmUuids(line.substring(colon + 1).trim(), helmUuids);
+                if (first != null) {
+                    break;
+                }
+            }
+        }
+        if (first == null && keyColumn > leadingSpaceCount(line)) {
+            // A sequence entry, "- {{ toYaml . }}", whose templates output the first of the item's entries
+            first = onlyHelmUuids(line.substring(keyColumn).trim(), helmUuids);
+            parentColumn = line.lastIndexOf('-', keyColumn);
+        }
+        if (first == null) {
+            return null;
+        }
+
+        int i = lineEnd;
+        while (i < source.length()) {
+            while (i < source.length() && (source.charAt(i) == '\n' || source.charAt(i) == '\r')) {
+                i++;
+            }
+            int nextEnd = i;
+            while (nextEnd < source.length() && source.charAt(nextEnd) != '\n' && source.charAt(nextEnd) != '\r') {
+                nextEnd++;
+            }
+            String next = source.substring(i, nextEnd);
+            String trimmed = next.trim();
+            if (trimmed.isEmpty() || trimmed.startsWith("#") || onlyHelmUuids(trimmed, helmUuids) != null) {
+                i = nextEnd;
+                continue;
+            }
+            return leadingSpaceCount(next) > parentColumn && isEntry(trimmed) ? first : null;
+        }
+        return null;
+    }
+
+    /**
+     * The column of a line's first mapping key or value, after its indent and any sequence entry dashes.
+     */
+    private static int keyColumn(String line) {
+        int i = leadingSpaceCount(line);
+        while (i < line.length() && line.charAt(i) == '-' &&
+               (i + 1 == line.length() || line.charAt(i + 1) == ' ' || line.charAt(i + 1) == '\t')) {
+            i++;
+            while (i < line.length() && (line.charAt(i) == ' ' || line.charAt(i) == '\t')) {
+                i++;
+            }
+        }
+        return i;
+    }
+
+    /**
+     * Whether a trimmed line starts a sequence entry or holds a mapping key, which cannot continue a plain scalar.
+     */
+    private static boolean isEntry(String trimmedLine) {
+        if ("-".equals(trimmedLine) || trimmedLine.startsWith("- ") || trimmedLine.startsWith("-\t")) {
+            return true;
+        }
+        for (int colon = trimmedLine.indexOf(':'); colon >= 0; colon = trimmedLine.indexOf(':', colon + 1)) {
+            if (colon + 1 == trimmedLine.length() || trimmedLine.charAt(colon + 1) == ' ' ||
+                trimmedLine.charAt(colon + 1) == '\t') {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
