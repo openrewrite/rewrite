@@ -18,6 +18,7 @@ package org.openrewrite.kotlin;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.java.ShortenFullyQualifiedTypeReferences;
+import org.openrewrite.java.ShortenFullyQualifiedTypeReferencesSafely;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -31,6 +32,20 @@ class ShortenFullyQualifiedTypeReferencesKotlinTest implements RewriteTest {
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/8237")
+    @Test
+    void safeRecipeSkipsKotlin() {
+        rewriteRun(
+          spec -> spec.recipe(new ShortenFullyQualifiedTypeReferencesSafely()),
+          kotlin(
+            """
+              class T {
+                  val list: java.util.List<String>? = null
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void doesNotShortenNestedTypeReachedViaImportedOuter() {
         rewriteRun(
