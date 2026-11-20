@@ -19,7 +19,7 @@ import {randomId} from "../uuid";
 import {JS} from "./tree";
 import {ResolvedNames} from "./markers";
 import {JavaScriptTypeMapping} from "./type-mapping";
-import {moduleName} from "./package-name";
+import {moduleName, moduleOfFile} from "./package-name";
 
 /** A lone surrogate prints as a six character `\uXXXX` escape in place of its one code unit. */
 const ESCAPED_SURROGATE_GROWTH = 5;
@@ -551,7 +551,7 @@ export class JavaScriptNameResolver {
             const relative = path.relative(root, path.resolve(root, file)).replace(/\\/g, "/");
             if (!relative.startsWith("../") && !path.isAbsolute(relative)) {
                 return sourceFile?.isDeclarationFile ? this.mappedPlace(file, root, null, false) :
-                    {module: withoutExtension(relative), file: relative, pkg: null, external: false};
+                    {module: moduleOfFile(relative), file: relative, pkg: null, external: false};
             }
         }
         return undefined;
@@ -563,7 +563,7 @@ export class JavaScriptNameResolver {
             this.mappings.set(root, mapping = new JavaScriptTypeMapping(this.checker, root, true));
         }
         const relative = path.relative(root, file).replace(/\\/g, "/");
-        return {module: withoutExtension(relative), file: relative, pkg, external, mapping};
+        return {module: moduleOfFile(relative), file: relative, pkg, external, mapping};
     }
 
     private packageNameAt(directory: string): string | undefined {
@@ -572,10 +572,6 @@ export class JavaScriptNameResolver {
         }
         return this.packageNames.get(directory);
     }
-}
-
-function withoutExtension(file: string): string {
-    return file.replace(/\.[^/.]+$/, "");
 }
 
 function moduleTarget(place: Place): Target {
