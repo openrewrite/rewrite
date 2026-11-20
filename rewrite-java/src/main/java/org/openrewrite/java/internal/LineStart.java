@@ -39,7 +39,8 @@ public final class LineStart {
      * original was, and the formatted code still starts its line, the line keeps that indentation. When the code was
      * given the original's comments, they keep their text and indentation too; comments the code was given instead
      * keep their formatting. Code given another indentation, as code moved elsewhere or given a fresh line break is,
-     * keeps the formatter's. The formatter keeps the blank lines it chose above the line.
+     * keeps the formatter's. Blank lines above the line, when the code was given them as they were, keep their bytes:
+     * how many there are and the whitespace on them. Above a line that had none, the formatter chooses the blank lines.
      */
     public static Space keep(Space formatted, Space original, Space given) {
         if (!startsLine(original) || !startsLine(given) || !startsLine(formatted) ||
@@ -50,7 +51,10 @@ public final class LineStart {
             String whitespace = original.getWhitespace();
             String formattedWhitespace = formatted.getWhitespace();
             int lastBreak = whitespace.lastIndexOf('\n');
-            if (lastBreak >= 0 && formattedWhitespace.indexOf('\n') >= 0) {
+            // blank lines the code was given as they were are the file's, not the recipe's
+            boolean blankLinesAsTheyWere = whitespace.indexOf('\n') != lastBreak &&
+                                           whitespace.equals(given.getWhitespace());
+            if (lastBreak >= 0 && formattedWhitespace.indexOf('\n') >= 0 && !blankLinesAsTheyWere) {
                 String lineBreak = whitespace.contains("\r\n") ? "\r\n" : "\n";
                 int breaks = (int) formattedWhitespace.chars().filter(c -> c == '\n').count();
                 whitespace = repeat(lineBreak, breaks) + whitespace.substring(lastBreak + 1);
