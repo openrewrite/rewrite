@@ -120,9 +120,61 @@ public class SourceSpecHooksTests : RewriteTest
             spec => spec
                 .SetRecipe(new RenameCalls("Foo", "Bar"))
                 .ExpectResults(results => Assert.Equal(["A.cs"], results.Select(r => r.After!.SourcePath))),
-            CSharp(Calls("Foo", "A"), Calls("Bar", "A")) with { SourcePath = "A.cs" },
-            CSharp(Calls("Bar", "B")) with { SourcePath = "B.cs" }
+            CSharp(Calls("Foo", "A"), Calls("Bar", "A"), "A.cs"),
+            CSharp(Calls("Bar", "B"), sourcePath: "B.cs")
         );
+    }
+
+    [Fact]
+    public void ACSharpSourceIsAtThePathTheTestGivesIt()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new RenameCalls("Foo", "Bar")),
+            CSharp(Calls("Foo"), actual => Calls("Bar"), "src/App/Program.cs")
+                .AfterRecipe(cu => Assert.Equal("src/App/Program.cs", cu.SourcePath))
+        );
+    }
+
+    [Theory]
+    [InlineData("Foo")]
+    [InlineData("Bar")]
+    public void AnAfterFunctionSaysWhetherTheRecipeChangesTheSource(string called)
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new RenameCalls("Foo", "Bar")),
+            CSharp(Calls(called), actual => called == "Foo" ? actual.Replace("Foo();", "Bar();") : null)
+        );
+    }
+
+    [Fact]
+    public void AnAfterFunctionThatExpectsNoChangeFailsWhenTheRecipeChangesTheSource()
+    {
+        var failure = Assert.Throws<TrueException>(() => RewriteRun(
+            spec => spec.SetRecipe(new RenameCalls("Foo", "Bar")),
+            CSharp(Calls("Foo"), _ => null)
+        ));
+
+        Assert.StartsWith("Recipe made unexpected changes to a source file that was not expected to change.",
+            failure.Message);
+    }
+
+    [Fact]
+    public void AnAfterFunctionThatExpectsAChangeFailsWhenTheRecipeLeavesTheSourceAlone()
+    {
+        var failure = Assert.Throws<TrueException>(() => RewriteRun(
+            spec => spec.SetRecipe(new RenameCalls("Foo", "Bar")),
+            CSharp(Calls("Bar"), actual => actual)
+        ));
+
+        Assert.StartsWith("Recipe was expected to make changes but did not modify the source file.", failure.Message);
+    }
+
+    [Fact]
+    public void ACSharpSourceIsAtAPathThatEndsInCs()
+    {
+        var failure = Assert.Throws<ArgumentException>(() => CSharp(Calls("Foo"), sourcePath: "Program.csx"));
+
+        Assert.StartsWith("A C# source is parsed here at a path that ends in .cs, not Program.csx.", failure.Message);
     }
 
     [Theory]

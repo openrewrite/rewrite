@@ -104,6 +104,13 @@ public sealed class Validations
     /// </summary>
     public bool UniqueIds { get; init; } = true;
 
+    /// <summary>
+    /// Whether the recipe is validated to edit each source file it changes rather than make another one of it: one with
+    /// the same id, path, charset and byte order mark, and the very <see cref="OpenRewrite.Core.Markers"/> it had.
+    /// Default: disabled, since a recipe may move a file or mark it with a search result.
+    /// </summary>
+    public bool SourceFileIdentity { get; init; }
+
     /// <summary>All validations enabled with default settings.</summary>
     public static Validations All { get; } = new();
 

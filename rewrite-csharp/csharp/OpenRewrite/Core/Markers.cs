@@ -85,6 +85,32 @@ public sealed class Markers(Guid id, IList<Marker> markerList) : IRpcCodec<Marke
     public Markers Add(Marker marker) =>
         new(Id, [..MarkerList, marker]);
 
+    /// <summary>
+    /// The markers with <paramref name="marker"/> in place of those of its exact type, or added when there are none.
+    /// </summary>
+    public Markers SetByType(Marker marker)
+    {
+        var markers = new List<Marker>(MarkerList.Count + 1);
+        var replaced = false;
+        foreach (var existing in MarkerList)
+        {
+            if (existing.GetType() != marker.GetType())
+            {
+                markers.Add(existing);
+            }
+            else if (!replaced)
+            {
+                markers.Add(marker);
+                replaced = true;
+            }
+        }
+        if (!replaced)
+        {
+            markers.Add(marker);
+        }
+        return new(Id, markers);
+    }
+
     public Markers Remove<T>() where T : Marker =>
         new(Id, MarkerList.Where(m => m is not T).ToList());
 

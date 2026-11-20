@@ -53,6 +53,17 @@ public class CompilesTests : RewriteTest
         }
         """;
 
+    private const string Hashing =
+        """
+        using static System.HashCode;
+
+        class C
+        {
+            int Foo(int a, int b) => a ^ b;
+            int M(int a, int b) => Foo(a, b);
+        }
+        """;
+
     [Fact]
     public void OutputThatCompilesPasses()
     {
@@ -115,6 +126,18 @@ public class CompilesTests : RewriteTest
             "namespace 'System.Runtime.Remoting' (are you missing an assembly reference?)\n" +
             "source.cs:\n" + Remoting.Replace("=> Foo(o)", "=> Bar(o)"),
             failure.Message);
+    }
+
+    [Fact]
+    public void TheRecipeRunsAgainOnItsOutputAsTheFrameworkItMigratesToBindsIt()
+    {
+        RewriteRun(
+            spec => spec
+                .SetRecipe(new CombineWhereItResolves())
+                .SetReferenceAssemblies(Assemblies.Net48)
+                .ExpectOutputCompiles(Assemblies.Net90),
+            CSharp(Hashing, Hashing.Replace("=> Foo(a, b)", "=> Combine(a, b)"))
+        );
     }
 
     [Fact]
@@ -303,6 +326,33 @@ public class CompilesTests : RewriteTest
                 return visited is MethodInvocation call && call.Name.SimpleName == from
                     ? call.WithName(call.Name.WithSimpleName(to))
                     : visited;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Renames the calls to Foo to calls to <c>HashCode.Combine</c>, and those of Combine that don't resolve back, as
+    /// on a framework without it.
+    /// </summary>
+    private class CombineWhereItResolves : global::OpenRewrite.Core.Recipe
+    {
+        public override string DisplayName => "Combine where it resolves";
+        public override string Description => "Renames calls to Foo to Combine, and back where Combine doesn't resolve.";
+
+        public override ITreeVisitor<ExecutionContext> GetVisitor() => new Visitor();
+
+        private class Visitor : CSharpVisitor<ExecutionContext>
+        {
+            public override J VisitMethodInvocation(MethodInvocation method, ExecutionContext ctx)
+            {
+                var visited = base.VisitMethodInvocation(method, ctx);
+                return visited switch
+                {
+                    MethodInvocation { Name.SimpleName: "Foo" } call => call.WithName(call.Name.WithSimpleName("Combine")),
+                    MethodInvocation { Name.SimpleName: "Combine", MethodType: null } call =>
+                        call.WithName(call.Name.WithSimpleName("Foo")),
+                    _ => visited
+                };
             }
         }
     }

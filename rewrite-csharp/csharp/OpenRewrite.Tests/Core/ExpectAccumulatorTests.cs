@@ -36,8 +36,8 @@ public class ExpectAccumulatorTests : RewriteTest
                 .SetRecipe(new RenameUnlessShadowed())
                 .ExpectAccumulator<RenameUnlessShadowed.Blocked>(blocked =>
                     Assert.Equal(["Shadow.cs declares Foo"], blocked.Reasons)),
-            CSharp("class C { void M() { Foo(); } void Foo() { } }") with { SourcePath = "C.cs" },
-            CSharp("class Shadow { class Foo { } }") with { SourcePath = "Shadow.cs" }
+            CSharp("class C { void M() { Foo(); } void Foo() { } }", sourcePath: "C.cs"),
+            CSharp("class Shadow { class Foo { } }", sourcePath: "Shadow.cs")
         );
     }
 
