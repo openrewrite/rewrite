@@ -18,12 +18,14 @@ package org.openrewrite.marker;
 import lombok.Value;
 import lombok.With;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.internal.ToBeRemoved;
 
 import java.util.UUID;
 
 /// Kept only so that older recipes and LSTs still load. A recipe whose edit must not be applied
 /// twice in one run should return `1` from [org.openrewrite.Recipe#maxCycles()] instead.
 @Deprecated
+@ToBeRemoved(after = "2027-05-16", reason = "Recipes return 1 from Recipe#maxCycles() instead")
 @Value
 @With
 public class AlreadyReplaced implements Marker {
