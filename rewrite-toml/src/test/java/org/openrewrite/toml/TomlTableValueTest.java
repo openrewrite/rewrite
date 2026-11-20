@@ -16,6 +16,8 @@
 package org.openrewrite.toml;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.toml.tree.Toml;
 
 import java.util.List;
@@ -119,6 +121,18 @@ class TomlTableValueTest {
                 .returns("\"new\"", Toml.Literal::getSource);
         assertThat(print(withTableValue(document, updated)))
                 .isEqualTo("library = { group = \"org.example\", name = \"new\" }\n");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"{}", "{ }", "{ group = \"org.example\", }"})
+    void addsAfterAnEmptyTableOrATrailingComma(String inlineTable) {
+        Toml.Document document = document("library = " + inlineTable + "\n");
+
+        Toml.Table updated = TomlTableValue.withStringOrAdd(table(document), "version", "1.0.0");
+
+        assertThat(print(withTableValue(document, updated))).isEqualTo(inlineTable.contains("group") ?
+                "library = { group = \"org.example\", version = \"1.0.0\" }\n" :
+                "library = { version = \"1.0.0\" }\n");
     }
 
     @Test

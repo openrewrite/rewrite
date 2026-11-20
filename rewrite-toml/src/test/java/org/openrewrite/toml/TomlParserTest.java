@@ -18,12 +18,23 @@ package org.openrewrite.toml;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.Parser;
+import org.openrewrite.SourceFile;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.toml.tree.Toml;
 
+import java.io.ByteArrayInputStream;
+import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 
+import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.toml.Assertions.toml;
 
@@ -572,6 +583,107 @@ class TomlParserTest implements RewriteTest {
     @ValueSource(strings = {"config.toml", "uv.lock", "poetry.lock", "pdm.lock", "Pipfile", ".xmake.cfg"})
     void acceptsTomlFiles(String fileName) {
         assertThat(new TomlParser().accept(Paths.get("project", fileName))).isTrue();
+    }
+
+    @Test
+    void localDateTimeWithSpaceOrLowercaseDelimiter() {
+        rewriteRun(
+          toml(
+            """
+              a = 2017-02-25 12:00:01.123456789
+              b = 1979-05-27t07:32:00
+              c = 1979-05-27t07:32:00Z
+              d = 1979-05-27 07:32:00+01:00
+              """,
+            spec -> spec.afterRecipe(doc -> assertThat(doc.getValues())
+              .extracting(kv -> ((Toml.Literal) ((Toml.KeyValue) kv).getValue()).getValue())
+              .containsExactly(
+                LocalDateTime.of(2017, 2, 25, 12, 0, 1, 123456789),
+                LocalDateTime.of(1979, 5, 27, 7, 32),
+                OffsetDateTime.of(1979, 5, 27, 7, 32, 0, 0, ZoneOffset.UTC),
+                OffsetDateTime.of(1979, 5, 27, 7, 32, 0, 0, ZoneOffset.ofHours(1))))
+          )
+        );
+    }
+
+    @Test
+    void fractionalSecondsBeyondNanosecondsAreTruncated() {
+        rewriteRun(
+          toml(
+            """
+              a = 1979-05-27T07:32:00.1234567899Z
+              b = 1979-05-27 07:32:00.1234567899
+              c = 07:32:00.1234567899
+              """,
+            spec -> spec.afterRecipe(doc -> assertThat(doc.getValues())
+              .extracting(kv -> ((Toml.Literal) ((Toml.KeyValue) kv).getValue()).getValue())
+              .containsExactly(
+                OffsetDateTime.of(1979, 5, 27, 7, 32, 0, 123456789, ZoneOffset.UTC),
+                LocalDateTime.of(1979, 5, 27, 7, 32, 0, 123456789),
+                LocalTime.of(7, 32, 0, 123456789)))
+          )
+        );
+    }
+
+    @Test
+    void emptyInlineTableKeepsItsSpace() {
+        rewriteRun(
+          toml(
+            """
+              dev-dependencies = { }
+              coverageThreshold = {}
+              headers = {  }
+              """
+          )
+        );
+    }
+
+    @Test
+    void integerBeyondSixtyFourBits() {
+        rewriteRun(
+          toml(
+            """
+              hex = 0x3D8660C0CB2D57B189C3D7995572A552F75E48B5
+              dec = 228097355113300204138531148905234651262148041026195375645000724271212049151994375092458297304264351187709081232384
+              max = 9223372036854775807
+              min = -9223372036854775808
+              """,
+            spec -> spec.afterRecipe(doc -> assertThat(doc.getValues())
+              .extracting(kv -> ((Toml.Literal) ((Toml.KeyValue) kv).getValue()).getValue())
+              .containsExactly(
+                new BigInteger("3D8660C0CB2D57B189C3D7995572A552F75E48B5", 16),
+                new BigInteger("228097355113300204138531148905234651262148041026195375645000724271212049151994375092458297304264351187709081232384"),
+                Long.MAX_VALUE,
+                Long.MIN_VALUE))
+          )
+        );
+    }
+
+    @Test
+    void fileNotInUtf8() {
+        String source = "[default]\nencoded_variable=\"accents like ç and ã é\"\n";
+        Parser.Input input = new Parser.Input(Paths.get("settings.toml"),
+          () -> new ByteArrayInputStream(source.getBytes(StandardCharsets.ISO_8859_1)));
+
+        SourceFile parsed = new TomlParser().parseInputs(singletonList(input), null, new InMemoryExecutionContext())
+          .findFirst().orElseThrow();
+
+        assertThat(parsed).isInstanceOf(Toml.Document.class);
+        assertThat(parsed.printAll()).isEqualTo(source);
+    }
+
+    @Test
+    void dottedKeyWithCharactersOutsideTheBasicMultilingualPlane() {
+        rewriteRun(
+          toml(
+            """
+              ['😀'.sub]
+              a = 1
+              ["𝐭𝐛𝐥".b."😀"]
+              c = 2
+              """
+          )
+        );
     }
 
     @ParameterizedTest
