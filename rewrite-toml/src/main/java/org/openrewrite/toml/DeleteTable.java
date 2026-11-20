@@ -59,7 +59,7 @@ public class DeleteTable extends Recipe {
             @Override
             public @Nullable Toml visitTable(Toml.Table table, ExecutionContext ctx) {
                 Toml.Table t = (Toml.Table) super.visitTable(table, ctx);
-                if (t.getName() != null && tableName.equals(t.getName().getName())) {
+                if (TableRowMatcher.isNamed(t, tableName)) {
                     return null;
                 }
                 return t;

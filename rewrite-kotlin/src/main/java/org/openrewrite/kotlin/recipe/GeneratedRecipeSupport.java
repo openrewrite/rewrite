@@ -37,6 +37,7 @@ import org.openrewrite.java.tree.JContainer;
 import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.kotlin.KotlinTemplate;
 import org.openrewrite.kotlin.KotlinVisitor;
@@ -466,12 +467,88 @@ public final class GeneratedRecipeSupport {
                 }
                 J result = KotlinTemplate.builder(afterTemplate).build()
                         .apply(getCursor(), fieldAccess.getCoordinates().replace(), substitutions);
-                J inserted = result.withPrefix(fieldAccess.getPrefix());
+                J inserted = attributed(result.withPrefix(fieldAccess.getPrefix()));
                 doAfterVisit(shortenTemplateTypes(this, inserted, substitutions));
                 return inserted;
             }
         };
         return wrapWithPrecondition(matcherSpecsLines, walker);
+    }
+
+    // The template stub is compiled without the recipe target's own classes, so a property it reads on one of
+    // them is left untyped; attribute it from the receiver's type. A property whose type cannot be resolved for
+    // this receiver, such as one declared in terms of an unbound type variable, stays untyped.
+    private static J attributed(J j) {
+        if (!(j instanceof J.FieldAccess) || TypeUtils.isWellFormedType(((J.FieldAccess) j).getType())) {
+            return j;
+        }
+        J.FieldAccess fieldAccess = (J.FieldAccess) j;
+        JavaType.Variable member = findMember(TypeUtils.asFullyQualified(fieldAccess.getTarget().getType()),
+                fieldAccess.getSimpleName(), new HashSet<>());
+        if (member == null) {
+            return j;
+        }
+        return fieldAccess
+                .withName(fieldAccess.getName().withType(member.getType()).withFieldType(member))
+                .withType(member.getType());
+    }
+
+    private static JavaType.@Nullable Variable findMember(JavaType.@Nullable FullyQualified type, String name,
+                                                          Set<String> visited) {
+        if (type == null || !visited.add(type.getFullyQualifiedName())) {
+            return null;
+        }
+        for (JavaType.Variable member : type.getMembers()) {
+            if (member.getName().equals(name)) {
+                JavaType memberType = substitute(member.getType(), type);
+                return memberType == null ? null : new JavaType.Variable(null, member.getFlagsBitMap(),
+                        member.getName(), member.getOwner(), memberType, member.getAnnotations());
+            }
+        }
+        JavaType.Variable inherited = findMember(type.getSupertype(), name, visited);
+        List<JavaType.FullyQualified> interfaces = type.getInterfaces();
+        for (int i = 0; inherited == null && i < interfaces.size(); i++) {
+            inherited = findMember(interfaces.get(i), name, visited);
+        }
+        return inherited;
+    }
+
+    private static @Nullable JavaType substitute(@Nullable JavaType type, JavaType.FullyQualified receiver) {
+        if (type instanceof JavaType.GenericTypeVariable) {
+            if (!(receiver instanceof JavaType.Parameterized)) {
+                return null;
+            }
+            JavaType.Parameterized parameterized = (JavaType.Parameterized) receiver;
+            List<JavaType> declared = parameterized.getType().getTypeParameters();
+            List<JavaType> arguments = parameterized.getTypeParameters();
+            for (int i = 0; i < declared.size() && i < arguments.size(); i++) {
+                if (declared.get(i) instanceof JavaType.GenericTypeVariable &&
+                    ((JavaType.GenericTypeVariable) declared.get(i)).getName()
+                            .equals(((JavaType.GenericTypeVariable) type).getName())) {
+                    JavaType argument = arguments.get(i);
+                    return argument instanceof JavaType.GenericTypeVariable ? null : argument;
+                }
+            }
+            return null;
+        } else if (type instanceof JavaType.Parameterized) {
+            JavaType.Parameterized parameterized = (JavaType.Parameterized) type;
+            List<JavaType> arguments = new ArrayList<>(parameterized.getTypeParameters().size());
+            for (JavaType argument : parameterized.getTypeParameters()) {
+                JavaType substituted = substitute(argument, receiver);
+                if (substituted == null) {
+                    return null;
+                }
+                arguments.add(substituted);
+            }
+            return arguments.equals(parameterized.getTypeParameters()) ? parameterized :
+                    new JavaType.Parameterized(null, parameterized.getType(), arguments);
+        } else if (type instanceof JavaType.Array) {
+            JavaType.Array array = (JavaType.Array) type;
+            JavaType elemType = substitute(array.getElemType(), receiver);
+            return elemType == null ? null : elemType == array.getElemType() ? array :
+                    new JavaType.Array(null, elemType, array.getAnnotations().toArray(new JavaType.FullyQualified[0]));
+        }
+        return type;
     }
 
     /**

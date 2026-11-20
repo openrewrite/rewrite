@@ -121,7 +121,7 @@ public class Assertions {
             List<FindMissingTypes.MissingTypeResult> missingTypeResults = FindMissingTypes.findMissingTypes(sf, true);
             missingTypeResults = missingTypeResults.stream()
                     .filter(missingType -> {
-                        if (missingType.getJ() instanceof J.Identifier) {
+                        if (missingType.getJ() instanceof J.Identifier || missingType.getJ() instanceof J.FieldAccess) {
                             return typeValidation.identifiers();
                         } else if (missingType.getJ() instanceof J.ClassDeclaration) {
                             return typeValidation.classDeclarations();

@@ -21,8 +21,11 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.toml.internal.TomlKeyParts;
 import org.openrewrite.toml.internal.TomlString;
 import org.openrewrite.toml.tree.Toml;
+
+import java.util.List;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -64,9 +67,21 @@ public class ChangeKey extends Recipe {
 
                     String formattedKey = newKeyName.matches("^[A-Za-z0-9_-]+$") ? newKeyName :
                             "\"" + TomlString.quoteBasic(newKeyName) + "\"";
-                    return kv.withKey(((Toml.Identifier) kv.getKey())
-                            .withName(newKeyName)
-                            .withSource(formattedKey));
+                    Toml.Identifier key = (Toml.Identifier) kv.getKey();
+                    List<int[]> parts = TomlKeyParts.ranges(key.getSource());
+                    if (parts.size() == 1) {
+                        return kv.withKey(key.withName(newKeyName).withSource(formattedKey));
+                    }
+                    // Rename the last part of a dotted key, so `package.name` stays in `package`
+                    String source = key.getSource();
+                    int[] last = parts.get(parts.size() - 1);
+                    StringBuilder name = new StringBuilder();
+                    for (int i = 0; i < parts.size() - 1; i++) {
+                        name.append(source, parts.get(i)[0], parts.get(i)[1]).append('.');
+                    }
+                    return kv.withKey(key
+                            .withName(name.append(formattedKey).toString())
+                            .withSource(source.substring(0, last[0]) + formattedKey + source.substring(last[1])));
                 }
 
                 return kv;

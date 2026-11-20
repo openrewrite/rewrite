@@ -282,7 +282,7 @@ public class GradleParser implements Parser {
     private List<Path> defaultClasspath(@Nullable Path relativeTo, ExecutionContext ctx) {
         if (defaultClasspath == null) {
             String gradleVersion = base.gradleVersion != null ? base.gradleVersion : wrapperGradleVersion(relativeTo);
-            defaultClasspath = JavaParser.dependenciesFromResources(ctx,
+            defaultClasspath = OwnTypeTable.load(ctx,
                     "gradle-public-api-" + gradleApiMajor(gradleVersion) + ".",
                     "develocity-gradle-plugin");
         }
@@ -295,8 +295,20 @@ public class GradleParser implements Parser {
      */
     private static List<Path> withKotlinDslAccessors(Collection<Path> classpath, ExecutionContext ctx) {
         List<Path> withAccessors = new ArrayList<>(classpath);
-        withAccessors.addAll(JavaParser.dependenciesFromResources(ctx, "gradle-kotlin-dsl-accessors"));
+        withAccessors.addAll(OwnTypeTable.load(ctx, "gradle-kotlin-dsl-accessors"));
         return withAccessors;
+    }
+
+    /**
+     * Calls {@link JavaParser#dependenciesFromResources}, which reads the type tables of its caller's class loader and
+     * skips parsers and parser builders when it looks for the caller. From here it reads this jar's table, which matches
+     * the artifact names this parser asks for. Whatever calls the parser may come from another jar, such as a recipe in
+     * its own class loader.
+     */
+    private static final class OwnTypeTable {
+        static List<Path> load(ExecutionContext ctx, String... artifactNames) {
+            return JavaParser.dependenciesFromResources(ctx, artifactNames);
+        }
     }
 
     static @Nullable String wrapperGradleVersion(@Nullable Path projectDir) {

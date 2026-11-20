@@ -199,4 +199,23 @@ class ChangeKeyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void renameTheLastPartOfADottedKey() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeKey("package.name", "title")),
+          toml(
+            """
+              package.name = "x"
+              package . name = "y"
+              "package".name = "z"
+              """,
+            """
+              package.title = "x"
+              package . title = "y"
+              "package".title = "z"
+              """
+          )
+        );
+    }
 }

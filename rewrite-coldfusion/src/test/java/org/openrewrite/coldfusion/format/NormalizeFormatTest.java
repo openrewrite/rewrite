@@ -22,6 +22,7 @@ import org.openrewrite.coldfusion.ColdFusionParser;
 import org.openrewrite.coldfusion.tree.Cf;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Space;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
 
 import static java.util.Collections.emptyList;
@@ -34,7 +35,9 @@ class NormalizeFormatTest implements RewriteTest {
     @Test
     void removedModifierLeavesItsSpaceWithTheFunction() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new ColdFusionIsoVisitor<>() {
+          // normalizing moves the removed modifier's space into the function's prefix, which deepens its line
+          spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().keepEditedLineIndentation(false).build())
+            .recipe(toRecipe(() -> new ColdFusionIsoVisitor<>() {
               @Override
               public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
                   J.MethodDeclaration m = super.visitMethodDeclaration(method, ctx);

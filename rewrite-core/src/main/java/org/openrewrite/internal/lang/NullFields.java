@@ -35,7 +35,7 @@ import java.lang.annotation.*;
 @Target({ElementType.PACKAGE, ElementType.TYPE})
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
-@org.jspecify.annotations.Nullable
+@Nullable
 @TypeQualifierDefault(ElementType.FIELD)
 public @interface NullFields {
 }

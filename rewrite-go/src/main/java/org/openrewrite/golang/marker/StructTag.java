@@ -46,7 +46,7 @@ public class StructTag implements Marker, RpcCodec<StructTag> {
         if (before.getTag() != null) {
             tag = before.getTag().withValueSource(valueSource);
         } else if (valueSource != null) {
-            tag = new J.Literal(java.util.UUID.randomUUID(),
+            tag = new J.Literal(UUID.randomUUID(),
                     org.openrewrite.java.tree.Space.EMPTY, org.openrewrite.marker.Markers.EMPTY,
                     valueSource, valueSource, null, org.openrewrite.java.tree.JavaType.Primitive.String);
         } else {

@@ -24,13 +24,13 @@ namespace OpenRewrite.Tests.Core;
 public class ValidationsTests
 {
     [Fact]
-    public void AllTurnsEveryCheckOn()
+    public void AllTurnsTheDefaultChecksOn()
     {
         var all = Validations.All;
         Assert.True(all.WhitespaceInSpaces && all.PrintEqualsInput && all.PrintIdempotence &&
                     all.FormattingReconciliation && all.ReportingMarkersOnly && all.ExecutionContextUnchanged &&
                     all.NoEditsInScanningPhase && all.LightweightAccumulators && all.ParserShapedTrees &&
-                    all.MinimalFormatting);
+                    all.MinimalFormatting && all.UniqueIds);
     }
 
     [Fact]
@@ -40,6 +40,13 @@ public class ValidationsTests
         Assert.False(none.WhitespaceInSpaces || none.PrintEqualsInput || none.PrintIdempotence ||
                      none.FormattingReconciliation);
         Assert.True(none.ReportingMarkersOnly && none.ExecutionContextUnchanged && none.NoEditsInScanningPhase &&
-                    none.LightweightAccumulators && none.ParserShapedTrees && none.MinimalFormatting);
+                    none.LightweightAccumulators && none.ParserShapedTrees && none.MinimalFormatting &&
+                    none.UniqueIds);
+    }
+
+    [Fact]
+    public void TypesAttributedAndSourceFileIdentityAreOptIn()
+    {
+        Assert.False(Validations.All.TypesAttributed || Validations.All.SourceFileIdentity);
     }
 }

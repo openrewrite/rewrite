@@ -253,6 +253,205 @@ class FindMissingTypesTest implements RewriteTest {
         );
     }
 
+    @Test
+    void untypedFieldAccess() {
+        rewriteRun(
+          spec -> spec.recipes(
+            toRecipe(() -> new JavaIsoVisitor<>() {
+                @Override
+                public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
+                    J.FieldAccess fa = super.visitFieldAccess(fieldAccess, ctx);
+                    return fa.withType(null);
+                }
+            }),
+            new FindMissingTypes(false)
+          ),
+          java(
+            """
+              class A {
+                  int x;
+                  int y = this.x;
+              }
+              """,
+            """
+              class A {
+                  int x;
+                  int y = /*~~(FieldAccess type is missing or malformed)~~>*/this.x;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void unresolvedFieldAccess() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  Object o = System.missing;
+              }
+              """,
+            """
+              class A {
+                  Object o = /*~~(FieldAccess type is missing or malformed)~~>*/System.missing;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void membersOfUnresolvedReceiver() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  Object o = missing().a.b;
+              }
+              """,
+            """
+              class A {
+                  Object o = /*~~(FieldAccess type is missing or malformed)~~>*//*~~(FieldAccess type is missing or malformed)~~>*//*~~(MethodInvocation type is missing or malformed)~~>*/missing().a.b;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void untypedFieldAccessAsQualifier() {
+        rewriteRun(
+          spec -> spec.recipes(
+            toRecipe(() -> new JavaIsoVisitor<>() {
+                @Override
+                public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
+                    J.FieldAccess fa = super.visitFieldAccess(fieldAccess, ctx);
+                    return "list".equals(fa.getSimpleName()) ? fa.withType(null) : fa;
+                }
+            }),
+            new FindMissingTypes(false)
+          ),
+          java(
+            """
+              import java.util.List;
+
+              class A {
+                  List<String> list;
+                  int size = this.list.size();
+              }
+              """,
+            """
+              import java.util.List;
+
+              class A {
+                  List<String> list;
+                  int size = /*~~(FieldAccess type is missing or malformed)~~>*/this.list.size();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void untypedConstantAsSelect() {
+        rewriteRun(
+          spec -> spec.recipes(
+            toRecipe(() -> new JavaIsoVisitor<>() {
+                @Override
+                public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
+                    J.FieldAccess fa = super.visitFieldAccess(fieldAccess, ctx);
+                    return "separator".equals(fa.getSimpleName()) ?
+                      fa.withTarget(fa.getTarget().withType(JavaType.Unknown.getInstance()))
+                        .withName(fa.getName().withType(null).withFieldType(null))
+                        .withType(null) :
+                      fa;
+                }
+            }),
+            new FindMissingTypes(false)
+          ),
+          java(
+            """
+              import java.io.File;
+
+              class A {
+                  boolean b(String s) {
+                      return File.separator.equals(s);
+                  }
+              }
+              """,
+            """
+              import java.io.File;
+
+              class A {
+                  boolean b(String s) {
+                      return /*~~(FieldAccess type is missing or malformed)~~>*/File.separator.equals(s);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void untypedClassLiteral() {
+        rewriteRun(
+          spec -> spec.recipes(
+            toRecipe(() -> new JavaIsoVisitor<>() {
+                @Override
+                public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
+                    return super.visitFieldAccess(fieldAccess, ctx).withType(null);
+                }
+            }),
+            new FindMissingTypes(false)
+          ),
+          java(
+            """
+              class A {
+                  Class<?> c = String.class;
+              }
+              """,
+            """
+              class A {
+                  Class<?> c = /*~~(FieldAccess type is missing or malformed)~~>*/String.class;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void typedFieldAccesses() {
+        rewriteRun(
+          java(
+            """
+              package a.b;
+
+              import java.util.List;
+
+              import static java.util.Collections.EMPTY_LIST;
+
+              @SuppressWarnings(javax.xml.XMLConstants.XML_NS_PREFIX)
+              class A {
+                  int x;
+                  enum E { P }
+                  java.util.Map.Entry<String, String> e;
+
+                  void m(int[] arr) {
+                      this.x = arr.length;
+                      System.out.println(java.lang.Integer.MAX_VALUE);
+                      Class<?> c = java.lang.String.class;
+                      Object p = A.E.P;
+                      Object s = Thread.State.NEW;
+                      int y = A.this.x;
+                      Runnable r = A.this::toString;
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @SuppressWarnings("JavadocDeclaration")
     @Test
     void missingJavadocReference() {
@@ -277,6 +476,22 @@ class FindMissingTypesTest implements RewriteTest {
                */
               interface Foo {
                   void bar();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void unresolvedQualifiedJavadocLink() {
+        rewriteRun(
+          spec -> spec.recipe(new FindMissingTypes(true)),
+          java(
+            """
+              /**
+               * {@link some.missing.Type}
+               */
+              class Foo {
               }
               """
           )

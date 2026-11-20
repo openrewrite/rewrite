@@ -41,7 +41,7 @@ public class RecipeList {
         return recipe(Recipe.builder(displayName, description).visitor(visitor));
     }
 
-    public RecipeList recipe(org.openrewrite.Recipe recipe) {
+    public RecipeList recipe(Recipe recipe) {
         return addRecipe(recipe);
     }
 

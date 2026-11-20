@@ -19,9 +19,12 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.internal.LineStart;
 import org.openrewrite.java.service.SourceFileStatementService;
+import org.openrewrite.java.trait.Scope;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
@@ -29,10 +32,13 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 import java.util.function.BiPredicate;
 import java.util.function.Predicate;
 
@@ -68,6 +74,16 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
             @Override
             public <J2 extends J> J2 autoFormat(J2 j, @Nullable J stopAfter, Integer p, Cursor parent) {
                 return autoFormat ? super.autoFormat(j, stopAfter, p, parent) : j;
+            }
+
+            /**
+             * Code that replaces code which started its line, or that changes part of a line that a declaration or
+             * statement starts, keeps the indentation and comments the line started with, rather than the
+             * indentation that a file formatted from scratch would give it. The formatter still chooses the blank
+             * lines above it, and formats the lines it nests as usual.
+             */
+            private <J2 extends J> J2 keepLineStart(J2 formatted, Space original) {
+                return formatted.withPrefix(LineStart.keep(formatted.getPrefix(), original, original));
             }
 
             @Override
@@ -147,7 +163,10 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                 Cursor parent = getCursor();
                 for (int i = 0; i < gen.size(); i++) {
                     Statement s = gen.get(i);
-                    if (anchorBeginsLine) {
+                    if (anchorBeginsLine && i == 0 && mode == JavaCoordinates.Mode.REPLACEMENT) {
+                        Space prefix = firstPrefix(anchor);
+                        gen.set(i, keepLineStart(autoFormat(s.withPrefix(prefix), p, parent), prefix));
+                    } else if (anchorBeginsLine) {
                         gen.set(i, autoFormat(i == 0 ? s.withPrefix(firstPrefix(anchor)) : s, p, parent));
                     } else {
                         gen.set(i, autoFormat(s, p, parent).withPrefix(leadingPrefix(anchor, i)));
@@ -255,7 +274,8 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                                             getComparatorOrThrow()));
                                 }
                             }
-                            return autoFormat(c, c.getName(), p, getCursor().getParentOrThrow());
+                            c = autoFormat(c, c.getName(), p, getCursor().getParentOrThrow());
+                            return mode == JavaCoordinates.Mode.REPLACEMENT ? keepLineStart(c, classDecl.getPrefix()) : c;
                         }
                         case EXTENDS: {
                             TypeTree anExtends = unsubstitute(templateParser.parseExtends(getCursor(), substitutedTemplate));
@@ -288,8 +308,8 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                             }
 
                             //noinspection ConstantConditions
-                            return autoFormat(c, c.getImplements().get(c.getImplements().size() - 1), p,
-                                    getCursor().getParentOrThrow());
+                            return keepLineStart(autoFormat(c, c.getImplements().get(c.getImplements().size() - 1), p,
+                                    getCursor().getParentOrThrow()), classDecl.getPrefix());
                         }
                         case TYPE_PARAMETERS: {
                             List<J.TypeParameter> typeParameters = unsubstitute(templateParser.parseTypeParameters(getCursor(), substitutedTemplate));
@@ -330,12 +350,12 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                 if ((loc == EXPRESSION_PREFIX ||
                      loc == STATEMENT_PREFIX && expression instanceof Statement) &&
                     isScope(expression)) {
-                    return autoFormat(unsubstitute(templateParser.parseExpression(
+                    return keepLineStart(autoFormat(unsubstitute(templateParser.parseExpression(
                                     getCursor(),
                                     substitutedTemplate,
                                     substitutions.getTypeVariables(),
                                     loc))
-                            .withPrefix(expression.getPrefix()), p);
+                            .withPrefix(expression.getPrefix()), p), expression.getPrefix());
                 }
                 return expression;
             }
@@ -343,20 +363,20 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
             @Override
             public J visitFieldAccess(J.FieldAccess fa, Integer p) {
                 if (loc == FIELD_ACCESS_PREFIX && isScope(fa)) {
-                    return autoFormat(unsubstitute(templateParser.parseExpression(
+                    return keepLineStart(autoFormat(unsubstitute(templateParser.parseExpression(
                                     getCursor(),
                                     substitutedTemplate,
                                     substitutions.getTypeVariables(),
                                     loc))
-                            .withPrefix(fa.getPrefix()), p);
+                            .withPrefix(fa.getPrefix()), p), fa.getPrefix());
                 } else if (loc == STATEMENT_PREFIX && isScope(fa)) {
                     // NOTE: while `J.FieldAccess` inherits from `Statement` they can only ever be used as expressions
-                    return autoFormat(unsubstitute(templateParser.parseExpression(
+                    return keepLineStart(autoFormat(unsubstitute(templateParser.parseExpression(
                                     getCursor(),
                                     substitutedTemplate,
                                     substitutions.getTypeVariables(),
                                     loc))
-                            .withPrefix(fa.getPrefix()), p);
+                            .withPrefix(fa.getPrefix()), p), fa.getPrefix());
                 }
                 return super.visitFieldAccess(fa, p);
             }
@@ -385,7 +405,8 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                     }
                     J.If.Else elsePart = new J.If.Else(randomId(), Space.SINGLE_SPACE, Markers.EMPTY,
                             JRightPadded.build(branch.withPrefix(Space.SINGLE_SPACE)));
-                    return autoFormat(iff.withElsePart(elsePart), p, getCursor().getParentOrThrow());
+                    return keepLineStart(autoFormat(iff.withElsePart(elsePart), p, getCursor().getParentOrThrow()),
+                            iff.getPrefix());
                 }
                 return super.visitIf(iff, p);
             }
@@ -394,12 +415,12 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
             public J visitIdentifier(J.Identifier ident, Integer p) {
                 // ONLY for backwards compatibility, otherwise the same as expression replacement
                 if (loc == IDENTIFIER_PREFIX && isScope(ident)) {
-                    return autoFormat(unsubstitute(templateParser.parseExpression(
+                    return keepLineStart(autoFormat(unsubstitute(templateParser.parseExpression(
                                     getCursor(),
                                     substitutedTemplate,
                                     substitutions.getTypeVariables(),
                                     loc))
-                            .withPrefix(ident.getPrefix()), p);
+                            .withPrefix(ident.getPrefix()), p), ident.getPrefix());
                 }
                 return super.visitIdentifier(ident, p);
             }
@@ -426,6 +447,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                         case ANNOTATIONS: {
                             List<J.Annotation> gen = unsubstitute(templateParser.parseAnnotations(getCursor(), substitutedTemplate));
                             J.MethodDeclaration m = method;
+                            boolean replacing = mode == JavaCoordinates.Mode.REPLACEMENT;
                             if (mode == JavaCoordinates.Mode.REPLACEMENT) {
                                 m = method.withLeadingAnnotations(gen);
                                 if (m.getTypeParameters() != null) {
@@ -442,8 +464,8 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                                             getComparatorOrThrow()));
                                 }
                             }
-                            return autoFormat(m, m.getName(), p,
-                                    getCursor().getParentOrThrow());
+                            m = autoFormat(m, m.getName(), p, getCursor().getParentOrThrow());
+                            return replacing ? keepLineStart(m, method.getPrefix()) : m;
                         }
                         case BLOCK_PREFIX: {
                             List<Statement> gen = unsubstituteStatements(templateParser.parseBlockStatements(getCursor(), Statement.class,
@@ -517,9 +539,20 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                                     flags.remove(Flag.Varargs);
                                 }
                                 type = type.withParameterNames(paramNames).withParameterTypes(paramTypes).withFlags(flags);
+                                // the template's stub method owns the parsed parameters until they are given this one
+                                JavaType.Method owner = type;
+                                parameters = ListUtils.map(parameters, parameter -> {
+                                    J.VariableDeclarations decl = (J.VariableDeclarations) parameter;
+                                    return decl.withVariables(ListUtils.map(decl.getVariables(), v -> {
+                                        JavaType.Variable owned = v.getVariableType() == null ? null : v.getVariableType().withOwner(owner);
+                                        return owned == null ? v : v.withVariableType(owned).withName(v.getName().withFieldType(owned));
+                                    }));
+                                });
                             }
 
-                            return method.withParameters(parameters).withMethodType(type).withName(method.getName().withType(type));
+                            J.MethodDeclaration m = method.withParameters(parameters).withMethodType(type).withName(method.getName().withType(type));
+                            // without a method type the parameters still belong to the template's stub
+                            return type == null ? m : retypeParameterReads(m, new Cursor(getCursor().getParentOrThrow(), m));
                         }
                         case THROWS: {
                             J.MethodDeclaration m = method.withThrows(unsubstitute(templateParser.parseThrows(getCursor(), substitutedTemplate)));
@@ -546,8 +579,8 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                             if (m.getName().getType() != null) {
                                 m = m.withName(method.getName().withType(m.getMethodType()));
                             }
-                            return autoFormat(m, typeParameters.get(typeParameters.size() - 1), p,
-                                    getCursor().getParentOrThrow());
+                            return keepLineStart(autoFormat(m, typeParameters.get(typeParameters.size() - 1), p,
+                                    getCursor().getParentOrThrow()), method.getPrefix());
                         }
                     }
                 }
@@ -620,12 +653,12 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                      parentValue instanceof J.TypeCast)) {
                     // Method invocation is used as an expression (e.g., inside return, assignment, type cast),
                     // not as a standalone statement in a block. Parse as expression replacement.
-                    return autoFormat(unsubstitute(templateParser.parseExpression(
+                    return keepLineStart(autoFormat(unsubstitute(templateParser.parseExpression(
                                     getCursor(),
                                     substitutedTemplate,
                                     substitutions.getTypeVariables(),
                                     loc))
-                            .withPrefix(method.getPrefix()), integer);
+                            .withPrefix(method.getPrefix()), integer), method.getPrefix());
                 }
                 if (isScope(method)) {
                     return maybeReplaceStatement(method, J.class, 0);
@@ -643,12 +676,12 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                          parentValue instanceof J.Assignment ||
                          parentValue instanceof J.AssignmentOperation ||
                          parentValue instanceof J.TypeCast)) {
-                        return autoFormat(unsubstitute(templateParser.parseExpression(
+                        return keepLineStart(autoFormat(unsubstitute(templateParser.parseExpression(
                                         getCursor(),
                                         substitutedTemplate,
                                         substitutions.getTypeVariables(),
                                         loc))
-                                .withPrefix(newClass.getPrefix()), p);
+                                .withPrefix(newClass.getPrefix()), p), newClass.getPrefix());
                     }
                     // allow a `J.NewClass` to also be replaced by an expression
                     return maybeReplaceStatement(newClass, J.class, p);
@@ -694,7 +727,8 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                             //noinspection unchecked
                             replacement = (J3) substitutions.toStatement(replacement);
                         }
-                        return autoFormat(replacement.withPrefix(statement.getPrefix()), p);
+                        return keepLineStart(autoFormat(replacement.withPrefix(statement.getPrefix()), p),
+                                statement.getPrefix());
                     }
                     throw new IllegalArgumentException("Cannot insert a new statement before an existing statement and return both to a visit method that returns one statement.");
                 }
@@ -720,8 +754,8 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                                         getComparatorOrThrow()));
                             }
                         }
-                        return autoFormat(v, v.getTypeExpression(), p,
-                                getCursor().getParentOrThrow());
+                        v = autoFormat(v, v.getTypeExpression(), p, getCursor().getParentOrThrow());
+                        return mode == JavaCoordinates.Mode.REPLACEMENT ? keepLineStart(v, multiVariable.getPrefix()) : v;
                     }
                 }
                 return super.visitVariableDeclarations(multiVariable, p);
@@ -887,6 +921,41 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                     .anyMatch(parameter -> namesTypeVariable(parameter, visited));
         }
         return type instanceof JavaType.Array && namesTypeVariable(((JavaType.Array) type).getElemType(), visited);
+    }
+
+    /**
+     * Gives the body's reads of each new parameter that parameter's types. A parameter that keeps the name of one it
+     * replaces keeps that one's readers, which still carry the replaced parameter's types.
+     */
+    private static J.MethodDeclaration retypeParameterReads(J.MethodDeclaration method, Cursor methodCursor) {
+        if (method.getBody() == null) {
+            return method;
+        }
+        Map<UUID, J.VariableDeclarations.NamedVariable> readers = new HashMap<>();
+        for (Statement parameter : method.getParameters()) {
+            if (parameter instanceof J.VariableDeclarations) {
+                for (J.VariableDeclarations.NamedVariable variable : ((J.VariableDeclarations) parameter).getVariables()) {
+                    if (variable.getVariableType() == null || !TypeUtils.isWellFormedType(variable.getType())) {
+                        // an unattributed parameter, such as one typed by a type variable or by a type missing from the
+                        // template's classpath, leaves its readers as they are
+                        continue;
+                    }
+                    Scope.bindingOf(methodCursor, variable).ifPresent(binding -> binding.references()
+                            .forEach(reference -> readers.put(reference.<J>getValue().getId(), variable)));
+                }
+            }
+        }
+        if (readers.isEmpty()) {
+            return method;
+        }
+        return method.withBody((J.Block) new JavaIsoVisitor<Integer>() {
+            @Override
+            public J.Identifier visitIdentifier(J.Identifier identifier, Integer p) {
+                J.VariableDeclarations.NamedVariable variable = readers.get(identifier.getId());
+                return variable == null ? identifier :
+                        identifier.withType(variable.getType()).withFieldType(variable.getVariableType());
+            }
+        }.visitNonNull(method.getBody(), 0));
     }
 
     private <J2 extends J> Comparator<J2> getComparatorOrThrow() {

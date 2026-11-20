@@ -114,6 +114,16 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
     }
 
     @Override
+    public boolean causesAnotherCycle() {
+        return NodeDependencyEdits.deferredThisCycle();
+    }
+
+    @Override
+    public void onComplete(ExecutionContext ctx) {
+        NodeDependencyEdits.reportUnresolvedDeferrals(ctx);
+    }
+
+    @Override
     public Accumulator getInitialValue(ExecutionContext ctx) {
         return new Accumulator(new NodeDependencyEdits(NodeDependencyEdits.rows(lockRegenerationFailures,
                 editsDeclined, packageName)));

@@ -16,6 +16,7 @@
 package org.openrewrite.test.internal;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import lombok.AccessLevel;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Value;
@@ -71,7 +72,6 @@ import org.openrewrite.yaml.YamlParser;
 import org.openrewrite.yaml.tree.Yaml;
 
 import javax.tools.ToolProvider;
-import java.io.InputStream;
 import java.lang.reflect.Constructor;
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -89,6 +89,7 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
+import java.util.stream.Stream;
 import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
 
@@ -1065,6 +1066,266 @@ class RewriteTestTest implements RewriteTest {
             }
             return JavaTemplate.apply("@Deprecated", cursor,
               c.getCoordinates().addAnnotation(comparing(J.Annotation::getSimpleName)));
+        }
+    }
+
+    @Nested
+    class EditedLineIndentation {
+
+        private static final String BEFORE = """
+          class A {
+              void foo() {
+              }
+
+              void bar() {
+              }
+
+              void test() {
+                  foo();
+              }
+          }
+          """;
+
+        @Test
+        void rejectReindentingALineItEdits() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(renameFooToBarAtTabIndentation()),
+              java(
+                BEFORE,
+                """
+                  class A {
+                      void foo() {
+                      }
+
+                      void bar() {
+                      }
+
+                      void test() {
+                  \t\tbar();
+                      }
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageStartingWith("Keep the indentation of the lines the recipe edits in place.")
+              .hasMessageContaining("""
+                  A.java:9
+                    before: ········foo();
+                    after:  →→bar();
+                """)
+              .hasMessageContaining("RecipeQualityValidation.builder().keepEditedLineIndentation(false)");
+        }
+
+        @Test
+        void acceptEditThatKeepsTheIndentation() {
+            rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                  @Override
+                  public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                      J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                      return "foo".equals(m.getSimpleName()) ? m.withName(m.getName().withSimpleName("bar")) : m;
+                  }
+              })),
+              java(
+                BEFORE,
+                """
+                  class A {
+                      void foo() {
+                      }
+
+                      void bar() {
+                      }
+
+                      void test() {
+                          bar();
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void acceptSearchResultPrintedInFrontOfTheIndentation() {
+            rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new PlainTextVisitor<>() {
+                  @Override
+                  public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                      return SearchResult.found(text);
+                  }
+              })),
+              text(
+                """
+                    indented
+                  second
+                  """,
+                """
+                  ~~>  indented
+                  second
+                  """
+              )
+            );
+        }
+
+        @Test
+        void acceptNewLinesAtTheirOwnIndentation() {
+            rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                  @Override
+                  public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                      if (!"foo".equals(method.getSimpleName())) {
+                          return method;
+                      }
+                      return JavaTemplate.builder("if (true) {\n    bar();\n}").contextSensitive().build()
+                        .apply(getCursor(), method.getCoordinates().replace());
+                  }
+              })),
+              java(
+                BEFORE,
+                """
+                  class A {
+                      void foo() {
+                      }
+
+                      void bar() {
+                      }
+
+                      void test() {
+                          if (true) {
+                              bar();
+                          }
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void acceptFormattingRecipe() {
+            rewriteRun(
+              spec -> spec.recipe(new AutoFormat(null)),
+              java(
+                """
+                  class A {
+                      void foo() {
+                      }
+
+                      void test() {
+                        foo( );
+                      }
+                  }
+                  """,
+                """
+                  class A {
+                      void foo() {
+                      }
+
+                      void test() {
+                          foo();
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void turnedOff() {
+            rewriteRun(
+              spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder()
+                  .keepEditedLineIndentation(false).build())
+                .recipe(renameFooToBarAtTabIndentation()),
+              java(
+                BEFORE,
+                """
+                  class A {
+                      void foo() {
+                      }
+
+                      void bar() {
+                      }
+
+                      void test() {
+                  \t\tbar();
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void shiftedInputFindsARecipeThatRecomputesIndentation() {
+            AssertionError e = withShiftedInput(() -> assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new RenameFooToBarRecipes.ReformatsWhatItRenames()),
+              java(BEFORE, AFTER_RENAME)
+            )));
+            assertThat(e).hasMessageStartingWith("Keep the indentation of the lines the recipe edits in place, " +
+                                                 "however the file is indented.")
+              .hasMessageContaining("""
+                    before: ·········foo();
+                    after:  ········bar();
+                """);
+        }
+
+        @Test
+        void shiftedInputAcceptsARecipeThatKeepsIndentation() {
+            withShiftedInput(() -> {
+                rewriteRun(
+                  spec -> spec.recipe(new RenameFooToBarRecipes.RenamesFooToBar()),
+                  java(BEFORE, AFTER_RENAME)
+                );
+                return null;
+            });
+        }
+
+        @Test
+        void shiftedInputOffByDefault() {
+            rewriteRun(
+              spec -> spec.recipe(new RenameFooToBarRecipes.ReformatsWhatItRenames()),
+              java(BEFORE, AFTER_RENAME)
+            );
+        }
+
+        private static final String AFTER_RENAME = """
+          class A {
+              void foo() {
+              }
+
+              void bar() {
+              }
+
+              void test() {
+                  bar();
+              }
+          }
+          """;
+
+        private <T> T withShiftedInput(java.util.function.Supplier<T> test) {
+            String property = "org.openrewrite.test.keepEditedLineIndentation.shiftedInput";
+            String previous = System.setProperty(property, "true");
+            try {
+                return test.get();
+            } finally {
+                if (previous == null) {
+                    System.clearProperty(property);
+                } else {
+                    System.setProperty(property, previous);
+                }
+            }
+        }
+
+        // Rebuilds the call's prefix as a file indented with tabs would have it
+        private Recipe renameFooToBarAtTabIndentation() {
+            return toRecipe(() -> new JavaIsoVisitor<>() {
+                @Override
+                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                    J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                    return "foo".equals(m.getSimpleName()) ?
+                      m.withName(m.getName().withSimpleName("bar")).withPrefix(Space.format("\n\t\t")) : m;
+                }
+            });
         }
     }
 
@@ -2821,6 +3082,40 @@ class RewriteTestTest implements RewriteTest {
         }
     }
 
+    /// Loads the recipe class and the classes nested in it, anonymous ones too, from a jar, as from a dependency.
+    private static URLClassLoader loadFromJar(Path dir, Class<?> recipeClass) throws Exception {
+        Path jar = dir.resolve("dependency.jar");
+        Path classes = Path.of(recipeClass.getProtectionDomain().getCodeSource().getLocation().toURI());
+        String packagePath = recipeClass.getPackageName().replace('.', '/');
+        String simpleName = recipeClass.getName().substring(recipeClass.getName().lastIndexOf('.') + 1);
+        List<String> entries;
+        try (Stream<Path> files = Files.list(classes.resolve(packagePath))) {
+            entries = files.map(f -> f.getFileName().toString())
+              .filter(f -> f.equals(simpleName + ".class") || f.startsWith(simpleName + "$"))
+              .map(f -> packagePath + "/" + f)
+              .toList();
+        }
+        try (JarOutputStream out = new JarOutputStream(Files.newOutputStream(jar))) {
+            for (String entry : entries) {
+                out.putNextEntry(new JarEntry(entry));
+                Files.copy(classes.resolve(entry), out);
+                out.closeEntry();
+            }
+        }
+        return new URLClassLoader(new URL[]{jar.toUri().toURL()}, recipeClass.getClassLoader()) {
+            @Override
+            protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
+                if (!name.equals(recipeClass.getName()) && !name.startsWith(recipeClass.getName() + "$")) {
+                    return super.loadClass(name, resolve);
+                }
+                synchronized (getClassLoadingLock(name)) {
+                    Class<?> loaded = findLoadedClass(name);
+                    return loaded != null ? loaded : findClass(name);
+                }
+            }
+        };
+    }
+
     @Nested
     class NoStaticVisitors {
 
@@ -2917,37 +3212,6 @@ class RewriteTestTest implements RewriteTest {
                   text("foo")
                 );
             }
-        }
-
-        private URLClassLoader loadFromJar(Path dir, Class<?> recipeClass) throws Exception {
-            Path jar = dir.resolve("dependency.jar");
-            List<Class<?>> classes = new ArrayList<>(List.of(recipeClass));
-            for (int i = 0; i < classes.size(); i++) {
-                classes.addAll(List.of(classes.get(i).getDeclaredClasses()));
-            }
-            try (JarOutputStream out = new JarOutputStream(Files.newOutputStream(jar))) {
-                for (Class<?> c : classes) {
-                    String entry = c.getName().replace('.', '/') + ".class";
-                    out.putNextEntry(new JarEntry(entry));
-                    try (InputStream in = recipeClass.getClassLoader().getResourceAsStream(entry)) {
-                        assertThat(in).isNotNull();
-                        in.transferTo(out);
-                    }
-                    out.closeEntry();
-                }
-            }
-            return new URLClassLoader(new URL[]{jar.toUri().toURL()}, recipeClass.getClassLoader()) {
-                @Override
-                protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
-                    if (!name.equals(recipeClass.getName()) && !name.startsWith(recipeClass.getName() + "$")) {
-                        return super.loadClass(name, resolve);
-                    }
-                    synchronized (getClassLoadingLock(name)) {
-                        Class<?> loaded = findLoadedClass(name);
-                        return loaded != null ? loaded : findClass(name);
-                    }
-                }
-            };
         }
 
         @Test
@@ -3225,6 +3489,102 @@ class RewriteTestTest implements RewriteTest {
               spec -> spec
                 .recipeQualityValidation(RecipeQualityValidation.builder().lightweightAccumulators(false).build())
                 .recipe(new KeepsWhatItScans()),
+              text("foo")
+            );
+        }
+    }
+
+    @Nested
+    class LightweightRecipeFields {
+
+        @Test
+        void rejectSourceFileKeptInRecipeField() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new KeepsWhatItVisitsInAField()),
+              text("foo", spec -> spec.path("foo.txt"))
+            ));
+            assertThat(e).hasMessageContaining("A recipe should keep in its fields")
+              .hasMessageContaining("org.openrewrite.test.internal.KeepsWhatItVisitsInAField keeps\n" +
+                                    "    KeepsWhatItVisitsInAField.visited[0] -> PlainText foo.txt\n")
+              .hasMessageContaining("lightweightRecipeFields(false)");
+        }
+
+        @Test
+        void rejectSourceFileKeptInStaticField() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new KeepsWhatItVisitsInAStaticField()),
+              text("foo", spec -> spec.path("foo.txt"))
+            ));
+            assertThat(e).hasMessageContaining("KeepsWhatItVisitsInAStaticField.VISITED[foo.txt] -> PlainText foo.txt");
+        }
+
+        @Test
+        void rejectSourceFileKeptInStaticFieldOfNestedClass() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new KeepsWhatItVisitsInANestedClass()),
+              text("foo", spec -> spec.path("foo.txt"))
+            ));
+            assertThat(e).hasMessageContaining(
+              "KeepsWhatItVisitsInANestedClass.Seen.FILES[foo.txt] -> PlainText foo.txt");
+        }
+
+        @Test
+        void rejectSourceFileKeptByRecipeThatCompositeCreatesAnew() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new ListsNewKeepsWhatItVisitsInAField()),
+              text("foo", spec -> spec.path("foo.txt"))
+            ));
+            assertThat(e).hasMessageContaining("KeepsWhatItVisitsInAField.visited[0] -> PlainText foo.txt");
+        }
+
+        @Test
+        void rejectTreesCollectedFromEachSourceFile() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new KeepsClassesItVisits()),
+              java("class A {}")
+            ));
+            assertThat(e).hasMessageContaining("KeepsClassesItVisits.classes[0] -> J.ClassDeclaration");
+        }
+
+        @Test
+        void rejectSourceFilesCollectedByVisitorKeptInField() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new KeepsCollectingVisitorInAField()),
+              text("foo", spec -> spec.path("foo.txt"))
+            ));
+            assertThat(e).hasMessageContaining(
+              "KeepsCollectingVisitorInAField.visitor.visited[0] -> PlainText foo.txt");
+        }
+
+        @Test
+        void acceptOneTreeToAFieldAndVisitorKeptInFields() {
+            rewriteRun(
+              spec -> spec.recipe(new KeepsOneTreeToAFieldAndAPrecondition()),
+              text("foo")
+            );
+        }
+
+        @Test
+        void acceptSourceFileKeptInStaticFieldOfRecipeFromDependencyJar(@TempDir Path dir) throws Exception {
+            try (URLClassLoader dependency = loadFromJar(dir, KeepsWhatItVisitsInAStaticField.class)) {
+                Constructor<?> constructor = dependency.loadClass(KeepsWhatItVisitsInAStaticField.class.getName())
+                  .getDeclaredConstructor();
+                constructor.setAccessible(true);
+                Recipe recipe = (Recipe) constructor.newInstance();
+                assertThat(recipe.getClass()).isNotEqualTo(KeepsWhatItVisitsInAStaticField.class);
+                rewriteRun(
+                  spec -> spec.recipe(recipe).validateRecipeSerialization(false),
+                  text("foo")
+                );
+            }
+        }
+
+        @Test
+        void optOut() {
+            rewriteRun(
+              spec -> spec
+                .recipeQualityValidation(RecipeQualityValidation.builder().lightweightRecipeFields(false).build())
+                .recipe(new KeepsWhatItVisitsInAField()),
               text("foo")
             );
         }
@@ -4291,6 +4651,175 @@ class KeepsWhatItScans extends ScanningRecipe<KeepsWhatItScans.Scanned> {
                 return tree;
             }
         };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class KeepsWhatItVisitsInAField extends Recipe {
+
+    String displayName = "Keeps the source files it visits in a field";
+
+    String description = "Keeps each source file it visits in a field of the recipe.";
+
+    transient List<SourceFile> visited = new ArrayList<>();
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new TreeVisitor<>() {
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof SourceFile s) {
+                    visited.add(s);
+                }
+                return tree;
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class KeepsWhatItVisitsInAStaticField extends Recipe {
+
+    static final Map<Path, SourceFile> VISITED = new HashMap<>();
+
+    String displayName = "Keeps the source files it visits in a static field";
+
+    String description = "Keeps each source file it visits in a static field of the recipe.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new TreeVisitor<>() {
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof SourceFile s) {
+                    VISITED.put(s.getSourcePath(), s);
+                }
+                return tree;
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class KeepsWhatItVisitsInANestedClass extends Recipe {
+
+    String displayName = "Keeps the source files it visits in a nested class";
+
+    String description = "Keeps each source file it visits in a static field of a class nested in the recipe.";
+
+    static class Seen {
+        static final Map<Path, SourceFile> FILES = new HashMap<>();
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new TreeVisitor<>() {
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof SourceFile s) {
+                    Seen.FILES.put(s.getSourcePath(), s);
+                }
+                return tree;
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class ListsNewKeepsWhatItVisitsInAField extends Recipe {
+
+    String displayName = "Lists a new recipe that keeps what it visits";
+
+    String description = "Lists a recipe that keeps the source files it visits, created anew each time it is listed.";
+
+    @Override
+    public List<Recipe> getRecipeList() {
+        return List.of(new KeepsWhatItVisitsInAField());
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class KeepsOneTreeToAFieldAndAPrecondition extends Recipe {
+
+    String displayName = "Keeps one tree to a field and a precondition";
+
+    String description = "Keeps a visitor, a snippet and a whole source file, each in a field of the recipe.";
+
+    @Getter(AccessLevel.NONE)
+    transient TreeVisitor<?, ExecutionContext> precondition = new PlainTextVisitor<>();
+
+    @Getter(AccessLevel.NONE)
+    transient PlainText.Snippet snippet = new PlainText.Snippet(Tree.randomId(), Markers.EMPTY, "foo");
+
+    @Getter(AccessLevel.NONE)
+    transient PlainText template = PlainText.builder().sourcePath(Path.of("template.txt")).text("foo").build();
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(precondition, new PlainTextVisitor<>());
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class KeepsClassesItVisits extends Recipe {
+
+    String displayName = "Keeps the classes it visits";
+
+    String description = "Keeps each class declaration it visits in a field of the recipe.";
+
+    transient List<J.ClassDeclaration> classes = new ArrayList<>();
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new JavaIsoVisitor<>() {
+            @Override
+            public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                classes.add(classDecl);
+                return super.visitClassDeclaration(classDecl, ctx);
+            }
+        };
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class KeepsCollectingVisitorInAField extends Recipe {
+
+    String displayName = "Keeps a visitor that collects source files";
+
+    String description = "Keeps a visitor in a field of the recipe that keeps each source file it visits.";
+
+    @Getter(AccessLevel.NONE)
+    transient Collecting visitor = new Collecting();
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return visitor;
+    }
+
+    static class Collecting extends TreeVisitor<Tree, ExecutionContext> {
+        final List<SourceFile> visited = new ArrayList<>();
+
+        @Override
+        public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+            if (tree instanceof SourceFile s) {
+                visited.add(s);
+            }
+            return tree;
+        }
     }
 }
 

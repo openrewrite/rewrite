@@ -337,4 +337,20 @@ class ChangeValueTest implements RewriteTest {
           )
         );
     }
+
+    @SuppressWarnings("YAMLUnusedAnchor")
+    @Test
+    void changeValueWithTagBeforeAnchor() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue("$.a", "new", null)),
+          yaml(
+            """
+              a: !!str &x six
+              """,
+            """
+              a: &x !!str new
+              """
+          )
+        );
+    }
 }

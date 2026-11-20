@@ -31,6 +31,8 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import java.util.List;
+
 /**
  * Manages the Scala 3 compiler context and provides methods to parse Scala source files.
  * This class delegates to the Scala bridge for compiler interaction.
@@ -110,8 +112,8 @@ public class ScalaCompilerContext {
         }
 
         // Convert to Java lists for the bridge
-        java.util.List<SourceEntry> sourceList = new ArrayList<>(entries);
-        java.util.List<String> cpList = new ArrayList<>(classpathStrings);
+        List<SourceEntry> sourceList = new ArrayList<>(entries);
+        List<String> cpList = new ArrayList<>(classpathStrings);
 
         // Get a working directory for compiler output (.class/.tasty files).
         String outputDir;
