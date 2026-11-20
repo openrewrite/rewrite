@@ -341,7 +341,12 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
         } else if (tree instanceof JCTree.JCClassDecl) {
             symbol = ((JCTree.JCClassDecl) tree).sym;
         } else if (tree instanceof JCTree.JCFieldAccess) {
-            symbol = ((JCTree.JCFieldAccess) tree).sym;
+            JCTree.JCFieldAccess select = (JCTree.JCFieldAccess) tree;
+            // A class literal that javac marks erroneous because of its context still has `Class<X>` on its symbol
+            if (select.type instanceof Type.ErrorType && select.sym != null && select.name.contentEquals("class")) {
+                return type(select.sym.type);
+            }
+            symbol = select.sym;
         }
 
         return type(((JCTree) tree).type, symbol);
@@ -411,15 +416,33 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
                     type = ((Type.ForAll) type).qtype;
                 }
 
-                resolvedOwner = type instanceof Type.MethodType ?
-                        methodDeclarationType(sym, (JavaType.FullyQualified) type(sym.owner.type)) :
-                        type(type);
+                if (type instanceof Type.MethodType) {
+                    resolvedOwner = methodDeclarationType(sym, (JavaType.FullyQualified) type(sym.owner.type));
+                } else if (type == null && sym instanceof Symbol.MethodSymbol &&
+                           ((Symbol.MethodSymbol) sym).isStaticOrInstanceInit()) {
+                    resolvedOwner = initializerType((Symbol.MethodSymbol) sym);
+                } else {
+                    resolvedOwner = type(type);
+                }
                 assert resolvedOwner != null;
             }
 
             variable.unsafeSet(resolvedOwner, type(symbol.type), listAnnotations(symbol));
             return variable;
         });
+    }
+
+    /**
+     * javac 21 and earlier leave the placeholder method symbol of an initializer block without a type,
+     * so give it the {@code void()} method type that later javac versions produce.
+     */
+    private JavaType.Method initializerType(Symbol.MethodSymbol initializer) {
+        JavaType.FullyQualified declaringType = (JavaType.FullyQualified) type(initializer.owner.type);
+        return typeFactory.methodFor(signatureBuilder.methodSignature(initializer),
+                () -> new JavaType.Method(null, initializer.flags_field, declaringType, "",
+                        JavaType.Primitive.Void, (String[]) null, null, null, null, null, null),
+                method -> {
+                });
     }
 
     /**

@@ -41,6 +41,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Collections.emptyList;
 import static org.openrewrite.Tree.randomId;
+import static org.openrewrite.java.ShortenFullyQualifiedTypeReferences.isTypeReferenceSafeToShorten;
 import static org.openrewrite.java.format.AutodetectGeneralFormatStyle.autodetectGeneralFormatStyle;
 import static org.openrewrite.java.tree.TypeUtils.isOfClassType;
 
@@ -80,7 +81,15 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
     @Nullable
     private final String alias;
 
+    @EqualsAndHashCode.Include
+    private final boolean explicitOnly;
+
     public AddImport(String type, @Nullable String member, boolean onlyIfReferenced) {
+        this(type, member, onlyIfReferenced, false);
+    }
+
+    // Cleanup recipes can request an explicit import without rewriting other references or folding existing imports.
+    AddImport(String type, @Nullable String member, boolean onlyIfReferenced, boolean explicitOnly) {
         int lastDotIdx = type.lastIndexOf('.');
         this.packageName = lastDotIdx != -1 ? type.substring(0, lastDotIdx) : null;
         this.typeName = lastDotIdx != -1 ? type.substring(lastDotIdx + 1) : type;
@@ -88,6 +97,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
         this.member = member;
         this.onlyIfReferenced = onlyIfReferenced;
         alias = null;
+        this.explicitOnly = explicitOnly;
     }
 
     public AddImport(@Nullable String packageName, String typeName, @Nullable String member, @Nullable String alias, boolean onlyIfReferenced) {
@@ -97,6 +107,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
         this.member = member;
         this.onlyIfReferenced = onlyIfReferenced;
         this.alias = alias;
+        this.explicitOnly = false;
     }
 
     @Override
@@ -142,7 +153,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
                 return cu;
             }
 
-            if (!"Record".equals(typeName) && importStatus == ImportStatus.IMPLICITLY_IMPORTED) {
+            if (!explicitOnly && !"Record".equals(typeName) && importStatus == ImportStatus.IMPLICITLY_IMPORTED) {
                 return cu;
             }
 
@@ -186,6 +197,9 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
 
             ImportLayoutStyle layoutStyle = Optional.ofNullable(Style.from(ImportLayoutStyle.class, ((SourceFile) cu)))
                     .orElse(IntelliJ.importLayout());
+            if (explicitOnly) {
+                layoutStyle = new ImportLayoutStyle(Integer.MAX_VALUE, Integer.MAX_VALUE, layoutStyle.getLayout(), emptyList());
+            }
 
             Optional<JavaSourceSet> sourceSet = cu.getMarkers().findFirst(JavaSourceSet.class);
             List<JavaType.FullyQualified> classpath = sourceSet.map(JavaSourceSet::getClasspath).orElse(emptyList());
@@ -193,9 +207,9 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
 
             List<JRightPadded<J.Import>> newImports = layoutStyle.addImport(cu.getPadding().getImports(), importToAdd, cu.getPackageDeclaration(), classpath, classpathDirty);
 
-            if (member != null && typeReference.isPresent()) {
+            if (!explicitOnly && member != null && typeReference.isPresent()) {
                 cu = (JavaSourceFile) new ShortenFullyQualifiedMemberReferences(typeReference.get()).visit(cu, p);
-            } else if (member == null && typeReference.isPresent()) {
+            } else if (!explicitOnly && member == null && typeReference.isPresent()) {
                 cu = (JavaSourceFile) new ShortenFullyQualifiedTypeReferences((JavaType.FullyQualified) typeReference.get()).visit(cu, p);
             }
 
@@ -204,9 +218,9 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
 
             cu = cu.getPadding().withImports(newImports);
 
-            JavaSourceFile c = cu;
+            Cursor cuCursor = new Cursor(getCursor().getParentOrThrow(), cu);
             cu = cu.withClasses(ListUtils.mapFirst(cu.getClasses(), clazz -> {
-                J.ClassDeclaration cl = autoFormat(clazz, clazz.getName(), p, new Cursor(null, c));
+                J.ClassDeclaration cl = autoFormat(clazz, clazz.getName(), p, cuCursor);
                 return clazz.withPrefix(clazz.getPrefix().withWhitespace(cl.getPrefix().getWhitespace()));
             }));
 
@@ -362,7 +376,8 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
 
         @Override
         public J visitFieldAccess(J.FieldAccess fieldAccess, P p) {
-            if (fieldAccess.isFullyQualifiedClassReference(typeToShorten.getFullyQualifiedName())) {
+            if (fieldAccess.isFullyQualifiedClassReference(typeToShorten.getFullyQualifiedName()) &&
+                    isTypeReferenceSafeToShorten(getCursor(), fieldAccess.getSimpleName(), typeToShorten)) {
                 return fieldAccess.getName().withPrefix(fieldAccess.getPrefix());
             }
             return super.visitFieldAccess(fieldAccess, p);
@@ -370,7 +385,8 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
 
         @Override
         public J visitIdentifier(J.Identifier identifier, P p) {
-            if (isFullyQualifiedClassReference(identifier, typeToShorten.getFullyQualifiedName())) {
+            if (isFullyQualifiedClassReference(identifier, typeToShorten.getFullyQualifiedName()) &&
+                    isTypeReferenceSafeToShorten(getCursor(), typeToShorten.getClassName(), typeToShorten)) {
                 return identifier.withSimpleName(typeToShorten.getClassName());
             }
             return super.visitIdentifier(identifier, p);

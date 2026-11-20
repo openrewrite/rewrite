@@ -171,6 +171,10 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
                 return typeMapping.type(matchClassId(psiElement, symbol.classId), owner)
             }
         }
+        val local = referencedLocalVariable(fir)
+        if (local != null) {
+            return typeMapping.type(local, localVariableOwner(local))
+        }
         return if (fir != null) typeMapping.type(fir, owner) else null
     }
 
@@ -334,6 +338,35 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
             else -> null
         }
     }
+
+    @OptIn(SymbolInternals::class)
+    private fun referencedLocalVariable(fir: FirElement?): FirVariable? {
+        val reference = (if (fir is FirPropertyAccessExpression) fir.calleeReference else fir) as? FirResolvedNamedReference
+        val variable = (reference?.resolvedSymbol as? FirVariableSymbol<*>)?.fir
+        return if (variable is FirValueParameter || variable is FirProperty && variable.isLocal) variable else null
+    }
+
+    private fun localVariableOwner(variable: FirVariable): FirElement? =
+        variable.source?.psi?.let { localVariableOwner(it) }
+
+    /**
+     * The parser types a local's declaration with this owner too, so a use gets the same variable type.
+     * An init block or property stands for the nameless method that owns its locals, see [initializerScope].
+     * The parser never makes an enum entry an owner, though `KtEnumEntry` is a `KtClass`.
+     */
+    fun localVariableOwner(declaration: PsiElement): FirElement? {
+        val owner = PsiTreeUtil.findFirstParent(declaration, true) {
+            it is KtNamedFunction || it is KtSecondaryConstructor || it is KtPropertyAccessor ||
+                    it is KtClassInitializer ||
+                    it is KtProperty && !it.isLocal && it.initializes(declaration) ||
+                    it is KtFile || it is KtClass && it !is KtEnumEntry
+        }
+        return owner?.let { primary(it) }
+    }
+
+    private fun KtProperty.initializes(declaration: PsiElement): Boolean =
+        PsiTreeUtil.isAncestor(initializer, declaration, true) ||
+                PsiTreeUtil.isAncestor(delegateExpression, declaration, true)
 
     fun fir(psi: PsiElement?, filter: (FirElement) -> Boolean) : FirElement? {
         var p = psi

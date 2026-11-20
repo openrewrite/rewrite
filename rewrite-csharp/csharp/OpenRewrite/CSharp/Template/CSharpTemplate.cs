@@ -54,13 +54,13 @@ public sealed class CSharpTemplate
     private readonly IReadOnlyList<string> _usings;
     private readonly IReadOnlyList<string> _context;
     private readonly IReadOnlyDictionary<string, string> _dependencies;
-    private readonly ScaffoldKind? _scaffoldKind;
+    private readonly ScaffoldKind _scaffoldKind;
     private J? _cachedTree;
 
     private CSharpTemplate(string code, Dictionary<string, object> captures,
         IReadOnlyList<string>? usings, IReadOnlyList<string>? context,
         IReadOnlyDictionary<string, string>? dependencies,
-        ScaffoldKind? scaffoldKind = null)
+        ScaffoldKind scaffoldKind)
     {
         _code = code;
         _captures = captures;
@@ -68,28 +68,6 @@ public sealed class CSharpTemplate
         _context = context ?? [];
         _dependencies = dependencies ?? new Dictionary<string, string>();
         _scaffoldKind = scaffoldKind;
-    }
-
-    /// <summary>
-    /// Create a template with auto-detected scaffold kind.
-    /// Prefer <see cref="Expression"/>, <see cref="Statement"/>,
-    /// <see cref="ClassMember"/>, or <see cref="Attribute"/> for explicit scaffold control.
-    /// </summary>
-    [Obsolete("Use Expression(), Statement(), ClassMember(), or Attribute() for explicit scaffold control.")]
-    public static CSharpTemplate Create(TemplateStringHandler handler,
-        IReadOnlyList<string>? usings = null, IReadOnlyList<string>? context = null,
-        IReadOnlyDictionary<string, string>? dependencies = null)
-    {
-        return new CSharpTemplate(handler.GetCode(), handler.GetCaptures(), usings, context, dependencies);
-    }
-
-    /// <inheritdoc cref="Create(TemplateStringHandler, IReadOnlyList{string}?, IReadOnlyList{string}?, IReadOnlyDictionary{string, string}?)"/>
-    [Obsolete("Use Expression(), Statement(), ClassMember(), or Attribute() for explicit scaffold control.")]
-    public static CSharpTemplate Create(string code,
-        IReadOnlyList<string>? usings = null, IReadOnlyList<string>? context = null,
-        IReadOnlyDictionary<string, string>? dependencies = null)
-    {
-        return new CSharpTemplate(code, new Dictionary<string, object>(), usings, context, dependencies);
     }
 
     /// <summary>
@@ -114,8 +92,7 @@ public sealed class CSharpTemplate
     /// <summary>
     /// Create a template that produces a statement.
     /// Scaffolds as <c>class __T__ { void __M__() { &lt;code&gt;; } }</c> and extracts the statement.
-    /// Unlike <see cref="Create(string, IReadOnlyList{string}?, IReadOnlyList{string}?, IReadOnlyDictionary{string, string}?)"/>,
-    /// this does not auto-unwrap ExpressionStatements.
+    /// This does not auto-unwrap ExpressionStatements.
     /// </summary>
     public static CSharpTemplate Statement(TemplateStringHandler handler,
         IReadOnlyList<string>? usings = null, IReadOnlyList<string>? context = null,

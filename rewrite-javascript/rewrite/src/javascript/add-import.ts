@@ -2,6 +2,7 @@ import {JavaScriptVisitor} from "./visitor";
 import {Comment, ElementRemovalFormatter, emptySpace, isIdentifier, J, rightPadded, singleSpace, space, spaceContainsNewline, splitAtLineEnd, Statement, TextComment, TrailingComma, Type} from "../java";
 import {isObjectBindingPattern, JS, JSX, moduleExportName} from "./tree";
 import {randomId, UUID} from "../uuid";
+import {Cursor} from "../tree";
 import {TypeVisitor} from "../java/type-visitor";
 import {mapAsync, updateIfChanged} from "../util";
 import {moduleName, packageNameOf, sameModule, spelledLike} from "./package-name";
@@ -2623,6 +2624,44 @@ function withRunSorted(cu: JS.CompilationUnit, ids: ReadonlySet<UUID>): JS.Compi
     return {...cu, statements};
 }
 
+/** For `(NS)` the cursor steps inside, since `resolve` wants the cursor of the node holding `NS`. */
+export function readsModuleObject(qualifier: J | undefined, holder: Cursor, moduleObjects: ReadonlySet<string>): boolean {
+    let object = qualifier, cursor = holder;
+    while (object?.kind === J.Kind.Parentheses) {
+        cursor = new Cursor(object, cursor);
+        object = (object as J.Parentheses<J>).tree.element;
+    }
+    return object !== undefined && isIdentifier(object) && moduleObjects.has(object.simpleName) &&
+        resolve(cursor, object)?.kind === JS.Kind.CompilationUnit;
+}
+
+export function isModuleObjectRead(cursor: Cursor, moduleObjects: ReadonlySet<string>): boolean {
+    if (moduleObjects.size === 0) {
+        return false;
+    }
+    const node = cursor.value as J;
+    switch (node.kind) {
+        case J.Kind.MethodInvocation:
+            return readsModuleObject((node as J.MethodInvocation).select?.element, cursor, moduleObjects);
+        case J.Kind.FieldAccess:
+            return readsModuleObject((node as J.FieldAccess).target, cursor, moduleObjects);
+        case J.Kind.NewClass: {
+            const clazz = (node as J.NewClass).class;
+            return clazz?.kind === J.Kind.FieldAccess && isModuleObjectRead(new Cursor(clazz, cursor), moduleObjects);
+        }
+        case J.Kind.Identifier: {
+            const holder = cursor.parentTree();
+            const read = holder?.value as J | undefined;
+            return holder !== undefined &&
+                (read?.kind === J.Kind.MethodInvocation && (read as J.MethodInvocation).name === node ||
+                    read?.kind === J.Kind.FieldAccess && (read as J.FieldAccess).name.element === node) &&
+                isModuleObjectRead(holder, moduleObjects);
+        }
+        default:
+            return false;
+    }
+}
+
 /**
  * Moves the binding `from` names to `to`, binding it under `boundName`, and the file's references
  * follow a `boundName` of its own. Whether the statement is rewritten in place or replaced is decided
@@ -2637,7 +2676,8 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
         readonly to: {module: string; member?: string},
         readonly localName: string,
         readonly boundName: string,
-        readonly group?: RebindGroup
+        readonly group?: RebindGroup,
+        readonly keptModuleObjects: ReadonlySet<string> = new Set()
     ) {
         super();
     }
@@ -2793,7 +2833,8 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
 
     /** Any type in the file can name what moved, whether or not it references the binding. */
     protected override async visitType(javaType: Type | undefined, p: P): Promise<Type | undefined> {
-        return this.movedTypes.visit(javaType, undefined);
+        return isModuleObjectRead(this.cursor, this.keptModuleObjects) ? javaType :
+            this.movedTypes.visit(javaType, undefined);
     }
 
     /**
@@ -3129,12 +3170,13 @@ function movedTypesIn(
 export async function withMovedTypes(
     cu: JS.CompilationUnit,
     from: {module: string; member?: string},
-    to: {module: string; member?: string}
+    to: {module: string; member?: string},
+    keptModuleObjects: ReadonlySet<string> = new Set()
 ): Promise<JS.CompilationUnit> {
     const movedTypes = movedTypesIn(cu, from, to, false);
     return await new class extends JavaScriptVisitor<undefined> {
         protected override async visitType(javaType: Type | undefined): Promise<Type | undefined> {
-            return movedTypes.visit(javaType, undefined);
+            return isModuleObjectRead(this.cursor, keptModuleObjects) ? javaType : movedTypes.visit(javaType, undefined);
         }
     }().visit(cu, undefined) as JS.CompilationUnit;
 }

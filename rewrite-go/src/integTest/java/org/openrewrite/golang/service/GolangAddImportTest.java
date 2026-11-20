@@ -423,6 +423,57 @@ class GolangAddImportTest implements RewriteTest {
         );
     }
 
+    @Test
+    void preservesCgoPreamble() {
+        rewriteRun(
+          spec -> spec.recipe(recipeCalling(v -> v.maybeAddImport("fmt", false))),
+          go(
+            """
+              package main
+
+              /*
+              #include <stdlib.h>
+              */
+              import "C"
+              """,
+            """
+              package main
+
+              /*
+              #include <stdlib.h>
+              */
+              import "C"
+
+              import "fmt"
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepsTrailingCommentOnExistingImport() {
+        rewriteRun(
+          spec -> spec.recipe(recipeCalling(v -> v.maybeAddImport("strings", false))),
+          go(
+            """
+              package main
+
+              import (
+              \t"fmt" // fmt comment
+              )
+              """,
+            """
+              package main
+
+              import (
+              \t"fmt" // fmt comment
+              \t"strings"
+              )
+              """
+          )
+        );
+    }
+
     private static Recipe recipeCalling(Consumer<JavaIsoVisitor<ExecutionContext>> maybeAddImport) {
         return toRecipe(() -> new JavaIsoVisitor<>() {
             @Override

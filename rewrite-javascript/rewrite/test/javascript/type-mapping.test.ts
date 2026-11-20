@@ -20,6 +20,8 @@ import {javascript, JavaScriptVisitor, JS, npm, packageJson, tsx, typescript} fr
 import {J, Type} from "../../src/java";
 import {ExecutionContext, foundSearchResult, Recipe} from "../../src";
 import {withDir} from "tmp-promise";
+import * as fs from "node:fs";
+import * as path from "node:path";
 import FullyQualified = Type.FullyQualified;
 
 describe('JavaScript type mapping', () => {
@@ -3158,6 +3160,126 @@ describe('JavaScript type mapping', () => {
                               }
                             `
                         )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
+        test('a call through a namespace import of a subpath attributes to the subpath, like a named import', async () => {
+            // The namespace object's type is named after its declaration file, which was cut to the
+            // package, so \`client.createRoot\` was declared on \`react-dom\` and missed a matcher on the subpath.
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes(declaringTypeAndName);
+
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        //language=typescript
+                        typescript(
+                            `
+                                import {createRoot} from 'react-dom/client';
+                                import * as client from 'react-dom/client';
+                                import required = require('react-dom/client');
+                                declare const container: Element;
+
+                                createRoot(container);
+                                client.createRoot(container);
+                                required.createRoot(container);
+                            `,
+                            //@formatter:off
+                            `
+                                import {createRoot} from 'react-dom/client';
+                                import * as client from 'react-dom/client';
+                                import required = require('react-dom/client');
+                                declare const container: Element;
+
+                                /*~~(react-dom/client#createRoot)~~>*/createRoot(container);
+                                /*~~(react-dom/client#createRoot)~~>*/client.createRoot(container);
+                                /*~~(react-dom/client#createRoot)~~>*/required.createRoot(container);
+                            `
+                            //@formatter:on
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "react-dom": "^18.2.0"
+                                },
+                                "devDependencies": {
+                                  "@types/react-dom": "^18.2.0"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
+        test('a namespace call keeps the module the checker types its receiver as, where the binding names another', async () => {
+            // Only an import's specifier is taken, since an import holds the module it names. A reassigned
+            // variable and a local function named \`require\` both read \`beta\` here; the \`brand\` constants
+            // keep the two module types apart, so the union is not reduced to one.
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes(declaringTypeAndName);
+
+            await withDir(async (repo) => {
+                const install = (pkg: string, files: Record<string, string>) => {
+                    for (const [file, text] of Object.entries(files)) {
+                        const target = path.join(repo.path, 'node_modules', pkg, file);
+                        fs.mkdirSync(path.dirname(target), {recursive: true});
+                        fs.writeFileSync(target, text);
+                    }
+                };
+                install('alpha', {
+                    'package.json': '{"name": "alpha", "version": "1.0.0", "types": "index.d.ts"}',
+                    'index.d.ts': 'export {};',
+                    'sub.d.ts': "export declare const brand: 'alpha'; export declare function f(): void;"
+                });
+                install('beta', {
+                    'package.json': '{"name": "beta", "version": "1.0.0", "types": "index.d.ts"}',
+                    'index.d.ts': "export declare const brand: 'beta'; export declare function f(): void;"
+                });
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        //language=typescript
+                        typescript(
+                            `
+                                import * as beta from 'beta';
+
+                                function local(require: (name: string) => typeof beta) {
+                                    require('alpha/sub').f();
+                                }
+
+                                async function reassigned() {
+                                    let m: typeof import('alpha/sub') | typeof import('beta') = await import('alpha/sub');
+                                    m = await import('beta');
+                                    m.f();
+                                }
+                            `,
+                            //@formatter:off
+                            `
+                                import * as beta from 'beta';
+
+                                function local(require: (name: string) => typeof beta) {
+                                    /*~~(beta#f)~~>*/require('alpha/sub').f();
+                                }
+
+                                async function reassigned() {
+                                    let m: typeof import('alpha/sub') | typeof import('beta') = await import('alpha/sub');
+                                    m = await import('beta');
+                                    /*~~(beta#f)~~>*/m.f();
+                                }
+                            `
+                            //@formatter:on
+                        ),
+                        //language=json
+                        packageJson(`{"name": "test-project", "version": "1.0.0"}`)
                     )
                 );
             }, {unsafeCleanup: true});

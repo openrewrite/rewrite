@@ -156,9 +156,11 @@ public final class TomlTableValue {
             // A table spanning lines: the new property gets a line of its own, after any comment, and `}` keeps its line
             String closeIndent = lastWhitespace.substring(newline + 1);
             String indent;
-            if (!values.isEmpty()) {
-                indent = values.get(values.size() - 1).getElement().getPrefix().getIndent();
-            } else if (beforeClose.getWhitespace().contains("\n")) {
+            Space lastPrefix = values.isEmpty() ? Space.EMPTY : values.get(values.size() - 1).getElement().getPrefix();
+            if (lastPrefix.getLastWhitespace().contains("\n")) {
+                indent = lastPrefix.getIndent();
+            } else if (values.isEmpty() && !beforeClose.getComments().isEmpty() &&
+                       beforeClose.getWhitespace().contains("\n")) {
                 // Indented like the comment that opens an otherwise empty table
                 indent = Space.format(beforeClose.getWhitespace()).getIndent();
             } else {

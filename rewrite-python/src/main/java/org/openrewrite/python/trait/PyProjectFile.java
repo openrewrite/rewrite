@@ -313,7 +313,8 @@ public class PyProjectFile implements PythonDependencyFile {
                     return kv;
                 }
                 Toml.Literal literal = (Toml.Literal) kv.getValue();
-                if (normalizedVersion.equals(literal.getValue())) {
+                if (normalizedVersion.equals(literal.getValue()) || literal.getValue() instanceof String &&
+                        PyProjectHelper.startsAtOrAbove((String) literal.getValue(), normalizedVersion)) {
                     return kv;
                 }
                 return kv.withValue(literal.withSource("\"" + normalizedVersion + "\"").withValue(normalizedVersion));

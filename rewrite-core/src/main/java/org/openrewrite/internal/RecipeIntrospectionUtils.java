@@ -31,6 +31,8 @@ import java.util.Objects;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.unmodifiableList;
 
+import java.lang.reflect.Parameter;
+
 @SuppressWarnings("unused")
 public class RecipeIntrospectionUtils {
 
@@ -117,7 +119,7 @@ public class RecipeIntrospectionUtils {
         Constructor<?> constructor = getConstructor(clazz, args);
         Object [] constructorArgs = new Object[constructor.getParameterCount()];
         for (int i = 0; i < constructor.getParameters().length; i++) {
-            java.lang.reflect.Parameter param = constructor.getParameters()[i];
+            Parameter param = constructor.getParameters()[i];
             if (args != null && args.containsKey(param.getName())) {
                 constructorArgs[i] = convert(args.get(param.getName()), param.getType());
             } else if (param.getType().isPrimitive()) {

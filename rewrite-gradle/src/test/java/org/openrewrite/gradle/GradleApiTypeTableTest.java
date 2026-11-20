@@ -17,12 +17,22 @@ package org.openrewrite.gradle;
 
 import groovy.lang.Closure;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.groovy.GroovyParser;
+import org.openrewrite.groovy.tree.G;
+import org.openrewrite.java.search.FindMethods;
+import org.openrewrite.marketplace.RecipeClassLoader;
 
+import java.io.File;
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
+import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.function.Predicate;
 import java.util.jar.JarFile;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -80,5 +90,70 @@ class GradleApiTypeTableTest {
           .contains("org/w3c/dom/Element")
           .allMatch(name -> jdk.getResource(name + ".class") != null || groovyCore.contains(name) ||
                             classesByVersion.get(version).contains(name)));
+    }
+
+    @Test
+    void recipeClassLoaderParsesAgainstTheTypeTableBesideGradleParser() throws Exception {
+        Path javaClasses = Path.of(GradleParser.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+        Path build = javaClasses.resolve("../../..").normalize();
+        Path typeTableDir = build.resolve("resources/main");
+        Path rewriteGroovy = Path.of(GroovyParser.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+        // A host with rewrite-groovy but without rewrite-gradle, which has none of the recipe's Gradle API
+        List<URL> host = new ArrayList<>();
+        for (String entry : System.getProperty("java.class.path").split(File.pathSeparator)) {
+            Path path = Path.of(entry);
+            if (!path.startsWith(build) && !hasGradleApiClasses(path)) {
+                host.add(path.toUri().toURL());
+            }
+        }
+        URL[] recipeJar = {
+          javaClasses.toUri().toURL(),
+          build.resolve("classes/groovy/main").toUri().toURL(),
+          typeTableDir.toUri().toURL(),
+          rewriteGroovy.toUri().toURL(),
+          DependsOnIsTypeAttributed.class.getProtectionDomain().getCodeSource().getLocation()
+        };
+        Thread thread = Thread.currentThread();
+        ClassLoader contextClassLoader = thread.getContextClassLoader();
+        try (URLClassLoader hostLoader = new URLClassLoader(host.toArray(URL[]::new), ClassLoader.getPlatformClassLoader());
+             RecipeClassLoader recipeLoader = new RecipeClassLoader(recipeJar, hostLoader)) {
+            // TypeTable reads the context class loader's type tables too, and this test's own loader has them all
+            thread.setContextClassLoader(hostLoader);
+            @SuppressWarnings("unchecked")
+            Predicate<String> dependsOnIsTypeAttributed = (Predicate<String>) recipeLoader
+              .loadClass(DependsOnIsTypeAttributed.class.getName()).getConstructor().newInstance();
+            assertThat(dependsOnIsTypeAttributed.test("tasks.register('report') { dependsOn 'check' }")).isTrue();
+        } finally {
+            thread.setContextClassLoader(contextClassLoader);
+        }
+    }
+
+    /**
+     * The Groovy compiler attributes types from the classes on its class loader as well as from the type table, so the
+     * host leaves out the Gradle API this module's tests run with.
+     */
+    private static boolean hasGradleApiClasses(Path classpathEntry) throws IOException {
+        String task = "org/gradle/api/Task.class";
+        if (Files.isDirectory(classpathEntry)) {
+            return Files.exists(classpathEntry.resolve(task));
+        }
+        if (!Files.isRegularFile(classpathEntry)) {
+            return false;
+        }
+        try (JarFile jar = new JarFile(classpathEntry.toFile())) {
+            return jar.getEntry(task) != null;
+        }
+    }
+
+    public static class DependsOnIsTypeAttributed implements Predicate<String> {
+        @Override
+        public boolean test(String script) {
+            // Through Parser.parse, as AddDependencyVisitor parses its template
+            G.CompilationUnit cu = GradleParser.builder().build().parse(new InMemoryExecutionContext(), script)
+              .map(GradleParser.requireParsed(G.CompilationUnit.class))
+              .findFirst()
+              .orElseThrow();
+            return !FindMethods.find(cu, "org.gradle.api.Task dependsOn(..)", true).isEmpty();
+        }
     }
 }

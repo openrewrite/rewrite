@@ -104,12 +104,13 @@ case class PackageSemicolon(id: UUID) extends Marker {
 
 /**
  * Marks a Scala 3 `given` declaration. Applied to:
- * - `J.VariableDeclarations` for named given aliases (`given x: Int = 42`)
- *   and named given instances with `with` bodies (`given x: Foo with { ... }`).
+ * - `J.VariableDeclarations` for named given aliases (`given x: Int = 42`).
  * - `J.MethodDeclaration` for method-shaped given aliases
  *   (`given listOrd[T](using Ord[T]): Ord[List[T]] = ...`).
+ * - `J.ClassDeclaration` for givens that define what they implement
+ *   (`given intOrd: Ord[Int] with { ... }`, `given Foo(1)`).
  *
- * The printer uses this to emit `given` in place of `val`/`def`.
+ * The printer uses this to emit `given` in place of `val`/`def`/`object`/`class`.
  */
 case class Given(id: UUID) extends Marker {
   override def getId(): UUID = id
@@ -127,11 +128,11 @@ case class OmitName(id: UUID) extends Marker {
 }
 
 /**
- * Captures additional constructor parameter lists for a Scala 3 class declared
- * with curried constructor params, e.g. `class C(a: Int)(using Executor)`.
- * The J.ClassDeclaration's `primaryConstructor` JContainer only models the first
- * list; this marker holds the verbatim source text of the remaining lists so the
- * printer can re-emit them after the first `)`. Includes the surrounding parens.
+ * The verbatim source of the argument lists after the first in a curried
+ * `new Foo(1)(2) { ... }`, parens included, which the printer re-emits after
+ * the first `)`. A class declaration's later parameter clauses are parameters
+ * marked with `ParameterClause`. LSTs written before that carry this marker on
+ * the primary constructor instead, and it still prints there.
  */
 case class ExtraConstructorParamLists(id: UUID, text: String) extends Marker {
   override def getId(): UUID = id

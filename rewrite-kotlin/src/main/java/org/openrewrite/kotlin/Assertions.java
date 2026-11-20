@@ -250,7 +250,7 @@ public final class Assertions {
             List<FindMissingTypes.MissingTypeResult> missingTypeResults = findMissingTypes(sf);
             missingTypeResults = missingTypeResults.stream()
                     .filter(missingType -> {
-                        if (missingType.getJ() instanceof J.Identifier) {
+                        if (missingType.getJ() instanceof J.Identifier || missingType.getJ() instanceof J.FieldAccess) {
                             return typeValidation.identifiers();
                         } else if (missingType.getJ() instanceof J.ClassDeclaration) {
                             return typeValidation.classDeclarations();
@@ -266,6 +266,7 @@ public final class Assertions {
                             return true;
                         }
                     })
+                    .filter(missingType -> !typeValidation.allowMissingType().apply(missingType))
                     .collect(toList());
             if (!missingTypeResults.isEmpty()) {
                 throw new IllegalStateException("LST contains missing or invalid type information\n" + missingTypeResults.stream().map(v -> v.getPath() + "\n" + v.getPrintedTree())
@@ -421,6 +422,64 @@ public final class Assertions {
         }
 
         @Override
+        public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
+            J.FieldAccess fa = super.visitFieldAccess(fieldAccess, ctx);
+            if (!isWellFormedType(fa.getType(), seenTypes) && !isAllowedToHaveUnknownType(fieldAccess)) {
+                fa = SearchResult.found(fa, "FieldAccess type is missing or malformed");
+            }
+            return fa;
+        }
+
+        private boolean isAllowedToHaveUnknownType(J.FieldAccess fa) {
+            if (inPackageDeclaration() || inImport()) {
+                return true;
+            }
+            if ("class".equals(fa.getSimpleName())) {
+                // An unattributed class literal target is reported on the target itself
+                return !isWellFormedType(fa.getTarget().getType(), seenTypes);
+            }
+            Tree parent = getCursor().getParentTreeCursor().getValue();
+            // An untyped qualifier is a package only if it names the package of what its parent refers to.
+            // Kotlin qualifies top-level members, not only types, with their package.
+            JavaType.FullyQualified referenced;
+            if (parent instanceof J.FieldAccess && fa == ((J.FieldAccess) parent).getTarget() &&
+                !"class".equals(((J.FieldAccess) parent).getSimpleName())) {
+                J.FieldAccess member = (J.FieldAccess) parent;
+                if (!isWellFormedType(member.getType(), seenTypes)) {
+                    return isPackageName(fa); // reported on the parent instead
+                }
+                JavaType.Variable field = member.getName().getFieldType();
+                referenced = TypeUtils.asFullyQualified(field != null ? field.getOwner() : member.getType());
+            } else if (parent instanceof J.MethodInvocation && fa == ((J.MethodInvocation) parent).getSelect()) {
+                JavaType.Method method = ((J.MethodInvocation) parent).getMethodType();
+                if (method == null || !isWellFormedType(method, seenTypes)) {
+                    return isPackageName(fa); // reported on the call instead
+                }
+                referenced = method.getDeclaringType();
+            } else {
+                return false;
+            }
+            return referenced != null && referenced.getPackageName().equals(dottedName(fa)) && isPackageName(fa);
+        }
+
+        // Neither a package nor any segment of its name has a type
+        private boolean isPackageName(Expression name) {
+            if (isWellFormedType(name.getType(), seenTypes)) {
+                return false;
+            }
+            return name instanceof J.Identifier ||
+                   name instanceof J.FieldAccess && isPackageName(((J.FieldAccess) name).getTarget());
+        }
+
+        private String dottedName(Expression name) {
+            if (name instanceof J.FieldAccess) {
+                J.FieldAccess fa = (J.FieldAccess) name;
+                return dottedName(fa.getTarget()) + '.' + fa.getSimpleName();
+            }
+            return name instanceof J.Identifier ? ((J.Identifier) name).getSimpleName() : "";
+        }
+
+        @Override
         public J.MemberReference visitMemberReference(J.MemberReference memberRef, ExecutionContext ctx) {
             J.MemberReference mr = super.visitMemberReference(memberRef, ctx);
             JavaType.Method type = mr.getMethodType();
@@ -449,7 +508,9 @@ public final class Assertions {
             JavaType.Method type = md.getMethodType();
             if (!isWellFormedType(type, seenTypes)) {
                 md = SearchResult.found(md, "MethodDeclaration type is missing or malformed");
-            } else if (!md.getSimpleName().equals(type.getName()) && !type.isConstructor() && !"anonymous".equals(type.getName())) {
+            } else if (!md.getSimpleName().equals(type.getName()) && !type.isConstructor() && !"anonymous".equals(type.getName()) &&
+                       // An accessor is declared by its `get`/`set` keyword but typed by its JVM name, such as `getName`.
+                       !(getCursor().getParentTreeCursor().getValue() instanceof K.Property)) {
                 md = SearchResult.found(md, "type information has a different method name '" + type.getName() + "'");
             }
             if (md.getName().getType() != null && type != md.getName().getType()) {

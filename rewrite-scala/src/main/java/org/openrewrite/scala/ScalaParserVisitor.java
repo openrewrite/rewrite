@@ -75,23 +75,6 @@ public class ScalaParserVisitor {
         J.Package packageDecl = result.getPackageDecl();
         List<JRightPadded<Statement>> statements = result.getStatements();
 
-
-        // Filter out any Unknown statements that contain the entire source with package
-        if (packageDecl != null) {
-            final String packageName = packageDecl.getPackageName();
-            statements = statements.stream()
-                .filter(rp -> {
-                    if (rp.getElement() instanceof J.Unknown) {
-                        String text = ((J.Unknown) rp.getElement()).getSource().getText().trim();
-                        // Skip if this Unknown contains the same package declaration
-                        boolean shouldFilter = text.startsWith("package " + packageName);
-                        return !shouldFilter;
-                    }
-                    return true;
-                })
-                .collect(java.util.stream.Collectors.toList());
-        }
-
         // Don't include empty package declarations
         if (packageDecl != null && packageDecl.getExpression() instanceof J.Identifier) {
             J.Identifier id = (J.Identifier) packageDecl.getExpression();
@@ -109,22 +92,7 @@ public class ScalaParserVisitor {
                 // A file of only whitespace and comments has no statements; it is modeled entirely by EOF.
                 eof = whole;
             } else {
-                J.Unknown.Source unknownSource = new J.Unknown.Source(
-                    randomId(),
-                    EMPTY,
-                    Markers.EMPTY,
-                    source
-                );
-
-                J.Unknown unknown = new J.Unknown(
-                    randomId(),
-                    EMPTY,
-                    Markers.EMPTY,
-                    unknownSource
-                );
-
-                statements.add(JRightPadded.build(unknown));
-                eof = EMPTY;
+                throw new UnsupportedOperationException("No Scala statements could be mapped from " + sourcePath);
             }
         }
 

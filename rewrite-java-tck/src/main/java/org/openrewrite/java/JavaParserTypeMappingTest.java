@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.ExecutionContext;
@@ -48,14 +49,19 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 @SuppressWarnings({"ConstantConditions", "PatternVariableCanBeUsed", "StatementWithEmptyBody"})
 class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
 
-    @Language("java")
-    private final String goat = StringUtils.readFully(JavaParserTypeMappingTest.class.getResourceAsStream("/JavaTypeGoat.java"));
+    // Every test reads the same compilation unit, so none may change its types, as `unsafeSet` would.
+    private static J.@Nullable CompilationUnit goatCu;
 
-    private final J.CompilationUnit goatCu = JavaParser.fromJavaVersion().build()
-      .parse(goat)
-      .findFirst()
-      .map(J.CompilationUnit.class::cast)
-      .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"));
+    private static J.CompilationUnit goatCu() {
+        if (goatCu == null) {
+            goatCu = JavaParser.fromJavaVersion().build()
+              .parse(StringUtils.readFully(JavaParserTypeMappingTest.class.getResourceAsStream("/JavaTypeGoat.java")))
+              .findFirst()
+              .map(J.CompilationUnit.class::cast)
+              .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"));
+        }
+        return goatCu;
+    }
 
     @Override
     public JavaType.FullyQualified classType(String fqn) {
@@ -69,7 +75,7 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
                 }
                 return super.visitClassDeclaration(classDecl, o);
             }
-        }.visit(goatCu, 0);
+        }.visit(goatCu(), 0);
         return type.get();
     }
 
@@ -301,6 +307,40 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
                   }
               }
               """
+          )
+        );
+    }
+
+    @Test
+    void initializerBlockLocalIsOwnedByTheInitializer() {
+        rewriteRun(
+          java(
+            """
+              class C {
+                  { int block = 1; block++; }
+                  static { int sblock = 1; sblock++; }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                List<J.Identifier> locals = new ArrayList<>();
+                new JavaIsoVisitor<List<J.Identifier>>() {
+                    @Override
+                    public J.Identifier visitIdentifier(J.Identifier identifier, List<J.Identifier> found) {
+                        if (identifier.getSimpleName().endsWith("block")) {
+                            found.add(identifier);
+                        }
+                        return identifier;
+                    }
+                }.visit(cu, locals);
+
+                assertThat(locals).hasSize(4).allSatisfy(local ->
+                  assertThat(local.getFieldType().getOwner()).isInstanceOfSatisfying(JavaType.Method.class, owner -> {
+                      assertThat(owner.getDeclaringType().getFullyQualifiedName()).isEqualTo("C");
+                      assertThat(owner.getName()).isEmpty();
+                      assertThat(owner.getReturnType()).isEqualTo(JavaType.Primitive.Void);
+                      assertThat(owner.getParameterTypes()).isEmpty();
+                  }));
+            })
           )
         );
     }

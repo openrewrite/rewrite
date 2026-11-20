@@ -229,4 +229,265 @@ class ChangeFieldNameTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void qualifyWhereALocalHasTheNewName() {
+        rewriteRun(
+          spec -> spec.recipe(changeFieldName("Test", "count", "n")),
+          java(
+            """
+              class Test {
+                  int count;
+                  static int total;
+
+                  int add(int n) {
+                      return count + n;
+                  }
+
+                  int unshadowed() {
+                      return count;
+                  }
+
+                  class Inner {
+                      int add(int n) {
+                          return count + n;
+                      }
+                  }
+              }
+              """,
+            """
+              class Test {
+                  int n;
+                  static int total;
+
+                  int add(int n) {
+                      return this.n + n;
+                  }
+
+                  int unshadowed() {
+                      return n;
+                  }
+
+                  class Inner {
+                      int add(int n) {
+                          return Test.this.n + n;
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void qualifyWhereANestedClassHasAFieldOfTheNewName() {
+        rewriteRun(
+          spec -> spec.recipe(changeFieldName("Test", "count", "n")),
+          java(
+            """
+              class Test {
+                  int count;
+
+                  class Inner {
+                      int n;
+
+                      int add() {
+                          return count + n;
+                      }
+                  }
+              }
+              """,
+            """
+              class Test {
+                  int n;
+
+                  class Inner {
+                      int n;
+
+                      int add() {
+                          return Test.this.n + n;
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void importTheClassAStaticallyImportedFieldIsQualifiedWith() {
+        rewriteRun(
+          spec -> spec.recipe(changeFieldName("com.acme.Totals", "total", "n")),
+          java(
+            """
+              package com.acme;
+
+              public class Totals {
+                  public static int total;
+              }
+              """,
+            """
+              package com.acme;
+
+              public class Totals {
+                  public static int n;
+              }
+              """
+          ),
+          java(
+            """
+              package com.other;
+
+              import static com.acme.Totals.total;
+
+              class Test {
+                  int add(int n) {
+                      return total + n;
+                  }
+              }
+              """,
+            """
+              package com.other;
+
+              import com.acme.Totals;
+
+              import static com.acme.Totals.n;
+
+              class Test {
+                  int add(int n) {
+                      return Totals.n + n;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void qualifyAStaticFieldWithItsClass() {
+        rewriteRun(
+          spec -> spec.recipe(changeFieldName("Test", "total", "n")),
+          java(
+            """
+              class Test {
+                  static int total;
+
+                  static int add(int n) {
+                      return total + n;
+                  }
+              }
+              """,
+            """
+              class Test {
+                  static int n;
+
+                  static int add(int n) {
+                      return Test.n + n;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void qualifyAnInheritedFieldWithThis() {
+        rewriteRun(
+          spec -> spec.recipe(changeFieldName("Base", "count", "n")),
+          java(
+            """
+              class Base {
+                  protected int count;
+              }
+              """,
+            """
+              class Base {
+                  protected int n;
+              }
+              """
+          ),
+          java(
+            """
+              class Test extends Base {
+                  int add(int n) {
+                      return count + n;
+                  }
+              }
+              """,
+            """
+              class Test extends Base {
+                  int add(int n) {
+                      return this.n + n;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void qualifyWhereTheFieldIsSelectedFrom() {
+        rewriteRun(
+          spec -> spec.recipe(changeFieldName("Test", "counts", "n")),
+          java(
+            """
+              class Test {
+                  int[] counts;
+
+                  int size(int[] n) {
+                      return counts.length + n.length;
+                  }
+              }
+              """,
+            """
+              class Test {
+                  int[] n;
+
+                  int size(int[] n) {
+                      return this.n.length + n.length;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void qualifyInTheInitializerOfALocal() {
+        rewriteRun(
+          spec -> spec.recipe(changeFieldName("Test", "count", "n")),
+          java(
+            """
+              class Test {
+                  int count;
+
+                  int add(int n) {
+                      int sum = count + n;
+                      return sum;
+                  }
+
+                  int copy() {
+                      int n = count;
+                      return n;
+                  }
+              }
+              """,
+            """
+              class Test {
+                  int n;
+
+                  int add(int n) {
+                      int sum = this.n + n;
+                      return sum;
+                  }
+
+                  int copy() {
+                      int n = this.n;
+                      return n;
+                  }
+              }
+              """
+          )
+        );
+    }
 }
