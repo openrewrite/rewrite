@@ -18,6 +18,7 @@ import {Cursor, rootCursor, SourceFile} from "./tree";
 import {createTwoFilesPatch} from "diff";
 import {TreePrinters} from "./print";
 import {Recipe, ScanningRecipe} from "./recipe";
+import {editPreconditionsRecipeList, prepareEditPreconditions} from "./edit-preconditions";
 
 export interface RecipeRun {
     changeset: Result[]
@@ -51,7 +52,7 @@ type RecipeLists = WeakMap<Recipe, Recipe[]>;
 async function subRecipes(recipe: Recipe, recipeLists: RecipeLists): Promise<Recipe[]> {
     let resolved = recipeLists.get(recipe);
     if (resolved === undefined) {
-        resolved = await recipe.recipeList();
+        resolved = await editPreconditionsRecipeList(recipe);
         recipeLists.set(recipe, resolved);
     }
     return resolved;
@@ -131,6 +132,7 @@ export async function* scheduleRunStreaming(
     ctx: ExecutionContext,
     onProgress?: ProgressCallback
 ): AsyncGenerator<Result, void, undefined> {
+    recipe = await prepareEditPreconditions(recipe);
     const cursor = rootCursor();
     const recipeLists: RecipeLists = new WeakMap();
     const isScanning = await hasScanningRecipe(recipe, recipeLists);

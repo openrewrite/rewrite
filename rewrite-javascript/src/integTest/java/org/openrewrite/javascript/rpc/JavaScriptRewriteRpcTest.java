@@ -23,6 +23,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.*;
+import org.openrewrite.config.CompositeRecipe;
 import org.openrewrite.config.DeclarativeRecipe;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.RecipeDescriptor;
@@ -1085,6 +1086,35 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     }
 
     /**
+     * A JS scanning recipe whose edit preconditions are a JS scanning recipe and a {@code hasSourcePath} reference:
+     * the host evaluates both, and their result also gates the Java recipe in its recipe list.
+     */
+    @Test
+    void jsRecipeEditsOnlyTheSourceFilesThatMeetItsEditPreconditions() {
+        Environment env = Environment.builder()
+          .scanRuntimeClasspath("org.openrewrite.text")
+          .build();
+        JavaScriptRewriteRpc.setFactory(JavaScriptRewriteRpc.builder()
+          .recipeInstallDir(tempDir)
+          .marketplace(env.toMarketplace(RecipeBundle.runtimeClasspath()))
+          .resolvers(List.of(new RuntimeClasspathResolver(env)))
+          .log(tempDir.resolve("rpc.log")));
+        assertThat(client().installRecipes(new File("rewrite/dist-fixtures/edit-preconditions.js"))
+          .getRecipesInstalled()).isGreaterThan(0);
+        Recipe recipe = client().prepareRecipe("org.openrewrite.example.text.exclaim-where-go");
+
+        assertThat(recipe.getDescriptor().getPreconditions())
+          .extracting(RecipeDescriptor::getName)
+          .containsExactly("org.openrewrite.example.text.mentions-go", "org.openrewrite.FindSourceFiles");
+        rewriteRun(
+          spec -> spec.recipe(recipe),
+          text("go now", "went now!", spec -> spec.path("src/go.txt")),
+          text("stop", spec -> spec.path("src/stop.txt")),
+          text("go", spec -> spec.path("src/go.md"))
+        );
+    }
+
+    /**
      * A {@link RecipeBundleResolver} that materializes a listed recipe from an {@link Environment}
      * scanned off the JVM classpath, the shape of a host's runtime-classpath resolver.
      */
@@ -1158,6 +1188,86 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
             }.visit(cu, 0))
           )
         );
+    }
+
+    /**
+     * A JS recipe under edit preconditions is reached through a decorator, which must still record the peer's ref
+     * checkpoint before the file's first visit. Otherwise the checkpoint is taken at the next, undecorated JS recipe,
+     * the host rolls back fewer refs than the peer, and the next file refers to an object the peer has dropped.
+     */
+    @Test
+    void jsRecipeUnderEditPreconditionsKeepsRefsInStepWithThePeer() {
+        installRecipes();
+        Recipe changeText = client().prepareRecipe("org.openrewrite.example.text.change-text", Map.of("text", "changed"));
+        rewriteRun(
+          spec -> spec.recipe(new CompositeRecipe(List.of(
+            new EditsWhereFound(client().prepareRecipe("org.openrewrite.example.text.change-text", Map.of("text", "changed"))),
+            changeText))),
+          text("one", "changed"),
+          text("two", "changed")
+        );
+    }
+
+    /**
+     * Like {@link #jsRecipeUnderEditPreconditionsKeepsRefsInStepWithThePeer()}, but the peer is first visited by a JS
+     * edit precondition of a Java recipe.
+     */
+    @Test
+    void jsEditPreconditionOfAJavaRecipeKeepsRefsInStepWithThePeer() {
+        installRecipes();
+        Recipe changeText = client().prepareRecipe("org.openrewrite.example.text.change-text", Map.of("text", "changed"));
+        rewriteRun(
+          spec -> spec.recipe(new CompositeRecipe(List.of(
+            new EditsWhereFound(client().prepareRecipe("org.openrewrite.example.text.change-text", Map.of("text", "found")),
+              new org.openrewrite.text.ChangeText("changed")),
+            changeText))),
+          text("one", "changed"),
+          text("two", "changed")
+        );
+    }
+
+    static class EditsWhereFound extends ScanningRecipe<Integer> {
+        private final Recipe condition;
+        private final Recipe child;
+
+        EditsWhereFound(Recipe child) {
+            this(new FindSourceFiles("**"), child);
+        }
+
+        EditsWhereFound(Recipe condition, Recipe child) {
+            this.condition = condition;
+            this.child = child;
+        }
+
+        @Override
+        public String getDisplayName() {
+            return "Edits where found";
+        }
+
+        @Override
+        public String getDescription() {
+            return "Runs its recipe list on every source file that a path search finds.";
+        }
+
+        @Override
+        public Integer getInitialValue(ExecutionContext ctx) {
+            return 0;
+        }
+
+        @Override
+        public TreeVisitor<?, ExecutionContext> getScanner(Integer acc) {
+            return TreeVisitor.noop();
+        }
+
+        @Override
+        public List<Recipe> getEditPreconditions() {
+            return List.of(condition);
+        }
+
+        @Override
+        public List<Recipe> getRecipeList() {
+            return List.of(child);
+        }
     }
 
     private File installRecipes() {

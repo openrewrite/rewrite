@@ -15,9 +15,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {Cursor, JavaScript, Recipe, RecipeMarketplace, rootCursor} from "../../src";
+import {
+    Cursor,
+    ExecutionContext,
+    JavaScript,
+    Recipe,
+    RecipeMarketplace,
+    rootCursor,
+    SourceFile,
+    suppressDataTables,
+    suppressedContext,
+    TreeVisitor
+} from "../../src";
 import {RewriteRpc} from "../../src/rpc/rewrite-rpc";
-import {PlainText, text} from "../../src/text";
+import {PlainText, PlainTextParser, text} from "../../src/text";
 import {json, Json} from "../../src/json";
 import {xml, Xml} from "../../src/xml";
 import {RecipeSpec} from "../../src/test";
@@ -474,6 +485,39 @@ describe("Rewrite RPC", () => {
         );
     });
 
+    test("a visit made while deciding an edit precondition drops the data table rows on the remote too", async () => {
+        // given
+        const suppressed: boolean[] = [];
+
+        class RecordsSuppression extends Recipe {
+            name = "org.openrewrite.example.text.records-suppression";
+            displayName = "Records suppression";
+            description = "Records whether the data table rows it writes are dropped.";
+
+            async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
+                return new class extends TreeVisitor<any, ExecutionContext> {
+                    protected async preVisit(tree: any, ctx: ExecutionContext): Promise<any> {
+                        suppressed.push(suppressedContext(ctx) !== undefined);
+                        this.stopAfterPreVisit();
+                        return tree;
+                    }
+                };
+            }
+        }
+
+        await serverMarketplace.install(RecordsSuppression, JavaScript);
+        const recipe = await client.prepareRecipe("org.openrewrite.example.text.records-suppression");
+        const [sourceFile] = await parsePlainText("hello");
+        const ctx = new ExecutionContext();
+
+        // when
+        await client.visit(sourceFile, recipe.editVisitor, suppressDataTables(ctx));
+        await client.visit(sourceFile, recipe.editVisitor, ctx);
+
+        // then
+        expect(suppressed).toEqual([true, false]);
+    });
+
     // Older Java hosts reject unknown response fields, so causesAnotherCycle is only sent when asked for.
     describe("causesAnotherCycle", () => {
         class CausesAnotherCycle extends Recipe {
@@ -579,3 +623,11 @@ describe("Rewrite RPC", () => {
         }, {unsafeCleanup: true});
     });
 });
+
+async function parsePlainText(...sources: string[]): Promise<SourceFile[]> {
+    const parsed: SourceFile[] = [];
+    for await (const sourceFile of new PlainTextParser().parse(...sources.map((text, i) => ({text, sourcePath: `file${i}.txt`})))) {
+        parsed.push(sourceFile);
+    }
+    return parsed;
+}

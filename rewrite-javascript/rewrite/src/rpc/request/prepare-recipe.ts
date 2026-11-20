@@ -29,7 +29,8 @@ export class PrepareRecipe {
     constructor(private readonly id: string,
                 private readonly options?: any,
                 // Older Java hosts reject unknown response fields, so causesAnotherCycle is only sent when asked.
-                private readonly acceptsCausesAnotherCycle?: boolean) {
+                private readonly acceptsCausesAnotherCycle?: boolean,
+                private readonly acceptsEditPreconditionRecipes?: boolean) {
     }
 
     static handle(connection: MessageConnection,
@@ -44,7 +45,10 @@ export class PrepareRecipe {
                 metricsCsv,
                 (context) => async (request) => {
                     context.target = request.id;
-                    const accepts = request.acceptsCausesAnotherCycle === true;
+                    const accepts: Accepts = {
+                        causesAnotherCycle: request.acceptsCausesAnotherCycle === true,
+                        editPreconditionRecipes: request.acceptsEditPreconditionRecipes === true
+                    };
                     const recipeCtor = marketplace.findRecipe(request.id);
                     if (!recipeCtor) {
                         // A miss means the host owns this recipe (e.g. a Java-delegate child a host
@@ -73,7 +77,7 @@ export class PrepareRecipe {
                                          snowflake: ReturnType<typeof SnowflakeId>,
                                          preparedRecipes: Map<String, Recipe>,
                                          marketplace: RecipeMarketplace,
-                                         acceptsCausesAnotherCycle: boolean): Promise<PrepareRecipeResponse> {
+                                         accepts: Accepts): Promise<PrepareRecipeResponse> {
         const id = snowflake.generate();
         const delegatesTo = PrepareRecipe.delegatesTo(recipe);
         if (delegatesTo) {
@@ -111,35 +115,56 @@ export class PrepareRecipe {
             scanVisitor: recipe instanceof ScanningRecipe ? `scan:${id}` : undefined,
             scanPreconditions: scanPreconditions
         };
-        if (acceptsCausesAnotherCycle && recipe.causesAnotherCycle === true) {
+        if (accepts.causesAnotherCycle && recipe.causesAnotherCycle === true) {
             response.causesAnotherCycle = true;
+        }
+
+        const editPreconditionRecipes = recipe instanceof ScanningRecipe ? await recipe.editPreconditions() : [];
+        if (editPreconditionRecipes.length > 0) {
+            if (!accepts.editPreconditionRecipes) {
+                throw new Error(`Recipe \`${descriptor.name}\` has edit preconditions, which this host cannot ` +
+                    "evaluate. Run it with a newer version of the host.");
+            }
+            response.editPreconditionRecipes = [];
+            for (const condition of editPreconditionRecipes) {
+                response.editPreconditionRecipes.push(await PrepareRecipe.prepareChild(condition instanceof RecipeRef ?
+                        new DelegatingRecipe(condition.recipeName, {...condition.options}) : condition,
+                    snowflake, preparedRecipes, marketplace, accepts));
+            }
         }
 
         const childResponses: PrepareRecipeResponse[] = [];
         for (const child of await recipe.recipeList()) {
-            if (child instanceof RpcRecipe) {
-                // Already prepared on the host: hand it back by name with the options its parent set.
-                const options: Record<string, any> = {};
-                for (const option of (await child.descriptor()).options) {
-                    if (option.value != null) {
-                        options[option.name] = option.value;
-                    }
-                }
-                childResponses.push(await PrepareRecipe.prepareInstance(new DelegatingRecipe(child.name, options),
-                    snowflake, preparedRecipes, marketplace, acceptsCausesAnotherCycle));
-                continue;
-            }
-            // Register a child that was instantiated in recipeList() but never installed, so a peer
-            // that re-prepares children by name (rather than consuming recipeList) can still find it.
-            if (!PrepareRecipe.delegatesTo(child) && !marketplace.findRecipe(child.name)) {
-                await marketplace.install(child.constructor as any, []);
-            }
-            childResponses.push(await PrepareRecipe.prepareInstance(child, snowflake, preparedRecipes, marketplace,
-                acceptsCausesAnotherCycle));
+            childResponses.push(await PrepareRecipe.prepareChild(child, snowflake, preparedRecipes, marketplace,
+                accepts));
         }
         response.recipeList = childResponses;
 
         return response;
+    }
+
+    private static async prepareChild(child: Recipe,
+                                      snowflake: ReturnType<typeof SnowflakeId>,
+                                      preparedRecipes: Map<String, Recipe>,
+                                      marketplace: RecipeMarketplace,
+                                      accepts: Accepts): Promise<PrepareRecipeResponse> {
+        if (child instanceof RpcRecipe) {
+            // Already prepared on the host: hand it back by name with the options its parent set.
+            const options: Record<string, any> = {};
+            for (const option of (await child.descriptor()).options) {
+                if (option.value != null) {
+                    options[option.name] = option.value;
+                }
+            }
+            return PrepareRecipe.prepareInstance(new DelegatingRecipe(child.name, options),
+                snowflake, preparedRecipes, marketplace, accepts);
+        }
+        // Register a child that was instantiated in recipeList() but never installed, so a peer
+        // that re-prepares children by name (rather than consuming recipeList) can still find it.
+        if (!PrepareRecipe.delegatesTo(child) && !marketplace.findRecipe(child.name)) {
+            await marketplace.install(child.constructor as any, []);
+        }
+        return PrepareRecipe.prepareInstance(child, snowflake, preparedRecipes, marketplace, accepts);
     }
 
     /**
@@ -276,6 +301,11 @@ export class PrepareRecipe {
     }
 }
 
+interface Accepts {
+    causesAnotherCycle: boolean
+    editPreconditionRecipes: boolean
+}
+
 export interface DelegatesTo {
     recipeName: string
     options: Record<string, any>
@@ -295,6 +325,12 @@ export interface PrepareRecipeResponse {
      */
     recipeList?: PrepareRecipeResponse[]
     causesAnotherCycle?: boolean
+    /**
+     * The prepared {@link ScanningRecipe#editPreconditions edit preconditions} of this recipe, which the host
+     * evaluates to decide which source files this recipe and its recipe list edit. Only sent when the host asks
+     * with {@code acceptsEditPreconditionRecipes}.
+     */
+    editPreconditionRecipes?: PrepareRecipeResponse[]
 }
 
 /**

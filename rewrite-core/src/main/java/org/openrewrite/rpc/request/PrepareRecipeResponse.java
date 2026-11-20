@@ -63,6 +63,14 @@ public class PrepareRecipeResponse {
     @Nullable
     Boolean causesAnotherCycle;
 
+    /**
+     * The prepared {@link org.openrewrite.ScanningRecipe#getEditPreconditions() edit preconditions} of a remote
+     * recipe, which the host evaluates. Only sent when requested by
+     * {@link PrepareRecipe#getAcceptsEditPreconditionRecipes()}.
+     */
+    @Nullable
+    List<PrepareRecipeResponse> editPreconditionRecipes;
+
     @Value
     public static class DelegatesTo {
         String recipeName;

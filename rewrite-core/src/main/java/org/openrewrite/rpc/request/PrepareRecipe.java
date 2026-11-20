@@ -22,6 +22,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Recipe;
 import org.openrewrite.ScanningRecipe;
+import org.openrewrite.internal.EditPreconditions;
 import org.openrewrite.rpc.internal.PreparedRecipeCache;
 
 import java.util.ArrayList;
@@ -42,6 +43,13 @@ public class PrepareRecipe implements RpcRequest {
     @Nullable
     Boolean acceptsCausesAnotherCycle;
 
+    /**
+     * Set by hosts that evaluate {@link PrepareRecipeResponse#getEditPreconditionRecipes()}. A remote recipe with
+     * edit preconditions cannot run on an older host, which would edit every source file.
+     */
+    @Nullable
+    Boolean acceptsEditPreconditionRecipes;
+
     public interface Loader {
         Recipe load(String id, Map<String, Object> options) throws Exception;
     }
@@ -54,7 +62,7 @@ public class PrepareRecipe implements RpcRequest {
         @Override
         protected Object handle(PrepareRecipe request) throws Exception {
             Recipe recipe = recipeLoader.load(request.id, request.getOptions());
-            return prepareTree(recipe, preparedRecipes, Boolean.TRUE.equals(request.acceptsCausesAnotherCycle));
+            return prepareTree(EditPreconditions.prepare(recipe), preparedRecipes, Boolean.TRUE.equals(request.acceptsCausesAnotherCycle));
         }
 
         static PrepareRecipeResponse prepareTree(Recipe recipe, PreparedRecipeCache preparedRecipes,
@@ -62,7 +70,7 @@ public class PrepareRecipe implements RpcRequest {
             String instanceId = SnowflakeId.generateId();
             preparedRecipes.getInstantiated().put(instanceId, recipe);
             List<PrepareRecipeResponse> children = new ArrayList<>();
-            for (Recipe child : recipe.getRecipeList()) {
+            for (Recipe child : EditPreconditions.recipeList(recipe)) {
                 children.add(prepareTree(child, preparedRecipes, acceptsCausesAnotherCycle));
             }
             return new PrepareRecipeResponse(
@@ -77,7 +85,8 @@ public class PrepareRecipe implements RpcRequest {
                     emptyList(),
                     null,
                     children,
-                    acceptsCausesAnotherCycle && recipe.causesAnotherCycle() ? true : null);
+                    acceptsCausesAnotherCycle && recipe.causesAnotherCycle() ? true : null,
+                    null);
         }
     }
 }

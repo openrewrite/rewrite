@@ -39,7 +39,7 @@ import {
     BatchVisit,
     SetDataTableStore
 } from "./request";
-import {DataTableStore} from "../data-table";
+import {DataTableStore, suppressedContext} from "../data-table";
 import {RecipeMarketplace} from "../marketplace";
 import {initializeMetricsCsv, setCacheSizeProvider} from "./request/metrics";
 import {RpcObjectData, RpcObjectState, RpcReceiveQueue, StringInternTable} from "./queue";
@@ -366,7 +366,8 @@ export class RewriteRpc {
 
     async visit(tree: Tree, visitorName: string, p: any, cursor?: Cursor): Promise<Tree> {
         this.localObjects.set(tree.id.toString(), tree);
-        const pId = this.localObject(p);
+        const suppressed = p instanceof ExecutionContext ? suppressedContext(p) : undefined;
+        const pId = this.localObject(suppressed ?? p);
         const cursorIds = this.getCursorIds(cursor);
 
         const sourceFileType = isSourceFile(tree) ? tree.kind :
@@ -374,7 +375,8 @@ export class RewriteRpc {
 
         const response = await this.connection.sendRequest(
             new rpc.RequestType<Visit, VisitResponse, Error>("Visit"),
-            new Visit(visitorName, sourceFileType, undefined, tree.id.toString(), pId, cursorIds)
+            new Visit(visitorName, sourceFileType, undefined, tree.id.toString(), pId, cursorIds,
+                suppressed ? true : undefined)
         );
         return response.modified ? this.getObject(tree.id.toString(), sourceFileType) : tree;
     }

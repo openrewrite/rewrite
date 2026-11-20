@@ -20,6 +20,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.internal.DataTableSuppressingExecutionContextView;
 import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.rpc.internal.PreparedRecipeCache;
 import org.openrewrite.scheduling.RecipeRunCycle;
@@ -57,6 +58,12 @@ public class Visit implements RpcRequest {
     @Nullable
     List<String> cursor;
 
+    /**
+     * Set by a host deciding an edit precondition, which discards the data table rows the visitor writes.
+     */
+    @Nullable
+    Boolean suppressDataTables;
+
     @RequiredArgsConstructor
     public static class Handler extends JsonRpcMethod<Visit> {
         private final RewriteRpc rpc;
@@ -87,6 +94,9 @@ public class Visit implements RpcRequest {
 
         private Object getVisitorP(Visit request) {
             Object p = getObject.apply(request.getP(), request.getSourceFileType());
+            if (Boolean.TRUE.equals(request.getSuppressDataTables()) && p instanceof ExecutionContext) {
+                p = DataTableSuppressingExecutionContextView.view((ExecutionContext) p);
+            }
             return visitorP(p, request.getVisitor(), preparedRecipes);
         }
     }

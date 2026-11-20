@@ -13,8 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {ExecutionContext, Recipe, ScanningRecipe, TreeVisitor} from "../../src";
-import {check} from "../../src/preconditions";
+import {ExecutionContext, Recipe, RecipeMarketplace, ScanningRecipe, TreeVisitor} from "../../src";
+import {SnowflakeId} from "@akashrajpurohit/snowflake-id";
+import {check, RecipeRef} from "../../src/preconditions";
 import {hasSourcePath} from "../../src/javascript/preconditions";
 import {JsonVisitor} from "../../src/json";
 import {PrepareRecipe} from "../../src/rpc/request/prepare-recipe";
@@ -48,7 +49,63 @@ class RecipeWithPrecondition extends Recipe {
     }
 }
 
+class Condition extends Recipe {
+    name = "org.openrewrite.example.condition";
+    displayName = "Condition";
+    description = "A condition that runs in this process.";
+}
+
+class GuardedByConditions extends ScanningRecipe<{}> {
+    name = "org.openrewrite.example.guarded-by-conditions";
+    displayName = "Guarded by conditions";
+    description = "Edits only the source files that meet its conditions.";
+
+    initialValue(): {} {
+        return {};
+    }
+
+    async editPreconditions(): Promise<(Recipe | RecipeRef)[]> {
+        return [new Condition(), hasSourcePath("**/package.json")];
+    }
+}
+
+function prepare(recipe: Recipe, acceptsEditPreconditionRecipes: boolean, preparedRecipes = new Map<String, Recipe>()) {
+    return PrepareRecipe["prepareInstance"](recipe, SnowflakeId(), preparedRecipes, new RecipeMarketplace(),
+        {causesAnotherCycle: false, editPreconditionRecipes: acceptsEditPreconditionRecipes});
+}
+
 describe("PrepareRecipe", () => {
+    test("sends the edit preconditions prepared for the host to evaluate", async () => {
+        // given
+        const preparedRecipes = new Map<String, Recipe>();
+
+        // when
+        const response = await prepare(new GuardedByConditions(), true, preparedRecipes);
+
+        // then
+        const [condition, reference] = response.editPreconditionRecipes!;
+        expect(condition.descriptor.name).toBe("org.openrewrite.example.condition");
+        expect(preparedRecipes.get(condition.id)).toBeInstanceOf(Condition);
+        expect(condition.editVisitor).toBe(`edit:${condition.id}`);
+        expect(reference.delegatesTo).toEqual({
+            recipeName: "org.openrewrite.FindSourceFiles",
+            options: {filePattern: "**/package.json"}
+        });
+        expect(response.descriptor.preconditions.map(p => p.name))
+            .toEqual(["org.openrewrite.example.condition", "org.openrewrite.FindSourceFiles"]);
+    });
+
+    test("refuses a recipe with edit preconditions when the host cannot evaluate them", async () => {
+        await expect(prepare(new GuardedByConditions(), false)).rejects
+            .toThrow("Recipe `org.openrewrite.example.guarded-by-conditions` has edit preconditions");
+    });
+
+    test("sends no edit preconditions for a recipe without them", async () => {
+        const response = await prepare(new RecipeWithPrecondition(), true);
+
+        expect(response.editPreconditionRecipes).toBeUndefined();
+    });
+
     test("an editor gated by a serializable precondition is built again for each visit", async () => {
         // given
         const prepared = await PrepareRecipe["optimizePreconditions"](new RecipeWithPrecondition(), "edit", []);

@@ -23,6 +23,7 @@ import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.config.DeclarativeRecipe;
+import org.openrewrite.internal.EditPreconditions;
 import org.openrewrite.internal.ExceptionUtils;
 import org.openrewrite.internal.FindRecipeRunException;
 import org.openrewrite.marker.Markup;
@@ -235,9 +236,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                             RewriteRpc currentRpc = recipe instanceof RpcRecipe ? ((RpcRecipe) recipe).getRpc() : null;
                             String scanVisitorName = recipe instanceof RpcRecipe ? ((RpcRecipe) recipe).getScanVisitor() : null;
 
-                            if (scanVisitorName != null) {
-                                captureRpc(currentRpc, touched, refCheckpoints);
-                            }
+                            captureRpc(recipe, touched, refCheckpoints);
 
                             if (currentRpc != null && scanVisitorName != null) {
                                 // Flush if switching to a different RPC instance
@@ -329,12 +328,29 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
 
     /**
      * Record a peer this file touched, snapshotting its ref high-water on first sight so
-     * {@link #evictSourceFile} can roll back exactly the refs this file introduced.
+     * {@link #evictSourceFile} can roll back exactly the refs this file introduced. A recipe
+     * that decorates an {@link RpcRecipe}, like one under edit preconditions, touches its peer
+     * too, as do the edit preconditions that it decides.
      */
-    private static void captureRpc(@Nullable RewriteRpc rpc, Set<RewriteRpc> touched,
+    private static void captureRpc(Recipe recipe, Set<RewriteRpc> touched,
                                    Map<RewriteRpc, int[]> refCheckpoints) {
-        if (rpc != null && touched.add(rpc)) {
-            refCheckpoints.put(rpc, rpc.refCheckpoint());
+        captureDecoratedRpc(recipe, touched, refCheckpoints);
+        for (Recipe condition : EditPreconditions.conditionRecipes(recipe)) {
+            captureDecoratedRpc(condition, touched, refCheckpoints);
+        }
+    }
+
+    private static void captureDecoratedRpc(Recipe recipe, Set<RewriteRpc> touched,
+                                            Map<RewriteRpc, int[]> refCheckpoints) {
+        Recipe r = recipe;
+        while (r instanceof Recipe.DelegatingRecipe) {
+            r = ((Recipe.DelegatingRecipe) r).getDelegate();
+        }
+        if (r instanceof RpcRecipe) {
+            RewriteRpc rpc = ((RpcRecipe) r).getRpc();
+            if (touched.add(rpc)) {
+                refCheckpoints.put(rpc, rpc.refCheckpoint());
+            }
         }
     }
 
@@ -470,7 +486,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
             }
 
             RewriteRpc currentRpc = recipe instanceof RpcRecipe ? ((RpcRecipe) recipe).getRpc() : null;
-            captureRpc(currentRpc, touched, refCheckpoints);
+            captureRpc(recipe, touched, refCheckpoints);
 
             // Flush before a different RPC, a non-RPC recipe, or a precondition that reads the batch's edits
             if (batch.rpc != null && (batch.rpc != currentRpc || ((RpcRecipe) recipe).editPreconditionReadsContent())) {

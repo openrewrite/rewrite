@@ -82,6 +82,42 @@ export class InMemoryDataTableStore implements DataTableStore {
     }
 }
 
+const NOOP_DATA_TABLE_STORE: DataTableStore = {
+    insertRow(): void {
+    },
+    getRows(): any[] {
+        return [];
+    },
+    getDataTables(): DataTable<any>[] {
+        return [];
+    }
+};
+
+const SUPPRESSED = Symbol("org.openrewrite.dataTables.suppressed");
+
+/**
+ * A view of `ctx` that drops the data table rows written through it and shares everything else with `ctx`,
+ * mirroring Java's data table suppression while a precondition decides.
+ */
+export function suppressDataTables(ctx: ExecutionContext): ExecutionContext {
+    if (suppressedContext(ctx)) {
+        return ctx;
+    }
+    const messages = new Proxy(ctx.messages, {
+        get(target, key, receiver) {
+            return key === DATA_TABLE_STORE ? NOOP_DATA_TABLE_STORE : Reflect.get(target, key, receiver);
+        }
+    });
+    return Object.create(ctx, {messages: {value: messages}, [SUPPRESSED]: {value: ctx}});
+}
+
+/**
+ * The context that `ctx` is a {@link suppressDataTables data table suppressing} view of, if it is one.
+ */
+export function suppressedContext(ctx: ExecutionContext): ExecutionContext | undefined {
+    return (ctx as any)[SUPPRESSED];
+}
+
 function sha256Prefix(input: string, hexChars: number): string {
     const hash = crypto.createHash('sha256').update(input, 'utf8').digest('hex');
     return hash.substring(0, hexChars);
