@@ -116,7 +116,45 @@ public class RecipeClassLoader extends URLClassLoader {
             "org.openrewrite.maven.attributes.Attributed",
             "org.openrewrite.protobuf.ProtoVisitor",
             "org.openrewrite.text.PlainText",
-            "org.openrewrite.quark.Quark"
+            "org.openrewrite.quark.Quark",
+            // A parser reads the type tables of the jar it comes from, so every parser is the host's copy even when
+            // a recipe ships its own. Each prefix also covers the parser's nested Builder. JavaParser, Java17Parser
+            // and the PlainText and Quark parsers are listed above.
+            "org.openrewrite.binary.BinaryParser",
+            "org.openrewrite.coldfusion.ColdFusionParser",
+            "org.openrewrite.csharp.CSharpParser",
+            "org.openrewrite.csharp.CsprojParser",
+            "org.openrewrite.docker.DockerParser",
+            "org.openrewrite.golang.GoModParser",
+            "org.openrewrite.golang.GoSumParser",
+            "org.openrewrite.golang.GolangParser",
+            "org.openrewrite.gradle.GradleParser",
+            "org.openrewrite.groovy.GroovyParser",
+            "org.openrewrite.hcl.HclParser",
+            "org.openrewrite.java.Java8Parser",
+            "org.openrewrite.java.Java11Parser",
+            "org.openrewrite.java.Java21Parser",
+            "org.openrewrite.java.Java25Parser",
+            "org.openrewrite.javascript.JavaScriptParser",
+            "org.openrewrite.javascript.PackageJsonParser",
+            "org.openrewrite.json.JsonParser",
+            "org.openrewrite.kotlin.KotlinParser",
+            "org.openrewrite.maven.MavenParser",
+            "org.openrewrite.properties.PropertiesParser",
+            "org.openrewrite.protobuf.ProtoParser",
+            "org.openrewrite.python.PipfileParser",
+            "org.openrewrite.python.PyProjectTomlParser",
+            "org.openrewrite.python.PythonParser",
+            "org.openrewrite.python.RequirementsTxtParser",
+            "org.openrewrite.python.SetupCfgParser",
+            "org.openrewrite.ruby.RubyParser",
+            "org.openrewrite.scala.ScalaParser",
+            "org.openrewrite.toml.TomlParser",
+            "org.openrewrite.xml.XmlParser",
+            "org.openrewrite.yaml.YamlParser",
+            // Recipe code hands the cache to the parser builders and the JavaSourceSet marker, and gets it back from
+            // JavaParser.Builder
+            "org.openrewrite.java.internal.JavaTypeCache"
     );
 
     public RecipeClassLoader(@Nullable Path recipeJar, List<Path> classpath) {
@@ -233,6 +271,10 @@ public class RecipeClassLoader extends URLClassLoader {
             return false;
         }
 
+        if (className.startsWith("org.openrewrite.groovy.GroovyParser") && gradleParserComesFromRecipe()) {
+            return false;
+        }
+
         // OpenRewrite API types that must be shared
         for (String prefix : PARENT_DELEGATED_PREFIXES) {
             if (className.startsWith(prefix)) {
@@ -242,6 +284,15 @@ public class RecipeClassLoader extends URLClassLoader {
 
         // Check for tree/marker/style types using package structure
         return isTreeMarkerStyleType(className);
+    }
+
+    /**
+     * GradleParser names a script base class from its own jar, which GroovyParser resolves through its own class
+     * loader. So when the parent has no GradleParser, GroovyParser comes from the recipe that ships one.
+     */
+    private boolean gradleParserComesFromRecipe() {
+        String gradleParser = "org/openrewrite/gradle/GradleParser.class";
+        return parent.getResource(gradleParser) == null && findResource(gradleParser) != null;
     }
 
     private boolean isTreeMarkerStyleType(String className) {

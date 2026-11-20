@@ -18,6 +18,7 @@ package org.openrewrite.gradle;
 import groovy.lang.Closure;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.groovy.GroovyParser;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.java.search.FindMethods;
 import org.openrewrite.marketplace.RecipeClassLoader;
@@ -96,11 +97,12 @@ class GradleApiTypeTableTest {
         Path javaClasses = Path.of(GradleParser.class.getProtectionDomain().getCodeSource().getLocation().toURI());
         Path build = javaClasses.resolve("../../..").normalize();
         Path typeTableDir = build.resolve("resources/main");
-        // A host whose own rewrite-gradle predates the recipe's type table has none of its Gradle API
+        Path rewriteGroovy = Path.of(GroovyParser.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+        // A host with rewrite-groovy but without rewrite-gradle, which has none of the recipe's Gradle API
         List<URL> host = new ArrayList<>();
         for (String entry : System.getProperty("java.class.path").split(File.pathSeparator)) {
             Path path = Path.of(entry);
-            if (!path.equals(typeTableDir) && !hasGradleApiClasses(path)) {
+            if (!path.startsWith(build) && !hasGradleApiClasses(path)) {
                 host.add(path.toUri().toURL());
             }
         }
@@ -108,6 +110,7 @@ class GradleApiTypeTableTest {
           javaClasses.toUri().toURL(),
           build.resolve("classes/groovy/main").toUri().toURL(),
           typeTableDir.toUri().toURL(),
+          rewriteGroovy.toUri().toURL(),
           DependsOnIsTypeAttributed.class.getProtectionDomain().getCodeSource().getLocation()
         };
         Thread thread = Thread.currentThread();
