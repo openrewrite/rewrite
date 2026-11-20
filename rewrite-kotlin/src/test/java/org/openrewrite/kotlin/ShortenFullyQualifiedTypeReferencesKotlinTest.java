@@ -32,6 +32,20 @@ class ShortenFullyQualifiedTypeReferencesKotlinTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/8237")
     @Test
+    void skipKotlinWithJavaOnlyOption() {
+        rewriteRun(
+          spec -> spec.recipe(new ShortenFullyQualifiedTypeReferences(true)),
+          kotlin(
+            """
+              class T {
+                  val list: java.util.List<String>? = null
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void doesNotShortenNestedTypeReachedViaImportedOuter() {
         rewriteRun(
           kotlin(

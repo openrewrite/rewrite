@@ -41,6 +41,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Collections.emptyList;
 import static org.openrewrite.Tree.randomId;
+import static org.openrewrite.java.ShortenFullyQualifiedTypeReferences.isTypeReferenceSafeToShorten;
 import static org.openrewrite.java.format.AutodetectGeneralFormatStyle.autodetectGeneralFormatStyle;
 import static org.openrewrite.java.tree.TypeUtils.isOfClassType;
 
@@ -362,7 +363,8 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
 
         @Override
         public J visitFieldAccess(J.FieldAccess fieldAccess, P p) {
-            if (fieldAccess.isFullyQualifiedClassReference(typeToShorten.getFullyQualifiedName())) {
+            if (fieldAccess.isFullyQualifiedClassReference(typeToShorten.getFullyQualifiedName()) &&
+                    isTypeReferenceSafeToShorten(getCursor(), fieldAccess.getSimpleName(), typeToShorten)) {
                 return fieldAccess.getName().withPrefix(fieldAccess.getPrefix());
             }
             return super.visitFieldAccess(fieldAccess, p);
@@ -370,7 +372,8 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
 
         @Override
         public J visitIdentifier(J.Identifier identifier, P p) {
-            if (isFullyQualifiedClassReference(identifier, typeToShorten.getFullyQualifiedName())) {
+            if (isFullyQualifiedClassReference(identifier, typeToShorten.getFullyQualifiedName()) &&
+                    isTypeReferenceSafeToShorten(getCursor(), typeToShorten.getClassName(), typeToShorten)) {
                 return identifier.withSimpleName(typeToShorten.getClassName());
             }
             return super.visitIdentifier(identifier, p);

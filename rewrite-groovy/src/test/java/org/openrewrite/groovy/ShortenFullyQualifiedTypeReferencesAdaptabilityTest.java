@@ -31,6 +31,20 @@ class ShortenFullyQualifiedTypeReferencesAdaptabilityTest implements RewriteTest
         spec.recipe(new ShortenFullyQualifiedTypeReferences());
     }
 
+    @Test
+    void skipGroovyWithJavaOnlyOption() {
+        rewriteRun(
+          spec -> spec.recipe(new ShortenFullyQualifiedTypeReferences(true)),
+          groovy(
+            """
+              class T {
+                  java.util.List<String> list
+              }
+              """
+          )
+        );
+    }
+
     @DocumentExample
     @Test
     void importWithLeadingComment() {

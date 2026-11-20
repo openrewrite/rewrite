@@ -22,6 +22,7 @@ import org.openrewrite.Issue;
 import org.openrewrite.java.service.ImportService;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -53,6 +54,201 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
 
               class T {
                   List<String> list;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepQualifiedStaticMethodWhenVariableShadowsType() {
+        rewriteRun(
+          java(
+            """
+              class T {
+                  Object m(Object Collections) {
+                      return java.util.Collections.emptyList();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepQualifiedStaticFieldWhenFieldShadowsType() {
+        rewriteRun(
+          java(
+            """
+              class T {
+                  int flags = java.util.regex.Pattern.DOTALL;
+                  Object Pattern;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void variableDoesNotConflictWithTypePosition() {
+        rewriteRun(
+          java(
+            """
+              class T {
+                  java.util.List<String> List;
+              }
+              """,
+            """
+              import java.util.List;
+
+              class T {
+                  List<String> List;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepQualifiedMethodReferenceWhenVariableShadowsType() {
+        rewriteRun(
+          java(
+            """
+              import java.util.function.Supplier;
+
+              class T {
+                  Supplier<?> m(Object Collections) {
+                      return java.util.Collections::emptyList;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void shortenJavaWithJavaOnlyOption() {
+        rewriteRun(
+          spec -> spec.recipe(new ShortenFullyQualifiedTypeReferences(true)),
+          java(
+            """
+              class T {
+                  java.util.List<String> list;
+              }
+              """,
+            """
+              import java.util.List;
+
+              class T {
+                  List<String> list;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepQualifiedStaticMethodEvenWhenTypeIsImported() {
+        rewriteRun(
+          java(
+            """
+              import java.util.Collections;
+
+              class T {
+                  Object m(Object Collections) {
+                      return java.util.Collections.emptyList();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepQualifiedStaticFieldWhenInheritedFieldShadowsType() {
+        rewriteRun(
+          java(
+            """
+              class Base {
+                  protected Object Pattern;
+              }
+              class T extends Base {
+                  int flags = java.util.regex.Pattern.DOTALL;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void shortenOnlyWhereVariableDoesNotObscureType() {
+        rewriteRun(
+          // This recipe deliberately changes the qualification, so a static import is already in the desired form.
+          spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().matchByTypeNotName(false).build()),
+          java(
+            """
+              class T {
+                  Object m(Object Collections) {
+                      return java.util.Collections.emptyList();
+                  }
+                  Object n() {
+                      return java.util.Collections.emptyList();
+                  }
+              }
+              """,
+            """
+              import java.util.Collections;
+
+              class T {
+                  Object m(Object Collections) {
+                      return java.util.Collections.emptyList();
+                  }
+                  Object n() {
+                      return Collections.emptyList();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void variableDoesNotObscureNestedTypeOrClassLiteral() {
+        rewriteRun(
+          java(
+            """
+              class T {
+                  Object Map;
+                  java.util.Map.Entry<?, ?> entry;
+                  Class<?> type = java.util.Map.class;
+              }
+              """,
+            """
+              import java.util.Map;
+
+              class T {
+                  Object Map;
+                  Map.Entry<?, ?> entry;
+                  Class<?> type = Map.class;
+              }
+              """
+          )
+        );
+    }
+
+    @SuppressWarnings("TypeParameterHidesVisibleType")
+    @Test
+    void typeParameterConflictIsNotOverwrittenByAnotherScope() {
+        rewriteRun(
+          java(
+            """
+              import java.util.List;
+
+              class T<List> {
+                  java.util.List<?> values;
+              }
+              class U {
+                  List<?> values;
               }
               """
           )

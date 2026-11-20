@@ -15,9 +15,14 @@
  */
 package org.openrewrite.java;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
@@ -25,6 +30,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.internal.DefaultJavaTypeSignatureBuilder;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.service.ImportService;
+import org.openrewrite.java.trait.Scope;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
@@ -36,9 +42,26 @@ import java.util.Map;
 import java.util.function.Predicate;
 
 import static org.openrewrite.java.tree.TypeUtils.fullyQualifiedNamesAreEqual;
+import static org.openrewrite.java.tree.TypeUtils.isOfClassType;
 import static org.openrewrite.java.tree.TypeUtils.isWellFormedType;
 
+@EqualsAndHashCode(callSuper = false)
 public class ShortenFullyQualifiedTypeReferences extends Recipe {
+
+    @Option(displayName = "Only Java",
+            description = "Only shorten references in Java compilation units. By default, also delegates to the import service of other languages.",
+            required = false)
+    @Getter
+    final @Nullable Boolean onlyJava;
+
+    public ShortenFullyQualifiedTypeReferences() {
+        this(null);
+    }
+
+    @JsonCreator
+    public ShortenFullyQualifiedTypeReferences(@JsonProperty("onlyJava") @Nullable Boolean onlyJava) {
+        this.onlyJava = onlyJava;
+    }
 
     @Getter
     final String displayName = "Add imports for fully qualified references to types";
@@ -57,7 +80,7 @@ public class ShortenFullyQualifiedTypeReferences extends Recipe {
         return new JavaVisitor<ExecutionContext>() {
             @Override
             public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
-                if (tree instanceof JavaSourceFile) {
+                if (tree instanceof JavaSourceFile && (!Boolean.TRUE.equals(onlyJava) || tree instanceof J.CompilationUnit)) {
                     return ((JavaSourceFile) tree).service(ImportService.class).shortenFullyQualifiedTypeReferencesIn((J) tree).visit(tree, ctx);
                 }
                 return (J) tree;
@@ -181,6 +204,9 @@ public class ShortenFullyQualifiedTypeReferences extends Recipe {
                     ensureInitialized();
 
                     String simpleName = fieldAccess.getSimpleName();
+                    if (!isTypeReferenceSafeToShorten(getCursor(), simpleName, (JavaType.FullyQualified) type)) {
+                        return fieldAccess;
+                    }
                     JavaType usedType = usedTypes.get(simpleName);
                     if (type == usedType || signatureBuilder.signature(type).equals(signatureBuilder.signature(usedType))) {
                         return shorten(fieldAccess);
@@ -237,4 +263,35 @@ public class ShortenFullyQualifiedTypeReferences extends Recipe {
             }
         };
     }
+
+    // AddImport also shortens references after inserting an import, so both visitors must honor the scope at each use.
+    static boolean isTypeReferenceSafeToShorten(Cursor cursor, String simpleName, JavaType.FullyQualified type) {
+        Scope scope = Scope.at(cursor);
+        Scope.Binding binding = scope.lookup(simpleName, Scope.Namespace.TYPE).orElse(null);
+        if (binding != null && !isOfClassType(binding.getType(), type.getFullyQualifiedName())) {
+            return false;
+        }
+        J qualifier = cursor.getValue();
+        for (Cursor parent = cursor.getParentTreeCursor(); ; parent = parent.getParentTreeCursor()) {
+            Object tree = parent.getValue();
+            if (tree instanceof J.FieldAccess && ((J.FieldAccess) tree).getTarget() == qualifier) {
+                J.FieldAccess access = (J.FieldAccess) tree;
+                // A class literal and a nested type in a type position cannot be obscured by a variable.
+                if ("class".equals(access.getSimpleName())) {
+                    return true;
+                }
+                if (access.getName().getFieldType() != null) {
+                    break;
+                }
+                qualifier = access;
+            } else if (tree instanceof J.MethodInvocation && ((J.MethodInvocation) tree).getSelect() == qualifier ||
+                       tree instanceof J.MemberReference && ((J.MemberReference) tree).getContaining() == qualifier) {
+                break;
+            } else {
+                return true;
+            }
+        }
+        return !scope.lookup(simpleName).isPresent();
+    }
+
 }
