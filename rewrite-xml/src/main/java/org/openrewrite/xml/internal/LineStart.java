@@ -30,13 +30,18 @@ public final class LineStart {
      * The prefix for an element that took the place of an element whose prefix was {@code original}, given
      * {@code given} and then formatted to {@code formatted}. When the element was given the original's indentation, so
      * that it stays where the original was, and the formatted element still starts its line, the line keeps that
-     * indentation. An element given another indentation keeps the formatter's. The formatter keeps the blank lines it
-     * chose above the line.
+     * indentation. An element given another indentation keeps the formatter's. Blank lines above the line, when the
+     * element was given them as they were, keep their bytes: how many there are and the whitespace on them. Above a
+     * line that had none, the formatter chooses the blank lines.
      */
     public static String keep(String formatted, String original, String given) {
         if (original.indexOf('\n') < 0 || given.indexOf('\n') < 0 || formatted.indexOf('\n') < 0 ||
             !afterLastBreak(given).equals(afterLastBreak(original))) {
             return formatted;
+        }
+        if (original.indexOf('\n') != original.lastIndexOf('\n') && original.equals(given)) {
+            // blank lines the element was given as they were are the document's, not the recipe's
+            return original;
         }
         String lineBreak = original.contains("\r\n") ? "\r\n" : "\n";
         int breaks = (int) formatted.chars().filter(c -> c == '\n').count();
