@@ -601,12 +601,53 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                 public J.Identifier visitIdentifier(J.Identifier ident, AtomicBoolean unresolved) {
                     JavaType type = ident.getType();
                     if (ident.getFieldType() == null && name.equals(ident.getSimpleName()) &&
-                            (type == null || type instanceof JavaType.Unknown)) {
+                            (type == null || type instanceof JavaType.Unknown) &&
+                            !namesSomethingElse(ident, getCursor())) {
                         unresolved.set(true);
                     }
                     return ident;
                 }
             }.reduce(cu, new AtomicBoolean()).get();
+        }
+
+        /**
+         * Whether the identifier names something the file declares or refers to by itself - a method, a label, a
+         * variable - rather than standing where a type can be named. The import binds the name only where a type
+         * can be named, so an identifier of the first kind is no sign of a reference the recipe cannot see, even
+         * where the LST gives it no type. A method named as the type is the one that happens in practice.
+         */
+        private boolean namesSomethingElse(J.Identifier ident, Cursor cursor) {
+            Object parent = cursor.getParentTreeCursor().getValue();
+            if (parent instanceof J.MethodDeclaration) {
+                return isSame(((J.MethodDeclaration) parent).getName(), ident);
+            }
+            if (parent instanceof J.MethodInvocation) {
+                return isSame(((J.MethodInvocation) parent).getName(), ident);
+            }
+            if (parent instanceof J.VariableDeclarations.NamedVariable) {
+                return isSame(((J.VariableDeclarations.NamedVariable) parent).getName(), ident);
+            }
+            if (parent instanceof J.ClassDeclaration) {
+                return isSame(((J.ClassDeclaration) parent).getName(), ident);
+            }
+            if (parent instanceof J.Label) {
+                return isSame(((J.Label) parent).getLabel(), ident);
+            }
+            if (parent instanceof J.Break) {
+                return isSame(((J.Break) parent).getLabel(), ident);
+            }
+            if (parent instanceof J.Continue) {
+                return isSame(((J.Continue) parent).getLabel(), ident);
+            }
+            if (parent instanceof J.Assignment) {
+                // only a field access, never a bare name, assigns to a member of a type
+                return isSame(((J.Assignment) parent).getVariable(), ident);
+            }
+            return false;
+        }
+
+        private boolean isSame(@Nullable J other, J.Identifier ident) {
+            return other != null && other.getId().equals(ident.getId());
         }
 
         private boolean importsOriginalAs(JavaSourceFile cu, String name) {

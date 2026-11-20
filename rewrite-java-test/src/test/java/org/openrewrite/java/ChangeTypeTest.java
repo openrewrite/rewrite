@@ -4939,6 +4939,79 @@ class ChangeTypeTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/10043")
+    @Test
+    void aMethodNamedAsTheOriginalIsNotAReferenceToIt() {
+        // the import binds the name only where a type can be named, so a method of that name strands nothing
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("org.jetbrains.annotations.NotNull", "org.jspecify.annotations.NonNull", true)),
+          java(
+            """
+              import org.jetbrains.annotations.NotNull;
+
+              class A {
+                  @NotNull String get() {
+                      return NotNull();
+                  }
+
+                  String NotNull() {
+                      return "";
+                  }
+              }
+              """,
+            """
+              import org.jspecify.annotations.NonNull;
+
+              class A {
+                  @NonNull String get() {
+                      return NotNull();
+                  }
+
+                  String NotNull() {
+                      return "";
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/10043")
+    @Test
+    void aLabelNamedAsTheOriginalIsNotAReferenceToIt() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("org.jetbrains.annotations.NotNull", "org.jspecify.annotations.NonNull", true)),
+          java(
+            """
+              import org.jetbrains.annotations.NotNull;
+
+              class A {
+                  @NotNull String get() {
+                      NotNull:
+                      for (int i = 0; i < 1; i++) {
+                          break NotNull;
+                      }
+                      return "";
+                  }
+              }
+              """,
+            """
+              import org.jspecify.annotations.NonNull;
+
+              class A {
+                  @NonNull String get() {
+                      NotNull:
+                      for (int i = 0; i < 1; i++) {
+                          break NotNull;
+                      }
+                      return "";
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void visitorReusedOnPartsOfTwoFiles() {
         JavaVisitor<ExecutionContext> changeType = ChangeType.visitor("java.util.ArrayList",
