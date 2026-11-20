@@ -264,7 +264,7 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
                 }
 
                 GradleDependencyConfiguration newGdc = gdc;
-                org.openrewrite.maven.tree.Dependency newRequested = Dependency.builder()
+                Dependency newRequested = Dependency.builder()
                                 .gav(gav)
                                 .classifier(classifier)
                                 .type("jar")

@@ -204,14 +204,14 @@ class PackageJsonHelperTest {
 
     @Test
     void parseDependencyPathPnpmStyle() {
-        java.util.List<DependencyPathSegment> segs =
+        List<DependencyPathSegment> segs =
                 PackageJsonOverrides.parsePath("express>accepts");
         assertThat(segs).extracting(DependencyPathSegment::getName).containsExactly("express", "accepts");
     }
 
     @Test
     void parseDependencyPathScopedPackage() {
-        java.util.List<DependencyPathSegment> segs =
+        List<DependencyPathSegment> segs =
                 PackageJsonOverrides.parsePath("@types/node>foo");
         assertThat(segs).extracting(DependencyPathSegment::getName).containsExactly("@types/node", "foo");
     }
@@ -223,7 +223,7 @@ class PackageJsonHelperTest {
                 "  \"dependencies\": { \"lodash\": \"^4.17.20\" }\n" +
                 "}\n");
         Json.Document modified = PackageJsonOverrides.of(NodeResolutionResult.PackageManager.Npm, doc, null,
-                "lodash", "^4.17.21", java.util.Collections.<DependencyPathSegment>emptyList()).apply(doc);
+                "lodash", "^4.17.21", Collections.<DependencyPathSegment>emptyList()).apply(doc);
         assertThat(modified.printAll()).contains("\"overrides\"");
         assertThat(modified.printAll()).contains("\"lodash\": \"^4.17.21\"");
     }
