@@ -38,7 +38,8 @@ fragment DIGIT : [0-9];
 fragment ALPHA : [A-Za-z];
 
 // strings
-fragment ESC     : '\\' (["\\/bfnrt] | UNICODE | EX_UNICODE);
+fragment ESC     : '\\' (["\\bfnrte] | HEX_ESC | UNICODE | EX_UNICODE); // \e and \xHH are TOML 1.1
+fragment HEX_ESC : 'x' HEX_DIGIT HEX_DIGIT;
 fragment UNICODE : 'u' HEX_DIGIT HEX_DIGIT HEX_DIGIT HEX_DIGIT;
 fragment EX_UNICODE:
     'U' HEX_DIGIT HEX_DIGIT HEX_DIGIT HEX_DIGIT HEX_DIGIT HEX_DIGIT HEX_DIGIT HEX_DIGIT
@@ -62,9 +63,12 @@ BOOLEAN: ('true' | 'false') -> popMode;
 // multiline strings
 fragment ML_ESC      : '\\' [ \t]* '\r'? '\n' | ESC;  // Allow whitespace before newline
 VALUE_BASIC_STRING   : BASIC_STRING                    -> type(BASIC_STRING), popMode;
-ML_BASIC_STRING      : '"""' ( ML_ESC | ~["\\] | '"' ~["] | '""' ~["] )*? '"""' -> popMode;
+// A lone quote must not take the character after it, or it can take the backslash of an escape.
+// Up to two quotes may sit right before the closing delimiter, as in """a "quote""""".
+ML_BASIC_STRING      : '"""' ( ML_ESC | ~["\\] | '"' )*? '"""' ('"' '"'?)? -> popMode;
 VALUE_LITERAL_STRING : LITERAL_STRING                  -> type(LITERAL_STRING), popMode;
-ML_LITERAL_STRING    : '\'\'\'' ( ~['] | '\'' ~['] | '\'\'' ~['] )*? '\'\'\'' -> popMode;
+// As for a basic string, up to two quotes may sit right before the closing delimiter
+ML_LITERAL_STRING    : '\'\'\'' ( ~['] | '\'' )*? '\'\'\'' ('\'' '\''?)? -> popMode;
 
 // floating point numbers
 fragment EXP                 : ('e' | 'E') [+-]? ZERO_PREFIXABLE_INT;
@@ -94,8 +98,8 @@ fragment MINUTE       : DIGIT DIGIT;
 fragment SECOND       : DIGIT DIGIT;
 fragment SECFRAC      : '.' DIGIT+;
 fragment NUMOFFSET    : ('+' | '-') HOUR ':' MINUTE;
-fragment OFFSET       : 'Z' | NUMOFFSET;
-fragment PARTIAL_TIME : HOUR ':' MINUTE ':' SECOND SECFRAC?;
+fragment OFFSET       : 'Z' | 'z' | NUMOFFSET;
+fragment PARTIAL_TIME : HOUR ':' MINUTE (':' SECOND SECFRAC?)?; // seconds are optional in TOML 1.1
 fragment FULL_DATE    : YEAR '-' MONTH '-' DAY;
 fragment FULL_TIME    : PARTIAL_TIME OFFSET;
 OFFSET_DATE_TIME      : FULL_DATE DELIM FULL_TIME    -> popMode;
@@ -105,7 +109,9 @@ LOCAL_TIME            : PARTIAL_TIME                 -> popMode;
 
 mode INLINE_TABLE_MODE;
 
-INLINE_TABLE_WS      : WS    -> skip;
+INLINE_TABLE_WS      : WS      -> skip;
+INLINE_TABLE_NL      : NL      -> type(NL);      // TOML 1.1 allows newlines and comments in inline tables
+INLINE_TABLE_COMMENT : COMMENT -> type(COMMENT);
 INLINE_TABLE_KEY_DOT : DOT   -> type(DOT);
 INLINE_TABLE_COMMA   : COMMA -> type(COMMA);
 R_BRACE              : '}'   -> popMode;

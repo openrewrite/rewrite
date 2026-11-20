@@ -518,7 +518,6 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
             } else {
                 if (source.charAt(delimIndex) == '#') {
                     inSingleLineComment = true;
-                    delimIndex++;
                 }
 
                 if (!inSingleLineComment) {

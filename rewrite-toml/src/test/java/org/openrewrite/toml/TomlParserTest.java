@@ -686,9 +686,173 @@ class TomlParserTest implements RewriteTest {
         );
     }
 
+    @Test
+    void inlineTableSpanningLinesWithComments() {
+        // TOML 1.1
+        rewriteRun(
+          toml(
+            """
+              tbl = {
+                  key      = "a string",
+                  # comments
+                  moar-tbl =  {
+                      key = 1,
+                  }, # trailing comma
+              }
+              ProcessConfigsByRound = [
+                  {
+                      EnableRound = 0,
+                      MaxRoundsWithoutNewBlockReceived = 10
+                  }
+              ]
+              """
+          )
+        );
+    }
+
+    @Test
+    void multilineBasicStringWithQuoteBeforeEscape() {
+        rewriteRun(
+          toml(
+            """
+              query = ""\"(
+              (#match? @ternary_block "\\\\\\\\?[\\\\\\\\n]*nil:")
+              )""\"
+              quotes = ""\"Here are two quotation marks: "". Simple enough.""\"
+              ends-in-quotes = ""\"a "quote\"""\"\"
+              """,
+            spec -> spec.afterRecipe(doc -> assertThat(doc.getValues())
+              .extracting(kv -> ((Toml.Literal) ((Toml.KeyValue) kv).getValue()).getValue())
+              .containsExactly(
+                "(\n(#match? @ternary_block \"\\\\?[\\\\n]*nil:\")\n)",
+                "Here are two quotation marks: \"\". Simple enough.",
+                "a \"quote\"\""))
+          )
+        );
+    }
+
+    @Test
+    void offsetDateTimeWithLowercaseZ() {
+        rewriteRun(
+          toml(
+            """
+              d = 1979-05-27T07:32:00z
+              """,
+            spec -> spec.afterRecipe(doc -> assertThat(((Toml.Literal) ((Toml.KeyValue) doc.getValues().getFirst()).getValue()).getValue())
+              .isEqualTo(OffsetDateTime.of(1979, 5, 27, 7, 32, 0, 0, ZoneOffset.UTC)))
+          )
+        );
+    }
+
+    @Test
+    void multilineLiteralStringEndingInQuotes() {
+        rewriteRun(
+          toml(
+            """
+              str = '''That,' she said, 'is still pointless.''''
+              this-str-has-apostrophes='''' there's one already
+              '' two more
+              '''''
+              """,
+            spec -> spec.afterRecipe(doc -> assertThat(doc.getValues())
+              .extracting(kv -> ((Toml.Literal) ((Toml.KeyValue) kv).getValue()).getValue())
+              .containsExactly("That,' she said, 'is still pointless.'", "' there's one already\n'' two more\n''"))
+          )
+        );
+    }
+
+    @Test
+    void arrayWithCommaAfterNewlineOrComment() {
+        rewriteRun(
+          toml(
+            """
+              arr = [
+                1 # one
+                , 2
+                ,#3
+                3
+                , # trailing
+              ]
+              """,
+            spec -> spec.afterRecipe(doc -> assertThat(((Toml.Array) ((Toml.KeyValue) doc.getValues().getFirst()).getValue()).getValues())
+              .filteredOn(Toml.Literal.class::isInstance)
+              .extracting(v -> ((Toml.Literal) v).getValue())
+              .containsExactly(1L, 2L, 3L))
+          )
+        );
+    }
+
+    @Test
+    void timesWithoutSeconds() {
+        // TOML 1.1
+        rewriteRun(
+          toml(
+            """
+              odt = 1979-05-27 07:32Z
+              odt-offset = 1979-05-27T07:32-07:00
+              ldt = 1979-05-27T07:32
+              lt = 07:32
+              """,
+            spec -> spec.afterRecipe(doc -> assertThat(doc.getValues())
+              .extracting(kv -> ((Toml.Literal) ((Toml.KeyValue) kv).getValue()).getValue())
+              .containsExactly(
+                OffsetDateTime.of(1979, 5, 27, 7, 32, 0, 0, ZoneOffset.UTC),
+                OffsetDateTime.of(1979, 5, 27, 7, 32, 0, 0, ZoneOffset.ofHours(-7)),
+                LocalDateTime.of(1979, 5, 27, 7, 32),
+                LocalTime.of(7, 32)))
+          )
+        );
+    }
+
+    @Test
+    void escapesOfToml11() {
+        rewriteRun(
+          toml(
+            """
+              esc = "\\e[0m"
+              hex = "tab\\x09 e-acute\\xE9"
+              ml = ""\"\\e and \\x41""\"
+              """,
+            spec -> spec.afterRecipe(doc -> assertThat(doc.getValues())
+              .extracting(kv -> ((Toml.Literal) ((Toml.KeyValue) kv).getValue()).getValue())
+              .containsExactly("\u001b[0m", "tab\t e-acute\u00e9", "\u001b and A"))
+          )
+        );
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"Pipfile.lock", "yarn.lock", "package-lock.json"})
     void rejectsNonTomlFiles(String fileName) {
         assertThat(new TomlParser().accept(Paths.get("project", fileName))).isFalse();
+    }
+
+    @Test
+    void emptyCommentInArray() {
+        rewriteRun(
+          toml(
+            """
+              a = [
+                1 #
+              ]
+              b = [
+                1 #
+                , 2
+              ]
+              """
+          )
+        );
+    }
+
+    @Test
+    void emptyCommentInInlineTable() {
+        rewriteRun(
+          toml(
+            """
+              t = {
+                  a = 1 #
+              }
+              """
+          )
+        );
     }
 }
