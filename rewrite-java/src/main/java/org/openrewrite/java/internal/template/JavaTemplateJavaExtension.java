@@ -20,8 +20,10 @@ import org.openrewrite.Cursor;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaTemplate;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.service.SourceFileStatementService;
+import org.openrewrite.java.trait.Scope;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
@@ -29,10 +31,13 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 import java.util.function.BiPredicate;
 import java.util.function.Predicate;
 
@@ -517,9 +522,20 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                                     flags.remove(Flag.Varargs);
                                 }
                                 type = type.withParameterNames(paramNames).withParameterTypes(paramTypes).withFlags(flags);
+                                // the template's stub method owns the parsed parameters until they are given this one
+                                JavaType.Method owner = type;
+                                parameters = ListUtils.map(parameters, parameter -> {
+                                    J.VariableDeclarations decl = (J.VariableDeclarations) parameter;
+                                    return decl.withVariables(ListUtils.map(decl.getVariables(), v -> {
+                                        JavaType.Variable owned = v.getVariableType() == null ? null : v.getVariableType().withOwner(owner);
+                                        return owned == null ? v : v.withVariableType(owned).withName(v.getName().withFieldType(owned));
+                                    }));
+                                });
                             }
 
-                            return method.withParameters(parameters).withMethodType(type).withName(method.getName().withType(type));
+                            J.MethodDeclaration m = method.withParameters(parameters).withMethodType(type).withName(method.getName().withType(type));
+                            // without a method type the parameters still belong to the template's stub
+                            return type == null ? m : retypeParameterReads(m, new Cursor(getCursor().getParentOrThrow(), m));
                         }
                         case THROWS: {
                             J.MethodDeclaration m = method.withThrows(unsubstitute(templateParser.parseThrows(getCursor(), substitutedTemplate)));
@@ -887,6 +903,40 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                     .anyMatch(parameter -> namesTypeVariable(parameter, visited));
         }
         return type instanceof JavaType.Array && namesTypeVariable(((JavaType.Array) type).getElemType(), visited);
+    }
+
+    /**
+     * Gives the body's reads of each new parameter that parameter's types. A parameter that keeps the name of one it
+     * replaces keeps that one's readers, which still carry the replaced parameter's types.
+     */
+    private static J.MethodDeclaration retypeParameterReads(J.MethodDeclaration method, Cursor methodCursor) {
+        if (method.getBody() == null) {
+            return method;
+        }
+        Map<UUID, J.VariableDeclarations.NamedVariable> readers = new HashMap<>();
+        for (Statement parameter : method.getParameters()) {
+            if (parameter instanceof J.VariableDeclarations) {
+                for (J.VariableDeclarations.NamedVariable variable : ((J.VariableDeclarations) parameter).getVariables()) {
+                    if (variable.getVariableType() == null) {
+                        // an unattributed parameter, such as one typed by a type variable, leaves its readers as they are
+                        continue;
+                    }
+                    Scope.bindingOf(methodCursor, variable).ifPresent(binding -> binding.references()
+                            .forEach(reference -> readers.put(reference.<J>getValue().getId(), variable)));
+                }
+            }
+        }
+        if (readers.isEmpty()) {
+            return method;
+        }
+        return method.withBody((J.Block) new JavaIsoVisitor<Integer>() {
+            @Override
+            public J.Identifier visitIdentifier(J.Identifier identifier, Integer p) {
+                J.VariableDeclarations.NamedVariable variable = readers.get(identifier.getId());
+                return variable == null ? identifier :
+                        identifier.withType(variable.getType()).withFieldType(variable.getVariableType());
+            }
+        }.visitNonNull(method.getBody(), 0));
     }
 
     private <J2 extends J> Comparator<J2> getComparatorOrThrow() {
