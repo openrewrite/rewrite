@@ -173,6 +173,26 @@ class TomlTableValueTest {
           """);
     }
 
+    @Test
+    void addsOneLevelDeeperThanTheCloseWhenNoPropertyShowsTheIndent() {
+        assertThat(addVersion("""
+          lib = {
+          }
+          """)).isEqualTo("""
+          lib = {
+              version = "1.0"
+          }
+          """);
+        assertThat(addVersion("""
+          lib = { name = "n"
+          }
+          """)).isEqualTo("""
+          lib = { name = "n",
+              version = "1.0"
+          }
+          """);
+    }
+
     private static String addVersion(String source) {
         Toml.Document document = document(source);
         return print(withTableValue(document, TomlTableValue.withStringOrAdd(table(document), "version", "1.0")));
