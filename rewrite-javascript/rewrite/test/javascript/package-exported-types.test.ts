@@ -96,6 +96,44 @@ describe("exportedTypes", () => {
         }, {unsafeCleanup: true});
     }, 60000);
 
+    test("a base of the class's own name gives the class its bases instead, so a table keyed by name has no cycle", async () => {
+        await withDir(async (root) => {
+            // As @types/supertest declares it: the namespace interface and the class that
+            // lib/test.d.ts gives with `export =` are both named `same-name-fixture.Test`.
+            const {pkg, nodeModules} = writeFiles(root.path, "same-name-fixture", {
+                "package.json": JSON.stringify({name: "same-name-fixture", version: "1.0.0", types: "index.d.ts"}),
+                "index.d.ts": `
+import STest = require("./lib/test");
+declare const fixture: fixture.Static;
+declare namespace fixture {
+    interface Test extends STest {}
+    interface Static {
+        Test: typeof STest;
+    }
+}
+export = fixture;
+`,
+                "lib/test.d.ts": `
+import { Request } from "./request";
+declare class Test extends Request {
+    app: string;
+}
+export = Test;
+`,
+                "lib/request.d.ts": `
+export declare class Request {
+    url: string;
+}
+`,
+            });
+
+            const test = exportedTypes([pkg], [nodeModules])
+                .find(t => Type.FullyQualified.getFullyQualifiedName(t) === "same-name-fixture.Test") as Type.Class;
+            expect(test.classKind).toBe(Type.Class.Kind.Interface);
+            expect(fqns(test.interfaces)).toEqual(["same-name-fixture.Request"]);
+        }, {unsafeCleanup: true});
+    }, 60000);
+
     test("resolves the declaration entry from an exports types condition", async () => {
         // Modern package: no top-level `types`, no root index.d.ts; types live only under
         // exports["."].{import,require}.types.
