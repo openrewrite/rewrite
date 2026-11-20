@@ -982,7 +982,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
             types: await mapAsync(union.types, item => this.visitRightPadded(item, p)),
             type: union.type && await this.visitType(union.type, p)
         }));
-        return updateIfChanged(union, updates);
+        return joinedUnion(updateIfChanged(union, updates) as JS.Union);
     }
 
     protected async visitIntersection(intersection: JS.Intersection, p: P): Promise<J | undefined> {
@@ -1340,4 +1340,29 @@ function concatenated(outer: J.Space, inner: J.Space): J.Space {
 function withOuterMarkers(outer: Markers, inner: Markers): Markers {
     const added = outer.markers.filter(marker => !inner.markers.some(own => own.id === marker.id));
     return added.length === 0 ? inner : {...inner, markers: [...added, ...inner.markers]};
+}
+
+
+/**
+ * A union directly holding a union, as a recipe leaves one replacing a member with a union, prints as
+ * one union and is parsed as one, so it is joined into one: `A | (B | C)` written without parentheses
+ * is `A | B | C`.
+ */
+function joinedUnion(union: JS.Union): JS.Union {
+    if (!union.types.some(t => t.element?.kind === JS.Kind.Union)) {
+        return union;
+    }
+    return {
+        ...union, types: union.types.flatMap(member => {
+            if (member.element?.kind !== JS.Kind.Union) {
+                return [member];
+            }
+            const types = (member.element as JS.Union).types;
+            return types.map((t, i) => ({
+                ...t,
+                element: i === 0 ? {...t.element, prefix: member.element.prefix} : t.element,
+                after: i === types.length - 1 ? member.after : t.after
+            }));
+        })
+    };
 }

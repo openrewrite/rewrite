@@ -17,10 +17,14 @@ import {Cursor, isTree, Markers, markers, produceAsync, Tree, updateIfChanged} f
 import {emptySpace, J, Statement, Type, TypedTree} from '../../java';
 import {Any, Capture, JavaScriptParser, JavaScriptVisitor, JS} from '..';
 import {create as produce} from 'mutative';
-import {CaptureMarker, dedentTemplate, PlaceholderUtils, randomizeIds, retainIds, TEMPLATE_MODULE, treeIds, wrapCode} from './utils';
+import {
+    CaptureMarker, dedentTemplate, PlaceholderUtils, randomizeIds, retainIds, slotOf, TEMPLATE_MODULE, TemplateSlot, treeIds, wrapCode
+} from './utils';
 import {CAPTURE_NAME_SYMBOL, CAPTURE_TYPE_SYMBOL, CaptureImpl, CaptureValue, RAW_CODE_SYMBOL, RawCode, TemplateParamImpl} from './capture';
 import {PlaceholderReplacementVisitor, SubstitutedValue} from './placeholder-replacement';
-import {isTrailingMarker, maybeParenthesize, parenthesize, requiredPrecedence, startsWithDeclarationToken} from './precedence';
+import {
+    isTrailingMarker, maybeParenthesize, maybeParenthesizeType, parenthesize, requiredPrecedence, startsWithDeclarationToken
+} from './precedence';
 import {JavaCoordinates} from './template';
 import {autoIndent, maybeAutoFormat} from '../format';
 import {getPrettierStyle} from '../format/prettier-format';
@@ -241,7 +245,7 @@ export class TemplateEngine {
         contextStatements: string[],
         dependencies: Record<string, string>,
         types: string[] | undefined,
-        expression: boolean = false,
+        expression: TemplateSlot = false,
         preamble: string[] = TemplateEngine.parameterPreamble(parameters)
     ): Promise<JS.CompilationUnit> {
         // A capture's type reaches the parse as a declaration, so it belongs with context.
@@ -313,7 +317,7 @@ export class TemplateEngine {
         contextStatements: string[] = [],
         dependencies: Record<string, string> = {},
         types?: string[],
-        expression: boolean = false,
+        expression: TemplateSlot = false,
         preamble?: string[]
     ): Promise<J> {
         const cu = await TemplateEngine.parseWithContext(templateParts, parameters, contextStatements, dependencies, types, expression, preamble);
@@ -465,7 +469,7 @@ export class TemplateEngine {
     private static buildTemplateString(
         templateParts: TemplateStringsArray,
         parameters: Parameter[],
-        expression: boolean
+        expression: TemplateSlot
     ): string {
         let result = '';
         for (let i = 0; i < templateParts.length; i++) {
@@ -878,6 +882,32 @@ async function replacedParent(tree: J, cursor: Cursor | undefined): Promise<J | 
     return holder ?? cursor?.parentTree()?.value;
 }
 
+/** The comments inside `tree`, other than on its own prefix. */
+function innerComments(tree: J): J.Space["comments"][number][] {
+    const found: J.Space["comments"][number][] = [];
+    const collect = (node: unknown, top: boolean) => {
+        if (!node || typeof node !== 'object') {
+            return;
+        }
+        if (Array.isArray(node)) {
+            node.forEach(n => collect(n, false));
+            return;
+        }
+        for (const [key, value] of Object.entries(node)) {
+            if (key === 'type' || key === 'markers' || top && key === 'prefix') {
+                continue;
+            }
+            if ((value as {kind?: string} | undefined)?.kind === J.Kind.Space) {
+                found.push(...(value as J.Space).comments);
+            } else {
+                collect(value, false);
+            }
+        }
+    };
+    collect(tree, true);
+    return found;
+}
+
 /**
  * Helper class for applying a template to an AST.
  */
@@ -924,18 +954,32 @@ export class TemplateApplier {
 
         const originalTree = tree as J;
         const parentTree = await replacedParent(originalTree, this.cursor);
-        let resultToUse = this.wrapTree(originalTree, this.ast, parentTree);
-        // A replaced node spliced back in as a capture carries its own trailing markers
+        const typeSlot = slotOf(originalTree, this.cursor) === 'type';
+        // A replaced node spliced back in as a capture carries its own trailing markers. A type's `?` marks
+        // the tuple element it fills instead, so `${t}<any>` replacing `X` in `[X?]` gives `[X<any>?]`.
         const trailing = trailingMarkers(originalTree);
-        const slotMarkers = trailing && !(await treeIds(this.ast)).has(originalTree.id) ? trailing : undefined;
+        const spliced = (await treeIds(this.ast)).has(originalTree.id);
+        const ast = trailing && spliced && typeSlot ? await withoutTrailingMarkers(this.ast, originalTree.id) : this.ast;
+        let resultToUse = this.wrapTree(originalTree, ast, parentTree);
+        const slotMarkers = trailing && (typeSlot || !spliced) ? trailing : undefined;
         if (slotMarkers) {
             resultToUse = {...resultToUse, markers: withMarkers(resultToUse.markers, slotMarkers)};
         }
-        const slot = this.replacedSlot(originalTree, parentTree);
-        // `format` substitutes the target's prefix, so decide against the prefix that will print
-        resultToUse = maybeParenthesize(slot?.[0], slot?.[1] ?? originalTree.id,
-            {...resultToUse, prefix: originalTree.prefix}, slotMarkers);
-        const result = await this.format(resultToUse, originalTree);
+        // A comment inside a replaced type, `R./* why */ReactChild`, stays with what replaces it
+        const inner = typeSlot ? innerComments(originalTree) : [];
+        if (typeSlot) {
+            // A type replacing a type: parenthesized by the type slot's own rules, not an expression's
+            resultToUse = maybeParenthesizeType(parentTree, originalTree.id, {...resultToUse, prefix: originalTree.prefix});
+        } else {
+            const slot = this.replacedSlot(originalTree, parentTree);
+            // `format` substitutes the target's prefix, so decide against the prefix that will print
+            resultToUse = maybeParenthesize(slot?.[0], slot?.[1] ?? originalTree.id,
+                {...resultToUse, prefix: originalTree.prefix}, slotMarkers);
+        }
+        let result = await this.format(resultToUse, originalTree);
+        if (inner.length) {
+            result = {...result, prefix: {...result.prefix, comments: [...result.prefix.comments, ...inner]}};
+        }
         templateResults.add(result);
         return result;
     }
@@ -1053,6 +1097,19 @@ export class TemplateApplier {
 function trailingMarkers(replaced: J): Markers | undefined {
     const trailing = replaced.markers.markers.filter(isTrailingMarker);
     return trailing.length === 0 ? undefined : markers(...trailing);
+}
+
+/** `tree` with the trailing markers taken off the node `id` names. */
+async function withoutTrailingMarkers(tree: J, id: string): Promise<J> {
+    return (await new class extends JavaScriptVisitor<undefined> {
+        protected override async preVisit(t: J): Promise<J | undefined> {
+            if (t.id !== id) {
+                return t;
+            }
+            this.stopAfterPreVisit();
+            return {...t, markers: {...t.markers, markers: t.markers.markers.filter(m => !isTrailingMarker(m))}};
+        }
+    }().visit<J>(tree, undefined))!;
 }
 
 /** `own`, plus each marker of `added` whose kind `own` does not already hold. */
