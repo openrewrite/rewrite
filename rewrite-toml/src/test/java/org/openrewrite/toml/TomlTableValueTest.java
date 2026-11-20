@@ -136,6 +136,69 @@ class TomlTableValueTest {
     }
 
     @Test
+    void addsOnItsOwnLineInATableSpanningLinesAndKeepsComments() {
+        assertThat(addVersion("""
+          lib = {
+              group = "g",
+              name = "n", # keep me
+          }
+          """)).isEqualTo("""
+          lib = {
+              group = "g",
+              name = "n", # keep me
+              version = "1.0"
+          }
+          """);
+        assertThat(addVersion("""
+          lib = {
+              group = "g",
+              name = "n" # keep me
+          }
+          """)).isEqualTo("""
+          lib = {
+              group = "g",
+              name = "n", # keep me
+              version = "1.0"
+          }
+          """);
+        assertThat(addVersion("""
+          lib = {
+              # nothing yet
+          }
+          """)).isEqualTo("""
+          lib = {
+              # nothing yet
+              version = "1.0"
+          }
+          """);
+    }
+
+    @Test
+    void addsOneLevelDeeperThanTheCloseWhenNoPropertyShowsTheIndent() {
+        assertThat(addVersion("""
+          lib = {
+          }
+          """)).isEqualTo("""
+          lib = {
+              version = "1.0"
+          }
+          """);
+        assertThat(addVersion("""
+          lib = { name = "n"
+          }
+          """)).isEqualTo("""
+          lib = { name = "n",
+              version = "1.0"
+          }
+          """);
+    }
+
+    private static String addVersion(String source) {
+        Toml.Document document = document(source);
+        return print(withTableValue(document, TomlTableValue.withStringOrAdd(table(document), "version", "1.0")));
+    }
+
+    @Test
     void addsMissingValueWithStringOrAddAndPreservesExistingPadding() {
         Toml.Document document = document("library = { group = \"org.example\", name = \"old\" }\n");
         Toml.Table table = table(document);

@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.toml.Assertions.toml;
 
 class MergeTableRowTest implements RewriteTest {
@@ -306,6 +307,190 @@ class MergeTableRowTest implements RewriteTest {
               [[team.members]]
               name = "Alice Smith"
               email = "alice@example.com"
+              """
+          )
+        );
+    }
+
+    @Test
+    void keyNewToTheRowGoesOnItsOwnLine() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeTableRow(
+            "package.contributors",
+            "email = \"alice@example.com\"\nname = \"Alice\"",
+            "name"
+          )),
+          toml(
+            """
+              [[package.contributors]]
+                name = "Alice"
+              """,
+            """
+              [[package.contributors]]
+                name = "Alice"
+                email = "alice@example.com"
+              """
+          )
+        );
+    }
+
+    @Test
+    void rowThatIsNotTomlIsInvalid() {
+        assertThat(new MergeTableRow(
+          "package.contributors",
+          "name = \"Alice\"\nrole = \"maintainer\"\nurl = https://example.com",
+          "name"
+        ).validate().failures())
+          .singleElement()
+          .satisfies(failure -> assertThat(failure.getProperty()).isEqualTo("row"));
+    }
+
+    @Test
+    void rowWithNullInAnInlineTableIsInvalid() {
+        assertThat(new MergeTableRow("pkg", "name = \"a\"\nm = { x = null }", "name").validate().isInvalid()).isTrue();
+    }
+
+    @Test
+    void newRowLeavesOutAPropertyWithNullValue() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeTableRow(
+            "plugins",
+            "name = \"plugin-c\"\nenabled = null\nversion = \"1.0.0\"",
+            "name"
+          )),
+          toml(
+            """
+              [[plugins]]
+              name = "plugin-a"
+              """,
+            """
+              [[plugins]]
+              name = "plugin-a"
+
+              [[plugins]]
+              name = "plugin-c"
+              version = "1.0.0"
+              """
+          )
+        );
+    }
+
+    @Test
+    void nullInsideAMultiLineStringIsText() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeTableRow(
+            "pkg",
+            "name = \"a\"\nscript = \"\"\"\ndebug = null\n\"\"\"",
+            "name"
+          )),
+          toml(
+            """
+              [[pkg]]
+              name = "a"
+              """,
+            "[[pkg]]\nname = \"a\"\nscript = \"\"\"\ndebug = null\n\"\"\""
+          )
+        );
+    }
+
+    @Test
+    void nullRemovesADottedKey() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeTableRow(
+            "pkg",
+            "name = \"a\"\nm.x = null\nv = 2",
+            "name"
+          )),
+          toml(
+            """
+              [[pkg]]
+              name = "a"
+              m.x = 1
+              v = 1
+              """,
+            """
+              [[pkg]]
+              name = "a"
+              v = 2
+              """
+          )
+        );
+    }
+
+    @Test
+    void commentOnTheLastLineStaysOnIt() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeTableRow(
+            "pkg",
+            "name = \"a\"\nx = 1",
+            "name"
+          )),
+          toml(
+            """
+              [[pkg]]
+              name = "a" # lead
+              """,
+            """
+              [[pkg]]
+              name = "a" # lead
+              x = 1
+              """
+          )
+        );
+    }
+
+    @Test
+    void newKeysTakeTheRowIndent() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeTableRow(
+            "pkg",
+            "name = \"a\"\nx = 1\ny = 2",
+            "name"
+          )),
+          toml(
+            """
+              [a]
+              b = 1
+
+                [[pkg]]
+                name = "a"
+              """,
+            """
+              [a]
+              b = 1
+
+                [[pkg]]
+                name = "a"
+                x = 1
+                y = 2
+              """
+          )
+        );
+    }
+
+    @Test
+    void commentOnTheLastLineBeforeAnotherTableStaysOnIt() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeTableRow(
+            "pkg",
+            "name = \"a\"\nx = 1",
+            "name"
+          )),
+          toml(
+            """
+              [[pkg]]
+              name = "a" # lead
+              # about b
+              [[pkg]]
+              name = "b"
+              """,
+            """
+              [[pkg]]
+              name = "a" # lead
+              x = 1
+              # about b
+              [[pkg]]
+              name = "b"
               """
           )
         );
