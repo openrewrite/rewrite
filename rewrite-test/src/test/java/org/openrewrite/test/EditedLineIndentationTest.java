@@ -75,6 +75,13 @@ class EditedLineIndentationTest {
     }
 
     @Test
+    void whitespaceSpelledAsEscapes() {
+        assertThat(reindented("x\n        \t\t<title>\ny\n", "x\n        \\u0009\\u0009<title>\ny\n")).isEmpty();
+        assertThat(reindented("x\n  \t<p>\ny\n", "x\n  \\t<p>\ny\n")).isEmpty();
+        assertThat(reindented("x\n    <p>\ny\n", "x\n  \\s<p>\ny\n")).hasSize(1);
+    }
+
+    @Test
     void blankLinesNotCompared() {
         assertThat(reindented("a {\n    \n    foo();\n}\n", "a {\nx\n    foo();\n}\n")).isEmpty();
     }

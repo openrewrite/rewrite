@@ -129,7 +129,7 @@ final class EditedLineIndentation {
     private static boolean sameIndentation(String was, String is) {
         String wasIndent = indentation(was);
         String isIndent = indentation(is);
-        if (wasIndent.equals(isIndent)) {
+        if (wasIndent.equals(isIndent) || spelledIndentation(was).equals(spelledIndentation(is))) {
             return true;
         }
         boolean wasStar = was.trim().startsWith("*");
@@ -194,6 +194,26 @@ final class EditedLineIndentation {
     private static boolean indentationIsStructure(SourceFile sourceFile) {
         String type = sourceFile.getClass().getName();
         return type.startsWith("org.openrewrite.yaml.") || type.startsWith("org.openrewrite.python.");
+    }
+
+    /**
+     * The leading whitespace of a line, with the whitespace escapes its code starts with read as the whitespace they
+     * stand for, the way a text block or string literal can spell its leading tabs.
+     */
+    private static String spelledIndentation(String line) {
+        StringBuilder spelled = new StringBuilder(indentation(line));
+        int i = spelled.length();
+        while (true) {
+            if (line.startsWith("\\t", i) || line.startsWith("\\s", i)) {
+                spelled.append(line.charAt(i + 1) == 't' ? '\t' : ' ');
+                i += 2;
+            } else if (line.startsWith("\\u0009", i) || line.startsWith("\\u0020", i)) {
+                spelled.append(line.charAt(i + 5) == '9' ? '\t' : ' ');
+                i += 6;
+            } else {
+                return spelled.toString();
+            }
+        }
     }
 
     private static String indentation(String line) {
