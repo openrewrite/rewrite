@@ -484,14 +484,18 @@ class ScopeTraitTest implements RewriteTest {
         @Language("kotlin") String source =
           """
             fun use(row: String, read: Any?): Int = 0
-            class C {
+            abstract class C {
                 val earlier = 1
                 init {
                     use("readsProperty", earlier)
                     use("readsLaterProperty", later)
+                    use("readsLaterLateinitProperty", lateinitLater)
+                    use("readsLaterAbstractProperty", abstractLater)
                     use("readsCompanionProperty", logger)
                 }
                 val later = 1
+                lateinit var lateinitLater: String
+                abstract val abstractLater: Int
                 companion object {
                     val logger = Any()
                 }
@@ -561,7 +565,8 @@ class ScopeTraitTest implements RewriteTest {
     }
 
     /**
-     * The rows in which kotlinc reports an error, in alphabetical order. A row starts at the line that names it.
+     * The rows in which kotlinc reports an error, in alphabetical order. A row starts at the line that names it. An
+     * error above every row counts by its line number, so that it fails the comparison.
      */
     private static Set<String> rowsKotlincRejects(@Language("kotlin") String source) {
         KotlinCompilation compilation = new KotlinCompilation();
@@ -573,13 +578,15 @@ class ScopeTraitTest implements RewriteTest {
         Matcher error = Pattern.compile("^e: .*Rows\\.kt:(\\d+):\\d+ ", Pattern.MULTILINE)
           .matcher(compilation.compile().getMessages());
         while (error.find()) {
+            String row = "line " + error.group(1);
             for (int line = Integer.parseInt(error.group(1)) - 1; line >= 0; line--) {
-                Matcher row = USE_ROW.matcher(lines[line]);
-                if (row.find()) {
-                    rejected.add(row.group(1));
+                Matcher named = USE_ROW.matcher(lines[line]);
+                if (named.find()) {
+                    row = named.group(1);
                     break;
                 }
             }
+            rejected.add(row);
         }
         return rejected;
     }

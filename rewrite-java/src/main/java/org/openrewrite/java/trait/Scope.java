@@ -251,7 +251,9 @@ public class Scope implements Trait<J> {
             return false;
         }
         J.VariableDeclarations declared = declaration.getValue();
-        if (initializesStatic != declared.hasModifier(J.Modifier.Type.Static)) {
+        // Kotlin lets an initializer read an abstract or `lateinit` property declared after it
+        if (initializesStatic != declared.hasModifier(J.Modifier.Type.Static) ||
+            declared.hasModifier(J.Modifier.Type.Abstract) || hasKeyword(declared, "lateinit")) {
             return false;
         }
         if (member.getId().equals(declared.getId())) {
@@ -262,6 +264,15 @@ public class Scope implements Trait<J> {
         List<Statement> members = body.<J.Block>getValue().getStatements();
         int at = indexOf(members, member);
         return at >= 0 && at < indexOf(members, declared);
+    }
+
+    private static boolean hasKeyword(J.VariableDeclarations declarations, String keyword) {
+        for (J.Modifier modifier : declarations.getModifiers()) {
+            if (keyword.equals(modifier.getKeyword())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static int indexOf(List<? extends J> trees, J tree) {
