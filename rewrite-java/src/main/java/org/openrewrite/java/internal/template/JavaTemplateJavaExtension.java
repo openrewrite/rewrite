@@ -935,8 +935,9 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
         for (Statement parameter : method.getParameters()) {
             if (parameter instanceof J.VariableDeclarations) {
                 for (J.VariableDeclarations.NamedVariable variable : ((J.VariableDeclarations) parameter).getVariables()) {
-                    if (variable.getVariableType() == null) {
-                        // an unattributed parameter, such as one typed by a type variable, leaves its readers as they are
+                    if (variable.getVariableType() == null || !TypeUtils.isWellFormedType(variable.getType())) {
+                        // an unattributed parameter, such as one typed by a type variable or by a type missing from the
+                        // template's classpath, leaves its readers as they are
                         continue;
                     }
                     Scope.bindingOf(methodCursor, variable).ifPresent(binding -> binding.references()
