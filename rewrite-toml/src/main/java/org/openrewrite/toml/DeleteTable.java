@@ -23,23 +23,27 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.toml.internal.TomlKeyParts;
 import org.openrewrite.toml.tree.Toml;
 import org.openrewrite.toml.tree.TomlValue;
+
+import java.util.List;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class DeleteTable extends Recipe {
     @Option(displayName = "Table name",
-            description = "The name of the TOML table to delete.",
+            description = "The name of the TOML table to delete. Its subtables, such as `[dependencies.serde]` for `dependencies`, are deleted with it.",
             example = "dependencies")
     String tableName;
 
     String displayName = "Delete TOML table";
 
-    String description = "Delete a TOML table.";
+    String description = "Delete a TOML table and its subtables.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
+        List<String> deleted = TomlKeyParts.split(tableName);
         return new TomlVisitor<ExecutionContext>() {
             @Override
             public Toml visitDocument(Toml.Document document, ExecutionContext ctx) {
@@ -59,10 +63,18 @@ public class DeleteTable extends Recipe {
             @Override
             public @Nullable Toml visitTable(Toml.Table table, ExecutionContext ctx) {
                 Toml.Table t = (Toml.Table) super.visitTable(table, ctx);
-                if (TableRowMatcher.isNamed(t, tableName)) {
+                if (isTheTableOrUnderIt(t)) {
                     return null;
                 }
                 return t;
+            }
+
+            private boolean isTheTableOrUnderIt(Toml.Table t) {
+                if (t.getName() == null) {
+                    return false;
+                }
+                List<String> parts = TomlKeyParts.of(t.getName());
+                return TomlKeyParts.startsWith(parts, deleted);
             }
         };
     }

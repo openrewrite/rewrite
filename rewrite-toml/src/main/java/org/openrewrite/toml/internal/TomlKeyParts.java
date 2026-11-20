@@ -66,6 +66,13 @@ public final class TomlKeyParts {
         return ranges;
     }
 
+    /**
+     * Whether {@code key} is {@code prefix} or a key under it, part by part.
+     */
+    public static boolean startsWith(List<String> key, List<String> prefix) {
+        return key.size() >= prefix.size() && key.subList(0, prefix.size()).equals(prefix);
+    }
+
     private static int closingQuote(String key, int open) {
         char quote = key.charAt(open);
         for (int i = open + 1; i < key.length(); i++) {

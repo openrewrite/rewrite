@@ -122,7 +122,9 @@ public class TomlPathMatcher {
             return emptyList();
         }
 
-        if (path.startsWith("[") && path.endsWith("]")) {
+        if (path.startsWith("[[") && path.endsWith("]]")) {
+            path = path.substring(2, path.length() - 2);
+        } else if (path.startsWith("[") && path.endsWith("]")) {
             path = path.substring(1, path.length() - 1);
         }
 
