@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.ExecutionContext;
@@ -48,14 +49,19 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 @SuppressWarnings({"ConstantConditions", "PatternVariableCanBeUsed", "StatementWithEmptyBody"})
 class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
 
-    @Language("java")
-    private final String goat = StringUtils.readFully(JavaParserTypeMappingTest.class.getResourceAsStream("/JavaTypeGoat.java"));
+    // Every test reads the same compilation unit, so none may change its types, as `unsafeSet` would.
+    private static J.@Nullable CompilationUnit goatCu;
 
-    private final J.CompilationUnit goatCu = JavaParser.fromJavaVersion().build()
-      .parse(goat)
-      .findFirst()
-      .map(J.CompilationUnit.class::cast)
-      .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"));
+    private static J.CompilationUnit goatCu() {
+        if (goatCu == null) {
+            goatCu = JavaParser.fromJavaVersion().build()
+              .parse(StringUtils.readFully(JavaParserTypeMappingTest.class.getResourceAsStream("/JavaTypeGoat.java")))
+              .findFirst()
+              .map(J.CompilationUnit.class::cast)
+              .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"));
+        }
+        return goatCu;
+    }
 
     @Override
     public JavaType.FullyQualified classType(String fqn) {
@@ -69,7 +75,7 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
                 }
                 return super.visitClassDeclaration(classDecl, o);
             }
-        }.visit(goatCu, 0);
+        }.visit(goatCu(), 0);
         return type.get();
     }
 
