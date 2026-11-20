@@ -47,7 +47,7 @@ final class NameMatching {
     /**
      * Messages that a recipe run puts on its execution context, which a rerun must not share.
      */
-    private static final Set<String> RUN_STATE = new HashSet<>(Arrays.asList(
+    static final Set<String> RUN_STATE = new HashSet<>(Arrays.asList(
             ExecutionContext.CURRENT_CYCLE,
             ExecutionContext.CURRENT_RECIPE,
             Recipe.PANIC,
