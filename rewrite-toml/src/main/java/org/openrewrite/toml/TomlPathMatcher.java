@@ -18,7 +18,6 @@ package org.openrewrite.toml;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.toml.internal.TomlKeyParts;
-import org.openrewrite.toml.internal.TomlString;
 import org.openrewrite.toml.tree.Toml;
 import org.openrewrite.toml.tree.TomlKey;
 
@@ -126,66 +125,30 @@ public class TomlPathMatcher {
             path = path.substring(1, path.length() - 1);
         }
 
-        List<String> parts = new ArrayList<>();
-        int i = 0;
-        while (i < path.length()) {
-            if (path.charAt(i) == '"' || path.charAt(i) == '\'') {
-                char quote = path.charAt(i);
-                int end = closingQuote(path, i);
-                if (end != -1) {
-                    String quoted = path.substring(i + 1, end);
-                    parts.add(quote == '"' ? TomlString.decodeBasic(quoted, false) : quoted);
-                    i = end + 1;
-                    if (i < path.length() && path.charAt(i) == '.') {
-                        i++; // Skip dot after quote
-                    }
-                } else {
-                    i++;
-                }
-            } else {
-                int nextDot = path.indexOf('.', i);
-                if (nextDot == -1) {
-                    parts.add(path.substring(i).trim());
-                    break;
-                } else {
-                    parts.add(path.substring(i, nextDot).trim());
-                    i = nextDot + 1;
-                }
-            }
-        }
-
         List<PathSegment> result = new ArrayList<>();
-        for (String part : parts) {
+        for (int[] range : TomlKeyParts.ranges(path)) {
+            String part = path.substring(range[0], range[1]);
+            if (TomlKeyParts.isQuoted(part)) {
+                // a quoted part names one key, even an empty one, and holds no wildcard
+                result.add(new PathSegment(TomlKeyParts.unquote(part), false, false, true));
+                continue;
+            }
             switch (part) {
                 case "":
                     continue;
                 case "**":
-                    result.add(new PathSegment(null, false, true));
+                    result.add(new PathSegment(null, false, true, false));
                     break;
                 case "*":
-                    result.add(new PathSegment(null, true, false));
+                    result.add(new PathSegment(null, true, false, false));
                     break;
                 default:
-                    result.add(new PathSegment(part, false, false));
+                    result.add(new PathSegment(part, false, false, false));
                     break;
             }
         }
 
         return result;
-    }
-
-    // a basic-string segment can hold an escaped quote, a literal-string one cannot
-    private static int closingQuote(String path, int open) {
-        char quote = path.charAt(open);
-        for (int i = open + 1; i < path.length(); i++) {
-            char c = path.charAt(i);
-            if (c == '\\' && quote == '"') {
-                i++;
-            } else if (c == quote) {
-                return i;
-            }
-        }
-        return -1;
     }
 
     private static class PathSegment {
@@ -194,12 +157,12 @@ public class TomlPathMatcher {
         final boolean isDoubleWildcard;
         final @Nullable Pattern pattern;
 
-        PathSegment(@Nullable String literal, boolean isSingleWildcard, boolean isDoubleWildcard) {
+        PathSegment(@Nullable String literal, boolean isSingleWildcard, boolean isDoubleWildcard, boolean quoted) {
             this.literal = literal;
             this.isSingleWildcard = isSingleWildcard;
             this.isDoubleWildcard = isDoubleWildcard;
 
-            if (literal != null && (literal.indexOf('*') >= 0 || literal.indexOf('?') >= 0)) {
+            if (literal != null && !quoted && (literal.indexOf('*') >= 0 || literal.indexOf('?') >= 0)) {
                 StringBuilder regex = new StringBuilder();
                 int start = 0;
                 for (int i = 0; i < literal.length(); i++) {

@@ -58,12 +58,7 @@ public class ChangeKey extends Recipe {
                 Toml.KeyValue kv = super.visitKeyValue(keyValue, ctx);
 
                 if (matcher.matches(getCursor()) && kv.getKey() instanceof Toml.Identifier) {
-                    String newKeyName = newKey;
-                    if (newKeyName.startsWith("\"") && newKeyName.endsWith("\"")) {
-                        newKeyName = TomlString.decodeBasic(newKeyName.substring(1, newKeyName.length() - 1), false);
-                    } else if (newKeyName.startsWith("'") && newKeyName.endsWith("'")) {
-                        newKeyName = newKeyName.substring(1, newKeyName.length() - 1);
-                    }
+                    String newKeyName = TomlKeyParts.unquote(newKey);
 
                     String formattedKey = newKeyName.matches("^[A-Za-z0-9_-]+$") ? newKeyName :
                             "\"" + TomlString.quoteBasic(newKeyName) + "\"";

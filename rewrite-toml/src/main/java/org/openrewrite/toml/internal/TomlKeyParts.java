@@ -79,7 +79,16 @@ public final class TomlKeyParts {
         return key.length() - 1;
     }
 
-    private static String unquote(String part) {
+    public static boolean isQuoted(String part) {
+        return part.length() >= 2 && (part.charAt(0) == '"' && part.endsWith("\"") ||
+                                      part.charAt(0) == '\'' && part.endsWith("'"));
+    }
+
+    /**
+     * The name one part stands for: a basic-string part with its escapes decoded, a literal-string part as it is
+     * written between its quotes, and a bare part as it is.
+     */
+    public static String unquote(String part) {
         if (part.length() >= 2 && part.charAt(0) == '"' && part.endsWith("\"")) {
             return TomlString.decodeBasic(part.substring(1, part.length() - 1), false);
         } else if (part.length() >= 2 && part.charAt(0) == '\'' && part.endsWith("'")) {

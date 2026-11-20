@@ -48,7 +48,7 @@ class FindKeyTest implements RewriteTest {
     @Test
     void quotedSegmentMatchesTheKeyItsEscapesStandFor() {
         rewriteRun(
-          spec -> spec.recipe(new FindKey("hosts.\"a\\\"b\\\\*\"")),
+          spec -> spec.recipe(new FindKey("hosts.\"a\\\"b\\\\\\nc\"")),
           toml(
             """
               [hosts]
@@ -59,6 +59,61 @@ class FindKeyTest implements RewriteTest {
               [hosts]
               ~~>"a\\"b\\\\\\nc" = 1
               other = 2
+              """
+          )
+        );
+    }
+
+    @Test
+    void quotedEmptySegmentMatchesTheEmptyKey() {
+        rewriteRun(
+          spec -> spec.recipe(new FindKey("tool.setuptools.package-dir.\"\"")),
+          toml(
+            """
+              [tool.setuptools.package-dir]
+              "" = "src"
+              lib = "lib"
+              """,
+            """
+              [tool.setuptools.package-dir]
+              ~~>"" = "src"
+              lib = "lib"
+              """
+          )
+        );
+    }
+
+    @Test
+    void quotedSegmentIsNotAWildcard() {
+        rewriteRun(
+          spec -> spec.recipe(new FindKey("lint.per-file-ignores.\"warp/*.py\"")),
+          toml(
+            """
+              [lint.per-file-ignores]
+              "warp/*.py" = ["E501"]
+              "warp/tests/*.py" = ["F401"]
+              """,
+            """
+              [lint.per-file-ignores]
+              ~~>"warp/*.py" = ["E501"]
+              "warp/tests/*.py" = ["F401"]
+              """
+          )
+        );
+    }
+
+    @Test
+    void quotedSegmentAfterWhitespace() {
+        rewriteRun(
+          spec -> spec.recipe(new FindKey("tool. \"my-pkg\".v")),
+          toml(
+            """
+              [tool."my-pkg"]
+              v = 1
+              """,
+            """
+              [tool."my-pkg"]
+              ~~>v = 1
               """
           )
         );
