@@ -127,27 +127,6 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
     }
 
     @Test
-    void shortenJavaWithJavaOnlyOption() {
-        rewriteRun(
-          spec -> spec.recipe(new ShortenFullyQualifiedTypeReferences(true)),
-          java(
-            """
-              class T {
-                  java.util.List<String> list;
-              }
-              """,
-            """
-              import java.util.List;
-
-              class T {
-                  List<String> list;
-              }
-              """
-          )
-        );
-    }
-
-    @Test
     void keepQualifiedStaticMethodEvenWhenTypeIsImported() {
         rewriteRun(
           java(
@@ -249,6 +228,31 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
               }
               class U {
                   List<?> values;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void variableDoesNotObscureConstructorReference() {
+        rewriteRun(
+          java(
+            """
+              import java.util.function.Supplier;
+
+              class T {
+                  Object ArrayList;
+                  Supplier<java.util.ArrayList<Object>> supplier = java.util.ArrayList::new;
+              }
+              """,
+            """
+              import java.util.ArrayList;
+              import java.util.function.Supplier;
+
+              class T {
+                  Object ArrayList;
+                  Supplier<ArrayList<Object>> supplier = ArrayList::new;
               }
               """
           )

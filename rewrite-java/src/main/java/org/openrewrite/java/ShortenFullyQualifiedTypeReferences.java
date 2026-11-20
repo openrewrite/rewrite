@@ -15,14 +15,10 @@
  */
 package org.openrewrite.java;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
@@ -45,23 +41,7 @@ import static org.openrewrite.java.tree.TypeUtils.fullyQualifiedNamesAreEqual;
 import static org.openrewrite.java.tree.TypeUtils.isOfClassType;
 import static org.openrewrite.java.tree.TypeUtils.isWellFormedType;
 
-@EqualsAndHashCode(callSuper = false)
 public class ShortenFullyQualifiedTypeReferences extends Recipe {
-
-    @Option(displayName = "Only Java",
-            description = "Only shorten references in Java compilation units. By default, also delegates to the import service of other languages.",
-            required = false)
-    @Getter
-    final @Nullable Boolean onlyJava;
-
-    public ShortenFullyQualifiedTypeReferences() {
-        this(null);
-    }
-
-    @JsonCreator
-    public ShortenFullyQualifiedTypeReferences(@JsonProperty("onlyJava") @Nullable Boolean onlyJava) {
-        this.onlyJava = onlyJava;
-    }
 
     @Getter
     final String displayName = "Add imports for fully qualified references to types";
@@ -80,7 +60,7 @@ public class ShortenFullyQualifiedTypeReferences extends Recipe {
         return new JavaVisitor<ExecutionContext>() {
             @Override
             public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
-                if (tree instanceof JavaSourceFile && (!Boolean.TRUE.equals(onlyJava) || tree instanceof J.CompilationUnit)) {
+                if (tree instanceof JavaSourceFile) {
                     return ((JavaSourceFile) tree).service(ImportService.class).shortenFullyQualifiedTypeReferencesIn((J) tree).visit(tree, ctx);
                 }
                 return (J) tree;
@@ -271,27 +251,31 @@ public class ShortenFullyQualifiedTypeReferences extends Recipe {
         if (binding != null && !isOfClassType(binding.getType(), type.getFullyQualifiedName())) {
             return false;
         }
+        return !isTypeQualifierInExpression(cursor) || !scope.lookup(simpleName).isPresent();
+    }
+
+    static boolean isTypeQualifierInExpression(Cursor cursor) {
         J qualifier = cursor.getValue();
         for (Cursor parent = cursor.getParentTreeCursor(); ; parent = parent.getParentTreeCursor()) {
             Object tree = parent.getValue();
             if (tree instanceof J.FieldAccess && ((J.FieldAccess) tree).getTarget() == qualifier) {
                 J.FieldAccess access = (J.FieldAccess) tree;
-                // A class literal and a nested type in a type position cannot be obscured by a variable.
-                if ("class".equals(access.getSimpleName())) {
-                    return true;
+                if ("class".equals(access.getSimpleName()) || "this".equals(access.getSimpleName()) || "super".equals(access.getSimpleName())) {
+                    return false;
                 }
                 if (access.getName().getFieldType() != null) {
-                    break;
+                    return true;
                 }
                 qualifier = access;
-            } else if (tree instanceof J.MethodInvocation && ((J.MethodInvocation) tree).getSelect() == qualifier ||
-                       tree instanceof J.MemberReference && ((J.MemberReference) tree).getContaining() == qualifier) {
-                break;
-            } else {
+            } else if (tree instanceof J.MethodInvocation && ((J.MethodInvocation) tree).getSelect() == qualifier) {
                 return true;
+            } else if (tree instanceof J.MemberReference && ((J.MemberReference) tree).getContaining() == qualifier) {
+                return !"new".equals(((J.MemberReference) tree).getReference().getSimpleName());
+            } else {
+                return false;
             }
         }
-        return !scope.lookup(simpleName).isPresent();
     }
+
 
 }
