@@ -15,6 +15,7 @@
  */
 package org.openrewrite.xml;
 
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
@@ -100,6 +101,256 @@ class RemoveEmptyXmlTagsTest implements RewriteTest {
                   <build attr="true">
                   </build>
                   <dependencies attr="false" />
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void deletesFileWhenRootCollapses() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveEmptyXmlTags(
+            List.of("/server/featureManager", "/server[@*]"),
+            "**/mp-telemetry.xml",
+            true)),
+          xml(
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <server description="DO NOT MODIFY.">
+                  <featureManager>
+                  </featureManager>
+              </server>
+              """,
+            (String) null,
+            spec -> spec.path("src/main/liberty/config/configDropins/defaults/mp-telemetry.xml")
+          )
+        );
+    }
+
+    @Test
+    void deleteFileIfEmptyDefaultsToTrue() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveEmptyXmlTags(null, null, null)),
+          xml(
+            """
+              <root>
+                  <child></child>
+              </root>
+              """,
+            (String) null
+          )
+        );
+    }
+
+    @Test
+    void preservesFileWhenRootHasAttributes() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveEmptyXmlTags(
+            List.of("/server/featureManager"),
+            null,
+            true)),
+          xml(
+            """
+              <server description="DO NOT MODIFY.">
+                  <featureManager>
+                  </featureManager>
+              </server>
+              """,
+            """
+              <server description="DO NOT MODIFY.">
+              </server>
+              """
+          )
+        );
+    }
+
+    @Test
+    void xPathWhitelistScopesRemoval() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveEmptyXmlTags(
+            List.of("//featureManager"),
+            null,
+            false)),
+          xml(
+            """
+              <server>
+                  <featureManager>
+                  </featureManager>
+                  <httpEndpoint>
+                  </httpEndpoint>
+              </server>
+              """,
+            """
+              <server>
+                  <httpEndpoint>
+                  </httpEndpoint>
+              </server>
+              """
+          )
+        );
+    }
+
+    @Test
+    void tagsWithAttributesArePreserved() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveEmptyXmlTags(
+            List.of("//feature"),
+            null,
+            false)),
+          xml(
+            """
+              <featureManager>
+                  <feature></feature>
+                  <feature version="1.0"></feature>
+              </featureManager>
+              """,
+            """
+              <featureManager>
+                  <feature version="1.0"></feature>
+              </featureManager>
+              """
+          )
+        );
+    }
+
+    @Test
+    void attributeWildcardAllowsAnyAttributes() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveEmptyXmlTags(
+            List.of("//feature[@*]"),
+            null,
+            false)),
+          xml(
+            """
+              <featureManager>
+                  <feature></feature>
+                  <feature version="1.0"></feature>
+                  <feature version="2.0" scope="runtime"></feature>
+              </featureManager>
+              """,
+            """
+              <featureManager>
+              </featureManager>
+              """
+          )
+        );
+    }
+
+    @Test
+    void singleAttributeAllowlist() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveEmptyXmlTags(
+            List.of("//feature[@description]"),
+            null,
+            false)),
+          xml(
+            """
+              <featureManager>
+                  <feature></feature>
+                  <feature description="X"></feature>
+                  <feature description="X" version="1.0"></feature>
+              </featureManager>
+              """,
+            """
+              <featureManager>
+                  <feature description="X" version="1.0"></feature>
+              </featureManager>
+              """
+          )
+        );
+    }
+
+    @Test
+    void multipleAttributeAllowlist() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveEmptyXmlTags(
+            List.of("//feature[@description or @other]"),
+            null,
+            false)),
+          xml(
+            """
+              <featureManager>
+                  <feature></feature>
+                  <feature description="X"></feature>
+                  <feature other="Y"></feature>
+                  <feature description="X" other="Y"></feature>
+                  <feature description="X" version="1.0"></feature>
+              </featureManager>
+              """,
+            """
+              <featureManager>
+                  <feature description="X" version="1.0"></feature>
+              </featureManager>
+              """
+          )
+        );
+    }
+
+    @Test
+    void fileMatcherSkipsNonMatchingFile() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveEmptyXmlTags(
+            List.of("//featureManager"),
+            "**/server.xml",
+            false)),
+          xml(
+            """
+              <server>
+                  <featureManager>
+                  </featureManager>
+              </server>
+              """,
+            spec -> spec.path("src/main/other.xml")
+          )
+        );
+    }
+
+    @Test
+    void deleteFileIfEmptyFalseLeavesEmptyRoot() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveEmptyXmlTags(
+            List.of("/server/featureManager"),
+            null,
+            false)),
+          xml(
+            """
+              <server>
+                  <featureManager>
+                  </featureManager>
+              </server>
+              """,
+            """
+              <server>
+              </server>
+              """
+          )
+        );
+    }
+
+    @Test
+    void nestedEmptyTagsCollapseInOneRun() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveEmptyXmlTags(
+            List.of("//plugin", "//plugins", "//pluginManagement", "//build"),
+            null,
+            false)),
+          xml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <build>
+                      <pluginManagement>
+                          <plugins>
+                              <plugin></plugin>
+                          </plugins>
+                      </pluginManagement>
+                  </build>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
               </project>
               """
           )
