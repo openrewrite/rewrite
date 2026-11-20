@@ -186,7 +186,8 @@ public class Scope implements Trait<J> {
      * Whether an identifier written at the position could refer to the binding by its simple name, in code the
      * language accepts. It could not where another binding shadows this one, where an instance member or a class's
      * type parameter is named from a {@link ScopeService#isStaticContext(Cursor) static context}, where an
-     * initializer names a field declared after it, or where a local that is not effectively final is read from
+     * initializer names a field declared after it, where a constructor or instance initializer of an enum names a
+     * static field of the enum that is no constant, or where a local that is not effectively final is read from
      * inside a lambda or a class body. Whether a local declared without an initializer has been assigned by then is
      * not checked.
      */
@@ -206,7 +207,8 @@ public class Scope implements Trait<J> {
                                 binding.cursor.getParentTreeCursor().getValue() instanceof J.TypeParameter;
         boolean needsInstance = (scopeTree instanceof J.ClassDeclaration || scopeTree instanceof J.NewClass) &&
                                 (binding.namespace == Namespace.TYPE ? typeParameter : !isStatic(binding));
-        return !isForwardReference(binding) && (!needsInstance || hasInstanceOf(binding.scope, !typeParameter));
+        return !isForwardReference(binding) && !isEnumFieldReadDuringConstruction(binding) &&
+               (!needsInstance || hasInstanceOf(binding.scope, !typeParameter));
     }
 
     /**
@@ -267,6 +269,107 @@ public class Scope implements Trait<J> {
             }
         }
         return -1;
+    }
+
+    /**
+     * Whether the position reads an enum's own static field while a constant of the enum is constructed, which is
+     * before the field is assigned (JLS 8.9.2). That is in a constructor, an instance initializer or an instance
+     * variable initializer of the enum or of the body of one of its constants, unless the field is a constant
+     * variable. Any other class body in between lifts the restriction.
+     */
+    private boolean isEnumFieldReadDuringConstruction(Binding field) {
+        if (field.namespace != Namespace.VARIABLE || !(field.scope.getValue() instanceof J.ClassDeclaration)) {
+            return false;
+        }
+        J.ClassDeclaration enumClass = field.scope.getValue();
+        if (enumClass.getKind() != J.ClassDeclaration.Kind.Type.Enum || !isStatic(field) || isConstantVariable(field)) {
+            return false;
+        }
+        // A field the body does not declare is the enum's own only where attribution says so
+        if (!(field.getTree() instanceof J.Identifier) && !(field.type instanceof JavaType.Variable &&
+              TypeUtils.isOfType(((JavaType.Variable) field.type).getOwner(), enumClass.getType()))) {
+            return false;
+        }
+        J member = null;
+        Cursor body = position;
+        while (!(body.getValue() instanceof J.Block && isClassBody(body))) {
+            if (body.getValue() instanceof J) {
+                member = body.getValue();
+            }
+            body = body.getParent();
+            if (body == null) {
+                return false;
+            }
+        }
+        Cursor constructed = body.getParentTreeCursor();
+        if (constructed.getValue() instanceof J.NewClass &&
+            constructed.getParentTreeCursor().getValue() instanceof J.EnumValue) {
+            constructed = constructed.dropParentUntil(J.ClassDeclaration.class::isInstance);
+        }
+        if (!isTree(constructed, field.scope)) {
+            return false;
+        }
+        return member instanceof J.MethodDeclaration && isConstructor((J.MethodDeclaration) member) ||
+               member instanceof J.Block && !((J.Block) member).isStatic() ||
+               member instanceof J.VariableDeclarations &&
+               !((J.VariableDeclarations) member).hasModifier(J.Modifier.Type.Static);
+    }
+
+    /**
+     * Attribution tells where it is present, since a language may leave the return type off a method too.
+     */
+    private static boolean isConstructor(J.MethodDeclaration method) {
+        return method.getMethodType() != null ? method.getMethodType().isConstructor() : method.isConstructor();
+    }
+
+    private static boolean isClassBody(Cursor block) {
+        Object owner = block.getParentTreeCursor().getValue();
+        return owner instanceof J.ClassDeclaration || owner instanceof J.NewClass;
+    }
+
+    /**
+     * Whether the field is a constant variable (JLS 4.12.4): final, of a primitive type or {@code String}, and
+     * initialized with a constant expression. An initializer that names another constant is not taken for one.
+     */
+    private static boolean isConstantVariable(Binding field) {
+        Cursor variable = field.getDeclaration().orElse(null);
+        if (variable == null || !(variable.getValue() instanceof J.VariableDeclarations.NamedVariable)) {
+            return false;
+        }
+        Object declaration = variable.getParentTreeCursor().getValue();
+        J.VariableDeclarations.NamedVariable named = variable.getValue();
+        return declaration instanceof J.VariableDeclarations &&
+               ((J.VariableDeclarations) declaration).hasModifier(J.Modifier.Type.Final) &&
+               isConstantType(named.getType()) &&
+               named.getInitializer() != null && isConstantExpression(named.getInitializer());
+    }
+
+    private static boolean isConstantType(@Nullable JavaType type) {
+        return type instanceof JavaType.Primitive || TypeUtils.isString(type);
+    }
+
+    /**
+     * Whether the expression is a constant expression (JLS 15.29) that names no variable.
+     */
+    private static boolean isConstantExpression(J expression) {
+        if (expression instanceof J.Literal) {
+            return ((J.Literal) expression).getValue() != null;
+        } else if (expression instanceof J.Parentheses) {
+            return isConstantExpression(((J.Parentheses<?>) expression).getTree());
+        } else if (expression instanceof J.Unary) {
+            return isConstantExpression(((J.Unary) expression).getExpression());
+        } else if (expression instanceof J.Binary) {
+            J.Binary binary = (J.Binary) expression;
+            return isConstantExpression(binary.getLeft()) && isConstantExpression(binary.getRight());
+        } else if (expression instanceof J.Ternary) {
+            J.Ternary ternary = (J.Ternary) expression;
+            return isConstantExpression(ternary.getCondition()) && isConstantExpression(ternary.getTruePart()) &&
+                   isConstantExpression(ternary.getFalsePart());
+        } else if (expression instanceof J.TypeCast) {
+            J.TypeCast cast = (J.TypeCast) expression;
+            return isConstantType(cast.getType()) && isConstantExpression(cast.getExpression());
+        }
+        return false;
     }
 
     /**
