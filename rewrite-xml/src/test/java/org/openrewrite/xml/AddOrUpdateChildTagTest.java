@@ -530,4 +530,17 @@ class AddOrUpdateChildTagTest implements RewriteTest {
                 )
         );
     }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"\n", "\r\n"})
+    void replacedTagKeepsTheBlankLinesAboveIt(String lineBreak) {
+        rewriteRun(spec -> spec.recipe(new AddOrUpdateChildTag("/project/configuration", "<skip>true</skip>", true)),
+                xml(
+                        "<project>\n  <configuration>\n    <encoding>UTF-8</encoding>\n \t \n    <skip>false</skip>\n  </configuration>\n</project>"
+                                .replace("\n", lineBreak),
+                        "<project>\n  <configuration>\n    <encoding>UTF-8</encoding>\n \t \n    <skip>true</skip>\n  </configuration>\n</project>"
+                                .replace("\n", lineBreak)
+                )
+        );
+    }
 }
