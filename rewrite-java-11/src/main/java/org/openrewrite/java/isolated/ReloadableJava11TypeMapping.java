@@ -341,7 +341,12 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
         } else if (tree instanceof JCTree.JCClassDecl) {
             symbol = ((JCTree.JCClassDecl) tree).sym;
         } else if (tree instanceof JCTree.JCFieldAccess) {
-            symbol = ((JCTree.JCFieldAccess) tree).sym;
+            JCTree.JCFieldAccess select = (JCTree.JCFieldAccess) tree;
+            // A class literal that javac marks erroneous because of its context still has `Class<X>` on its symbol
+            if (select.type instanceof Type.ErrorType && select.sym != null && select.name.contentEquals("class")) {
+                return type(select.sym.type);
+            }
+            symbol = select.sym;
         }
 
         return type(((JCTree) tree).type, symbol);

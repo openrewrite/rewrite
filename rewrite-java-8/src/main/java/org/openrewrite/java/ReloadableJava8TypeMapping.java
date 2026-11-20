@@ -336,6 +336,12 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
             return variableType(((JCTree.JCVariableDecl) tree).sym);
         } else if (tree instanceof JCTree.JCAnnotatedType && ((JCTree.JCAnnotatedType) tree).getUnderlyingType() instanceof JCTree.JCArrayTypeTree) {
             return annotatedArray((JCTree.JCAnnotatedType) tree);
+        } else if (tree instanceof JCTree.JCFieldAccess) {
+            JCTree.JCFieldAccess select = (JCTree.JCFieldAccess) tree;
+            // A class literal that javac marks erroneous because of its context still has `Class<X>` on its symbol
+            if (select.type instanceof Type.ErrorType && select.sym != null && select.name.contentEquals("class")) {
+                return type(select.sym.type);
+            }
         }
 
         return type(((JCTree) tree).type, symbol);
