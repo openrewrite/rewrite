@@ -232,17 +232,17 @@ describe("Rewrite RPC", () => {
     });
 
     test("prepareRecipe rejects a missing required option", async () => {
-        // The server validates required options when preparing a recipe. `text` is required, so
-        // omitting it must fail rather than silently preparing a broken recipe.
+        // The server reports the rejected option on its response node rather than failing the
+        // request, so refusing here is what keeps a broken recipe from being prepared.
         await expect(client.prepareRecipe("org.openrewrite.example.text.change-text", {}))
-            .rejects.toThrow("Missing required option `text`");
+            .rejects.toThrow("`text` is required");
     });
 
-    test("prepareRecipe validates required options of child recipes", async () => {
-        // The composite's child ChangeText is missing its required `text`. Validation recurses through
-        // the whole prepared tree (like the C# server), so preparing the composite must fail.
+    test("prepareRecipe rejects a child's missing required option", async () => {
+        // The composite's child ChangeText is missing its required `text`. Every node of the tree
+        // carries its own validations, so the client refuses on the child's behalf too.
         await expect(client.prepareRecipe("org.openrewrite.example.text.composite-with-invalid-child"))
-            .rejects.toThrow("Missing required option `text`");
+            .rejects.toThrow("`text` is required");
     });
 
     // TODO: Re-enable once @openrewrite/recipes-npm is updated to use RecipeMarketplace API

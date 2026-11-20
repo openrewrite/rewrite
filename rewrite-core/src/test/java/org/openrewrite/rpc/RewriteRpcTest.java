@@ -1105,7 +1105,7 @@ class RewriteRpcTest implements RewriteTest {
         // the second recipe's precondition keeps it out of the batch, so the batch is flushed during its turn
         Recipe throwing = client.prepareRecipe("org.openrewrite.rpc.RewriteRpcTest$ThrowingRpcRecipe", Map.of());
         Recipe gatedOut = new RpcRecipe(client, "gated-out", Recipe.noop().getDescriptor(), "edit:gated-out",
-          TreeVisitor.noop(), null, null, List.of(), false);
+          TreeVisitor.noop(), null, null, List.of(), false, null);
 
         RecipeRun run = new RecipeScheduler().scheduleRun(
           new CompositeRecipe(List.of(throwing, gatedOut)),
@@ -1281,7 +1281,7 @@ class RewriteRpcTest implements RewriteTest {
         RpcRecipe prepared = (RpcRecipe) client.prepareRecipe(recipeName, options);
         String editVisitor = prepared.getEditVisitor();
         return client.recipeFromPrepareResponse(new PrepareRecipeResponse(editVisitor.substring("edit:".length()),
-          prepared.getDescriptor(), editVisitor, List.of(editPrecondition), null, List.of(), null, List.of(), null));
+          prepared.getDescriptor(), editVisitor, List.of(editPrecondition), null, List.of(), null, List.of(), null, null));
     }
 
     /**
@@ -1309,7 +1309,7 @@ class RewriteRpcTest implements RewriteTest {
         RpcRecipe prepared = (RpcRecipe) client.prepareRecipe(ScanThenEdit.class.getName(), Map.of());
         String scanVisitor = requireNonNull(prepared.getScanVisitor());
         return new RpcRecipe(client, scanVisitor.substring("scan:".length()), prepared.getDescriptor(),
-          prepared.getEditVisitor(), editPrecondition, scanVisitor, scanPrecondition, List.of(), false);
+          prepared.getEditVisitor(), editPrecondition, scanVisitor, scanPrecondition, List.of(), false, null);
     }
 
     @Test

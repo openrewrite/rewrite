@@ -526,12 +526,45 @@ public class RewriteRpc {
         return prepareRecipe(id, emptyMap());
     }
 
+    /**
+     * Prepares a recipe and refuses one whose options the remote rejected, so a caller that never
+     * validates cannot run a misconfigured recipe. Use
+     * {@link #prepareRecipeDeferringValidation(String, Map)} to report the failures from a validate
+     * stage instead.
+     */
     public Recipe prepareRecipe(String id, Map<String, Object> options) {
-        // Required-option validation is enforced server-side: PrepareRecipe instantiates the whole
-        // tree there and validates each recipe's option values (root and children alike), which a
-        // host-side check on the root descriptor alone cannot cover.
-        PrepareRecipeResponse r = send("PrepareRecipe", new PrepareRecipe(id, options, true), PrepareRecipeResponse.class);
+        PrepareRecipeResponse r = sendPrepareRecipe(id, options);
+        // Only what the remote reported. Running validateAll here would also collect every
+        // JVM-side node's own validate() -- a delegatesTo child the host resolved locally among
+        // them -- and raise it at the load stage, where a host's per-option reporting cannot see it.
+        Validated<Object> validated = remoteValidations(r);
+        if (validated.isInvalid()) {
+            throw new ValidationException(validated);
+        }
         return recipeFromPrepareResponse(r);
+    }
+
+    /**
+     * Prepares a recipe whatever the remote made of its options, leaving the failures on the
+     * returned recipe for {@link Recipe#validateAll} to report. The caller takes responsibility for
+     * refusing to run it.
+     */
+    public Recipe prepareRecipeDeferringValidation(String id, Map<String, Object> options) {
+        return recipeFromPrepareResponse(sendPrepareRecipe(id, options));
+    }
+
+    private PrepareRecipeResponse sendPrepareRecipe(String id, Map<String, Object> options) {
+        return send("PrepareRecipe", new PrepareRecipe(id, options, true), PrepareRecipeResponse.class);
+    }
+
+    static Validated<Object> remoteValidations(PrepareRecipeResponse r) {
+        Validated<Object> validated = RpcRecipe.toValidated(r.getDescriptor(), r.getValidations());
+        if (r.getRecipeList() != null) {
+            for (PrepareRecipeResponse child : r.getRecipeList()) {
+                validated = validated.and(remoteValidations(child));
+            }
+        }
+        return validated;
     }
 
     Recipe recipeFromPrepareResponse(PrepareRecipeResponse r) {
@@ -547,7 +580,7 @@ public class RewriteRpc {
         }
         return new RpcRecipe(this, r.getId(), r.getDescriptor(), r.getEditVisitor(),
                 matchAll(r.getEditPreconditions()), r.getScanVisitor(), matchAll(r.getScanPreconditions()),
-                r.getRecipeList(), Boolean.TRUE.equals(r.getCausesAnotherCycle()));
+                r.getRecipeList(), Boolean.TRUE.equals(r.getCausesAnotherCycle()), r.getValidations());
     }
 
     private @Nullable TreeVisitor<?, ExecutionContext> matchAll(List<PrepareRecipeResponse.Precondition> preconditions) {
