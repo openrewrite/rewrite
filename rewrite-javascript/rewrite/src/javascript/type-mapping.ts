@@ -1330,9 +1330,9 @@ export class JavaScriptTypeMapping {
 
             methodName = escapeLoneSurrogates(symbol.getName());
 
-            // Get the declaring type (the class/interface that contains this method)
+            // The declaring type: the class, whether declared or an expression, the interface or the object literal around it
             const parent = node.parent;
-            if (ts.isClassDeclaration(parent) || ts.isInterfaceDeclaration(parent) || ts.isObjectLiteralExpression(parent)) {
+            if (ts.isClassLike(parent) || ts.isInterfaceDeclaration(parent) || ts.isObjectLiteralExpression(parent)) {
                 const parentType = this.checker.getTypeAtLocation(parent);
                 declaringType = this.declaringType(parentType);
             } else {
