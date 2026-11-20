@@ -1146,6 +1146,28 @@ class RewriteTestTest implements RewriteTest {
         }
 
         @Test
+        void acceptSearchResultPrintedInFrontOfTheIndentation() {
+            rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new PlainTextVisitor<>() {
+                  @Override
+                  public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                      return SearchResult.found(text);
+                  }
+              })),
+              text(
+                """
+                    indented
+                  second
+                  """,
+                """
+                  ~~>  indented
+                  second
+                  """
+              )
+            );
+        }
+
+        @Test
         void acceptNewLinesAtTheirOwnIndentation() {
             rewriteRun(
               spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {

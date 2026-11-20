@@ -16,6 +16,7 @@
 package org.openrewrite.test;
 
 import lombok.Value;
+import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.Recipe;
 import org.openrewrite.Result;
 import org.openrewrite.SourceFile;
@@ -77,7 +78,7 @@ final class EditedLineIndentation {
                 indentationIsStructure(before) || indentationIsStructure(after)) {
                 continue;
             }
-            List<Reindented> reindented = reindented(before.printAll(), after.printAll());
+            List<Reindented> reindented = reindented(printed(before), printed(after));
             if (!reindented.isEmpty()) {
                 found.put(after.getSourcePath().toString(), reindented);
             }
@@ -85,6 +86,14 @@ final class EditedLineIndentation {
         if (!found.isEmpty()) {
             fail(message(found));
         }
+    }
+
+    /**
+     * The source as it is written, without the search results and other markers that a printer shows in front of the
+     * code they mark, sometimes in front of its indentation.
+     */
+    static String printed(SourceFile sourceFile) {
+        return sourceFile.printAll(new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED));
     }
 
     /**

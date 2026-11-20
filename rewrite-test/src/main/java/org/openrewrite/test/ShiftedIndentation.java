@@ -104,7 +104,7 @@ final class ShiftedIndentation {
             if (before == null || result.getAfter() == null || !isShiftable(before)) {
                 continue;
             }
-            String shifted = shift(before.printAll());
+            String shifted = shift(EditedLineIndentation.printed(before));
             List<SourceFile> others = new ArrayList<>();
             for (SourceFile source : parsed) {
                 if (!source.getId().equals(before.getId()) && source.getClass() == before.getClass()) {
@@ -112,7 +112,7 @@ final class ShiftedIndentation {
                 }
             }
             SourceFile reparsed = AddedMarkers.reparse(before, shifted, others, parsersFor, relativeTo, parseCtx);
-            if (reparsed == null || !reparsed.printAll().equals(shifted)) {
+            if (reparsed == null || !EditedLineIndentation.printed(reparsed).equals(shifted)) {
                 continue;
             }
             int index = sources.indexOf(before);
@@ -127,7 +127,7 @@ final class ShiftedIndentation {
                 continue;
             }
             List<EditedLineIndentation.Reindented> reindented = EditedLineIndentation.reindented(shifted,
-                    after.printAll());
+                    EditedLineIndentation.printed(after));
             if (!reindented.isEmpty()) {
                 found.put(before.getSourcePath().toString(), reindented);
             }
