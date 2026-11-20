@@ -280,7 +280,7 @@ public abstract class RewriteTest
                                 $"{recipeSpec.Recipe.Name} returned a new tree for {source.SourcePath} that prints " +
                                 "the same, so the run reports the source file as changed, with an empty diff.");
                         }
-                        Assert.True(result == null || result.After == null || result.Before == result.After,
+                        Assert.True(result == null || result.Before == result.After,
                             "Recipe made unexpected changes to a source file that was not expected to change.");
                     }
                     AfterRecipe(spec, source, result == null ? source : result.After);
