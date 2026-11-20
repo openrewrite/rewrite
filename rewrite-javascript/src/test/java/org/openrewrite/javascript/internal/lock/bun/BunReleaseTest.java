@@ -297,12 +297,12 @@ class BunReleaseTest {
      */
     @Test
     void migratesAPnpmLockFrom1223() {
-        java.util.Set<String> pnpm = java.util.Collections.singleton("pnpm-lock.yaml");
+        java.util.Set<String> pnpm = Collections.singleton("pnpm-lock.yaml");
         assertThat(Lockfile.rewritesAnotherFile(pnpm::contains, BunRelease.of("1.2.23"))).isTrue();
         assertThat(Lockfile.rewritesAnotherFile(pnpm::contains, BunRelease.of("1.2.22"))).isFalse();
         java.util.Set<String> yarnFirst = new java.util.HashSet<>(java.util.Arrays.asList("pnpm-lock.yaml", "yarn.lock"));
         assertThat(Lockfile.rewritesAnotherFile(yarnFirst::contains, BunRelease.of("1.2.23"))).isFalse();
-        java.util.Set<String> lockb = java.util.Collections.singleton("bun.lockb");
+        java.util.Set<String> lockb = Collections.singleton("bun.lockb");
         assertThat(Lockfile.rewritesAnotherFile(lockb::contains, BunRelease.of("1.2.0"))).isTrue();
     }
 
@@ -398,7 +398,7 @@ class BunReleaseTest {
         Log log = new Log();
         try {
             new Package().parseWithJSON(new Lockfile(BunRelease.of(release)), options(release, null), log, "",
-              Json.parse(manifest), Features.MAIN, java.util.Collections.singletonMap("", manifest));
+              Json.parse(manifest), Features.MAIN, Collections.singletonMap("", manifest));
         } catch (IllegalArgumentException e) {
             assertThat(e).hasMessage("InvalidPackageJSON");
         }
@@ -516,7 +516,7 @@ class BunReleaseTest {
      */
     @Test
     void writesTheOverridesOfAnInstallAsEachReleaseDid() {
-        java.util.Map<String, String> manifests = new java.util.LinkedHashMap<>();
+        Map<String, String> manifests = new java.util.LinkedHashMap<>();
         manifests.put("", "{\"name\":\"p\",\"dependencies\":{\"a\":\"file:./a\",\"b\":\"file:./b\",\"c\":\"file:./c\"}," +
                           "\"overrides\":{\"zz\":\"1.0.0\",\"c\":\"file:./c\",\"a\":\"file:./a\",\"b\":\"file:./b\"}}");
         for (String name : new String[]{"a", "b", "c"}) {
@@ -524,7 +524,7 @@ class BunReleaseTest {
         }
         String lock = "{\n  \"lockfileVersion\": 1,\n  \"workspaces\": {\n    \"\": {\n      \"name\": \"p\",\n    },\n" +
                       "  },\n  \"packages\": {}\n}\n";
-        java.util.Map<String, String> none = java.util.Collections.emptyMap();
+        Map<String, String> none = Collections.emptyMap();
         assertThat(overridesOf(written(install("1.2.7", lock, manifests, none)))).containsExactly("a", "c", "b");
         for (String release : new String[]{"1.2.8", "1.2.13"}) {
             assertThat(failure(install(release, lock, manifests, none))).isEqualTo("SECOND_INSTALL a second bun " +
@@ -654,13 +654,13 @@ class BunReleaseTest {
      */
     @Test
     void writesAWorkspacesBinAsEachReleaseDid() {
-        java.util.Map<String, String> manifests = new java.util.LinkedHashMap<>();
+        Map<String, String> manifests = new java.util.LinkedHashMap<>();
         manifests.put("", "{\"name\":\"p\",\"workspaces\":[\"packages/*\"]}");
         manifests.put("packages/m", "{\"name\":\"m\",\"version\":\"1.0.0\",\"bin\":{\"m1\":\"m1.js\",\"m2\":\"m2.js\"}}");
         manifests.put("packages/n", "{\"name\":\"n\",\"version\":\"1.0.0\",\"bin\":{\"n1\":\"n1.js\"}}");
         String lock = "{\n  \"lockfileVersion\": 1,\n  \"workspaces\": {\n    \"\": {\n      \"name\": \"p\",\n    },\n" +
                       "  },\n  \"packages\": {}\n}\n";
-        java.util.Map<String, String> none = java.util.Collections.emptyMap();
+        Map<String, String> none = Collections.emptyMap();
         assertThat(written(install("1.2.2", lock, manifests, none)))
           .contains("      \"bin\": {\n        \"m1\": \"m1.js\",        \"m2\": \"m2.js\"      },\n")
           .contains("      \"bin\": {\n        \"n1\": \"n1.js\"\n      },\n");
@@ -682,10 +682,10 @@ class BunReleaseTest {
      */
     @Test
     void keepsOverridesOffTheRootsEdgeToAMemberFrom123() {
-        java.util.Map<String, String> manifests = new java.util.LinkedHashMap<>();
+        Map<String, String> manifests = new java.util.LinkedHashMap<>();
         manifests.put("", "{\"name\":\"r\",\"workspaces\":[\"packages/a\"],\"overrides\":{\"a\":\"1.0.0\"}}");
         manifests.put("packages/a", "{\"name\":\"a\",\"version\":\"2.0.0\"}");
-        java.util.Map<String, String> packuments = java.util.Collections.singletonMap("a",
+        Map<String, String> packuments = Collections.singletonMap("a",
           registryPackument("a", "1.0.0", registryVersion("a", "1.0.0", "")));
         String lock = "{\n  \"lockfileVersion\": 1,\n  \"workspaces\": {\n    \"\": {\n      \"name\": \"r\",\n    },\n" +
                       "    \"packages/a\": {\n      \"name\": \"a\",\n      \"version\": \"2.0.0\",\n    },\n  },\n" +
@@ -702,13 +702,13 @@ class BunReleaseTest {
      */
     @Test
     void overridesTheRootsEdgeToAMemberAsEachReleaseDid() {
-        java.util.Map<String, String> manifests = new java.util.LinkedHashMap<>();
+        Map<String, String> manifests = new java.util.LinkedHashMap<>();
         manifests.put("", "{\"name\":\"p\",\"workspaces\":[\"packages/a\"],\"overrides\":{\"a\":\"file:./b\"}}");
         manifests.put("packages/a", "{\"name\":\"a\",\"version\":\"1.0.0\"}");
         manifests.put("b", "{\"name\":\"a\",\"version\":\"9.0.0\"}");
         String lock = "{\n  \"lockfileVersion\": 1,\n  \"workspaces\": {\n    \"\": {\n      \"name\": \"p\",\n    },\n" +
                       "  },\n  \"packages\": {}\n}\n";
-        java.util.Map<String, String> none = java.util.Collections.emptyMap();
+        Map<String, String> none = Collections.emptyMap();
         assertThat(written(install("1.2.2", lock, manifests, none))).isEqualTo("{\n  \"lockfileVersion\": 1,\n" +
           "  \"workspaces\": {\n    \"\": {\n      \"name\": \"p\",\n    },\n  },\n  \"overrides\": {\n" +
           "    \"a\": \"file:./b\",\n  },\n  \"packages\": {\n    \"a\": [\"a@file:b\", {}],\n  }\n}\n");
@@ -766,7 +766,7 @@ class BunReleaseTest {
      */
     @Test
     void aLaterNegationExcludesAWorkspaceFrom130() {
-        java.util.Map<String, String> manifests = new java.util.LinkedHashMap<>();
+        Map<String, String> manifests = new java.util.LinkedHashMap<>();
         manifests.put("packages/a", "{\"name\":\"a\"}");
         manifests.put("packages/b", "{\"name\":\"b\"}");
         List<Json.Expr> globs = Json.parse("[\"packages/*\", \"!packages/a\"]").items();
@@ -934,7 +934,7 @@ class BunReleaseTest {
      */
     @Test
     void walksATwoCharacterDotComponentAsWrittenFrom134() {
-        java.util.Map<String, String> manifests = java.util.Collections.singletonMap(".x/a", "{\"name\":\"a\"}");
+        Map<String, String> manifests = Collections.singletonMap(".x/a", "{\"name\":\"a\"}");
         List<Json.Expr> globs = Json.parse("[\".x/*\"]").items();
         Workspaces later = new Workspaces(BunRelease.of("1.3.4"));
         later.processNamesArray(new Log(), globs, manifests);
@@ -947,10 +947,10 @@ class BunReleaseTest {
     // 1.4.x: src/install/lockfile/OverrideMap.rs and override_selector.rs
 
     // the overrides of a root manifest as the release reads them, its members by location, and what it warns of
-    private static OverrideMap overrides(String release, String manifest, java.util.Map<String, String> members,
+    private static OverrideMap overrides(String release, String manifest, Map<String, String> members,
                                          List<String> warnings) {
         BunOptions options = options(release, null);
-        java.util.Map<String, String> manifests = new java.util.LinkedHashMap<>(members);
+        Map<String, String> manifests = new java.util.LinkedHashMap<>(members);
         manifests.put("", manifest);
         Json.Expr json = Json.parse(manifest);
         Lockfile lockfile = new Lockfile(options.getRelease());
@@ -1066,7 +1066,7 @@ class BunReleaseTest {
         String manifest = "{\"name\":\"p\",\"workspaces\":[\"packages/a\",\"packages/b\"],\"dependencies\":" +
                           "{\"foo\":\"^1.2.3\"},\"overrides\":{\"bar\":\"$foo\",\"y\":\"$z\",\"u\":\"$v\"," +
                           "\"w\":\"$nowhere\"}}";
-        java.util.Map<String, String> members = new java.util.LinkedHashMap<>();
+        Map<String, String> members = new java.util.LinkedHashMap<>();
         members.put("packages/a", "{\"name\":\"a\",\"dependencies\":{\"z\":\"^2.0.0\",\"v\":\"1\"}}");
         members.put("packages/b", "{\"name\":\"b\",\"devDependencies\":{\"z\":\"^2.0.0\",\"v\":\"2\"}}");
         List<String> warnings = new java.util.ArrayList<>();
@@ -1087,7 +1087,7 @@ class BunReleaseTest {
     void readsAReferencedSpecAsWrittenFrom141() {
         String manifest = "{\"name\":\"p\",\"workspaces\":[\"packages/a\"],\"dependencies\":{\"a\":\"^1.0.0\"}," +
                           "\"overrides\":{\"x\":\"$a\"}}";
-        java.util.Map<String, String> members = Collections.singletonMap("packages/a",
+        Map<String, String> members = Collections.singletonMap("packages/a",
           "{\"name\":\"a\",\"version\":\"1.0.0\"}");
         Dependency later = overrides("1.4.1", manifest, members, new java.util.ArrayList<>()).map
           .get(Wyhash11.stringHash("x"));
@@ -1335,12 +1335,12 @@ class BunReleaseTest {
     }
 
     private static org.openrewrite.javascript.internal.LockFileRegeneration.Result install(
-      String release, String lock, java.util.Map<String, String> manifests, java.util.Map<String, String> packuments) {
+      String release, String lock, Map<String, String> manifests, Map<String, String> packuments) {
         BunLockRegenerator.Inputs.InputsBuilder inputs = BunLockRegenerator.Inputs.builder()
           .lock(lock)
           .now(java.time.Instant.parse("2026-10-11T00:00:00Z"))
           .release(BunRelease.of(release));
-        for (java.util.Map.Entry<String, String> manifest : manifests.entrySet()) {
+        for (Map.Entry<String, String> manifest : manifests.entrySet()) {
             inputs.manifest(manifest.getKey(), manifest.getValue());
         }
         return new BunLockRegenerator(inputs.build(), (url, name, extended) -> packuments.get(name)).regenerate();
@@ -1356,8 +1356,8 @@ class BunReleaseTest {
         return requireNonNull(result.getFailure()).getKind() + " " + result.getFailure().getDetail();
     }
 
-    private static java.util.Map<String, String> rootManifest(String manifest) {
-        java.util.Map<String, String> manifests = new java.util.LinkedHashMap<>();
+    private static Map<String, String> rootManifest(String manifest) {
+        Map<String, String> manifests = new java.util.LinkedHashMap<>();
         manifests.put("", manifest);
         return manifests;
     }
@@ -1405,12 +1405,12 @@ class BunReleaseTest {
      */
     @Test
     void redirectsOnlyPlainDependenciesToAnAliasFrom140() {
-        java.util.Map<String, String> packuments = new java.util.LinkedHashMap<>();
+        Map<String, String> packuments = new java.util.LinkedHashMap<>();
         packuments.put("@ts/ts6", registryPackument("@ts/ts6", "6.0.2",
           registryVersion("@ts/ts6", "6.0.2", ",\"dependencies\":{\"@ts/old\":\"npm:typescript@^6\"}")));
         packuments.put("typescript", registryPackument("typescript", "6.0.3",
           registryVersion("typescript", "6.0.3", "")));
-        java.util.Map<String, String> manifests =
+        Map<String, String> manifests =
           rootManifest("{\"name\":\"root\",\"dependencies\":{\"typescript\":\"npm:@ts/ts6@6.0.2\"}}");
         assertThat(written(install("1.4.0", EMPTY_ROOT, manifests, packuments)))
           .contains("\"@ts/old\": [\"typescript@6.0.3\"");
@@ -1422,7 +1422,7 @@ class BunReleaseTest {
     private static Lockfile resolvedPeerPick(String release) {
         BunOptions options = options(release, null);
         String manifest = "{\"name\":\"root\",\"dependencies\":{\"x\":\"1.0.0\",\"z\":\"1.0.0\"}}";
-        java.util.Map<String, String> packuments = new java.util.LinkedHashMap<>();
+        Map<String, String> packuments = new java.util.LinkedHashMap<>();
         packuments.put("x", registryPackument("x", "1.5.0", registryVersion("x", "1.0.0", ""),
           registryVersion("x", "1.5.0", "")));
         packuments.put("z", registryPackument("z", "1.0.0", registryVersion("z", "1.0.0",
@@ -1430,7 +1430,7 @@ class BunReleaseTest {
         packuments.put("w", registryPackument("w", "1.0.0", registryVersion("w", "1.0.0",
           ",\"dependencies\":{\"x\":\"~1.5.0\"}")));
         Lockfile lockfile = new Lockfile(options.getRelease());
-        java.util.Map<String, String> manifests = rootManifest(manifest);
+        Map<String, String> manifests = rootManifest(manifest);
         PackageManager manager = new PackageManager(lockfile, options, new Log(), manifests,
           (url, name, extended) -> packuments.get(name), 0);
         Package root = new Package();
@@ -1493,14 +1493,14 @@ class BunReleaseTest {
      */
     @Test
     void installsARangeBesideALowerMajorWhateverTheArrivalOrderFrom140() {
-        java.util.Map<String, String> packuments = new java.util.LinkedHashMap<>();
+        Map<String, String> packuments = new java.util.LinkedHashMap<>();
         packuments.put("x", registryPackument("x", "2.0.0", registryVersion("x", "1.9.0", ""),
           registryVersion("x", "2.0.0", "")));
         packuments.put("a", registryPackument("a", "1.0.0", registryVersion("a", "1.0.0",
           ",\"dependencies\":{\"x\":\"^1\"}")));
         packuments.put("b", registryPackument("b", "1.0.0", registryVersion("b", "1.0.0",
           ",\"dependencies\":{\"x\":\">=1\"}")));
-        java.util.Map<String, String> manifests =
+        Map<String, String> manifests =
           rootManifest("{\"name\":\"root\",\"dependencies\":{\"a\":\"1.0.0\",\"b\":\"1.0.0\"}}");
         assertThat(written(install("1.4.0", EMPTY_ROOT, manifests, packuments)))
           .contains("\"x\": [\"x@1.9.0\"").contains("\"b/x\": [\"x@2.0.0\"");
@@ -1532,9 +1532,9 @@ class BunReleaseTest {
      */
     @Test
     void redirectsDependentsOfAMovedDirectDependencyFrom140() {
-        java.util.Map<String, String> packuments = java.util.Collections.singletonMap("ms", registryPackument("ms",
+        Map<String, String> packuments = Collections.singletonMap("ms", registryPackument("ms",
           "2.1.3", registryVersion("ms", "2.0.0", ""), registryVersion("ms", "2.1.3", "")));
-        java.util.Map<String, String> manifests = rootManifest("{\"name\":\"root\",\"workspaces\":[\"packages/a\"]," +
+        Map<String, String> manifests = rootManifest("{\"name\":\"root\",\"workspaces\":[\"packages/a\"]," +
                                                                "\"dependencies\":{\"ms\":\"^2.1.0\"}}");
         manifests.put("packages/a", "{\"name\":\"a\",\"dependencies\":{\"ms\":\"^2.0.0\"}}");
         String later = written(install("1.4.0", MS_IN_A_WORKSPACE, manifests, packuments));
@@ -1549,20 +1549,20 @@ class BunReleaseTest {
      */
     @Test
     void refusesAFolderPathLeavingItsPackageFrom140() {
-        java.util.Map<String, String> packuments = java.util.Collections.singletonMap("x", registryPackument("x",
+        Map<String, String> packuments = Collections.singletonMap("x", registryPackument("x",
           "1.0.0", registryVersion("x", "1.0.0", ",\"dependencies\":{\"b\":\"file:../b\"}")));
-        java.util.Map<String, String> manifests = rootManifest("{\"name\":\"root\",\"dependencies\":{\"x\":\"1.0.0\"}}");
+        Map<String, String> manifests = rootManifest("{\"name\":\"root\",\"dependencies\":{\"x\":\"1.0.0\"}}");
         assertThat(failure(install("1.4.0", EMPTY_ROOT, manifests, packuments))).isEqualTo(
           "PM_REJECTS bun rejects this edit: Could not find package.json for \"file:../b\" dependency \"b\"; " +
           "b@file:../b failed to resolve");
         assertThat(written(install("1.3.14", EMPTY_ROOT, manifests, packuments)))
           .contains("\"x/b\": [\"b@file:../b\", {}]");
-        java.util.Map<String, String> overridden = rootManifest("{\"name\":\"root\",\"dependencies\":{\"x\":\"1.0.0\"}," +
+        Map<String, String> overridden = rootManifest("{\"name\":\"root\",\"dependencies\":{\"x\":\"1.0.0\"}," +
                                                                 "\"overrides\":{\"b\":\"file:../b\"}}");
         assertThat(written(install("1.4.0", EMPTY_ROOT, overridden, packuments)))
           .contains("\"x/b\": [\"b@file:../b\", {}]");
         // bun on Windows takes \b for absolute, which leaves the package, and on POSIX for a name below it
-        java.util.Map<String, String> backslash = java.util.Collections.singletonMap("x", registryPackument("x",
+        Map<String, String> backslash = Collections.singletonMap("x", registryPackument("x",
           "1.0.0", registryVersion("x", "1.0.0", ",\"dependencies\":{\"b\":\"file:\\\\b\"}")));
         assertThat(failure(install("1.4.0", EMPTY_ROOT, manifests, backslash)))
           .startsWith("CANNOT_KNOW the engine cannot know folder dependency b@file:\\b (bun on Windows");
@@ -1574,7 +1574,7 @@ class BunReleaseTest {
      */
     @Test
     void trustsTheFolderPathsOfALocalPackageFrom143() {
-        java.util.Map<String, String> manifests = rootManifest("{\"name\":\"root\",\"dependencies\":{\"a\":\"file:./a\"}}");
+        Map<String, String> manifests = rootManifest("{\"name\":\"root\",\"dependencies\":{\"a\":\"file:./a\"}}");
         manifests.put("a", "{\"name\":\"a\",\"version\":\"1.0.0\",\"dependencies\":{\"b\":\"file:../../b\"}}");
         assertThat(written(install("1.4.3", EMPTY_ROOT, manifests, Collections.emptyMap())))
           .contains("\"a/b\": [\"b@file:../b\", {}]");
@@ -1589,14 +1589,14 @@ class BunReleaseTest {
      */
     @Test
     void resolvesAForeignWorkspaceSpecOnlyToTheRootsWorkspaceFrom140() {
-        java.util.Map<String, String> packuments = java.util.Collections.singletonMap("x", registryPackument("x",
+        Map<String, String> packuments = Collections.singletonMap("x", registryPackument("x",
           "1.0.0", registryVersion("x", "1.0.0", ",\"dependencies\":{\"w\":\"workspace:*\"}")));
-        java.util.Map<String, String> manifests = rootManifest("{\"name\":\"root\",\"dependencies\":{\"x\":\"1.0.0\"}}");
+        Map<String, String> manifests = rootManifest("{\"name\":\"root\",\"dependencies\":{\"x\":\"1.0.0\"}}");
         assertThat(failure(install("1.4.0", EMPTY_ROOT, manifests, packuments))).isEqualTo(
           "PM_REJECTS bun rejects this edit: Workspace dependency \"w\" not found; w@workspace:* failed to resolve");
         assertThat(failure(install("1.3.14", EMPTY_ROOT, manifests, packuments)))
           .startsWith("CANNOT_KNOW the engine cannot know workspace member manifest of w@workspace:*");
-        java.util.Map<String, String> withW = rootManifest("{\"name\":\"root\",\"workspaces\":[\"packages/w\"]," +
+        Map<String, String> withW = rootManifest("{\"name\":\"root\",\"workspaces\":[\"packages/w\"]," +
                                                            "\"dependencies\":{\"x\":\"1.0.0\"}}");
         withW.put("packages/w", "{\"name\":\"w\",\"version\":\"1.0.0\"}");
         assertThat(written(install("1.4.0", EMPTY_ROOT, withW, packuments)))
@@ -2575,7 +2575,7 @@ class BunReleaseTest {
     }
 
     private static java.util.Set<String> workspaces(String release, String globs, String... locations) {
-        java.util.Map<String, String> manifests = new java.util.LinkedHashMap<>();
+        Map<String, String> manifests = new java.util.LinkedHashMap<>();
         for (String location : locations) {
             manifests.put(location, "{\"name\":\"" + location.replace('/', '-') + "\"}");
         }
@@ -2829,8 +2829,8 @@ class BunReleaseTest {
         assertThat(earlier).contains("\"https://r.example/a b/ms/-/ms-2.1.3.tgz\"");
     }
 
-    private static java.util.Map<String, String> dotEnv(String release, String env) {
-        java.util.Map<String, String> process = new java.util.HashMap<>();
+    private static Map<String, String> dotEnv(String release, String env) {
+        Map<String, String> process = new java.util.HashMap<>();
         process.put("B", "x");
         return DotEnv.load(BunRelease.of(release), HostEnvironment.of(process), Collections.singletonMap(".env", env))
           .known();
