@@ -61,6 +61,128 @@ class ShortenFullyQualifiedTypeReferencesSafelyTest implements RewriteTest {
     }
 
     @Test
+    void useExplicitImportEvenWhenAWildcardIsPresent() {
+        rewriteRun(
+          // The explicit import intentionally disambiguates a same-package type absent from the source-set index.
+          spec -> spec.parser(JavaParser.fromJavaVersion().dependsOn("package a; public class List {}"))
+            .recipeQualityValidation(RecipeQualityValidation.builder().removeUnusedImports(false).build()),
+          java(
+            """
+              package a;
+
+              import java.util.*;
+
+              class T {
+                  java.util.List<String> values;
+                  Set<String> set;
+              }
+              """,
+            """
+              package a;
+
+              import java.util.*;
+
+              import java.util.List;
+
+              class T {
+                  List<String> values;
+                  Set<String> set;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotFoldExistingImports() {
+        rewriteRun(
+          spec -> spec.parser(JavaParser.fromJavaVersion().dependsOn("package a; public class List {}")),
+          java(
+            """
+              package a;
+
+              import java.util.Collection;
+              import java.util.List;
+              import java.util.Map;
+              import java.util.Set;
+
+              class T {
+                  Collection<?> collection;
+                  List<?> list;
+                  Map<?, ?> map;
+                  Set<?> set;
+                  java.util.Queue<?> queue;
+              }
+              """,
+            """
+              package a;
+
+              import java.util.Collection;
+              import java.util.List;
+              import java.util.Map;
+              import java.util.Queue;
+              import java.util.Set;
+
+              class T {
+                  Collection<?> collection;
+                  List<?> list;
+                  Map<?, ?> map;
+                  Set<?> set;
+                  Queue<?> queue;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void preserveJavaLangAnnotationWhenSamePackageMaySupplyItsName() {
+        rewriteRun(
+          spec -> spec.parser(JavaParser.fromJavaVersion().dependsOn("package a; public @interface Deprecated {}")),
+          java(
+            """
+              package a;
+
+              @java.lang.Deprecated
+              class T {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void preserveTypeAnnotationLocation() {
+        rewriteRun(
+          java(
+            """
+              import java.lang.annotation.*;
+
+              @Retention(RetentionPolicy.RUNTIME)
+              @Target({ElementType.FIELD, ElementType.TYPE_USE})
+              @interface Both {}
+
+              class T {
+                  java.util.@Both List<?> field;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void preserveCommentsInQualifiedNames() {
+        rewriteRun(
+          java(
+            """
+              class T {
+                  java./* explanation */util.List<?> field;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void keepQualifiedTypeWhenDependencyMaySupplyAnInheritedMemberType() {
         rewriteRun(
           spec -> spec.parser(JavaParser.fromJavaVersion().dependsOn(

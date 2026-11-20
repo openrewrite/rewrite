@@ -136,7 +136,8 @@ public class ShortenFullyQualifiedTypeReferencesSafely extends ScanningRecipe<Ma
                         if (access.getName().getFieldType() == null && type instanceof JavaType.Class &&
                             ((JavaType.Class) type).getOwningClass() == null &&
                             access.getSimpleName().equals(((JavaType.Class) type).getClassName()) &&
-                            (isTemplateSyntax(getCursor()) || !inheritedNameIsProven(getCursor(), access.getSimpleName(),
+                            (hasSensitiveTypeSyntax(access) || "java.lang".equals(((JavaType.Class) type).getPackageName()) ||
+                             isTemplateSyntax(getCursor()) || !inheritedNameIsProven(getCursor(), access.getSimpleName(),
                                     ((JavaType.Class) type).getFullyQualifiedName(), sources))) {
                             keep.add(((JavaType.Class) type).getFullyQualifiedName());
                         }
@@ -148,11 +149,37 @@ public class ShortenFullyQualifiedTypeReferencesSafely extends ScanningRecipe<Ma
                         return space;
                     }
                 }.visit(cu, keepQualified);
-                // AddImport has its own whole-file shortening pass. Excluding a risky type throughout this file
-                // prevents an import needed in another class from rewriting the qualified reference indirectly.
-                return requireNonNull(ShortenFullyQualifiedTypeReferences.modifyOnly(cu, keepQualified::contains).visit(cu, ctx));
+                Set<String> requestedImports = new TreeSet<>();
+                J.CompilationUnit shortened = (J.CompilationUnit) requireNonNull(
+                        ShortenFullyQualifiedTypeReferences.getVisitor(cu, keepQualified::contains, requestedImports).visit(cu, ctx));
+                // Explicit imports take precedence over wildcard imports and same-package types. Keep existing
+                // imports intact: folding them can change the binding of names elsewhere in this compilation unit.
+                for (String type : requestedImports) {
+                    shortened = (J.CompilationUnit) requireNonNull(new AddImport<ExecutionContext>(type, null, true, true).visit(shortened, ctx));
+                }
+                return shortened;
             }
         };
+    }
+
+    private static boolean hasSensitiveTypeSyntax(J.FieldAccess access) {
+        AtomicBoolean sensitive = new AtomicBoolean();
+        new JavaIsoVisitor<AtomicBoolean>() {
+            @Override
+            public J.Annotation visitAnnotation(J.Annotation annotation, AtomicBoolean found) {
+                found.set(true);
+                return annotation;
+            }
+
+            @Override
+            public Space visitSpace(Space space, Space.Location location, AtomicBoolean found) {
+                if (!space.getComments().isEmpty()) {
+                    found.set(true);
+                }
+                return space;
+            }
+        }.visit(access, sensitive);
+        return sensitive.get();
     }
 
     private boolean isSource(SourceFile sourceFile) {

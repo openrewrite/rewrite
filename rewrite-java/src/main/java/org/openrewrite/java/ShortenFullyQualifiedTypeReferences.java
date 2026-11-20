@@ -35,6 +35,7 @@ import org.openrewrite.java.tree.Space;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Predicate;
 
 import static org.openrewrite.java.tree.TypeUtils.fullyQualifiedNamesAreEqual;
@@ -91,6 +92,11 @@ public class ShortenFullyQualifiedTypeReferences extends Recipe {
     }
 
     private static JavaVisitor<ExecutionContext> getVisitor(@Nullable J scope, Predicate<String> keepQualified) {
+        return getVisitor(scope, keepQualified, null);
+    }
+
+    static JavaVisitor<ExecutionContext> getVisitor(@Nullable J scope, Predicate<String> keepQualified,
+                                                  @Nullable Set<String> requestedImports) {
         return new JavaVisitor<ExecutionContext>() {
             final Map<String, JavaType> usedTypes = new HashMap<>();
             final JavaTypeSignatureBuilder signatureBuilder = new DefaultJavaTypeSignatureBuilder();
@@ -196,7 +202,7 @@ public class ShortenFullyQualifiedTypeReferences extends Recipe {
                             if (!isAnnotationTypeName() || conflictsWithSamePackageType(simpleName, fullyQualifiedName)) {
                                 return fieldAccess;
                             }
-                        } else {
+                        } else if (requestedImports == null) {
                             maybeAddImport(fullyQualifiedName);
                         }
                         usedTypes.put(simpleName, type);
@@ -207,6 +213,9 @@ public class ShortenFullyQualifiedTypeReferences extends Recipe {
             }
 
             private J shorten(J.FieldAccess fieldAccess) {
+                if (requestedImports != null) {
+                    requestedImports.add(((JavaType.FullyQualified) fieldAccess.getType()).getFullyQualifiedName());
+                }
                 // the name has the type of the qualified name it replaces, which keeps the import that provides it
                 J.Identifier name = fieldAccess.getName().withType(fieldAccess.getType());
                 if (!name.getAnnotations().isEmpty()) {
