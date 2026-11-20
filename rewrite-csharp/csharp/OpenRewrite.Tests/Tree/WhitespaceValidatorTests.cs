@@ -915,6 +915,22 @@ public class WhitespaceValidatorTests
     }
 
     [Fact]
+    public void EndifLineInsideRawStringLiteralNextToConditionalDirective()
+    {
+        AssertNoViolations(
+            """"
+            #if DEBUG
+            class Debug { }
+            #endif
+            class Foo {
+                string s = """
+            #endif
+            """;
+            }
+            """");
+    }
+
+    [Fact]
     public void ByteOrderMark()
     {
         AssertNoViolations("\uFEFFclass Foo { }");
