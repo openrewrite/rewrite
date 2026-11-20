@@ -728,6 +728,8 @@ public interface RewriteTest extends SourceSpecs {
         }
         unneededOptOuts.check("minimalFormatting", quality.minimalFormatting(), () ->
                 formattingScope.assertFormattedOnlyWhatChanged(recipeRun.getChangeset().getAllResults()));
+        unneededOptOuts.check("keepEditedLineIndentation", quality.keepEditedLineIndentation(), () ->
+                EditedLineIndentation.assertKept(recipe, recipeRun.getChangeset().getAllResults()));
         importedNames.assertImports(recipeRun.getChangeset().getAllResults(), quality.importReferencedTypes(),
                 quality.removeUnusedImports());
         unneededOptOuts.checkOnTheSideLater("importReferencedTypes", () ->

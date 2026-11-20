@@ -1070,6 +1070,183 @@ class RewriteTestTest implements RewriteTest {
     }
 
     @Nested
+    class EditedLineIndentation {
+
+        private static final String BEFORE = """
+          class A {
+              void foo() {
+              }
+
+              void bar() {
+              }
+
+              void test() {
+                  foo();
+              }
+          }
+          """;
+
+        @Test
+        void rejectReindentingALineItEdits() {
+            AssertionError e = assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(renameFooToBarAtTabIndentation()),
+              java(
+                BEFORE,
+                """
+                  class A {
+                      void foo() {
+                      }
+
+                      void bar() {
+                      }
+
+                      void test() {
+                  \t\tbar();
+                      }
+                  }
+                  """
+              )
+            ));
+            assertThat(e).hasMessageStartingWith("Keep the indentation of the lines the recipe edits in place.")
+              .hasMessageContaining("""
+                  A.java:9
+                    before: ········foo();
+                    after:  →→bar();
+                """)
+              .hasMessageContaining("RecipeQualityValidation.builder().keepEditedLineIndentation(false)");
+        }
+
+        @Test
+        void acceptEditThatKeepsTheIndentation() {
+            rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                  @Override
+                  public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                      J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                      return "foo".equals(m.getSimpleName()) ? m.withName(m.getName().withSimpleName("bar")) : m;
+                  }
+              })),
+              java(
+                BEFORE,
+                """
+                  class A {
+                      void foo() {
+                      }
+
+                      void bar() {
+                      }
+
+                      void test() {
+                          bar();
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void acceptNewLinesAtTheirOwnIndentation() {
+            rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                  @Override
+                  public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                      if (!"foo".equals(method.getSimpleName())) {
+                          return method;
+                      }
+                      return JavaTemplate.builder("if (true) {\n    bar();\n}").contextSensitive().build()
+                        .apply(getCursor(), method.getCoordinates().replace());
+                  }
+              })),
+              java(
+                BEFORE,
+                """
+                  class A {
+                      void foo() {
+                      }
+
+                      void bar() {
+                      }
+
+                      void test() {
+                          if (true) {
+                              bar();
+                          }
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void acceptFormattingRecipe() {
+            rewriteRun(
+              spec -> spec.recipe(new AutoFormat(null)),
+              java(
+                """
+                  class A {
+                      void foo() {
+                      }
+
+                      void test() {
+                        foo( );
+                      }
+                  }
+                  """,
+                """
+                  class A {
+                      void foo() {
+                      }
+
+                      void test() {
+                          foo();
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void turnedOff() {
+            rewriteRun(
+              spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder()
+                  .keepEditedLineIndentation(false).build())
+                .recipe(renameFooToBarAtTabIndentation()),
+              java(
+                BEFORE,
+                """
+                  class A {
+                      void foo() {
+                      }
+
+                      void bar() {
+                      }
+
+                      void test() {
+                  \t\tbar();
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        // Rebuilds the call's prefix as a file indented with tabs would have it
+        private Recipe renameFooToBarAtTabIndentation() {
+            return toRecipe(() -> new JavaIsoVisitor<>() {
+                @Override
+                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                    J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                    return "foo".equals(m.getSimpleName()) ?
+                      m.withName(m.getName().withSimpleName("bar")).withPrefix(Space.format("\n\t\t")) : m;
+                }
+            });
+        }
+    }
+
+    @Nested
     class MatchesByType {
 
         @Test
