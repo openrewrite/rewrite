@@ -27,6 +27,8 @@ import org.openrewrite.java.internal.parser.RewriteClasspathJarClasspathLoader;
 import org.openrewrite.java.internal.parser.TypeTable;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.style.NamedStyles;
 
 import java.io.ByteArrayInputStream;
@@ -245,6 +247,23 @@ public interface JavaParser extends Parser {
      * @param classpath new classpath to use
      */
     void setClasspath(Collection<Path> classpath);
+
+    /**
+     * The type a fully qualified name has on this parser's classpath, with its members and supertypes, or
+     * {@code null} where the classpath has no such type. A nested type is named by its binary name, as
+     * {@code a.Outer$Inner}. Each call compiles a stub, which resets the parser.
+     */
+    default JavaType.@Nullable FullyQualified findType(String fullyQualifiedName) {
+        ExecutionContext ctx = new InMemoryExecutionContext();
+        ctx.putMessage(SKIP_SOURCE_SET_TYPE_GENERATION, true);
+        return reset().parse(ctx, "class $FindType { " + fullyQualifiedName.replace('$', '.') + " t; }")
+                .findFirst()
+                .filter(J.CompilationUnit.class::isInstance)
+                .map(cu -> ((J.CompilationUnit) cu).getClasses().get(0).getBody().getStatements().get(0))
+                .filter(J.VariableDeclarations.class::isInstance)
+                .map(field -> TypeUtils.asFullyQualified(((J.VariableDeclarations) field).getType()))
+                .orElse(null);
+    }
 
     @SuppressWarnings("unchecked")
     abstract class Builder<P extends JavaParser, B extends Builder<P, B>> extends Parser.Builder {
