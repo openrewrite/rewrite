@@ -22,6 +22,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Recipe;
 import org.openrewrite.ScanningRecipe;
+import org.openrewrite.internal.EditPreconditions;
 import org.openrewrite.rpc.internal.PreparedRecipeCache;
 
 import java.util.ArrayList;
@@ -54,7 +55,7 @@ public class PrepareRecipe implements RpcRequest {
         @Override
         protected Object handle(PrepareRecipe request) throws Exception {
             Recipe recipe = recipeLoader.load(request.id, request.getOptions());
-            return prepareTree(recipe, preparedRecipes, Boolean.TRUE.equals(request.acceptsCausesAnotherCycle));
+            return prepareTree(EditPreconditions.prepare(recipe), preparedRecipes, Boolean.TRUE.equals(request.acceptsCausesAnotherCycle));
         }
 
         static PrepareRecipeResponse prepareTree(Recipe recipe, PreparedRecipeCache preparedRecipes,
@@ -62,7 +63,7 @@ public class PrepareRecipe implements RpcRequest {
             String instanceId = SnowflakeId.generateId();
             preparedRecipes.getInstantiated().put(instanceId, recipe);
             List<PrepareRecipeResponse> children = new ArrayList<>();
-            for (Recipe child : recipe.getRecipeList()) {
+            for (Recipe child : EditPreconditions.recipeList(recipe)) {
                 children.add(prepareTree(child, preparedRecipes, acceptsCausesAnotherCycle));
             }
             return new PrepareRecipeResponse(

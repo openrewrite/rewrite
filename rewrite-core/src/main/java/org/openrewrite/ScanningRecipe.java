@@ -15,9 +15,13 @@
  */
 package org.openrewrite;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.config.RecipeDescriptor;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.UUID;
 
 import static java.util.Collections.emptyList;
@@ -93,6 +97,34 @@ public abstract class ScanningRecipe<T> extends Recipe {
         return TreeVisitor.noop();
     }
 
+    /**
+     * Conditions that a source file must meet before this recipe's {@link #getVisitor(Object) editing visitor}
+     * and the editing visitors of every recipe in its {@link #getRecipeList() recipe list}, recursively, may
+     * change it. This is the programmatic equivalent of the {@code preconditions} of a declarative recipe:
+     * <pre>{@code
+     * @Override
+     * public List<Recipe> getEditPreconditions() {
+     *     return singletonList(new RepositoryContainsFile("pom.xml"));
+     * }
+     * }</pre>
+     * A source file matches when every listed condition marks it as found. A condition with a recipe list also
+     * matches when any recipe in that list does. The conditions are evaluated once per source file in each cycle,
+     * immediately before this recipe edits it and with the edits of the recipes that ran before it, and that result
+     * then applies to the whole recipe list.
+     * <p>
+     * Scanning and generation are not affected: this recipe and its recipe list still scan every source file and
+     * generate new ones, which are then edited only if they match. A {@link ScanningRecipe} condition scans every
+     * source file into an accumulator of its own before its editing visitor decides. Conditions never generate
+     * source files, and the changes they make while deciding are discarded.
+     *
+     * @return The conditions, which by default are none.
+     */
+    @Incubating(since = "8.111.0")
+    @JsonIgnore
+    public List<Recipe> getEditPreconditions() {
+        return emptyList();
+    }
+
     public T getAccumulator(Cursor cursor, ExecutionContext ctx) {
         return cursor.getRoot().computeMessageIfAbsent(getRecipeAccMessage(), m -> getInitialValue(ctx));
     }
@@ -126,6 +158,32 @@ public abstract class ScanningRecipe<T> extends Recipe {
                 return delegate(ctx).visit(tree, ctx);
             }
         };
+    }
+
+    @Override
+    public Collection<Validated<Object>> validateAll(ExecutionContext ctx, Collection<Validated<Object>> acc) {
+        super.validateAll(ctx, acc);
+        for (Recipe editPrecondition : getEditPreconditions()) {
+            editPrecondition.validateAll(ctx, acc);
+        }
+        return acc;
+    }
+
+    @Override
+    protected RecipeDescriptor createRecipeDescriptor() {
+        RecipeDescriptor descriptor = super.createRecipeDescriptor();
+        List<Recipe> editPreconditions = getEditPreconditions();
+        if (editPreconditions.isEmpty()) {
+            return descriptor;
+        }
+        List<RecipeDescriptor> preconditions = new ArrayList<>(descriptor.getPreconditions());
+        for (Recipe editPrecondition : editPreconditions) {
+            RecipeDescriptor preconditionDescriptor = editPrecondition.getDescriptor();
+            if (!preconditions.contains(preconditionDescriptor)) {
+                preconditions.add(preconditionDescriptor);
+            }
+        }
+        return descriptor.withPreconditions(preconditions);
     }
 
     @Override

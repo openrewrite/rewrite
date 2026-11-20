@@ -21,6 +21,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.LargeSourceSet;
 import org.openrewrite.Recipe;
+import org.openrewrite.internal.EditPreconditions;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -35,6 +36,7 @@ import static org.openrewrite.Recipe.PANIC;
 
 class RecipeStack {
     private final Map<Recipe, List<Recipe>> recipeLists = new IdentityHashMap<>();
+    private final Map<Recipe, Recipe> preparedRecipes = new IdentityHashMap<>();
 
     @SuppressWarnings("NotNullFieldNotInitialized")
     private Deque<RecipePath> allRecipesStack;
@@ -102,7 +104,7 @@ class RecipeStack {
 
     private void init(Recipe recipe) {
         allRecipesStack = new ArrayDeque<>();
-        allRecipesStack.push(new RecipePath(recipe));
+        allRecipesStack.push(new RecipePath(preparedRecipes.computeIfAbsent(recipe, EditPreconditions::prepare)));
     }
 
     private void recurseRecipeList(RecipePath recipePath) {
@@ -123,6 +125,6 @@ class RecipeStack {
     }
 
     private List<Recipe> getRecipeList(Recipe recipe) {
-        return recipeLists.computeIfAbsent(recipe, Recipe::getRecipeList);
+        return recipeLists.computeIfAbsent(recipe, EditPreconditions::recipeList);
     }
 }
