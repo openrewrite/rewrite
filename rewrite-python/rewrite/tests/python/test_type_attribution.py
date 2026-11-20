@@ -2646,13 +2646,19 @@ class TestFqnDedupSupertypes:
         # Simulate what ty-types produces for:
         #   class Pair(collections.namedtuple('Pair', 'name value')): ...
         # Two classLiteral descriptors with the same FQN but different type_ids.
-        # type_id 1: the namedtuple-generated Pair (no supertypes of its own here)
+        # type_id 1: the namedtuple-generated Pair, a tuple
         # type_id 2: the class Pair, whose supertype is type_id 1
+        mapping._type_registry[3] = {
+            'kind': 'classLiteral',
+            'className': 'tuple',
+            'moduleName': 'builtins',
+            'supertypes': [],
+        }
         mapping._type_registry[1] = {
             'kind': 'classLiteral',
             'className': 'Pair',
             'moduleName': 'mymodule',
-            'supertypes': [],
+            'supertypes': [3],
         }
         mapping._type_registry[2] = {
             'kind': 'classLiteral',
@@ -2667,10 +2673,12 @@ class TestFqnDedupSupertypes:
         assert isinstance(type_pair, JavaType.FullyQualified)
         assert type_pair.fully_qualified_name == 'mymodule.Pair'
 
-        # The supertype must NOT be itself
+        # Types are keyed by FQN once they leave the parser, so a namesake supertype
+        # would become the class itself there
         supertype = getattr(type_pair, '_supertype', None)
-        assert supertype is not type_pair, \
-            "Pair has itself as its own supertype — would cause StackOverflowError in Java"
+        assert isinstance(supertype, JavaType.FullyQualified)
+        assert supertype.fully_qualified_name != 'mymodule.Pair'
+        assert supertype is mapping._resolve_type(3)
 
 
 def _parse_with_types(files: dict, main_filename: str = 'm.py'):

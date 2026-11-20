@@ -828,18 +828,13 @@ class PythonTypeMapping:
 
             # Populate supertypes: first → _supertype, rest → _interfaces
             if supertypes:
-                super_type = self._resolve_type(supertypes[0])
-                if isinstance(super_type, JavaType.FullyQualified):
-                    class_type._supertype = super_type
-
-                if len(supertypes) > 1:
-                    interfaces = []
-                    for st_id in supertypes[1:]:
-                        iface = self._resolve_type(st_id)
-                        if isinstance(iface, JavaType.FullyQualified):
-                            interfaces.append(iface)
-                    if interfaces:
-                        class_type._interfaces = interfaces
+                resolved = [self._resolve_type(st_id) for st_id in supertypes]
+                bases = _without_namesakes(fqn, [st for st in resolved if isinstance(st, JavaType.FullyQualified)])
+                if bases and isinstance(resolved[0], JavaType.FullyQualified):
+                    class_type._supertype = bases[0]
+                    bases = bases[1:]
+                if bases:
+                    class_type._interfaces = bases
 
             # Populate type parameters from typeVar descriptors
             type_params = descriptor.get('typeParameters', [])
@@ -1105,6 +1100,7 @@ class PythonTypeMapping:
                 bases = [base_type for base_type in map(self.type, node.bases)
                          if isinstance(base_type, JavaType.FullyQualified)
                          and not isinstance(base_type, JavaType.Unknown)]
+                bases = _without_namesakes(fqn, bases)
                 if bases:
                     declared._supertype = bases[0]
                     declared._interfaces = bases[1:] or None
@@ -2257,3 +2253,26 @@ class PythonTypeMapping:
         if module_name:
             return self._module_class(module_name)
         return None
+
+
+def _without_namesakes(fqn: str, bases: List[JavaType.FullyQualified]) -> List[JavaType.FullyQualified]:
+    """Replace a base named like the class, as in ``class Url(namedtuple('Url', ...))``, by its own bases.
+
+    Types are keyed by fully qualified name once they leave the parser, which would
+    otherwise make the class its own supertype.
+    """
+    result: List[JavaType.FullyQualified] = []
+    pending = list(bases)
+    seen: Set[int] = set()
+    while pending:
+        base = pending.pop(0)
+        if id(base) in seen:
+            continue
+        seen.add(id(base))
+        if getattr(base, "fully_qualified_name", None) != fqn:
+            result.append(base)
+            continue
+        inherited = [t for t in [getattr(base, '_supertype', None), *(getattr(base, '_interfaces', None) or [])]
+                     if isinstance(t, JavaType.FullyQualified)]
+        pending[:0] = inherited
+    return result
