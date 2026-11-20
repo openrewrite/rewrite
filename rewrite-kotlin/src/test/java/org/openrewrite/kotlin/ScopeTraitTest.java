@@ -512,6 +512,7 @@ class ScopeTraitTest implements RewriteTest {
                     use("readsLaterPropertyWithGetter", laterWithGetter)
                     use("readsLaterLateinitProperty", lateinitLater)
                     use("readsLaterAbstractProperty", abstractLater)
+                    use("readsLaterGetterOnlyProperty", getter)
                 }
                 val withGetter: Int = use("initializerWithGetterReadsLater", later)
                     get() = field

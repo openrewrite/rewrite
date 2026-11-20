@@ -22,11 +22,13 @@ import org.openrewrite.java.service.ScopeService;
 import org.openrewrite.java.trait.Scope;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
+import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.kotlin.marker.KObject;
 import org.openrewrite.kotlin.marker.PrimaryConstructor;
 import org.openrewrite.kotlin.tree.K;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Kotlin's binding rules where they part from Java's. A {@code when} subject is visible only in its branches.
@@ -115,7 +117,7 @@ public class KotlinScopeService extends ScopeService {
     /**
      * Kotlin initializes the properties of a class in the order it declares them, its {@code init} blocks among
      * them, and an enum's entries before its companion object. A {@code lateinit} or abstract property waits on no
-     * initializer, and an assignment uses a property as a read does.
+     * initializer, and neither does one without a backing field. An assignment uses a property as a read does.
      */
     @Override
     public boolean isUsedBeforeInitialized(Scope.Binding member, Cursor position) {
@@ -138,6 +140,10 @@ public class KotlinScopeService extends ScopeService {
         if (declared.hasModifier(J.Modifier.Type.Abstract) || hasModifier(declared.getModifiers(), "lateinit")) {
             return false;
         }
+        if (hasNoBackingField(statementOf(declaration).getValue(),
+                property.getCursor().getParentTreeCursor().getValue())) {
+            return false;
+        }
         Cursor initializer = classBodyMemberAt(position);
         if (initializer == null ||
             !(initializer.getValue() instanceof J.Block || initializer.getValue() instanceof J.VariableDeclarations)) {
@@ -150,6 +156,31 @@ public class KotlinScopeService extends ScopeService {
         List<Statement> members = body.<J.Block>getValue().getStatements();
         return indexOf(members, statementOf(initializer).getValue()) <=
                indexOf(members, statementOf(declaration).getValue());
+    }
+
+    /**
+     * Whether the property has accessors, no initializer and no accessor naming {@code field}, so that it has no
+     * backing field to initialize.
+     */
+    private static boolean hasNoBackingField(Object statement, Object variable) {
+        if (!(statement instanceof K.Property) || ((K.Property) statement).getBackingField() != null ||
+            !(variable instanceof J.VariableDeclarations.NamedVariable) ||
+            ((J.VariableDeclarations.NamedVariable) variable).getInitializer() != null) {
+            return false;
+        }
+        for (J.MethodDeclaration accessor : ((K.Property) statement).getAccessors().getElements()) {
+            boolean namesField = new KotlinIsoVisitor<AtomicBoolean>() {
+                @Override
+                public J.Identifier visitIdentifier(J.Identifier identifier, AtomicBoolean found) {
+                    found.set(found.get() || "field".equals(identifier.getSimpleName()));
+                    return identifier;
+                }
+            }.reduce(accessor, new AtomicBoolean()).get();
+            if (namesField) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**

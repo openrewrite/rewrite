@@ -185,8 +185,8 @@ public class Scope implements Trait<J> {
     /**
      * Whether an identifier written at the position could refer to the binding by its simple name, in code the
      * language accepts. It could not where another binding shadows this one, where an instance member or a class's
-     * type parameter is named from a {@link ScopeService#isStaticContext(Cursor) static context}, where an
-     * the member is {@link ScopeService#isUsedBeforeInitialized(Binding, Cursor) used before it is initialized},
+     * type parameter is named from a {@link ScopeService#isStaticContext(Cursor) static context}, where the
+     * member is {@link ScopeService#isUsedBeforeInitialized(Binding, Cursor) used before it is initialized},
      * or where a local that is not effectively final is read from inside a lambda or a class body. Whether a local
      * declared without an initializer has been assigned by then is not checked.
      */
