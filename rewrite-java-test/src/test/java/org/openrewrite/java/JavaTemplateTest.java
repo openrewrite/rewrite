@@ -555,7 +555,7 @@ class JavaTemplateTest implements RewriteTest {
 
               class A {
                   Object[] o = new Object[] {
-                          Arrays.asList(1, 2, 3)
+                      Arrays.asList(1, 2, 3)
                   };
               }
               """
