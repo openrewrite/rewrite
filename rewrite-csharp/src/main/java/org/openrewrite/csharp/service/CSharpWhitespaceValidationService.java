@@ -18,7 +18,6 @@ package org.openrewrite.csharp.service;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.csharp.CSharpIsoVisitor;
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.WhitespaceValidationService;
 import org.openrewrite.java.tree.Space;
 
@@ -28,11 +27,33 @@ public class CSharpWhitespaceValidationService implements WhitespaceValidationSe
         return new CSharpIsoVisitor<ExecutionContext>() {
             @Override
             public Space visitSpace(Space space, Space.Location loc, ExecutionContext ctx) {
-                if (!StringUtils.isBlank(space.getWhitespace())) {
+                if (!isCSharpWhitespace(space.getWhitespace())) {
                     return space.withWhitespace("~~(non-whitespace)~~>" + space.getWhitespace() + "<~~");
                 }
                 return space;
             }
         };
+    }
+
+    private static boolean isCSharpWhitespace(String whitespace) {
+        for (int i = 0; i < whitespace.length(); i++) {
+            char c = whitespace.charAt(i);
+            switch (c) {
+                case '\t':
+                case '\u000B':
+                case '\f':
+                case '\r':
+                case '\n':
+                case '\u0085':
+                case '\u2028':
+                case '\u2029':
+                    continue;
+                default:
+                    if (Character.getType(c) != Character.SPACE_SEPARATOR) {
+                        return false;
+                    }
+            }
+        }
+        return true;
     }
 }

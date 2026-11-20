@@ -104,11 +104,17 @@ public class WhitespaceValidator : CSharpVisitor<List<WhitespaceViolation>>
         if (string.IsNullOrEmpty(value)) return true;
         foreach (var c in value)
         {
-            if (c != ' ' && c != '\t' && c != '\n' && c != '\r' && c != '\f' && c != '\v')
+            if (!IsCSharpWhitespace(c))
                 return false;
         }
         return true;
     }
+
+    private static bool IsCSharpWhitespace(char c) => c switch
+    {
+        '\t' or '\v' or '\f' or '\r' or '\n' or '\u0085' or '\u2028' or '\u2029' => true,
+        _ => char.GetUnicodeCategory(c) == System.Globalization.UnicodeCategory.SpaceSeparator
+    };
 
     private static bool IsJRightPaddedType(Type type)
         => type.IsGenericType && type.GetGenericTypeDefinition() == typeof(JRightPadded<>);
