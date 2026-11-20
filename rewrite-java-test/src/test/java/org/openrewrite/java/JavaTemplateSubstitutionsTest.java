@@ -834,4 +834,36 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void preservesSpacingInsideSubstitutedExpression() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if (method.getSimpleName().equals("print")) {
+                      return JavaTemplate.apply("System.out.println( #{any(String)} )", getCursor(),
+                        method.getCoordinates().replace(), method.getArguments().getFirst());
+                  }
+                  return super.visitMethodInvocation(method, ctx);
+              }
+          })),
+          java(
+            """
+              class T {
+                  void print(String readLine) {
+                      System.out.print("ip:"+readLine);
+                  }
+              }
+              """,
+            """
+              class T {
+                  void print(String readLine) {
+                      System.out.println("ip:"+readLine);
+                  }
+              }
+              """
+          )
+        );
+    }
 }
