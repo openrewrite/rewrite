@@ -378,6 +378,37 @@ class ScopeTraitTest implements RewriteTest {
     }
 
     @Test
+    void enumReadsItsCompanionFromAMethodButNotFromAPropertyInitializer() {
+        rewriteRun(
+          spec -> spec.recipe(atHere(scope -> scope.lookup("logger").map(scope::canReference).map(String::valueOf).orElse("unbound"))),
+          kotlin(
+            """
+              enum class E {
+                  A;
+                  companion object {
+                      private val logger = "log"
+                  }
+                  val property = here()
+                  fun method() = here()
+              }
+              fun here() = 1
+              """,
+            """
+              enum class E {
+                  A;
+                  companion object {
+                      private val logger = "log"
+                  }
+                  val property = /*~~(false)~~>*/here()
+                  fun method() = /*~~(true)~~>*/here()
+              }
+              fun here() = 1
+              """
+          )
+        );
+    }
+
+    @Test
     void impliedLambdaParameterIsReferencedFromANestedLambda() {
         rewriteRun(
           spec -> spec.recipe(atHere(scope -> scope.lookup("it").map(scope::canReference).map(String::valueOf).orElse("unbound"))),
