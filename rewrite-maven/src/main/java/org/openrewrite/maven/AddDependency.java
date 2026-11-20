@@ -31,6 +31,7 @@ import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
 import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.semver.Semver;
+import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.*;
@@ -132,7 +133,8 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
     String familyPattern;
 
     @Option(displayName = "Accept transitive",
-            description = "Default false. If enabled, the dependency will not be added if it is already on the classpath as a transitive dependency.",
+            description = "Default false. If enabled, the dependency will not be added when it is already on the " +
+                          "classpath as a transitive dependency at a version that satisfies `version`.",
             example = "true",
             required = false)
     @Nullable
@@ -237,7 +239,8 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                         if (d.isTransitive() &&
                             hasAcceptableTransitivity(d, acc) &&
                             groupId.equals(d.getGroupId()) &&
-                            artifactId.equals(d.getArtifactId())) {
+                            artifactId.equals(d.getArtifactId()) &&
+                            satisfiesRequestedVersion(d)) {
                             return maven;
                         }
                     }
@@ -249,7 +252,8 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                     for (ResolvedDependency d : dependencies.get(resolvedScopeEnum)) {
                         if (d.isTransitive() &&
                                 hasAcceptableTransitivity(d, acc) &&
-                                groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId())) {
+                                groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId()) &&
+                                satisfiesRequestedVersion(d)) {
                             return maven;
                         }
                     }
@@ -294,5 +298,19 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
     private boolean hasAcceptableTransitivity(ResolvedDependency d, Scanned acc) {
         return d.isDirect() || Boolean.TRUE.equals(acceptTransitive) && (onlyIfUsing == null || !acc.scopeByProject.isEmpty());
+    }
+
+    private boolean satisfiesRequestedVersion(ResolvedDependency d) {
+        //noinspection ConstantConditions
+        if (version == null) {
+            return true;
+        }
+        Validated<VersionComparator> validated = Semver.validate(version, versionPattern);
+        if (!validated.isValid()) {
+            // An unparseable selector says nothing about the resolved version, so accept it as before.
+            return true;
+        }
+        VersionComparator versionComparator = validated.getValue();
+        return versionComparator == null || versionComparator.isValid(d.getVersion(), d.getVersion());
     }
 }
