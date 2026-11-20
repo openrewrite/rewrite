@@ -90,7 +90,7 @@ public abstract class RewriteTest
         // Collect all csproj-related specs and parse them together in a shared temp directory
         // so that MSBuild imports (Directory.Build.props/.targets) resolve correctly during restore.
         var csprojSpecs = specs.Where(s => !s.PlainXml && s.SourcePath != null && IsCsprojPath(s.SourcePath)).ToList();
-        var csprojParsed = ParseCsprojFilesTogether(csprojSpecs, recipeSpec.ProjectRestore);
+        var csprojParsed = ParseCsprojFilesTogether(csprojSpecs, recipeSpec.ProjectRestore, validations);
         var projects = new TestProjects(specs,
             spec => csprojParsed.GetValueOrDefault(spec)?.Markers.FindFirst<MSBuildProject>());
 
@@ -133,7 +133,6 @@ public abstract class RewriteTest
                            spec.SourcePath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase);
             if (csprojParsed.TryGetValue(spec, out var projectFile))
             {
-                AssertPrintsAsParsed(spec, projectFile, validations);
                 parsed.Add((spec, WithProject(spec, projectFile)));
                 continue;
             }
@@ -916,10 +915,11 @@ public abstract class RewriteTest
     }
 
     /// <summary>
-    /// The project files and the files their build reads, parsed together and adjusted as their specs say before the
-    /// projects of the C# sources are read from them.
+    /// The project files and the files their build reads, parsed together, checked to print as parsed, and adjusted as
+    /// their specs say before the projects of the C# sources are read from them.
     /// </summary>
-    private static Dictionary<SourceSpec, SourceFile> ParseCsprojFilesTogether(List<SourceSpec> specs, bool restore)
+    private static Dictionary<SourceSpec, SourceFile> ParseCsprojFilesTogether(List<SourceSpec> specs, bool restore,
+        Validations validations)
     {
         var result = new Dictionary<SourceSpec, SourceFile>(ReferenceEqualityComparer.Instance);
         if (specs.Count == 0)
@@ -931,6 +931,7 @@ public abstract class RewriteTest
             restored.Contains);
         for (var i = 0; i < specs.Count; i++)
         {
+            AssertPrintsAsParsed(specs[i], docs[i], validations);
             result[specs[i]] = SourceSpec.ApplyBeforeRecipe(specs[i], docs[i]);
         }
         return result;
