@@ -314,5 +314,6 @@ internal sealed record CompileSetup(
     CSharpCompilationOptions Options,
     CSharpParseOptions ParseOptions)
 {
-    public SyntaxTree Parse(string text, string path) => CSharpSyntaxTree.ParseText(text, ParseOptions, path);
+    public SyntaxTree Parse(string text, string path) =>
+        CSharpSyntaxTree.ParseText(text.StartsWith('\uFEFF') ? text[1..] : text, ParseOptions, path);
 }

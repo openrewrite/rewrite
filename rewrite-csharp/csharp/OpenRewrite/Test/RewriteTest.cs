@@ -73,7 +73,6 @@ public abstract class RewriteTest
         using var editorConfigs = editorConfigSpecs.Count > 0 ? new EditorConfigSources(editorConfigSpecs) : null;
 
         var parser = new CSharpParser();
-        var printer = new CSharpPrinter<object>();
 
         var setup = recipeSpec.ReferenceAssemblies != null
             ? new CompileSetup(ResolveAssemblies(recipeSpec.ReferenceAssemblies).AddRange(recipeSpec.References),
@@ -175,7 +174,7 @@ public abstract class RewriteTest
                 }
 
                 // Verify round-trip: printed should match input
-                var printed = printer.Print(source);
+                var printed = PrintTree(source);
                 if (validations.PrintEqualsInput)
                 {
                     AssertContentEquals(spec.Before, printed, source.SourcePath,
@@ -187,7 +186,7 @@ public abstract class RewriteTest
                 if (validations.PrintIdempotence)
                 {
                     var reparsed = parser.Parse(printed);
-                    var reprinted = printer.Print(reparsed);
+                    var reprinted = PrintTree(reparsed);
                     AssertContentEquals(printed, reprinted, source.SourcePath,
                         "The source is not print idempotent. Printing, re-parsing, and re-printing produced different output.");
                 }
@@ -836,7 +835,10 @@ public abstract class RewriteTest
         {
             new CSharpPrinter<object>().Visit(tree, capture);
         }
-        return capture.ToString();
+        var printed = capture.ToString();
+        return tree is CompilationUnit { CharsetBomMarked: true } && !printed.StartsWith('\uFEFF')
+            ? '\uFEFF' + printed
+            : printed;
     }
 
     private static void PrintParseError(ParseError parseError, PrintOutputCapture<object> capture)

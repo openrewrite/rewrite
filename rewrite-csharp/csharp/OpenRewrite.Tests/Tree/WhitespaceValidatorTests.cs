@@ -863,6 +863,63 @@ public class WhitespaceValidatorTests
     }
 
     [Fact]
+    public void ConstantConditionalDirective()
+    {
+        AssertNoViolations(
+            """
+            #if true
+            class Foo { }
+            #endif
+            """);
+    }
+
+    [Fact]
+    public void ConstantConditionalDirectiveWithElse()
+    {
+        AssertNoViolations(
+            """
+            #if false
+            class Inactive { }
+            #else
+            class Foo { }
+            #endif
+            """);
+    }
+
+    [Fact]
+    public void ConstantConditionalDirectiveInBlock()
+    {
+        AssertNoViolations(
+            """
+            class Foo {
+                void Bar() {
+            #if true
+                    int x = 1;
+            #endif
+                }
+            }
+            """);
+    }
+
+    [Fact]
+    public void ByteOrderMark()
+    {
+        AssertNoViolations("\uFEFFclass Foo { }");
+    }
+
+    [Fact]
+    public void ByteOrderMarkBeforeConditionalDirective()
+    {
+        AssertNoViolations(
+            "\uFEFF" +
+            """
+            #if DEBUG
+            class Foo { }
+            #endif
+            """);
+    }
+
+    [Fact]
     public void Region()
     {
         AssertNoViolations(

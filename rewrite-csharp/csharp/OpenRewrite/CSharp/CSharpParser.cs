@@ -32,9 +32,14 @@ public class CSharpParser
         SemanticModel? semanticModel = null, bool charsetBomMarked = false,
         Dictionary<ISymbol, JavaType>? typeCache = null)
     {
+        if (source.StartsWith('﻿'))
+        {
+            source = source[1..];
+            charsetBomMarked = true;
+        }
         _charsetBomMarked = charsetBomMarked;
         var symbols = PreprocessorSourceTransformer.ExtractSymbols(source);
-        if (symbols.Count == 0)
+        if (symbols.Count == 0 && PreprocessorSourceTransformer.GetDirectivePositions(source).Count == 0)
             return ParseSingle(source, sourcePath, semanticModel, typeCache);
 
         var cu = ParseMulti(source, sourcePath, semanticModel, symbols, typeCache);
