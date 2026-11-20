@@ -53,7 +53,8 @@ val csharpSharedBuildFiles = files(
     csharpDir.resolve("Directory.Build.targets"),
     csharpDir.resolve("OpenRewrite.sln"),
     csharpDir.resolve(".editorconfig"),
-    fileTree(rootDir.resolve(".local")) { include("RealPath.props", "RealPath.targets") }
+    rootDir.resolve(".local/RealPath.props"),
+    rootDir.resolve(".local/RealPath.targets")
 )
 
 // Find dotnet executable
