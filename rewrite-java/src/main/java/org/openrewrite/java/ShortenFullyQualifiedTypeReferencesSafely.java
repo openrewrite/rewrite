@@ -44,8 +44,8 @@ import static org.openrewrite.java.tree.TypeUtils.isOfClassType;
 
 @EqualsAndHashCode(callSuper = false)
 public class ShortenFullyQualifiedTypeReferencesSafely extends ScanningRecipe<Map<JavaType.FullyQualified, ShortenFullyQualifiedTypeReferencesSafely.DeclaredMembers>> {
-    private static final String NON_SOURCES = "**/src/*/resources/**;**/docs/evidence/**;**/src/generated/**;" +
-            "**/target/generated-sources/**;**/build/generated/**";
+    private static final String NON_SOURCES = "**/src/*/resources/**;**/docs/evidence/**;**/generated/**;" +
+            "**/target/generated-sources/**";
 
     @Option(displayName = "Exclude files",
             description = "Additional source paths to leave unchanged. Glob patterns are separated by semicolons. " +

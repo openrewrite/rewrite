@@ -512,6 +512,20 @@ class ShortenFullyQualifiedTypeReferencesSafelyTest implements RewriteTest {
     }
 
     @Test
+    void generatedSourceSetWithoutHeaderIsUnchanged() {
+        rewriteRun(
+          java(
+            """
+              class T {
+                  java.util.List<?> generated;
+              }
+              """,
+            spec -> spec.path("src/main/generated/java/T.java")
+          )
+        );
+    }
+
+    @Test
     void preserveLombokBuilderQualificationEvenWithoutAnnotationArguments() {
         rewriteRun(
           spec -> spec.parser(JavaParser.fromJavaVersion().dependsOn(
