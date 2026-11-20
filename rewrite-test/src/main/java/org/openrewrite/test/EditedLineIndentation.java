@@ -195,7 +195,7 @@ final class EditedLineIndentation {
         return line.substring(0, i);
     }
 
-    private static String visible(String line) {
+    static String visible(String line) {
         String indent = indentation(line);
         String code = line.substring(indent.length());
         if (code.endsWith("\r")) {

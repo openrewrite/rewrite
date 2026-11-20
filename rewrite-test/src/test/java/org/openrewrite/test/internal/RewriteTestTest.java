@@ -1233,6 +1233,67 @@ class RewriteTestTest implements RewriteTest {
             );
         }
 
+        @Test
+        void shiftedInputFindsARecipeThatRecomputesIndentation() {
+            AssertionError e = withShiftedInput(() -> assertThrows(AssertionError.class, () -> rewriteRun(
+              spec -> spec.recipe(new RenameFooToBarRecipes.ReformatsWhatItRenames()),
+              java(BEFORE, AFTER_RENAME)
+            )));
+            assertThat(e).hasMessageStartingWith("Keep the indentation of the lines the recipe edits in place, " +
+                                                 "however the file is indented.")
+              .hasMessageContaining("""
+                    before: ·········foo();
+                    after:  ········bar();
+                """);
+        }
+
+        @Test
+        void shiftedInputAcceptsARecipeThatKeepsIndentation() {
+            withShiftedInput(() -> {
+                rewriteRun(
+                  spec -> spec.recipe(new RenameFooToBarRecipes.RenamesFooToBar()),
+                  java(BEFORE, AFTER_RENAME)
+                );
+                return null;
+            });
+        }
+
+        @Test
+        void shiftedInputOffByDefault() {
+            rewriteRun(
+              spec -> spec.recipe(new RenameFooToBarRecipes.ReformatsWhatItRenames()),
+              java(BEFORE, AFTER_RENAME)
+            );
+        }
+
+        private static final String AFTER_RENAME = """
+          class A {
+              void foo() {
+              }
+
+              void bar() {
+              }
+
+              void test() {
+                  bar();
+              }
+          }
+          """;
+
+        private <T> T withShiftedInput(java.util.function.Supplier<T> test) {
+            String property = "org.openrewrite.test.keepEditedLineIndentation.shiftedInput";
+            String previous = System.setProperty(property, "true");
+            try {
+                return test.get();
+            } finally {
+                if (previous == null) {
+                    System.clearProperty(property);
+                } else {
+                    System.setProperty(property, previous);
+                }
+            }
+        }
+
         // Rebuilds the call's prefix as a file indented with tabs would have it
         private Recipe renameFooToBarAtTabIndentation() {
             return toRecipe(() -> new JavaIsoVisitor<>() {
