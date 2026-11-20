@@ -15,13 +15,16 @@
  */
 package org.openrewrite.java.internal;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.tree.Comment;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Space;
 
 import java.util.List;
 import java.util.Objects;
 
+import static java.util.Collections.emptyList;
 import static org.openrewrite.internal.StringUtils.repeat;
 
 /**
@@ -62,6 +65,139 @@ public final class LineStart {
             return original.withWhitespace(whitespace);
         }
         return withIndentation(formatted, indentation(original));
+    }
+
+    /**
+     * A declaration formatted to {@code formatted} after its annotations, modifiers or other parts changed where it
+     * stands, given the declaration it was, {@code original}, and the prefix it was given before formatting,
+     * {@code given}. The line that holds its modifiers, type and name keeps the indentation it had, when it started a
+     * line before and still starts one: an annotation added above that line, or a modifier removed from its start,
+     * doesn't reindent it. A declaration given another indentation keeps the formatter's, as does one whose line can't
+     * be told, such as a line that an annotation with arguments shares with the modifiers.
+     */
+    public static <J2 extends J> J2 keepDeclarationLine(J2 formatted, J original, Space given) {
+        if (!startsLine(original.getPrefix()) || !startsLine(given) ||
+            !indentation(given).equals(indentation(original.getPrefix()))) {
+            return formatted;
+        }
+        String indentation = declarationLineIndentation(original);
+        Space prefix = afterLeadingAnnotations(formatted);
+        if (indentation == null || prefix == null || !startsLine(prefix) || indentation(prefix).equals(indentation)) {
+            return formatted;
+        }
+        return withAfterLeadingAnnotations(formatted, withIndentation(prefix, indentation));
+    }
+
+    /**
+     * The indentation of the line that holds a declaration's modifiers, type and name.
+     */
+    private static @Nullable String declarationLineIndentation(J declaration) {
+        Space prefix = afterLeadingAnnotations(declaration);
+        if (prefix == null) {
+            return null;
+        }
+        if (startsLine(prefix)) {
+            return indentation(prefix);
+        }
+        List<J.Annotation> annotations = leadingAnnotations(declaration);
+        for (int i = annotations.size() - 1; i >= 0; i--) {
+            J.Annotation annotation = annotations.get(i);
+            if (annotation.getArguments() != null && !annotation.getArguments().isEmpty()) {
+                // its arguments may span lines, so the line it ends on is not the one it starts
+                return null;
+            }
+            if (startsLine(annotation.getPrefix())) {
+                return indentation(annotation.getPrefix());
+            }
+        }
+        return startsLine(declaration.getPrefix()) ? indentation(declaration.getPrefix()) : null;
+    }
+
+    private static List<J.Annotation> leadingAnnotations(J declaration) {
+        if (declaration instanceof J.MethodDeclaration) {
+            return ((J.MethodDeclaration) declaration).getLeadingAnnotations();
+        } else if (declaration instanceof J.VariableDeclarations) {
+            return ((J.VariableDeclarations) declaration).getLeadingAnnotations();
+        } else if (declaration instanceof J.ClassDeclaration) {
+            return ((J.ClassDeclaration) declaration).getLeadingAnnotations();
+        }
+        return emptyList();
+    }
+
+    /**
+     * The prefix of what a declaration prints first after its leading annotations, or null when that is not a
+     * declaration's or it prints annotations of its own ahead of that prefix.
+     */
+    private static @Nullable Space afterLeadingAnnotations(J declaration) {
+        if (declaration instanceof J.MethodDeclaration) {
+            J.MethodDeclaration m = (J.MethodDeclaration) declaration;
+            if (!m.getModifiers().isEmpty()) {
+                return modifierPrefix(m.getModifiers().get(0));
+            }
+            J.TypeParameters typeParameters = m.getAnnotations().getTypeParameters();
+            if (typeParameters != null) {
+                return typeParameters.getAnnotations().isEmpty() ? typeParameters.getPrefix() : null;
+            }
+            if (m.getReturnTypeExpression() != null) {
+                return m.getReturnTypeExpression().getPrefix();
+            }
+            return m.getAnnotations().getName().getAnnotations().isEmpty() ? m.getName().getPrefix() : null;
+        } else if (declaration instanceof J.VariableDeclarations) {
+            J.VariableDeclarations v = (J.VariableDeclarations) declaration;
+            if (!v.getModifiers().isEmpty()) {
+                return modifierPrefix(v.getModifiers().get(0));
+            }
+            if (v.getTypeExpression() != null) {
+                return v.getTypeExpression().getPrefix();
+            }
+            return v.getVariables().isEmpty() ? null : v.getVariables().get(0).getPrefix();
+        } else if (declaration instanceof J.ClassDeclaration) {
+            J.ClassDeclaration c = (J.ClassDeclaration) declaration;
+            if (!c.getModifiers().isEmpty()) {
+                return modifierPrefix(c.getModifiers().get(0));
+            }
+            J.ClassDeclaration.Kind kind = c.getPadding().getKind();
+            return kind.getAnnotations().isEmpty() ? kind.getPrefix() : null;
+        }
+        return null;
+    }
+
+    private static @Nullable Space modifierPrefix(J.Modifier modifier) {
+        return modifier.getAnnotations().isEmpty() ? modifier.getPrefix() : null;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <J2 extends J> J2 withAfterLeadingAnnotations(J2 declaration, Space prefix) {
+        if (declaration instanceof J.MethodDeclaration) {
+            J.MethodDeclaration m = (J.MethodDeclaration) declaration;
+            if (!m.getModifiers().isEmpty()) {
+                return (J2) m.withModifiers(ListUtils.mapFirst(m.getModifiers(), mod -> mod.withPrefix(prefix)));
+            }
+            J.TypeParameters typeParameters = m.getAnnotations().getTypeParameters();
+            if (typeParameters != null) {
+                return (J2) m.getAnnotations().withTypeParameters(typeParameters.withPrefix(prefix));
+            }
+            if (m.getReturnTypeExpression() != null) {
+                return (J2) m.withReturnTypeExpression(m.getReturnTypeExpression().withPrefix(prefix));
+            }
+            return (J2) m.withName(m.getName().withPrefix(prefix));
+        } else if (declaration instanceof J.VariableDeclarations) {
+            J.VariableDeclarations v = (J.VariableDeclarations) declaration;
+            if (!v.getModifiers().isEmpty()) {
+                return (J2) v.withModifiers(ListUtils.mapFirst(v.getModifiers(), mod -> mod.withPrefix(prefix)));
+            }
+            if (v.getTypeExpression() != null) {
+                return (J2) v.withTypeExpression(v.getTypeExpression().withPrefix(prefix));
+            }
+            return (J2) v.withVariables(ListUtils.mapFirst(v.getVariables(), variable -> variable.withPrefix(prefix)));
+        } else if (declaration instanceof J.ClassDeclaration) {
+            J.ClassDeclaration c = (J.ClassDeclaration) declaration;
+            if (!c.getModifiers().isEmpty()) {
+                return (J2) c.withModifiers(ListUtils.mapFirst(c.getModifiers(), mod -> mod.withPrefix(prefix)));
+            }
+            return (J2) c.getPadding().withKind(c.getPadding().getKind().withPrefix(prefix));
+        }
+        return declaration;
     }
 
     /**
