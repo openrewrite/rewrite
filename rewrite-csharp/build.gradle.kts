@@ -48,6 +48,14 @@ tasks.withType<Javadoc>().configureEach {
 // C#-specific build tasks
 val csharpDir = projectDir.resolve("csharp")
 
+val csharpSharedBuildFiles = files(
+    csharpDir.resolve("Directory.Build.props"),
+    csharpDir.resolve("Directory.Build.targets"),
+    csharpDir.resolve("OpenRewrite.sln"),
+    csharpDir.resolve(".editorconfig"),
+    fileTree(rootDir.resolve(".local")) { include("RealPath.props", "RealPath.targets") }
+)
+
 // Find dotnet executable
 fun findDotnet(): String {
     val candidates = listOf("dotnet")
@@ -80,6 +88,9 @@ val csharpBuild = tasks.register<Exec>("csharpBuild") {
         .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(fileTree(csharpDir.resolve("OpenRewrite.LstViewer")) { exclude("**/bin/**", "**/obj/**", "**/build/**") })
         .withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(csharpSharedBuildFiles)
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+        .withPropertyName("csharpSharedBuildFiles")
     outputs.dir(csharpDir.resolve("OpenRewrite/bin"))
     outputs.dir(csharpDir.resolve("OpenRewrite.Tests/bin"))
     outputs.dir(csharpDir.resolve("OpenRewrite.Tool/bin"))
@@ -139,6 +150,9 @@ val csharpTest = tasks.register<Exec>("csharpTest") {
         .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(fileTree(csharpDir.resolve("OpenRewrite.Tool")) { exclude("**/bin/**", "**/obj/**", "**/build/**") })
         .withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(csharpSharedBuildFiles)
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+        .withPropertyName("csharpSharedBuildFiles")
     outputs.files(junitXmlFile)
     outputs.cacheIf { true }
 
@@ -202,6 +216,9 @@ testing {
                             .withPathSensitivity(PathSensitivity.RELATIVE)
                         inputs.files(fileTree(csharpDir.resolve("OpenRewrite.LstViewer")) { exclude("**/bin/**", "**/obj/**", "**/build/**") })
                             .withPathSensitivity(PathSensitivity.RELATIVE)
+                        inputs.files(csharpSharedBuildFiles)
+                            .withPathSensitivity(PathSensitivity.RELATIVE)
+                            .withPropertyName("csharpSharedBuildFiles")
                         // Tiered PGO first runs hot code instrumented, which the short-lived C# processes
                         // these tests start pay for without living long enough to profit from: without it
                         // they parse CSharpPrinterParityTest's own sources in less than half the time.
@@ -323,6 +340,9 @@ val csharpBuildRelease = tasks.register<Exec>("csharpBuildRelease") {
         .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(fileTree(csharpDir.resolve("OpenRewrite.Tool")) { exclude("**/bin/**", "**/obj/**") })
         .withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(csharpSharedBuildFiles)
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+        .withPropertyName("csharpSharedBuildFiles")
     outputs.dir(csharpDir.resolve("OpenRewrite/bin/Release"))
     outputs.dir(csharpDir.resolve("OpenRewrite.Tool/bin/Release"))
 
@@ -341,6 +361,9 @@ val csharpPack = tasks.register<Exec>("csharpPack") {
 
     inputs.files(fileTree(csharpDir.resolve("OpenRewrite")) { exclude("**/bin/**", "**/obj/**") })
     inputs.files(fileTree(csharpDir.resolve("OpenRewrite.Tool")) { exclude("**/bin/**", "**/obj/**") })
+    inputs.files(csharpSharedBuildFiles)
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+        .withPropertyName("csharpSharedBuildFiles")
     inputs.property("version", nugetVersion)
     outputs.dir(csharpDir.resolve("dist"))
 
