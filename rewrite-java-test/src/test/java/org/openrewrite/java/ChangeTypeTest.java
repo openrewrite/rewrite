@@ -4942,7 +4942,6 @@ class ChangeTypeTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/10043")
     @Test
     void aMethodNamedAsTheOriginalIsNotAReferenceToIt() {
-        // the import binds the name only where a type can be named, so a method of that name strands nothing
         rewriteRun(
           spec -> spec.recipe(new ChangeType("org.jetbrains.annotations.NotNull", "org.jspecify.annotations.NonNull", true)),
           java(
@@ -4988,7 +4987,10 @@ class ChangeTypeTest implements RewriteTest {
               class A {
                   @NotNull String get() {
                       NotNull:
-                      for (int i = 0; i < 1; i++) {
+                      for (int i = 0; i < 2; i++) {
+                          if (i == 0) {
+                              continue NotNull;
+                          }
                           break NotNull;
                       }
                       return "";
@@ -5001,7 +5003,10 @@ class ChangeTypeTest implements RewriteTest {
               class A {
                   @NonNull String get() {
                       NotNull:
-                      for (int i = 0; i < 1; i++) {
+                      for (int i = 0; i < 2; i++) {
+                          if (i == 0) {
+                              continue NotNull;
+                          }
                           break NotNull;
                       }
                       return "";

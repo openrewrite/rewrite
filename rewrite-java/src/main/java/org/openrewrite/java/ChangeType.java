@@ -573,10 +573,9 @@ public class ChangeType extends Recipe implements RenamingRecipe {
 
         /**
          * Whether changing this file would leave the original type's simple name spelled where no import binds it.
-         * A file parsed without the original type on its classpath has use sites the LST gives no type, so they are
-         * not rewritten while the import that binds their name is retired anyway, and the file is left referring to
-         * a type it no longer imports. Such a file is left alone; its references cannot be seen, so there is nothing
-         * to migrate.
+         * In a file parsed without the original type on its classpath the use sites have no type, so none is
+         * rewritten, while the import that binds their name is retired on the strength of the import itself. Such a
+         * file is left alone: its references cannot be seen, so there is nothing to migrate.
          * <p>
          * A target whose own or outermost simple name is the original's is no hazard: its import binds the same name,
          * so the spelling keeps resolving. See https://github.com/openrewrite/rewrite/pull/9889.
@@ -602,7 +601,7 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                     JavaType type = ident.getType();
                     if (ident.getFieldType() == null && name.equals(ident.getSimpleName()) &&
                             (type == null || type instanceof JavaType.Unknown) &&
-                            !namesSomethingElse(ident, getCursor())) {
+                            !namesSomethingElse(getCursor().getParentTreeCursor().getValue(), ident)) {
                         unresolved.set(true);
                     }
                     return ident;
@@ -611,43 +610,21 @@ public class ChangeType extends Recipe implements RenamingRecipe {
         }
 
         /**
-         * Whether the identifier names something the file declares or refers to by itself - a method, a label, a
-         * variable - rather than standing where a type can be named. The import binds the name only where a type
-         * can be named, so an identifier of the first kind is no sign of a reference the recipe cannot see, even
-         * where the LST gives it no type. A method named as the type is the one that happens in practice.
+         * Whether the identifier names a method or a label rather than standing where a type can be named. The
+         * import binds the name only where a type can be named, and these are the positions the parser leaves
+         * untyped in a well attributed file, so an identifier in one of them is no sign of a reference the recipe
+         * cannot see. A method named as the type is the one that happens in practice.
          */
-        private boolean namesSomethingElse(J.Identifier ident, Cursor cursor) {
-            Object parent = cursor.getParentTreeCursor().getValue();
-            if (parent instanceof J.MethodDeclaration) {
-                return isSame(((J.MethodDeclaration) parent).getName(), ident);
-            }
-            if (parent instanceof J.MethodInvocation) {
-                return isSame(((J.MethodInvocation) parent).getName(), ident);
-            }
-            if (parent instanceof J.VariableDeclarations.NamedVariable) {
-                return isSame(((J.VariableDeclarations.NamedVariable) parent).getName(), ident);
-            }
-            if (parent instanceof J.ClassDeclaration) {
-                return isSame(((J.ClassDeclaration) parent).getName(), ident);
-            }
+        private static boolean namesSomethingElse(Object parent, J.Identifier ident) {
+            J named = null;
             if (parent instanceof J.Label) {
-                return isSame(((J.Label) parent).getLabel(), ident);
+                named = ((J.Label) parent).getLabel();
+            } else if (parent instanceof J.Break) {
+                named = ((J.Break) parent).getLabel();
+            } else if (parent instanceof J.Continue) {
+                named = ((J.Continue) parent).getLabel();
             }
-            if (parent instanceof J.Break) {
-                return isSame(((J.Break) parent).getLabel(), ident);
-            }
-            if (parent instanceof J.Continue) {
-                return isSame(((J.Continue) parent).getLabel(), ident);
-            }
-            if (parent instanceof J.Assignment) {
-                // only a field access, never a bare name, assigns to a member of a type
-                return isSame(((J.Assignment) parent).getVariable(), ident);
-            }
-            return false;
-        }
-
-        private boolean isSame(@Nullable J other, J.Identifier ident) {
-            return other != null && other.getId().equals(ident.getId());
+            return isDeclarationName(parent, ident) || named != null && named.getId().equals(ident.getId());
         }
 
         private boolean importsOriginalAs(JavaSourceFile cu, String name) {
