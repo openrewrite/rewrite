@@ -15,6 +15,9 @@
  */
 package org.openrewrite.toml;
 
+import org.antlr.v4.runtime.CharStreams;
+import org.antlr.v4.runtime.CommonTokenStream;
+import org.antlr.v4.runtime.atn.DecisionInfo;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -24,6 +27,7 @@ import org.openrewrite.ParseExceptionResult;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.toml.internal.grammar.TomlLexer;
 import org.openrewrite.toml.tree.Toml;
 import org.openrewrite.tree.ParseError;
 
@@ -36,6 +40,7 @@ import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import static java.util.Collections.singletonList;
@@ -722,6 +727,31 @@ class TomlParserTest implements RewriteTest {
         assertThat(recovered.getMarkers().findFirst(ParseExceptionResult.class))
           .hasValueSatisfying(result -> assertThat(result.getMessage()).contains("Syntax error", "line 2:"));
         assertThat(valid.getMarkers().findFirst(ParseExceptionResult.class)).isEmpty();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "[server]\nport = 8080 host = \"x\"\n",
+      "[server] port = 8080\n",
+      "[[servers]]\nport = 8080 host = \"x\"\n"
+    })
+    void keyValueInATableNeedsALineOfItsOwn(String source) {
+        SourceFile parsed = new TomlParser().parse(new InMemoryExecutionContext(), source)
+          .findFirst().orElseThrow();
+
+        assertThat(parsed.getMarkers().findFirst(ParseExceptionResult.class))
+          .hasValueSatisfying(result -> assertThat(result.getMessage()).contains("Syntax error"));
+    }
+
+    @Test
+    void keyValuesUnderTableHeadersNeedNoFullContextPrediction() {
+        org.openrewrite.toml.internal.grammar.TomlParser parser = new org.openrewrite.toml.internal.grammar.TomlParser(
+          new CommonTokenStream(new TomlLexer(CharStreams.fromString("[a]\nx = 1\ny = 2\n\n[[b]]\nx = 1\n# c\ny = 2\n"))));
+        parser.setProfile(true);
+        parser.document();
+
+        assertThat(parser.getNumberOfSyntaxErrors()).isZero();
+        assertThat(Arrays.stream(parser.getParseInfo().getDecisionInfo()).mapToLong(d -> d.LL_Fallback).sum()).isZero();
     }
 
     @Test
