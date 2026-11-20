@@ -1,0 +1,218 @@
+/*
+ * Copyright 2026 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.openrewrite.java.tree;
+
+import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.MinimumJava17;
+import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Consumer;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.java.Assertions.java;
+
+/**
+ * A record component's annotations are propagated to whichever of the component, the field, the accessor
+ * method and the constructor parameter the annotation is applicable to (JLS 9.7.4), and javac attributes
+ * each one only where it landed. Whichever of those it was, the annotation keeps the type it was written
+ * with.
+ * <p>
+ * These assert the type each annotation resolves to rather than leaning on type validation, which only
+ * sees whether a type is present: an annotation that took its neighbour's type is well formed and passes.
+ */
+@Issue("https://github.com/openrewrite/rewrite/pull/8751")
+@MinimumJava17
+class RecordComponentAnnotationTypeTest implements RewriteTest {
+
+    private static final String ANNOTATIONS = """
+      import java.lang.annotation.ElementType;
+      import java.lang.annotation.Repeatable;
+      import java.lang.annotation.Target;
+
+      @Target(ElementType.METHOD)
+      @interface OnMethod {
+          String value() default "";
+      }
+
+      @Target(ElementType.RECORD_COMPONENT)
+      @interface OnComponent {
+      }
+
+      @Target(ElementType.FIELD)
+      @interface OnField {
+      }
+
+      @Target({ElementType.RECORD_COMPONENT, ElementType.FIELD})
+      @interface OnComponentAndField {
+      }
+
+      @Target(ElementType.RECORD_COMPONENT)
+      @Repeatable(OnComponentRepeats.class)
+      @interface OnComponentRepeated {
+      }
+
+      @Target(ElementType.RECORD_COMPONENT)
+      @interface OnComponentRepeats {
+          OnComponentRepeated[] value();
+      }
+      """;
+
+    private static Consumer<SourceSpec<J.CompilationUnit>> annotationTypes(String... expected) {
+        return spec -> spec.afterRecipe(cu -> {
+            List<String> actual = new ArrayList<>();
+            new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.Annotation visitAnnotation(J.Annotation annotation, Integer p) {
+                    JavaType type = annotation.getAnnotationType().getType();
+                    actual.add(annotation.getSimpleName() + " -> " + (type == null ? "null" : TypeUtils.toString(type)));
+                    return super.visitAnnotation(annotation, p);
+                }
+            }.visit(cu, 0);
+            assertThat(actual).containsExactly(expected);
+        });
+    }
+
+    @Test
+    void componentApplicableAnnotation() {
+        rewriteRun(
+          java(ANNOTATIONS),
+          java(
+            """
+              record ComponentApplicable(@OnComponent String name) {
+              }
+              """,
+            annotationTypes("OnComponent -> OnComponent")
+          )
+        );
+    }
+
+    @Test
+    void accessorOnlyAnnotation() {
+        rewriteRun(
+          java(ANNOTATIONS),
+          java(
+            """
+              record AccessorOnly(@OnMethod String name) {
+              }
+              """,
+            annotationTypes("OnMethod -> OnMethod")
+          )
+        );
+    }
+
+    @Test
+    void accessorOnlyAnnotationBeforeComponentApplicableOne() {
+        rewriteRun(
+          java(ANNOTATIONS),
+          java(
+            """
+              record AccessorOnlyFirst(@OnMethod @OnComponent String name) {
+              }
+              """,
+            annotationTypes("OnMethod -> OnMethod", "OnComponent -> OnComponent")
+          )
+        );
+    }
+
+    @Test
+    void componentApplicableAnnotationBeforeAccessorOnlyOne() {
+        rewriteRun(
+          java(ANNOTATIONS),
+          java(
+            """
+              record AccessorOnlyLast(@OnComponent @OnMethod String name) {
+              }
+              """,
+            annotationTypes("OnComponent -> OnComponent", "OnMethod -> OnMethod")
+          )
+        );
+    }
+
+    @Test
+    void fieldOnlyAnnotationBeforeComponentApplicableOne() {
+        rewriteRun(
+          java(ANNOTATIONS),
+          java(
+            """
+              record FieldOnlyFirst(@OnField @OnComponent String name) {
+              }
+              """,
+            annotationTypes("OnField -> OnField", "OnComponent -> OnComponent")
+          )
+        );
+    }
+
+    @Test
+    void accessorOnlyAnnotationBeforeOneThatAlsoReachesTheField() {
+        rewriteRun(
+          java(ANNOTATIONS),
+          java(
+            """
+              record AccessorOnlyBeforeComponentAndField(@OnMethod @OnComponentAndField String name) {
+              }
+              """,
+            annotationTypes("OnMethod -> OnMethod", "OnComponentAndField -> OnComponentAndField")
+          )
+        );
+    }
+
+    @Test
+    void accessorOnlyAnnotationWithAnArgument() {
+        rewriteRun(
+          java(ANNOTATIONS),
+          java(
+            """
+              record AccessorOnlyWithArgument(@OnMethod("full_name") String name) {
+              }
+              """,
+            annotationTypes("OnMethod -> OnMethod")
+          )
+        );
+    }
+
+    @Test
+    void accessorOnlyAnnotationWithAWrittenAttributeName() {
+        rewriteRun(
+          java(ANNOTATIONS),
+          java(
+            """
+              record AccessorOnlyWithNamedArgument(@OnMethod(value = "full_name") String name) {
+              }
+              """,
+            annotationTypes("OnMethod -> OnMethod")
+          )
+        );
+    }
+
+    @Test
+    void repeatedComponentApplicableAnnotations() {
+        rewriteRun(
+          java(ANNOTATIONS),
+          java(
+            """
+              record Repeated(@OnComponentRepeated @OnComponentRepeated String name) {
+              }
+              """,
+            annotationTypes("OnComponentRepeated -> OnComponentRepeated", "OnComponentRepeated -> OnComponentRepeated")
+          )
+        );
+    }
+}
