@@ -180,6 +180,26 @@ public class ChangeType extends Recipe implements RenamingRecipe {
         });
     }
 
+    /**
+     * A visitor that changes the old type to {@code newType} in a source file, or in a part of one visited with its
+     * cursor. Visiting a part leaves the imports to the caller. The new type goes into the tree as given, so one
+     * with members and supertypes, such as {@link JavaParser#findType(String)} returns, keeps them.
+     *
+     * @param newType a class, which may be nested, or a primitive
+     */
+    public static JavaVisitor<ExecutionContext> visitor(String oldFullyQualifiedTypeName, JavaType newType, boolean ignoreDefinition) {
+        String newName;
+        if (newType instanceof JavaType.Primitive && newType != JavaType.Primitive.None && newType != JavaType.Primitive.Null) {
+            newName = ((JavaType.Primitive) newType).getKeyword();
+        } else if (newType instanceof JavaType.FullyQualified && !(newType instanceof JavaType.Parameterized) &&
+                   !(newType instanceof JavaType.Unknown)) {
+            newName = ((JavaType.FullyQualified) newType).getFullyQualifiedName();
+        } else {
+            throw new IllegalArgumentException("The new type must be a class or a primitive: " + newType);
+        }
+        return new JavaChangeTypeVisitor(oldFullyQualifiedTypeName, newType, newName, ignoreDefinition, false);
+    }
+
     private static class JavaChangeTypeVisitor extends JavaVisitor<ExecutionContext> {
         private final JavaType.Class originalType;
         private JavaType targetType;
@@ -191,6 +211,11 @@ public class ChangeType extends Recipe implements RenamingRecipe {
         private final boolean ignoreDefinition;
 
         /**
+         * Whether the target is built from its name, so that a file whose parser knows the target better can supply it.
+         */
+        private final boolean targetFromName;
+
+        /**
          * Whether the visited file's definition of the original type stays as it is, where asked to or where renaming
          * it in place can't make it the target type.
          */
@@ -199,12 +224,22 @@ public class ChangeType extends Recipe implements RenamingRecipe {
         private final TypeReplacer types = new TypeReplacer(this::replacement);
         private final Set<String> declaredClassNames = new HashSet<>();
         private @Nullable Set<String> otherTypeNames;
+        private @Nullable UUID otherTypeNamesOf;
 
         private JavaChangeTypeVisitor(String oldFullyQualifiedTypeName, String newFullyQualifiedTypeName, @Nullable Boolean ignoreDefinition) {
+            this(oldFullyQualifiedTypeName, JavaType.buildType(newFullyQualifiedTypeName), newFullyQualifiedTypeName,
+                    Boolean.TRUE.equals(ignoreDefinition), true);
+        }
+
+        private JavaChangeTypeVisitor(String oldFullyQualifiedTypeName, JavaType targetType, String newFullyQualifiedTypeName,
+                                      boolean ignoreDefinition, boolean targetFromName) {
             this.originalType = JavaType.ShallowClass.build(oldFullyQualifiedTypeName);
-            this.targetType = JavaType.buildType(newFullyQualifiedTypeName);
+            this.targetType = targetType;
             this.newFullyQualifiedTypeName = newFullyQualifiedTypeName;
-            this.ignoreDefinition = Boolean.TRUE.equals(ignoreDefinition);
+            this.ignoreDefinition = ignoreDefinition;
+            this.targetFromName = targetFromName;
+            // a part visited without its source file keeps the definition only where asked to
+            this.keepsDefinition = ignoreDefinition;
             importAlias = null;
         }
 
@@ -212,7 +247,10 @@ public class ChangeType extends Recipe implements RenamingRecipe {
         public J visit(@Nullable Tree tree, ExecutionContext ctx) {
             if (tree instanceof JavaSourceFile) {
                 JavaSourceFile cu = (JavaSourceFile) tree;
-                if (!(cu instanceof J.CompilationUnit) && targetType instanceof JavaType.FullyQualified) {
+                // what the last file declared and imported says nothing about this one, as the visitor may be reused
+                importAlias = null;
+                declaredClassNames.clear();
+                if (targetFromName && !(cu instanceof J.CompilationUnit) && targetType instanceof JavaType.FullyQualified) {
                     targetType = targetType(cu);
                 }
                 keepsDefinition = ignoreDefinition ||
@@ -806,7 +844,9 @@ public class ChangeType extends Recipe implements RenamingRecipe {
          * declaration of it stays. Shortening the target to one of these names would bind that name to two types.
          */
         private Set<String> otherTypeNames(JavaSourceFile sf, JavaType.FullyQualified newType) {
-            if (otherTypeNames == null) {
+            // the names are those of the file as it was first seen, before this visit edits it
+            if (otherTypeNames == null || !sf.getId().equals(otherTypeNamesOf)) {
+                otherTypeNamesOf = sf.getId();
                 JavaType.FullyQualified outermost = getTopLevelClassName(newType);
                 Map<String, String> importedTypeNames = new HashMap<>();
                 for (J.Import anImport : sf.getImports()) {
