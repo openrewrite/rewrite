@@ -217,17 +217,15 @@ public abstract class RewriteTest
                     $"Cycles={cycles} has to be at least 1 and at least ExpectedCyclesThatMakeChanges={expectedCycles}");
             }
 
-            var prevThrow = WhitespaceReconciler.ThrowOnMismatchDefault;
-            WhitespaceReconciler.ThrowOnMismatchDefault = validations.FormattingReconciliation;
-            var checks = new RunChecks(validations);
-            var runCtx = checks.Ctx;
-            foreach (var seed in recipeSpec.ExecutionContextSeeds)
+            using (WhitespaceReconciler.UseThrowOnMismatch(validations.FormattingReconciliation))
             {
-                checks.Seed(seed);
-            }
-            var formatting = validations.MinimalFormatting ? new FormattingScope(recipeSpec.Recipe, checks) : null;
-            try
-            {
+                var checks = new RunChecks(validations);
+                var runCtx = checks.Ctx;
+                foreach (var seed in recipeSpec.ExecutionContextSeeds)
+                {
+                    checks.Seed(seed);
+                }
+                var formatting = validations.MinimalFormatting ? new FormattingScope(recipeSpec.Recipe, checks) : null;
                 CycleRun run;
                 using (formatting?.Install())
                 {
@@ -319,10 +317,6 @@ public abstract class RewriteTest
                 }
                 EmptySources.AssertNoneThrow(recipeSpec.Recipe, results, cycles);
                 UnparsedSources.AssertNoneThrow(recipeSpec.Recipe, results, sources, cycles);
-            }
-            finally
-            {
-                WhitespaceReconciler.ThrowOnMismatchDefault = prevThrow;
             }
         }
         else
