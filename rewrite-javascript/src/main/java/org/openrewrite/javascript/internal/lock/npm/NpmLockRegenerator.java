@@ -38,8 +38,11 @@ import org.openrewrite.javascript.internal.lock.Spec;
 import org.openrewrite.javascript.internal.registry.NodeRegistryException;
 
 import java.time.Instant;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Deque;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -168,18 +171,35 @@ public final class NpmLockRegenerator {
     // the repository's own directory, whose name the host does not know: one that names no package
     private static final String REPOSITORY = ". repository";
 
+    private static final String[] DEPENDENCY_FIELDS =
+            {"dependencies", "devDependencies", "optionalDependencies", "peerDependencies"};
+
     private final Inputs inputs;
     private final PackumentSource registry;
 
+    /**
+     * The direct dependencies an update replaces, by name; null outside of {@link #regenerateForUpdate()}, where a
+     * peer conflict is named after the package npm could not resolve.
+     */
+    private final @Nullable Set<String> replaced;
+
     public NpmLockRegenerator(Inputs inputs, PackumentSource registry) {
+        this(inputs, registry, null);
+    }
+
+    private NpmLockRegenerator(Inputs inputs, PackumentSource registry, @Nullable Set<String> replaced) {
         this.inputs = inputs;
         this.registry = registry;
+        this.replaced = replaced;
     }
 
     /**
      * A migration may replace several peer-coupled packages together. Only retry a peer rejection from an existing
      * lock, first proving that the final manifests resolve without any lock. A forced candidate must then pass a
      * plain install with the original configuration; the mode never changes a user's npmrc.
+     * <p>
+     * A peer conflict that remains is named after the direct dependency the update leaves alone whose dependencies ask
+     * for the peer npm could not resolve: the package to upgrade alongside, rather than one the update replaces.
      */
     public Result regenerateForUpdate() {
         Result original = regenerate();
@@ -195,7 +215,7 @@ public final class NpmLockRegenerator {
             paths.remove("yarn.lock");
         }
         Inputs fresh = inputs.toBuilder().lock(null).yarnLock(null).paths(paths).build();
-        Result checked = stable(fresh, null, true);
+        Result checked = new NpmLockRegenerator(fresh, registry, replaced(inputs)).stable(fresh, null, true);
         if (!checked.isSuccess()) {
             return checked;
         }
@@ -212,7 +232,7 @@ public final class NpmLockRegenerator {
         if (current.getLock() != null) {
             seen.add(current.getLock());
         }
-        Result result = new NpmLockRegenerator(current, registry).regenerate(force, allowNoLock);
+        Result result = new NpmLockRegenerator(current, registry, replaced).regenerate(force, allowNoLock);
         for (int attempt = 0; attempt < 3; attempt++) {
             Failure failure = result.getFailure();
             if (failure == null || failure.getKind() !=
@@ -222,7 +242,7 @@ public final class NpmLockRegenerator {
                 return result;
             }
             current = current.toBuilder().lock(failure.getWritten()).build();
-            result = new NpmLockRegenerator(current, registry).regenerate(force, false);
+            result = new NpmLockRegenerator(current, registry, replaced).regenerate(force, false);
         }
         return result;
     }
@@ -280,7 +300,7 @@ public final class NpmLockRegenerator {
         } catch (NodeRegistryException e) {
             throw e;
         } catch (RuntimeException e) {
-            return Result.failure(failure(e));
+            return Result.failure(failure(e, replaced));
         }
         Result verified = INSTALL.verify(written, lock -> {
             IdealTreeBuilder again = arborist(path, projectFiles(new LockFile(lock), manifestsAgain), options);
@@ -556,6 +576,88 @@ public final class NpmLockRegenerator {
         return "/" + directoryName;
     }
 
+    /**
+     * The names of the direct dependencies whose specs the manifests give otherwise than the lock records for their
+     * importers; null when the lock records no importers.
+     */
+    private static @Nullable Set<String> replaced(Inputs inputs) {
+        Map<String, Object> lock = asMap(lockData(new LockFile(Objects.requireNonNull(inputs.getLock()))));
+        Map<String, Object> packages = lock == null ? null : asMap(lock.get("packages"));
+        if (packages == null) {
+            return null;
+        }
+        Set<String> replaced = new LinkedHashSet<>();
+        for (Map.Entry<String, String> manifest : inputs.getManifests().entrySet()) {
+            Map<String, Object> edited;
+            try {
+                edited = asMap(JsonParseEvenBetterErrors.jsonParse(manifest.getValue()));
+            } catch (RuntimeException e) {
+                continue;
+            }
+            Map<String, Object> locked = asMap(packages.get(manifest.getKey()));
+            if (edited == null || locked == null) {
+                continue;
+            }
+            for (String field : DEPENDENCY_FIELDS) {
+                Map<String, Object> specs = asMap(edited.get(field));
+                Map<String, Object> lockedSpecs = asMap(locked.get(field));
+                if (specs == null) {
+                    continue;
+                }
+                for (Map.Entry<String, Object> spec : specs.entrySet()) {
+                    if (lockedSpecs == null || !Objects.equals(spec.getValue(), lockedSpecs.get(spec.getKey()))) {
+                        replaced.add(spec.getKey());
+                    }
+                }
+            }
+        }
+        return replaced;
+    }
+
+    /**
+     * The direct dependency of the project or one of its workspaces, other than one {@code replaced}, that the
+     * dependent of the peer edge npm could not resolve is installed for, nearest first: the one whose upgrade the
+     * conflict waits on. Null when the edge is the project's own or no such dependency is among its dependents.
+     */
+    private static @Nullable String blocker(Map<String, Object> explanation, Set<String> replaced) {
+        Map<String, Object> edge = asMap(explanation.get("edge"));
+        Map<String, Object> from = edge == null ? null : asMap(edge.get("from"));
+        Deque<Map<String, Object>> dependents = new ArrayDeque<>();
+        if (from != null) {
+            dependents.add(from);
+        }
+        Set<Map<String, Object>> seen = Collections.newSetFromMap(new IdentityHashMap<>());
+        while (!dependents.isEmpty()) {
+            Map<String, Object> node = dependents.poll();
+            if (isImporter(node) || !seen.add(node) || !(node.get("dependents") instanceof List)) {
+                continue;
+            }
+            for (Object in : (List<?>) node.get("dependents")) {
+                Map<String, Object> dependency = asMap(in);
+                Map<String, Object> dependent = dependency == null ? null : asMap(dependency.get("from"));
+                if (dependent == null) {
+                    continue;
+                }
+                Object name = dependency.get("name");
+                if (isImporter(dependent) && name instanceof String && !replaced.contains(name)) {
+                    return (String) name;
+                }
+                dependents.add(dependent);
+            }
+        }
+        return null;
+    }
+
+    // the project root, whose explanation is only its location, or a workspace member
+    private static boolean isImporter(Map<String, Object> node) {
+        return !truthy(node.get("name")) && !truthy(node.get("version")) || Boolean.TRUE.equals(node.get("isWorkspace"));
+    }
+
+    @SuppressWarnings("unchecked")
+    private static @Nullable Map<String, Object> asMap(@Nullable Object value) {
+        return value instanceof Map ? (Map<String, Object>) value : null;
+    }
+
     // a lock that does not parse is the builder's to refuse
     private static @Nullable Object lockData(@Nullable LockFile lock) {
         if (lock == null) {
@@ -579,10 +681,14 @@ public final class NpmLockRegenerator {
     }
 
     private static Failure failure(RuntimeException e) {
-        return INSTALL.failure(outcome(e));
+        return failure(e, null);
     }
 
-    private static RuntimeException outcome(RuntimeException e) {
+    private static Failure failure(RuntimeException e, @Nullable Set<String> replaced) {
+        return INSTALL.failure(outcome(e, replaced));
+    }
+
+    private static RuntimeException outcome(RuntimeException e, @Nullable Set<String> replaced) {
         String message = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
         if (e instanceof PlaceDep.CouldNotResolve) {
             PlaceDep.PeerConflict conflict = ((PlaceDep.CouldNotResolve) e).getConflict();
@@ -597,7 +703,9 @@ public final class NpmLockRegenerator {
                 }
                 report = String.valueOf(er.getMessage());
             }
-            return Rejected.coded(Reason.PEER_CONFLICT, conflict.getEdge().getName(), "ERESOLVE", report);
+            String blocker = replaced == null ? null : blocker(conflict.getExplanation(), replaced);
+            return Rejected.coded(Reason.PEER_CONFLICT, blocker == null ? conflict.getEdge().getName() : blocker,
+                    "ERESOLVE", report);
         }
         if (e instanceof CannotKnow || e instanceof Rejected) {
             return e;
