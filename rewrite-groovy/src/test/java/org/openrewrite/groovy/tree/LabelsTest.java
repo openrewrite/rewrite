@@ -16,11 +16,18 @@
 package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.test.RewriteTest;
+import org.openrewrite.Issue;
+import org.openrewrite.SourceFile;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.tree.Comment;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.Space;
+import org.openrewrite.test.RewriteTest;
+
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-
 import static org.openrewrite.groovy.Assertions.groovy;
 
 class LabelsTest implements RewriteTest {
@@ -131,5 +138,214 @@ class LabelsTest implements RewriteTest {
             """
           )
         );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9873")
+    @Test
+    void aLabelOnASwitch() {
+        rewriteRun(
+          groovy(
+            """
+              def m() {
+                when:
+                switch (x) {
+                  case 1:
+                    break
+                }
+              }
+              """,
+            spec -> spec.afterRecipe(LabelsTest::nothingKeptAsWhitespace)
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9873")
+    @Test
+    void aLabelOnAWhile() {
+        rewriteRun(
+          groovy(
+            """
+              def m() {
+                when:
+                while (x) {
+                  b()
+                }
+              }
+              """,
+            spec -> spec.afterRecipe(LabelsTest::nothingKeptAsWhitespace)
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9873")
+    @Test
+    void aLabelOnADoWhile() {
+        rewriteRun(
+          groovy(
+            """
+              def m() {
+                when:
+                do {
+                  b()
+                } while (x)
+              }
+              """,
+            spec -> spec.afterRecipe(LabelsTest::nothingKeptAsWhitespace)
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9873")
+    @Test
+    void aLabelOnATry() {
+        rewriteRun(
+          groovy(
+            """
+              def m() {
+                when:
+                try {
+                  b()
+                } catch (e) {}
+              }
+              """,
+            spec -> spec.afterRecipe(LabelsTest::nothingKeptAsWhitespace)
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9873")
+    @Test
+    void aLabelOnASynchronizedBlock() {
+        rewriteRun(
+          groovy(
+            """
+              def m() {
+                when:
+                synchronized (x) {
+                  b()
+                }
+              }
+              """,
+            spec -> spec.afterRecipe(LabelsTest::nothingKeptAsWhitespace)
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9873")
+    @Test
+    void aLabelOnAReturn() {
+        rewriteRun(
+          groovy(
+            """
+              def m() {
+                when:
+                return 1
+              }
+              """,
+            spec -> spec.afterRecipe(LabelsTest::nothingKeptAsWhitespace)
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9873")
+    @Test
+    void aLabelOnAThrow() {
+        rewriteRun(
+          groovy(
+            """
+              def m() {
+                when:
+                throw new E()
+              }
+              """,
+            spec -> spec.afterRecipe(LabelsTest::nothingKeptAsWhitespace)
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9873")
+    @Test
+    void aLabelOnABlock() {
+        rewriteRun(
+          groovy(
+            """
+              def m() {
+                when:
+                {
+                  b()
+                }
+              }
+              """,
+            spec -> spec.afterRecipe(LabelsTest::nothingKeptAsWhitespace)
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9873")
+    @Test
+    void twoLabelsAndALabeledBreak() {
+        rewriteRun(
+          groovy(
+            """
+              def m() {
+                given:
+                def a = 1
+                when:
+                b: switch (x) {
+                  default:
+                    break b
+                }
+                then:
+                a == 1
+              }
+              """,
+            spec -> spec.afterRecipe(LabelsTest::nothingKeptAsWhitespace)
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9873")
+    @Test
+    void labelsOnAForAndAnIfParseAlready() {
+        rewriteRun(
+          groovy(
+            """
+              def m() {
+                when:
+                for (i in a) {
+                  b()
+                }
+                then:
+                if (x) {
+                  b()
+                }
+              }
+              """,
+            spec -> spec.afterRecipe(LabelsTest::nothingKeptAsWhitespace)
+          )
+        );
+    }
+
+    /**
+     * Printing back alone can't tell whether source text was parsed: text the parser never visits is kept as
+     * whitespace and still prints. Each source here must leave none.
+     */
+    private static void nothingKeptAsWhitespace(SourceFile sf) {
+        List<String> kept = new ArrayList<>();
+        new JavaIsoVisitor<Integer>() {
+            @Override
+            public Space visitSpace(Space space, Space.Location loc, Integer p) {
+                if (!space.getWhitespace().isBlank()) {
+                    kept.add(loc + ": " + space.getWhitespace().strip());
+                }
+                for (Comment c : space.getComments()) {
+                    if (!c.getSuffix().isBlank()) {
+                        kept.add(loc + ": " + c.getSuffix().strip());
+                    }
+                }
+                return space;
+            }
+        }.visit(sf, 0);
+        assertThat(kept).as("source text kept as whitespace").isEmpty();
     }
 }
