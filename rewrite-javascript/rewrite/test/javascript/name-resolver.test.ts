@@ -660,6 +660,26 @@ describe("a declaration's name", () => {
         ]);
     });
 
+    test("of what export = gives is as written, where the rest of its declaration file is the module's", async () => {
+        expect(await resolved({
+            "index.d.ts": trimIndent(`
+                interface Options {
+                    name: string;
+                }
+                declare namespace Queue {
+                    interface Job {
+                        options: Options;
+                    }
+                }
+                export = Queue;
+            `),
+        }, "index.d.ts")).toEqual(expect.arrayContaining([
+            ["Options", "interface", "index.Options"],
+            ["Queue", "module", "Queue"],
+            ["Job", "interface", "Queue.Job"],
+        ]));
+    });
+
     test("is one for two declarations of one symbol, which answer together", async () => {
         const names = await resolved({
             "a.ts": trimIndent(`
@@ -1664,6 +1684,36 @@ describe("a name in a package", () => {
         const [code] = await parseAll(source, ["lib/helpers.js"]);
         expect(use).toContainEqual(["isBrowser", "method-call", "lib/helpers.isBrowser", "split"]);
         expect(await rowsOf(code)).toContainEqual(["isBrowser", "method", "lib/helpers.isBrowser", null]);
+    });
+
+    test("of a bundled class is the one the code beside its declaration file declares", async () => {
+        // As a bundler writes a package: the class declared in its module, and exported apart from that.
+        const source = {
+            "package.json": JSON.stringify({name: "bundled", version: "1.0.0", types: "dist/index.d.cts", main: "dist/index.cjs"}),
+            "dist/index.d.cts": trimIndent(`
+                declare class Client {
+                    rpc(fn: string): string;
+                }
+                export { Client };
+            `),
+            "dist/index.cjs": trimIndent(`
+                var Client = class Client {
+                    rpc(fn) { return fn; }
+                };
+                exports.Client = Client;
+            `),
+        };
+        const use = await packaged({
+            ...installed("bundled", source),
+            "use.ts": trimIndent(`
+                import {Client} from "bundled";
+                new Client().rpc("f");
+            `)
+        }, "use.ts");
+        const [declarations, code] = await parseAll(source, ["dist/index.d.cts", "dist/index.cjs"]);
+        expect(use).toContainEqual(["rpc", "method-call", "dist/index.Client.rpc", "bundled"]);
+        expect(await rowsOf(declarations)).toContainEqual(["rpc", "method", "dist/index.Client.rpc", null]);
+        expect(await rowsOf(code)).toContainEqual(["rpc", "method", "dist/index.Client.rpc", null]);
     });
 
     test("of a DefinitelyTyped package carries its own id", async () => {

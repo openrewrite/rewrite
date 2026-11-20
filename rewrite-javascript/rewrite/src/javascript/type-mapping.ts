@@ -1526,6 +1526,8 @@ export class JavaScriptTypeMapping {
     /**
      * The project module whose top level holds a declaration local to it, such as a class it does not
      * export. TypeScript names that as bare as a global, so a module's own `class Array` needs the module.
+     * A declaration file's are named the same way, since a bundler writes `declare class X` and `export {X}`
+     * beside code that declares `X` in the module. What `export =` gives is named as its consumers name it.
      */
     private sourceModuleOf(declaration: ts.Declaration): string | undefined {
         if (!declaration.parent || !ts.isSourceFile(declaration.parent) || isGlobalAugmentation(declaration) ||
@@ -1534,8 +1536,18 @@ export class JavaScriptTypeMapping {
         }
         const sourceFile = declaration.parent;
         const isModule = ts.isExternalModule(sourceFile) || (sourceFile as any).commonJsModuleIndicator !== undefined;
-        return isModule && !sourceFile.isDeclarationFile && !this.isInstalled(sourceFile.fileName) ?
-            this.sourceModuleName(sourceFile) : undefined;
+        if (!isModule || this.isInstalled(sourceFile.fileName) ||
+            sourceFile.isDeclarationFile && this.isExportAssigned(declaration)) {
+            return undefined;
+        }
+        return this.sourceModuleName(sourceFile);
+    }
+
+    /** Whether `export =` gives what a declaration declares, as `export = React` gives the namespace `React`. */
+    private isExportAssigned(declaration: ts.Declaration): boolean {
+        return declaration.getSourceFile().statements.some(statement =>
+            ts.isExportAssignment(statement) && statement.isExportEquals &&
+            this.checker.getSymbolAtLocation(statement.expression)?.declarations?.includes(declaration) === true);
     }
 
     private isInstalledModuleObject(type: ts.Type): boolean {
