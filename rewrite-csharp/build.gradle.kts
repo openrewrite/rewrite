@@ -17,6 +17,11 @@ plugins {
 
 normalization {
     runtimeClasspath {
+        // Project jars carry the commit and build date in these, which no test reads
+        metaInf {
+            ignoreManifest()
+        }
+        ignore("META-INF/*.properties")
         ignore("META-INF/rewrite-csharp-version.txt")
     }
 }
