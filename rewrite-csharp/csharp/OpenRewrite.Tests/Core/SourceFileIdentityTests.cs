@@ -81,7 +81,7 @@ public class SourceFileIdentityTests : RewriteTest
         var failure = Assert.Throws<FailException>(() => RewriteRun(
             spec => spec.SetRecipe(new RenameCallsAnd(cu => cu.WithCharset("UTF-16").WithCharsetBomMarked(true)))
                 .SetValidations(Identity),
-            CSharp(Calls("Foo"), Calls("Bar"))
+            CSharp(Calls("Foo"), "\uFEFF" + Calls("Bar"))
         ));
 
         Assert.Contains("    its charset UTF-8 became UTF-16\n    it gained a byte order mark\n", failure.Message);
