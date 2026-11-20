@@ -20,10 +20,12 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.ParseExceptionResult;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.toml.tree.Toml;
+import org.openrewrite.tree.ParseError;
 
 import java.io.ByteArrayInputStream;
 import java.math.BigInteger;
@@ -33,6 +35,8 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.List;
 
 import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -673,6 +677,18 @@ class TomlParserTest implements RewriteTest {
     }
 
     @Test
+    void invalidTomlReportsTheSyntaxError() {
+        SourceFile parsed = new TomlParser().parse(new InMemoryExecutionContext(), "not toml\n")
+          .findFirst().orElseThrow();
+
+        assertThat(parsed).isInstanceOf(ParseError.class);
+        assertThat(parsed.getMarkers().findFirst(ParseExceptionResult.class))
+          .hasValueSatisfying(result -> assertThat(result.getMessage())
+            .startsWith("org.openrewrite.toml.TomlParsingException: Syntax error")
+            .contains("line 1:4"));
+    }
+
+    @Test
     void dottedKeyWithCharactersOutsideTheBasicMultilingualPlane() {
         rewriteRun(
           toml(
@@ -684,6 +700,28 @@ class TomlParserTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Test
+    void slashIsNotAnEscape() {
+        SourceFile parsed = new TomlParser().parse(new InMemoryExecutionContext(), "a = \"\\/\"\n")
+          .findFirst().orElseThrow();
+
+        assertThat(parsed.getMarkers().findFirst(ParseExceptionResult.class))
+          .hasValueSatisfying(result -> assertThat(result.getMessage()).contains("Syntax error", "line 1:"));
+    }
+
+    @Test
+    void recoveredSyntaxErrorIsMarked() {
+        SourceFile recovered = new TomlParser().parse(new InMemoryExecutionContext(), "[a]\nkey =\nb = 1\n")
+          .findFirst().orElseThrow();
+        SourceFile valid = new TomlParser().parse(new InMemoryExecutionContext(), "[a]\nb = 1\n")
+          .findFirst().orElseThrow();
+
+        assertThat(recovered).isInstanceOf(Toml.Document.class);
+        assertThat(recovered.getMarkers().findFirst(ParseExceptionResult.class))
+          .hasValueSatisfying(result -> assertThat(result.getMessage()).contains("Syntax error", "line 2:"));
+        assertThat(valid.getMarkers().findFirst(ParseExceptionResult.class)).isEmpty();
     }
 
     @Test
@@ -854,5 +892,25 @@ class TomlParserTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Test
+    void recoveredTreeThatDoesNotPrintBackReportsTheSyntaxError() {
+        SourceFile parsed = new TomlParser().parse(new InMemoryExecutionContext(), "a = [1, 2\n")
+          .findFirst().orElseThrow();
+
+        assertThat(parsed).isInstanceOf(ParseError.class);
+        assertThat(parsed.getMarkers().findFirst(ParseExceptionResult.class))
+          .hasValueSatisfying(result -> assertThat(result.getMessage())
+            .startsWith("org.openrewrite.toml.TomlParsingException: Syntax error")
+            .contains("line 2:0"));
+    }
+
+    @Test
+    void eachErrorIsReportedOnce() {
+        List<Throwable> errors = new ArrayList<>();
+        new TomlParser().parse(new InMemoryExecutionContext(errors::add), "not toml\n").findFirst().orElseThrow();
+
+        assertThat(errors).isNotEmpty().doesNotHaveDuplicates();
     }
 }
