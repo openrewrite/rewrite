@@ -125,6 +125,9 @@ val csharpTest = tasks.register<Exec>("csharpTest") {
     description = "Run C# xunit tests"
     dependsOn(csharpBuild, rpcTestClasspath)
 
+    inputs.files(sourceSets["test"].runtimeClasspath)
+        .withNormalizer(ClasspathNormalizer::class)
+
     workingDir = csharpDir
 
     environment("RPC_TEST_SERVER_CLASSPATH",
