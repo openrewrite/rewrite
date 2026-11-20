@@ -79,8 +79,8 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
             /**
              * Code that replaces code which started its line, or that changes part of a line that a declaration or
              * statement starts, keeps the indentation and comments the line started with, rather than the
-             * indentation that a file formatted from scratch would give it. The formatter still chooses the blank
-             * lines above it, and formats the lines it nests as usual.
+             * indentation that a file formatted from scratch would give it. Blank lines above it keep their bytes, and
+             * the lines it nests are formatted as usual.
              */
             private <J2 extends J> J2 keepLineStart(J2 formatted, Space original) {
                 return formatted.withPrefix(LineStart.keep(formatted.getPrefix(), original, original));
