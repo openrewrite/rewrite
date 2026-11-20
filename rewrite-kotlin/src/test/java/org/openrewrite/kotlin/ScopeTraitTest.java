@@ -507,12 +507,20 @@ class ScopeTraitTest implements RewriteTest {
           """
             fun use(row: String, read: Any?): Int = 0
             abstract class C {
+                val assignedInInit: Int
                 init {
                     assignedLater = use("assignsLaterProperty", null)
                     use("readsLaterPropertyWithGetter", laterWithGetter)
                     use("readsLaterLateinitProperty", lateinitLater)
                     use("readsLaterAbstractProperty", abstractLater)
                     use("readsLaterGetterOnlyProperty", getter)
+                    use("readsPropertyBeforeTheInitThatAssignsIt", assignedInInit)
+                }
+                init {
+                    assignedInInit = 1
+                }
+                init {
+                    use("readsPropertyAfterTheInitThatAssignsIt", assignedInInit)
                 }
                 val withGetter: Int = use("initializerWithGetterReadsLater", later)
                     get() = field
@@ -529,7 +537,8 @@ class ScopeTraitTest implements RewriteTest {
         assertThat(readsRefused(source)).containsExactly(
           "assignsLaterProperty",
           "initializerWithGetterReadsLater",
-          "readsLaterPropertyWithGetter");
+          "readsLaterPropertyWithGetter",
+          "readsPropertyBeforeTheInitThatAssignsIt");
         assertThat(rowsKotlincRejects(source)).isEqualTo(readsRefused(source));
     }
 

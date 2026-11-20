@@ -155,7 +155,46 @@ public class KotlinScopeService extends ScopeService {
         }
         List<Statement> members = body.<J.Block>getValue().getStatements();
         return indexOf(members, statementOf(initializer).getValue()) <=
-               indexOf(members, statementOf(declaration).getValue());
+               initializedAt(members, statementOf(declaration).getValue(),
+                       property.getCursor().getParentTreeCursor().getValue());
+    }
+
+    /**
+     * The index of the class body member where the property gets its value. That is its declaration, or for one
+     * declared without an initializer the first {@code init} block after it that assigns it.
+     */
+    private static int initializedAt(List<Statement> members, J declaration, Object variable) {
+        int declared = indexOf(members, declaration);
+        if (declared < 0 || !(variable instanceof J.VariableDeclarations.NamedVariable) ||
+            ((J.VariableDeclarations.NamedVariable) variable).getInitializer() != null) {
+            return declared;
+        }
+        String name = ((J.VariableDeclarations.NamedVariable) variable).getSimpleName();
+        for (int i = declared + 1; i < members.size(); i++) {
+            if (members.get(i) instanceof J.Block && assigns(members.get(i), name)) {
+                return i;
+            }
+        }
+        return declared;
+    }
+
+    /**
+     * Whether the tree assigns the property of the name, as {@code name = ..} or {@code this.name = ..}.
+     */
+    private static boolean assigns(J tree, String name) {
+        return new KotlinIsoVisitor<AtomicBoolean>() {
+            @Override
+            public J.Assignment visitAssignment(J.Assignment assignment, AtomicBoolean found) {
+                J variable = assignment.getVariable();
+                if (variable instanceof J.Identifier && name.equals(((J.Identifier) variable).getSimpleName()) ||
+                    variable instanceof J.FieldAccess && name.equals(((J.FieldAccess) variable).getSimpleName()) &&
+                    ((J.FieldAccess) variable).getTarget() instanceof J.Identifier &&
+                    "this".equals(((J.Identifier) ((J.FieldAccess) variable).getTarget()).getSimpleName())) {
+                    found.set(true);
+                }
+                return super.visitAssignment(assignment, found);
+            }
+        }.reduce(tree, new AtomicBoolean()).get();
     }
 
     /**
