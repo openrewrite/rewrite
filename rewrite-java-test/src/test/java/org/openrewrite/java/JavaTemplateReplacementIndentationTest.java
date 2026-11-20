@@ -27,6 +27,7 @@ import org.openrewrite.marker.Markers;
 import org.openrewrite.test.RewriteTest;
 
 import static java.util.Collections.emptyList;
+import static java.util.Comparator.comparing;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
@@ -245,6 +246,121 @@ class JavaTemplateReplacementIndentationTest implements RewriteTest {
 
                       final int j = 1;
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void addedAnnotationKeepsTheLinesOfItsDeclaration() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations field, ExecutionContext ctx) {
+                  if (!"value".equals(field.getVariables().getFirst().getSimpleName()) || !field.getLeadingAnnotations().isEmpty()) {
+                      return field;
+                  }
+                  return JavaTemplate.apply("@Deprecated", getCursor(),
+                    field.getCoordinates().addAnnotation(comparing(J.Annotation::getSimpleName)));
+              }
+          })),
+          java(
+            """
+              class A {
+                  int first;
+              \t
+              \t/**
+              \t * A field.
+              \t */
+              \tprivate int value;
+                  int last;
+              }
+              """,
+            """
+              class A {
+                  int first;
+              \t
+              \t/**
+              \t * A field.
+              \t */
+              \t@Deprecated
+              \tprivate int value;
+                  int last;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replacedDeclarationKeepsTheLineUnderItsAnnotation() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                  if (!"foo".equals(method.getSimpleName())) {
+                      return method;
+                  }
+                  return JavaTemplate.builder("@Deprecated\npublic abstract void bar();").contextSensitive().build()
+                    .apply(getCursor(), method.getCoordinates().replace());
+              }
+          })),
+          java(
+            """
+              abstract class A {
+                  abstract void x();
+
+              \t@Deprecated
+              \tpublic abstract void foo();
+
+                  abstract void y();
+              }
+              """,
+            """
+              abstract class A {
+                  abstract void x();
+
+              \t@Deprecated
+              \tpublic abstract void bar();
+
+                  abstract void y();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void maybeAutoFormatKeepsTheLineUnderTheAnnotations() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable,
+                                                                      ExecutionContext ctx) {
+                  J.VariableDeclarations v = super.visitVariableDeclarations(multiVariable, ctx);
+                  if (!v.hasModifier(J.Modifier.Type.Final)) {
+                      return v;
+                  }
+                  return maybeAutoFormat(v, v.withModifiers(ListUtils.filter(v.getModifiers(),
+                    m -> m.getType() != J.Modifier.Type.Final)), ctx);
+              }
+          })),
+          java(
+            """
+              class A {
+              \t@Deprecated
+              \tstatic final int x = 1;
+                  int y;
+                  int z;
+              }
+              """,
+            """
+              class A {
+              \t@Deprecated
+              \tstatic int x = 1;
+                  int y;
+                  int z;
               }
               """
           )

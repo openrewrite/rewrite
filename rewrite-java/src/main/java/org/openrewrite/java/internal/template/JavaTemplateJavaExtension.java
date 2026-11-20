@@ -91,6 +91,14 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                 return formatted.withPrefix(LineStart.keep(formatted.getPrefix(), original, original));
             }
 
+            /**
+             * A declaration, or code in place of one, also keeps the indentation of the line that holds its
+             * modifiers and name, below any annotations the template added or replaced.
+             */
+            private <J2 extends J> J2 keepDeclarationLines(J2 formatted, J original, Space prefix) {
+                return LineStart.keepDeclarationLine(keepLineStart(formatted, prefix), original, prefix);
+            }
+
             @Override
             public J visitAnnotation(J.Annotation annotation, Integer p) {
                 if (loc == ANNOTATION_PREFIX && mode == JavaCoordinates.Mode.REPLACEMENT &&
@@ -170,7 +178,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                     Statement s = gen.get(i);
                     if (anchorBeginsLine && i == 0 && mode == JavaCoordinates.Mode.REPLACEMENT) {
                         Space prefix = firstPrefix(anchor);
-                        gen.set(i, keepLineStart(autoFormat(s.withPrefix(prefix), p, parent), prefix));
+                        gen.set(i, keepDeclarationLines(autoFormat(s.withPrefix(prefix), p, parent), anchor, prefix));
                     } else if (anchorBeginsLine) {
                         gen.set(i, autoFormat(i == 0 ? s.withPrefix(firstPrefix(anchor)) : s, p, parent));
                     } else {
@@ -280,7 +288,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                                 }
                             }
                             c = autoFormat(c, c.getName(), p, getCursor().getParentOrThrow());
-                            return mode == JavaCoordinates.Mode.REPLACEMENT ? keepLineStart(c, classDecl.getPrefix()) : c;
+                            return keepDeclarationLines(c, classDecl, classDecl.getPrefix());
                         }
                         case EXTENDS: {
                             TypeTree anExtends = unsubstitute(templateParser.parseExtends(getCursor(), substitutedTemplate));
@@ -452,7 +460,6 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                         case ANNOTATIONS: {
                             List<J.Annotation> gen = unsubstitute(templateParser.parseAnnotations(getCursor(), substitutedTemplate));
                             J.MethodDeclaration m = method;
-                            boolean replacing = mode == JavaCoordinates.Mode.REPLACEMENT;
                             if (mode == JavaCoordinates.Mode.REPLACEMENT) {
                                 m = method.withLeadingAnnotations(gen);
                                 if (m.getTypeParameters() != null) {
@@ -470,7 +477,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                                 }
                             }
                             m = autoFormat(m, m.getName(), p, getCursor().getParentOrThrow());
-                            return replacing ? keepLineStart(m, method.getPrefix()) : m;
+                            return keepDeclarationLines(m, method, method.getPrefix());
                         }
                         case BLOCK_PREFIX: {
                             List<Statement> gen = unsubstituteStatements(templateParser.parseBlockStatements(getCursor(), Statement.class,
@@ -732,8 +739,8 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                             //noinspection unchecked
                             replacement = (J3) substitutions.toStatement(replacement);
                         }
-                        return keepLineStart(autoFormat(replacement.withPrefix(statement.getPrefix()), p),
-                                statement.getPrefix());
+                        return keepDeclarationLines(autoFormat(replacement.withPrefix(statement.getPrefix()), p),
+                                statement, statement.getPrefix());
                     }
                     throw new IllegalArgumentException("Cannot insert a new statement before an existing statement and return both to a visit method that returns one statement.");
                 }
@@ -760,7 +767,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                             }
                         }
                         v = autoFormat(v, v.getTypeExpression(), p, getCursor().getParentOrThrow());
-                        return mode == JavaCoordinates.Mode.REPLACEMENT ? keepLineStart(v, multiVariable.getPrefix()) : v;
+                        return keepDeclarationLines(v, multiVariable, multiVariable.getPrefix());
                     }
                 }
                 return super.visitVariableDeclarations(multiVariable, p);

@@ -743,4 +743,45 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void lineUnderAnAnnotationKeepsItsIndentation() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.A *(..)", "package", null)),
+          java(
+            """
+              package com.abc;
+
+              class A {
+              \t@Deprecated
+              \tpublic void a() {
+              \t}
+
+                  @Deprecated
+                  public static void b() {
+                  }
+
+                  void c() {
+                  }
+              }
+              """,
+            """
+              package com.abc;
+
+              class A {
+              \t@Deprecated
+              \tvoid a() {
+              \t}
+
+                  @Deprecated
+                  static void b() {
+                  }
+
+                  void c() {
+                  }
+              }
+              """
+          )
+        );
+    }
 }

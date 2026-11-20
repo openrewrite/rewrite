@@ -78,9 +78,11 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
     @CheckReturnValue
     public <J2 extends J> J2 maybeAutoFormat(J2 before, J2 after, @Nullable J stopAfter, P p, Cursor parent) {
         if (before != after) {
-            // what changed in place keeps the indentation of the line it starts, however the file is indented
+            // what changed in place keeps the indentation of the line it starts, however the file is indented, and a
+            // declaration also keeps the indentation of the line that holds its modifiers and name
             J2 formatted = autoFormat(after, stopAfter, p, parent);
-            return formatted.withPrefix(LineStart.keep(formatted.getPrefix(), before.getPrefix(), after.getPrefix()));
+            formatted = formatted.withPrefix(LineStart.keep(formatted.getPrefix(), before.getPrefix(), after.getPrefix()));
+            return LineStart.keepDeclarationLine(formatted, before, after.getPrefix());
         }
         return after;
     }
