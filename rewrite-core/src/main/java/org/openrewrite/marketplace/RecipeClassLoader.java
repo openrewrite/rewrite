@@ -97,8 +97,6 @@ public class RecipeClassLoader extends URLClassLoader {
             "org.openrewrite.gradle.attributes.Category",
             "org.openrewrite.gradle.attributes.ProjectAttribute",
             "org.openrewrite.java.JavadocVisitor",
-            "org.openrewrite.java.JavaParser",
-            "org.openrewrite.java.Java17Parser",
             "org.openrewrite.java.AnnotationMatcher",
             "org.openrewrite.java.MethodMatcher",
             "org.openrewrite.java.TypeNameMatcher",
@@ -118,8 +116,7 @@ public class RecipeClassLoader extends URLClassLoader {
             "org.openrewrite.text.PlainText",
             "org.openrewrite.quark.Quark",
             // A parser reads the type tables of the jar it comes from, so every parser is the host's copy even when
-            // a recipe ships its own. Each prefix also covers the parser's nested Builder. JavaParser, Java17Parser
-            // and the PlainText and Quark parsers are listed above.
+            // a recipe ships its own. Each prefix also covers the parser's nested Builder.
             "org.openrewrite.binary.BinaryParser",
             "org.openrewrite.coldfusion.ColdFusionParser",
             "org.openrewrite.csharp.CSharpParser",
@@ -131,8 +128,10 @@ public class RecipeClassLoader extends URLClassLoader {
             "org.openrewrite.gradle.GradleParser",
             "org.openrewrite.groovy.GroovyParser",
             "org.openrewrite.hcl.HclParser",
+            "org.openrewrite.java.JavaParser",
             "org.openrewrite.java.Java8Parser",
             "org.openrewrite.java.Java11Parser",
+            "org.openrewrite.java.Java17Parser",
             "org.openrewrite.java.Java21Parser",
             "org.openrewrite.java.Java25Parser",
             "org.openrewrite.javascript.JavaScriptParser",
