@@ -1470,6 +1470,32 @@ describe("a name in a package", () => {
         ]);
     });
 
+    test("bound through a module the repository declares with no body is the installed package's file", async () => {
+        const [shims, use] = await parseAll({
+            ...typedPackage,
+            "shims.d.ts": `declare module "typed";`,
+            "use.ts": useTyped,
+        }, ["shims.d.ts", "use.ts"]);
+        expect(await rowsOf(use)).toEqual([
+            ["go", "import-ref", "index.d.ts", "typed"],
+            [`"typed"`, "import-ref", "index.d.ts", "typed"],
+            ["go", "type-ref", "index.d.ts", "typed"],
+        ]);
+        expect(await rowsOf(shims)).toEqual([[`"typed"`, "import-ref", "index.d.ts", "typed"]]);
+    });
+
+    test("bound through a module declared with no body is that declaration where no package is installed", async () => {
+        const [, use] = await parseAll({
+            "shims.d.ts": `declare module "typed";`,
+            "use.ts": useTyped,
+        }, ["shims.d.ts", "use.ts"]);
+        expect(await rowsOf(use)).toEqual([
+            ["go", "import-ref", "shims.d.ts", null],
+            [`"typed"`, "import-ref", "shims.d.ts", null],
+            ["go", "type-ref", "shims.d.ts", null],
+        ]);
+    });
+
     test("is what the parser names it when the package is itself the source", async () => {
         const declared: string[] = [];
         await new class extends JavaScriptVisitor<void> {
