@@ -493,6 +493,25 @@ class ShortenFullyQualifiedTypeReferencesSafelyTest implements RewriteTest {
     }
 
     @Test
+    void nestedGeneratedDeclarationIsUnchanged() {
+        rewriteRun(
+          java(
+            """
+              import java.util.List;
+
+              class Outer {
+                  @javax.annotation.processing.Generated("Generator")
+                  static class GeneratedPart {
+                      List<?> witness;
+                      java.util.List<?> generated;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void preserveLombokBuilderQualificationEvenWithoutAnnotationArguments() {
         rewriteRun(
           spec -> spec.parser(JavaParser.fromJavaVersion().dependsOn(

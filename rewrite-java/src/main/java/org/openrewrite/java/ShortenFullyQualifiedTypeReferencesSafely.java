@@ -193,10 +193,18 @@ public class ShortenFullyQualifiedTypeReferencesSafely extends ScanningRecipe<Ma
             }
         }
         J.CompilationUnit cu = (J.CompilationUnit) sourceFile;
-        for (J.ClassDeclaration declaration : cu.getClasses()) {
-            if (declaration.getLeadingAnnotations().stream().anyMatch(annotation -> "Generated".equals(annotation.getSimpleName()))) {
-                return false;
+        AtomicBoolean generatedDeclaration = new AtomicBoolean();
+        new JavaIsoVisitor<AtomicBoolean>() {
+            @Override
+            public J.Annotation visitAnnotation(J.Annotation annotation, AtomicBoolean generated) {
+                if ("Generated".equals(annotation.getSimpleName())) {
+                    generated.set(true);
+                }
+                return annotation;
             }
+        }.visit(cu, generatedDeclaration);
+        if (generatedDeclaration.get()) {
+            return false;
         }
         List<Comment> headers = new ArrayList<>(cu.getComments());
         if (cu.getPackageDeclaration() != null) {
