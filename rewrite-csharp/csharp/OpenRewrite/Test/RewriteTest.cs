@@ -164,8 +164,7 @@ public abstract class RewriteTest
                     semanticModel = compilations[syntaxTree].GetSemanticModel(syntaxTree);
                 }
 
-                var cu = parser.Parse(spec.Before, sourcePath: localSourcePath, semanticModel: semanticModel,
-                    charsetBomMarked: spec.CharsetBomMarked);
+                var cu = parser.Parse(spec.Before, sourcePath: localSourcePath, semanticModel: semanticModel);
                 source = editorConfigs?.Style(cu, localSourcePath) ?? cu;
 
                 // Verify no non-whitespace content leaked into Space fields
@@ -343,7 +342,10 @@ public abstract class RewriteTest
                 {
                     foreach (var (key, value) in runCtx.Messages)
                     {
-                        carried.PutMessage(key, value);
+                        if (key != DataTable<object>.DataTableStoreKey)
+                        {
+                            carried.PutMessage(key, value);
+                        }
                     }
                 }
             }
@@ -389,7 +391,8 @@ public abstract class RewriteTest
             var outputSetup = OutputSetup(recipeSpec, check, setup);
             var compilations = projects.Compile(
                 units.Select(u => (projects.Of(u.Unit), outputSetup.Parse(u.Text, u.Unit.SourcePath))), outputSetup);
-            AssertCompiles(compilations.Values.Distinct(), check.Inspect == null ? [] : [check.Inspect], new HashSet<string>(),
+            AssertCompiles(compilations.Values.Distinct(), check.Inspect == null ? [] : [check.Inspect],
+                ImmutableHashSet<string>.Empty,
                 $"The recipe's output doesn't compile against {Target(recipeSpec, check).TargetFramework}");
         }
     }
@@ -677,11 +680,8 @@ public abstract class RewriteTest
     protected static SourceSpec CSharpFromFile(string path, string? after = null, string? sha256 = null,
         string? sourcePath = null)
     {
-        var bytes = ReadFixtureFile(path);
-        return new SourceSpec(FixtureText(bytes, path, sha256), after, sourcePath ?? CSharpPath(FixturePath(path)))
-        {
-            CharsetBomMarked = HasUtf8Bom(bytes)
-        };
+        var text = FixtureText(ReadFixtureFile(path), path, sha256);
+        return new SourceSpec(text, after, sourcePath ?? CSharpPath(FixturePath(path)));
     }
 
     /// <summary>
@@ -693,11 +693,8 @@ public abstract class RewriteTest
     protected SourceSpec CSharpFromResource(string name, string? after = null, string? sha256 = null,
         string? sourcePath = null)
     {
-        var bytes = ReadFixtureResource(name);
-        return new SourceSpec(FixtureText(bytes, name, sha256), after, sourcePath ?? CSharpPath(FixturePath(name)))
-        {
-            CharsetBomMarked = HasUtf8Bom(bytes)
-        };
+        var text = FixtureText(ReadFixtureResource(name), name, sha256);
+        return new SourceSpec(text, after, sourcePath ?? CSharpPath(FixturePath(name)));
     }
 
     /// <summary>
@@ -759,10 +756,10 @@ public abstract class RewriteTest
             }
         }
         using var reader = new StreamReader(new MemoryStream(bytes), detectEncodingFromByteOrderMarks: true);
-        return reader.ReadToEnd();
+        var text = reader.ReadToEnd();
+        var bom = reader.CurrentEncoding.GetPreamble();
+        return bom.Length > 0 && bytes.AsSpan().StartsWith(bom) ? '\uFEFF' + text : text;
     }
-
-    private static bool HasUtf8Bom(byte[] bytes) => bytes is [0xEF, 0xBB, 0xBF, ..];
 
     private static string FixturePath(string name)
     {
@@ -973,7 +970,6 @@ public record SourceSpec(
 {
     internal Func<string, string?>? AfterFromActual { get; init; }
     internal bool PlainXml { get; init; }
-    internal bool CharsetBomMarked { get; init; }
     internal bool Skipped { get; private init; }
     internal ImmutableList<Func<SourceFile, SourceFile>> BeforeRecipeHooks { get; private init; } = [];
     internal ImmutableList<Action<SourceFile, SourceFile>> AfterRecipeHooks { get; private init; } = [];

@@ -28,7 +28,7 @@ namespace OpenRewrite.Test;
 public sealed class RemoteRecipe(string javaRecipeName, Dictionary<string, object?>? options = null)
     : Recipe, IDelegatesTo
 {
-    private readonly Dictionary<string, object?> _options = options ?? new();
+    private readonly Dictionary<string, object?> _options = options == null ? new() : new(options);
 
     public override string DisplayName => javaRecipeName;
 

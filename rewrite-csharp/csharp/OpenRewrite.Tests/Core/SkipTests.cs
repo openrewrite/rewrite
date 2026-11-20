@@ -56,10 +56,12 @@ public class SkipTests : RewriteTest
     [Fact]
     public void ASkippedSourceCannotExpectAChange()
     {
-        Assert.Throws<ArgumentException>(() => RewriteRun(
+        var failure = Assert.Throws<ArgumentException>(() => RewriteRun(
             spec => spec.SetRecipe(new RenameCalls()),
             CSharp(Library, Library.Replace("=> Foo()", "=> Bar()")).Skip()
         ));
+
+        Assert.Equal("A source the test skips is kept from the recipe, which doesn't change it.", failure.Message);
     }
 
     private class RenameCalls : global::OpenRewrite.Core.Recipe

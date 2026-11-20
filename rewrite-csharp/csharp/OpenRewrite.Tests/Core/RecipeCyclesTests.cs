@@ -162,6 +162,23 @@ public class RecipeCyclesTests : RewriteTest
         );
     }
 
+    [Fact]
+    public void AFollowUpRunOnTheContextOfAnEarlierRunHasItsOwnDataTables()
+    {
+        var ctx = new ExecutionContext();
+        for (var run = 0; run < 2; run++)
+        {
+            RewriteRun(
+                spec => spec
+                    .SetRecipe(new RenameAndReportCalls())
+                    .SetExecutionContext(ctx)
+                    .ExpectDataTable<CalledMethod>(CalledMethods.Name, CalledMethods.InstanceName,
+                        rows => Assert.Equal([new CalledMethod { Name = "Foo" }], rows)),
+                CSharp(Calls("Foo"), Calls("Bar"))
+            );
+        }
+    }
+
     /// <summary>
     /// The recipe writes <c>A.Foo</c> as a single identifier, which it does not match again, but a fresh
     /// parse reads it as a call to <c>Foo</c> on <c>A</c>.
