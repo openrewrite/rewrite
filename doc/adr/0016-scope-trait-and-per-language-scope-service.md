@@ -94,10 +94,11 @@ read while a constant is constructed, in every language. Groovy and Kotlin refus
 though not in the same places as Java. Scala allows it, so there `canReference` says no for a read
 the language accepts. A Kotlin `init` block is an instance initializer to these rules. In a Kotlin
 enum, `canReference` refuses every member of the companion object while an entry is constructed and
-in an entry's arguments, a `const val` and a function too. Kotlin allows such a read in a lambda, as
-in `by lazy { }`, where `canReference` refuses it. An enum constant's body binds none of the members
-it inherits from its enum, so `canReference` refuses a field of the enum there that the body could
-read.
+in an entry's arguments, a `const val` and a function too, as Kotlin does. It allows one in an object
+expression there, which Kotlin refuses. Kotlin allows a read in a lambda, as of a companion member in
+`by lazy { }` or of a property declared after an `init` block, where `canReference` refuses it. An
+enum constant's body binds none of the members it inherits from its enum, so `canReference` refuses a
+field of the enum there that the body could read.
 
 `canEvaluateBefore` looks at names and assignments only. It does not see a method called in between
 that changes a field or an object the expression reads, nor what the expression itself changes.
