@@ -27,6 +27,8 @@ import org.openrewrite.java.internal.parser.RewriteClasspathJarClasspathLoader;
 import org.openrewrite.java.internal.parser.TypeTable;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.style.NamedStyles;
 
 import java.io.ByteArrayInputStream;
@@ -246,6 +248,23 @@ public interface JavaParser extends Parser {
      */
     void setClasspath(Collection<Path> classpath);
 
+    /**
+     * The type a fully qualified name has on this parser's classpath, with its members and supertypes, or
+     * {@code null} where the classpath has no such type. A nested type is named by its binary name, as
+     * {@code a.Outer$Inner}. Each call compiles a stub, which resets the parser.
+     */
+    default JavaType.@Nullable FullyQualified findType(String fullyQualifiedName) {
+        ExecutionContext ctx = new InMemoryExecutionContext();
+        ctx.putMessage(SKIP_SOURCE_SET_TYPE_GENERATION, true);
+        return reset().parse(ctx, "class $FindType { " + fullyQualifiedName.replace('$', '.') + " t; }")
+                .findFirst()
+                .filter(J.CompilationUnit.class::isInstance)
+                .map(cu -> ((J.CompilationUnit) cu).getClasses().get(0).getBody().getStatements().get(0))
+                .filter(J.VariableDeclarations.class::isInstance)
+                .map(field -> TypeUtils.asFullyQualified(((J.VariableDeclarations) field).getType()))
+                .orElse(null);
+    }
+
     @SuppressWarnings("unchecked")
     abstract class Builder<P extends JavaParser, B extends Builder<P, B>> extends Parser.Builder {
         protected Collection<Path> classpath = emptyList();
@@ -253,6 +272,8 @@ public interface JavaParser extends Parser {
         protected Collection<byte[]> classBytesClasspath = emptyList();
         protected JavaTypeCache javaTypeCache = new JavaTypeCache();
         private boolean typeCacheConfigured;
+        protected @Nullable Path javaPlatform;
+        protected @Nullable Integer sourceCompatibility;
 
         @Nullable
         protected JavaTypeFactory javaTypeFactory;
@@ -267,6 +288,36 @@ public interface JavaParser extends Parser {
 
         public Builder() {
             super(J.CompilationUnit.class);
+        }
+
+        /** Select the JDK home whose platform classes javac resolves, including internal APIs. */
+        public B javaPlatform(@Nullable Path javaHome) {
+            if (javaHome != null && !supportsCompilerConfiguration(null)) {
+                throw new UnsupportedOperationException(getClass().getName() + " does not support selecting a Java platform");
+            }
+            if (!Objects.equals(javaPlatform, javaHome) && !typeCacheConfigured && javaTypeFactory == null) {
+                javaTypeCache = new JavaTypeCache();
+            }
+            javaPlatform = javaHome;
+            return (B) this;
+        }
+
+        /** Whether this parser supports platform selection and, when supplied, this source version. */
+        protected boolean supportsCompilerConfiguration(@Nullable Integer sourceVersion) {
+            return false;
+        }
+
+        /** Select source syntax independently of the runtime API; null keeps the parser's default. */
+        public B sourceCompatibility(@Nullable Integer majorVersion) {
+            if (majorVersion != null && !supportsCompilerConfiguration(majorVersion)) {
+                throw new UnsupportedOperationException(getClass().getName() +
+                        " does not support source compatibility " + majorVersion);
+            }
+            if (!Objects.equals(sourceCompatibility, majorVersion) && !typeCacheConfigured && javaTypeFactory == null) {
+                javaTypeCache = new JavaTypeCache();
+            }
+            sourceCompatibility = majorVersion;
+            return (B) this;
         }
 
         public B logCompilationWarningsAndErrors(boolean logCompilationWarningsAndErrors) {
@@ -401,14 +452,14 @@ public interface JavaParser extends Parser {
          * elsewhere, and the caller falls back to a default factory.
          */
         protected @Nullable JavaTypeFactory resolvedTypeFactory() {
-            if (javaTypeFactory != null || typeCacheConfigured) {
+            if (javaTypeFactory != null || typeCacheConfigured || javaPlatform != null || sourceCompatibility != null) {
                 return javaTypeFactory;
             }
             return JdkClassSharingTypeFactory.forParser(resolvedTypeCache());
         }
 
         protected JavaTypeCache resolvedTypeCache() {
-            boolean configured = typeCacheConfigured || javaTypeFactory != null;
+            boolean configured = typeCacheConfigured || javaTypeFactory != null || javaPlatform != null || sourceCompatibility != null;
             javaTypeCache = HashMapJavaTypeCache.forParser(
                     JdkClassSharingTypeFactory.cacheForParser(javaTypeCache, getClass(), configured), configured);
             return javaTypeCache;

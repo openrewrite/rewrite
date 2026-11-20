@@ -444,7 +444,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
               import java.util.Map;
               class Test {
                void test(Map<String, ?> map) {
-                   System.out.println(map.get("test"));
+                System.out.println(map.get("test"));
                }
               }
               """

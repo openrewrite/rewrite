@@ -22,6 +22,7 @@ import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
@@ -603,6 +604,104 @@ class JavaTemplateDeclarationTest implements RewriteTest {
               class Test {
 
                   void test(List<String> names) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceParametersRetypesTheBodysReadsOfAParameterKeepingItsName() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                  if (!(method.getParameters().getFirst() instanceof J.VariableDeclarations param) ||
+                      !TypeUtils.isOfClassType(param.getType(), "java.util.ArrayList")) {
+                      return method;
+                  }
+                  maybeAddImport("java.util.LinkedList");
+                  maybeRemoveImport("java.util.ArrayList");
+                  return JavaTemplate.builder("LinkedList<String> list")
+                    .imports("java.util.LinkedList")
+                    .build()
+                    .apply(getCursor(), method.getCoordinates().replaceParameters());
+              }
+          })).afterRecipe(run -> {
+              var cu = (J.CompilationUnit) run.getChangeset().getAllResults().getFirst().getAfter();
+              var method = (J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().getFirst();
+              var returned = (J.Identifier) ((J.Return) method.getBody().getStatements().getLast()).getExpression();
+              assertThat(returned.getFieldType().getOwner())
+                .as("The parameter belongs to the method it is declared in, not to the template's stub")
+                .isSameAs(method.getMethodType());
+          }),
+          java(
+            """
+              import java.util.ArrayList;
+
+              class Test {
+                  Object test(ArrayList<String> list) {
+                      Object copy = list;
+                      return list;
+                  }
+              }
+              """,
+            """
+              import java.util.LinkedList;
+
+              class Test {
+                  Object test(LinkedList<String> list) {
+                      Object copy = list;
+                      return list;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceParametersKeepsTheReadsOfAParameterWhoseNewTypeDoesNotResolve() {
+        rewriteRun(
+          spec -> spec.parser(JavaParser.fromJavaVersion()
+              .dependsOn("package com.example; public class Mapper { public void configure() {} }"))
+            .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                @Override
+                public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                    if (method.getParameters().size() != 1) {
+                        return method;
+                    }
+                    // the template's classpath lacks the `dependsOn` source, so its `Mapper` does not resolve
+                    J.MethodDeclaration m = JavaTemplate.builder("#{}, int extra")
+                      .contextSensitive()
+                      .build()
+                      .apply(getCursor(), method.getCoordinates().replaceParameters(),
+                        method.getParameters().getFirst().printTrimmed(getCursor()));
+                    JavaType.Method type = method.getMethodType()
+                      .withParameterTypes(ListUtils.concat(method.getMethodType().getParameterTypes(), JavaType.Primitive.Int))
+                      .withParameterNames(ListUtils.concat(method.getMethodType().getParameterNames(), "extra"));
+                    return m.withParameters(ListUtils.concat(method.getParameters(), m.getParameters().get(1)))
+                      .withMethodType(type)
+                      .withName(m.getName().withType(type));
+                }
+            })),
+          java(
+            """
+              import com.example.Mapper;
+
+              class Test {
+                  void test(Mapper mapper) {
+                      mapper.configure();
+                  }
+              }
+              """,
+            """
+              import com.example.Mapper;
+
+              class Test {
+                  void test(Mapper mapper, int extra) {
+                      mapper.configure();
                   }
               }
               """

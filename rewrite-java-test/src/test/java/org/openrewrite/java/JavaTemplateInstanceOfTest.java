@@ -18,7 +18,6 @@ package org.openrewrite.java;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.search.FindMissingTypes;
@@ -94,7 +93,6 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail
     @Issue("https://github.com/openrewrite/rewrite/issues/2958")
     @SuppressWarnings({"ConstantValue", "IfStatementWithIdenticalBranches"})
     @Test
@@ -513,6 +511,67 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
                 """
             ),
             17
+          )
+        );
+    }
+
+    @Test
+    void replaceInWhileBodyAndForUpdate() {
+        rewriteRun(
+          templatedJava17(
+            """
+              class T {
+                  Object m(Object o) {
+                      while (o instanceof String s) {
+                          o = 42;
+                      }
+                      for (int i = 0; o instanceof String s; i += 42) {
+                      }
+                      return /*invalid*/ 42;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceAfterWhileLoop() {
+        rewriteRun(
+          templatedJava17(
+            """
+              class T {
+                  Object m(Object o) {
+                      while (!(o instanceof String s)) {
+                          o = next();
+                      }
+                      return 42;
+                  }
+                  Object next() {
+                      return null;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceAfterIfWhoseLoopMayCompleteNormally() {
+        rewriteRun(
+          templatedJava17(
+            """
+              class T {
+                  Object m(Object o, boolean c) {
+                      if (!(o instanceof String s)) {
+                          while (c) {
+                              return 1;
+                          }
+                      }
+                      return /*invalid*/ 42;
+                  }
+              }
+              """
           )
         );
     }

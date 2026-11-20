@@ -48,6 +48,8 @@ import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 
+import org.openrewrite.maven.tree.Dependency;
+
 @Value
 public class GradleDependency implements Trait<J.MethodInvocation> {
 
@@ -1759,7 +1761,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                 return null;
             }
 
-            return org.openrewrite.maven.tree.Dependency.builder()
+            return Dependency.builder()
                     .gav(new GroupArtifactVersion(group, artifact, version))
                     .build();
         }

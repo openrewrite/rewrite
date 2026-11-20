@@ -30,7 +30,6 @@ import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.trait.Reference;
 
-import java.lang.reflect.Method;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -141,6 +140,7 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                     }
                     if (!Boolean.TRUE.equals(ignoreDefinition) &&
                             mayContainDefinition(cu, normalizedOldName) &&
+                            mayDeclareType(cu.getTypesInUse(), oldFullyQualifiedTypeName) &&
                             containsClassDefinition(cu, oldFullyQualifiedTypeName) &&
                             !declaresNestedTypeThatStays(cu, oldFullyQualifiedTypeName, newFullyQualifiedTypeName)) {
                         return SearchResult.found(cu);
@@ -180,6 +180,26 @@ public class ChangeType extends Recipe implements RenamingRecipe {
         });
     }
 
+    /**
+     * A visitor that changes the old type to {@code newType} in a source file, or in a part of one visited with its
+     * cursor. Visiting a part leaves the imports to the caller. The new type goes into the tree as given, so one
+     * with members and supertypes, such as {@link JavaParser#findType(String)} returns, keeps them.
+     *
+     * @param newType a class, which may be nested, or a primitive
+     */
+    public static JavaVisitor<ExecutionContext> visitor(String oldFullyQualifiedTypeName, JavaType newType, boolean ignoreDefinition) {
+        String newName;
+        if (newType instanceof JavaType.Primitive && newType != JavaType.Primitive.None && newType != JavaType.Primitive.Null) {
+            newName = ((JavaType.Primitive) newType).getKeyword();
+        } else if (newType instanceof JavaType.FullyQualified && !(newType instanceof JavaType.Parameterized) &&
+                   !(newType instanceof JavaType.Unknown)) {
+            newName = ((JavaType.FullyQualified) newType).getFullyQualifiedName();
+        } else {
+            throw new IllegalArgumentException("The new type must be a class or a primitive: " + newType);
+        }
+        return new JavaChangeTypeVisitor(oldFullyQualifiedTypeName, newType, newName, ignoreDefinition, false);
+    }
+
     private static class JavaChangeTypeVisitor extends JavaVisitor<ExecutionContext> {
         private final JavaType.Class originalType;
         private JavaType targetType;
@@ -191,6 +211,11 @@ public class ChangeType extends Recipe implements RenamingRecipe {
         private final boolean ignoreDefinition;
 
         /**
+         * Whether the target is built from its name, so that a file whose parser knows the target better can supply it.
+         */
+        private final boolean targetFromName;
+
+        /**
          * Whether the visited file's definition of the original type stays as it is, where asked to or where renaming
          * it in place can't make it the target type.
          */
@@ -199,12 +224,22 @@ public class ChangeType extends Recipe implements RenamingRecipe {
         private final TypeReplacer types = new TypeReplacer(this::replacement);
         private final Set<String> declaredClassNames = new HashSet<>();
         private @Nullable Set<String> otherTypeNames;
+        private @Nullable UUID otherTypeNamesOf;
 
         private JavaChangeTypeVisitor(String oldFullyQualifiedTypeName, String newFullyQualifiedTypeName, @Nullable Boolean ignoreDefinition) {
+            this(oldFullyQualifiedTypeName, JavaType.buildType(newFullyQualifiedTypeName), newFullyQualifiedTypeName,
+                    Boolean.TRUE.equals(ignoreDefinition), true);
+        }
+
+        private JavaChangeTypeVisitor(String oldFullyQualifiedTypeName, JavaType targetType, String newFullyQualifiedTypeName,
+                                      boolean ignoreDefinition, boolean targetFromName) {
             this.originalType = JavaType.ShallowClass.build(oldFullyQualifiedTypeName);
-            this.targetType = JavaType.buildType(newFullyQualifiedTypeName);
+            this.targetType = targetType;
             this.newFullyQualifiedTypeName = newFullyQualifiedTypeName;
-            this.ignoreDefinition = Boolean.TRUE.equals(ignoreDefinition);
+            this.ignoreDefinition = ignoreDefinition;
+            this.targetFromName = targetFromName;
+            // a part visited without its source file keeps the definition only where asked to
+            this.keepsDefinition = ignoreDefinition;
             importAlias = null;
         }
 
@@ -212,7 +247,10 @@ public class ChangeType extends Recipe implements RenamingRecipe {
         public J visit(@Nullable Tree tree, ExecutionContext ctx) {
             if (tree instanceof JavaSourceFile) {
                 JavaSourceFile cu = (JavaSourceFile) tree;
-                if (!(cu instanceof J.CompilationUnit) && targetType instanceof JavaType.FullyQualified) {
+                // what the last file declared and imported says nothing about this one, as the visitor may be reused
+                importAlias = null;
+                declaredClassNames.clear();
+                if (targetFromName && !(cu instanceof J.CompilationUnit) && targetType instanceof JavaType.FullyQualified) {
                     targetType = targetType(cu);
                 }
                 keepsDefinition = ignoreDefinition ||
@@ -806,7 +844,9 @@ public class ChangeType extends Recipe implements RenamingRecipe {
          * declaration of it stays. Shortening the target to one of these names would bind that name to two types.
          */
         private Set<String> otherTypeNames(JavaSourceFile sf, JavaType.FullyQualified newType) {
-            if (otherTypeNames == null) {
+            // the names are those of the file as it was first seen, before this visit edits it
+            if (otherTypeNames == null || !sf.getId().equals(otherTypeNamesOf)) {
+                otherTypeNamesOf = sf.getId();
                 JavaType.FullyQualified outermost = getTopLevelClassName(newType);
                 Map<String, String> importedTypeNames = new HashMap<>();
                 for (J.Import anImport : sf.getImports()) {
@@ -1058,36 +1098,45 @@ public class ChangeType extends Recipe implements RenamingRecipe {
     }
 
     /**
-     * Cheap pre-filter for {@link #containsClassDefinition}: a Java file can only declare a type
-     * whose package equals the file's package declaration, so a file whose package is not a prefix
-     * of the old type's name can skip the (potentially full-tree) definition scan entirely. This
-     * invariant is Java-specific, so it is only applied to {@link J.CompilationUnit}; other
-     * {@link JavaSourceFile} dialects (e.g. {@code K.CompilationUnit}, {@code G.CompilationUnit})
-     * always fall through to the scan.
-     *
-     * @param normalizedOldName the old fully qualified type name with {@code $} normalized to {@code .}
+     * Whether {@link TypesInUse} on the runtime classpath exposes {@link TypesInUse#hasDocReference}. Probed once at class
+     * load so an older parent-loaded {@code rewrite-java} doesn't trigger {@link NoSuchMethodError}.
      */
-    // Looked up reflectively because recipe modules built against this ChangeType may run alongside an
-    // older TypesInUse that predates the method, which would otherwise fail with NoSuchMethodError.
-    private static final @Nullable Method HAS_DOC_REFERENCE = findHasDocReference();
+    private static final boolean TYPES_IN_USE_HAS_DOC_REFERENCE = probeTypesInUseHasDocReference();
 
-    private static @Nullable Method findHasDocReference() {
+    private static boolean probeTypesInUseHasDocReference() {
         try {
-            return TypesInUse.class.getMethod("hasDocReference", String.class);
+            TypesInUse.class.getMethod("hasDocReference", String.class);
+            return true;
         } catch (NoSuchMethodException e) {
-            return null;
+            return false;
         }
     }
 
     private static boolean hasDocReference(TypesInUse typesInUse, String fullyQualifiedTypeName) {
-        if (HAS_DOC_REFERENCE == null) {
-            return false;
-        }
+        return TYPES_IN_USE_HAS_DOC_REFERENCE && typesInUse.hasDocReference(fullyQualifiedTypeName);
+    }
+
+    /**
+     * Whether {@link TypesInUse} on the runtime classpath exposes {@link TypesInUse#mayDeclareType}. Probed once at class
+     * load so an older parent-loaded {@code rewrite-java} doesn't trigger {@link NoSuchMethodError}.
+     */
+    private static final boolean TYPES_IN_USE_HAS_MAY_DECLARE_TYPE = probeTypesInUseHasMayDeclareType();
+
+    private static boolean probeTypesInUseHasMayDeclareType() {
         try {
-            return (Boolean) HAS_DOC_REFERENCE.invoke(typesInUse, fullyQualifiedTypeName);
-        } catch (ReflectiveOperationException e) {
+            TypesInUse.class.getMethod("mayDeclareType", String.class);
+            return true;
+        } catch (NoSuchMethodException e) {
             return false;
         }
+    }
+
+    /**
+     * Unlike {@link #mayContainDefinition}, holds for every language, so a Scala or Python file isn't walked again for
+     * each type that is changed.
+     */
+    private static boolean mayDeclareType(TypesInUse typesInUse, String fullyQualifiedTypeName) {
+        return !TYPES_IN_USE_HAS_MAY_DECLARE_TYPE || typesInUse.mayDeclareType(fullyQualifiedTypeName);
     }
 
     /**
@@ -1106,6 +1155,16 @@ public class ChangeType extends Recipe implements RenamingRecipe {
         return false;
     }
 
+    /**
+     * Cheap pre-filter for {@link #containsClassDefinition}: a Java file can only declare a type
+     * whose package equals the file's package declaration, so a file whose package is not a prefix
+     * of the old type's name can skip the (potentially full-tree) definition scan entirely. The same
+     * holds for Kotlin and Groovy, but rewrite-java can't name their compilation units, so only
+     * {@link J.CompilationUnit} is checked here. It doesn't hold for every dialect: a Scala file can
+     * declare types in several braced packages.
+     *
+     * @param normalizedOldName the old fully qualified type name with {@code $} normalized to {@code .}
+     */
     private static boolean mayContainDefinition(JavaSourceFile sourceFile, String normalizedOldName) {
         if (!(sourceFile instanceof J.CompilationUnit)) {
             return true;

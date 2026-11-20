@@ -181,7 +181,7 @@ public final class SdkVersionValueSourceResolver {
     }
 
     private static boolean noArgs(J.MethodInvocation method) {
-        List<org.openrewrite.java.tree.Expression> args = method.getArguments();
+        List<Expression> args = method.getArguments();
         return args.isEmpty() || (args.size() == 1 && args.get(0) instanceof J.Empty);
     }
 

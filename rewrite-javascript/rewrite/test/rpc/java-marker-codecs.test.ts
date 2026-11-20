@@ -32,7 +32,7 @@ import {
 } from "../../src/javascript";
 import {Marker, marker, MarkersKind} from "../../src/markers";
 import {randomId} from "../../src/uuid";
-import {omitColon, Yaml} from "../../src/yaml";
+import {omitColon, tagBeforeAnchor, Yaml} from "../../src/yaml";
 
 /**
  * One of each marker that can be attached on this side. A marker type that is added to one of the
@@ -122,6 +122,7 @@ const samples: { [kind: string]: () => Marker } = {
     [StyleKind.PrettierStyle]: () => prettierStyle(randomId(), {semi: false}, "3.0.0"),
     [`${StyleKind.PrettierStyle} without a version`]: () => prettierStyle(randomId(), {semi: false}),
     [Yaml.Markers.OmitColon]: () => omitColon(),
+    [Yaml.Markers.TagBeforeAnchor]: () => tagBeforeAnchor(),
 };
 
 const kinds: string[] = [

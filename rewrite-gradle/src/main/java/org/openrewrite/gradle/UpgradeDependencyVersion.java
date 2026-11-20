@@ -707,7 +707,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         }
 
         @Override
-        public org.openrewrite.properties.tree.Properties visitEntry(Properties.Entry entry, ExecutionContext ctx) {
+        public Properties visitEntry(Properties.Entry entry, ExecutionContext ctx) {
             if (acc.versionPropNameToGA.containsKey(entry.getKey()) && scope.includesVersionVariable(entry.getKey())) {
                 String agreedVersion = safeUpdatedVersion(entry.getKey(), dependencyMatcher, acc, null, entry.getValue().getText(), ctx);
                 if (agreedVersion == null) {

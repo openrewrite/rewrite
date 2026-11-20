@@ -28,6 +28,12 @@ class TomlStringTest {
     }
 
     @Test
+    void decodeBasicReadsTheHexEscapeOfToml11() {
+        assertThat(TomlString.decodeBasic("tab\\x09 e-acute\\xE9 \\e[0m", false)).isEqualTo("tab\t e-acute\u00e9 \u001b[0m");
+        assertThat(TomlString.decodeBasic("\\xZ9 \\x4", false)).isEqualTo("\\xZ9 \\x4");
+    }
+
+    @Test
     void decodeBasicKeepsAnEscapeWithASignedNumberAsWritten() {
         assertThat(TomlString.decodeBasic("\\u+041", false)).isEqualTo("\\u+041");
     }

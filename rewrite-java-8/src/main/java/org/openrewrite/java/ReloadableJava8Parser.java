@@ -98,6 +98,12 @@ class ReloadableJava8Parser implements JavaParser {
         this.context = new Context();
         this.compilerLog = new ResettableLog(context);
         this.pfm = new ByteArrayCapableJavacFileManager(context, true, charset, classBytesClasspath);
+        try {
+            // Dependency jars supply bytecode; source dependencies arrive through dependsOn.
+            pfm.setLocation(StandardLocation.SOURCE_PATH, java.util.Collections.emptyList());
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
         context.put(JavaFileManager.class, this.pfm);
 
         // otherwise, consecutive string literals in binary expressions are concatenated by the parser, losing the original

@@ -33,4 +33,9 @@
     <ProjectReference Include="..\OpenRewrite\OpenRewrite.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="Core\Fixtures\*.txt" WithCulture="false" />
+    <None Include="Core\Fixtures\*.txt" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

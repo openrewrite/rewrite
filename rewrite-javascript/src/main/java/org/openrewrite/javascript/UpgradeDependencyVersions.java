@@ -128,6 +128,16 @@ public class UpgradeDependencyVersions extends ScanningRecipe<NodeDependencyEdit
     }
 
     @Override
+    public boolean causesAnotherCycle() {
+        return NodeDependencyEdits.deferredThisCycle();
+    }
+
+    @Override
+    public void onComplete(ExecutionContext ctx) {
+        NodeDependencyEdits.reportUnresolvedDeferrals(ctx);
+    }
+
+    @Override
     public NodeDependencyEdits getInitialValue(ExecutionContext ctx) {
         Validated<Object> validated = validate();
         if (validated.isInvalid()) {

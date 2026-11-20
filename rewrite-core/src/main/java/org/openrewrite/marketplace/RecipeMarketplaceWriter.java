@@ -221,7 +221,11 @@ public class RecipeMarketplaceWriter {
             return "";
         }
         try {
-            return JSON_MAPPER.writeValueAsString(options);
+            List<OptionDescriptor> redacted = new ArrayList<>(options.size());
+            for (OptionDescriptor option : options) {
+                redacted.add(option.redacted());
+            }
+            return JSON_MAPPER.writeValueAsString(redacted);
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Failed to serialize options to JSON", e);
         }

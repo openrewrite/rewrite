@@ -35,13 +35,14 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.newSetFromMap;
 import static org.assertj.core.api.Assertions.fail;
 
-/**
- * Finds the {@link TreeVisitor}s that recipes keep in static fields. A visitor keeps its cursor and other state while
- * it visits, so one that every thread shares breaks when source files are visited in parallel.
- */
-final class StaticVisitors {
+/// Checks what recipes keep in their fields and in the static fields of the classes nested in them. A visitor in a
+/// static field is shared by every thread visiting source files in parallel, and a [org.openrewrite.Heavyweight]
+/// object in any of them stays in memory for as long as the recipe, or the class, does. Recipes a composite lists
+/// from dependency jars are left to the builds of the projects that own them.
+final class RecipeFields {
 
-    private static final ClassValue<List<Field>> STATIC_FIELDS = new ClassValue<List<Field>>() {
+    /// The fields, static or not, that a class of the module under test declares and that can hold a reference.
+    private static final ClassValue<List<Field>> FIELDS = new ClassValue<List<Field>>() {
         @Override
         protected List<Field> computeValue(Class<?> type) {
             if (!underTest(type)) {
@@ -55,7 +56,7 @@ final class StaticVisitors {
             }
             List<Field> fields = new ArrayList<>();
             for (Field field : declared) {
-                if (Modifier.isStatic(field.getModifiers()) && !field.isSynthetic() && mayHoldVisitor(field)) {
+                if (!field.getType().isPrimitive() && !field.isSynthetic()) {
                     try {
                         field.setAccessible(true);
                         fields.add(field);
@@ -67,22 +68,27 @@ final class StaticVisitors {
         }
     };
 
-    private StaticVisitors() {
+    private final Set<Recipe> ran = newSetFromMap(new IdentityHashMap<>());
+
+    /// Records a recipe that ran, which may be another instance than the one its composite's recipe list returns
+    /// after the run.
+    void ran(Recipe recipe) {
+        ran.add(unwrap(recipe));
     }
 
-    static void assertNoneKept(Recipe recipe) {
+    static void assertNoStaticVisitors(Recipe recipe) {
         Set<Class<?>> classes = new LinkedHashSet<>();
-        collectRecipeClasses(recipe, classes, newSetFromMap(new IdentityHashMap<>()));
+        for (Recipe r : recipes(recipe)) {
+            collectClasses(r, classes);
+        }
         Set<String> found = new LinkedHashSet<>();
         for (Class<?> c : classes) {
-            for (Field field : STATIC_FIELDS.get(c)) {
-                Map<String, TreeVisitor<?, ?>> visitors;
-                try {
-                    visitors = visitors(AddedMarkers.typeName(c) + "." + field.getName(), field.get(null));
-                } catch (IllegalAccessException | RuntimeException | LinkageError ignored) {
+            for (Field field : FIELDS.get(c)) {
+                if (!Modifier.isStatic(field.getModifiers()) || !mayHoldVisitor(field)) {
                     continue;
                 }
-                for (Map.Entry<String, TreeVisitor<?, ?>> visitor : visitors.entrySet()) {
+                String path = AddedMarkers.typeName(c) + "." + field.getName();
+                for (Map.Entry<String, TreeVisitor<?, ?>> visitor : visitors(path, read(field, null)).entrySet()) {
                     found.add("  " + visitor.getKey() + " -> " + AddedMarkers.typeName(visitor.getValue().getClass()));
                 }
             }
@@ -99,26 +105,100 @@ final class StaticVisitors {
         }
     }
 
-    private static void collectRecipeClasses(Recipe recipe, Set<Class<?>> classes, Set<Recipe> seen) {
+    /// Walks the fields of the recipe and of each recipe it lists or that ran, and the static fields of their classes
+    /// and the classes nested in them, each class once.
+    void assertLightweight(Recipe recipe) {
+        Set<Recipe> recipes = newSetFromMap(new IdentityHashMap<>());
+        recipes.addAll(recipes(recipe));
+        recipes.addAll(ran);
+        Heavyweights heavyweights = new Heavyweights();
+        Set<Class<?>> walkedStatics = new HashSet<>();
+        for (Recipe r : recipes) {
+            Set<Class<?>> classes = new LinkedHashSet<>();
+            collectClasses(r, classes);
+            if (classes.isEmpty()) {
+                continue;
+            }
+            Heavyweights.Walk walk = heavyweights.walk(r.getName(), null, true);
+            String name = AddedMarkers.typeName(r.getClass());
+            for (Class<?> c = r.getClass(); c != Recipe.class && c != ScanningRecipe.class; c = c.getSuperclass()) {
+                for (Field field : FIELDS.get(c)) {
+                    if (!Modifier.isStatic(field.getModifiers())) {
+                        walk.from(read(field, r), name + "." + field.getName());
+                    }
+                }
+            }
+            for (Class<?> c : classes) {
+                if (walkedStatics.add(c)) {
+                    for (Field field : FIELDS.get(c)) {
+                        if (Modifier.isStatic(field.getModifiers())) {
+                            walk.from(read(field, null), AddedMarkers.typeName(c) + "." + field.getName());
+                        }
+                    }
+                }
+            }
+            walk.drain();
+        }
+        if (!heavyweights.isEmpty()) {
+            fail("A recipe should keep in its fields, and in the static fields of the classes nested in it, what it " +
+                 "is configured with, and no collection of the trees it visits nor any cursor, ExecutionContext or " +
+                 "build model:\n" + heavyweights.report() +
+                 "A recipe stays in memory for the whole run, and a static field for as long as its class, so what " +
+                 "they keep for each source file adds up over a large repository. Keep what one source file needs " +
+                 "in the fields of the visitor that getVisitor() creates for it, and what is needed across source " +
+                 "files in a ScanningRecipe's accumulator, as values such as paths and ids. Moving a static field " +
+                 "to another class, such as a visitor's, keeps the same objects in memory and is not a fix. When " +
+                 "what the recipe keeps doesn't grow with the number of source files, opt out with " +
+                 "RecipeQualityValidation.builder().lightweightRecipeFields(false).");
+        }
+    }
+
+    /// The recipe, the recipes it lists and their preconditions, each once.
+    private static Set<Recipe> recipes(Recipe recipe) {
+        Set<Recipe> recipes = newSetFromMap(new IdentityHashMap<>());
+        collectRecipes(recipe, recipes);
+        return recipes;
+    }
+
+    private static void collectRecipes(Recipe recipe, Set<Recipe> recipes) {
+        Recipe r = unwrap(recipe);
+        if (!recipes.add(r)) {
+            return;
+        }
+        if (r instanceof RecipePreconditions) {
+            for (Recipe precondition : ((RecipePreconditions) r).getPreconditions()) {
+                collectRecipes(precondition, recipes);
+            }
+        }
+        for (Recipe child : r.getRecipeList()) {
+            collectRecipes(child, recipes);
+        }
+    }
+
+    private static Recipe unwrap(Recipe recipe) {
         Recipe r = recipe;
         while (r instanceof Recipe.DelegatingRecipe) {
             r = ((Recipe.DelegatingRecipe) r).getDelegate();
         }
-        if (!seen.add(r)) {
+        return r;
+    }
+
+    /// The classes of the recipe up to [Recipe], and the classes nested in each.
+    private static void collectClasses(Recipe recipe, Set<Class<?>> classes) {
+        if (recipe instanceof AdHocRecipe || recipe instanceof AdHocScanningRecipe) {
             return;
         }
-        if (!(r instanceof AdHocRecipe) && !(r instanceof AdHocScanningRecipe)) {
-            for (Class<?> c = r.getClass(); c != Recipe.class && c != ScanningRecipe.class; c = c.getSuperclass()) {
-                collectNested(c, classes);
-            }
+        for (Class<?> c = recipe.getClass(); c != Recipe.class && c != ScanningRecipe.class; c = c.getSuperclass()) {
+            collectNested(c, classes);
         }
-        if (r instanceof RecipePreconditions) {
-            for (Recipe precondition : ((RecipePreconditions) r).getPreconditions()) {
-                collectRecipeClasses(precondition, classes, seen);
-            }
-        }
-        for (Recipe child : r.getRecipeList()) {
-            collectRecipeClasses(child, classes, seen);
+    }
+
+    private static @Nullable Object read(Field field, @Nullable Object owner) {
+        try {
+            return field.get(owner);
+        } catch (IllegalAccessException | RuntimeException | LinkageError ignored) {
+            // a field that can't be read, or whose class fails to initialize, can't be walked
+            return null;
         }
     }
 
@@ -160,12 +240,12 @@ final class StaticVisitors {
             for (int i = 0; i < elements.length; i++) {
                 addIfVisitor(found, path + "[" + i + "]", elements[i]);
             }
-        } else if (value instanceof Collection && AccumulatorContents.isJdk(value.getClass())) {
+        } else if (value instanceof Collection && Heavyweights.isJdk(value.getClass())) {
             int i = 0;
             for (Object element : (Collection<?>) value) {
                 addIfVisitor(found, path + "[" + i++ + "]", element);
             }
-        } else if (value instanceof Map && AccumulatorContents.isJdk(value.getClass())) {
+        } else if (value instanceof Map && Heavyweights.isJdk(value.getClass())) {
             for (Map.Entry<?, ?> entry : ((Map<?, ?>) value).entrySet()) {
                 addIfVisitor(found, path + "[" + entry.getKey() + "]", entry.getValue());
             }

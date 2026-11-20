@@ -113,7 +113,8 @@ final class Probes {
         ExecutionContext ctx = copy(recipeCtx, errors::add);
         ctx.putMessage(ExecutionContext.SOURCE_FILE_TIMEOUT, TIMEOUT);
         try {
-            recipe.run(new InMemoryLargeSourceSet(sources), ctx, cycles, 1);
+            LargeSourceSet lss = new InMemoryLargeSourceSet(sources);
+            CheckingScheduler.of(lss, ctx).scheduleRun(recipe, lss, ctx, cycles, 1);
         } catch (Throwable t) {
             errors.add(t);
         }

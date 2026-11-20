@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.java.ShortenFullyQualifiedTypeReferences;
+import org.openrewrite.java.ShortenFullyQualifiedTypeReferencesSafely;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -29,6 +30,20 @@ class ShortenFullyQualifiedTypeReferencesAdaptabilityTest implements RewriteTest
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new ShortenFullyQualifiedTypeReferences());
+    }
+
+    @Test
+    void safeRecipeSkipsGroovy() {
+        rewriteRun(
+          spec -> spec.recipe(new ShortenFullyQualifiedTypeReferencesSafely()),
+          groovy(
+            """
+              class T {
+                  java.util.List<String> list
+              }
+              """
+          )
+        );
     }
 
     @DocumentExample
