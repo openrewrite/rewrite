@@ -163,8 +163,8 @@ describe("the marker", () => {
             `)
         }, "use.ts"))!;
         expect(names.map((name, i) => [name, packages[i]])).toEqual(expect.arrayContaining([
-            ["index.d.go", "one"],
-            ["index.d.go", "two"],
+            ["index.go", "one"],
+            ["index.go", "two"],
         ]));
     });
 
@@ -644,7 +644,7 @@ describe("a declaration's name", () => {
         ]);
     });
 
-    test("in a declaration file is the parser's, which drops the .d of a type", async () => {
+    test("in a declaration file drops the .d, so that its types and functions are named as the code beside it names them", async () => {
         const names = await resolved({
             "types/route.d.ts": trimIndent(`
                 export interface Route {
@@ -656,7 +656,7 @@ describe("a declaration's name", () => {
         expect(names).toEqual([
             ["Route", "interface", "types/route.Route"],
             ["path", "field", "types/route.Route.path"],
-            ["go", "method", "types/route.d.go"],
+            ["go", "method", "types/route.go"],
         ]);
     });
 
@@ -1239,7 +1239,7 @@ describe("a module specifier", () => {
             `),
         }, "shims.d.ts")).toEqual([
             [`"untyped"`, "import-ref", "shims.d.ts"],
-            ["go", "method", "shims.d.go"],
+            ["go", "method", "shims.go"],
         ]);
     });
 
@@ -1444,9 +1444,9 @@ describe("a name in a package", () => {
 
     test("carries the package that declares it", async () => {
         expect(await packaged({...typedPackage, "use.js": useTyped}, "use.js")).toEqual([
-            ["go", "import-ref", "index.d.go", "typed"],
+            ["go", "import-ref", "index.go", "typed"],
             [`"typed"`, "import-ref", "index.d.ts", "typed"],
-            ["go", "method-call", "index.d.go", "typed"],
+            ["go", "method-call", "index.go", "typed"],
         ]);
     });
 
@@ -1476,7 +1476,7 @@ describe("a name in a package", () => {
                 let inner: ns.Inner;
             `)
         }, "use.ts");
-        expect(declared).toEqual(expect.arrayContaining(["index.d.go", "index.Box", "index.Box.open", "ns.deep", "index.Lid"]));
+        expect(declared).toEqual(expect.arrayContaining(["index.go", "index.Box", "index.Box.open", "ns.deep", "index.Lid"]));
         expect(names.map(([, , name]) => name)).toEqual(expect.arrayContaining(declared.filter(name => !name.endsWith(".<constructor>"))));
     });
 
@@ -1550,7 +1550,7 @@ describe("a name in a package", () => {
         expect(names).toEqual(expect.arrayContaining([
             ["read", "method-call", "index.Options.read", "held"],
             ["open", "method-call", "index.Options.open", "held"],
-            ["run", "method-call", "index.d.run", "held"],
+            ["run", "method-call", "index.run", "held"],
         ]));
     });
 
@@ -1576,7 +1576,7 @@ describe("a name in a package", () => {
             "use.js": `require("./lib.js");`,
         }, "use.js")).filter(([, , , pkg]) => pkg === "@types/node");
         const declarations = await ownDeclarations(source);
-        expect(references).toEqual([["require", "method-call", "module.d.require", "@types/node"]]);
+        expect(references).toEqual([["require", "method-call", "module.require", "@types/node"]]);
         expect(references.filter(reference => !meets(reference, declarations, Object.keys(source)))).toEqual([]);
     });
 
@@ -1633,7 +1633,7 @@ describe("a name in a package", () => {
             `),
         }, "use.js")).filter(([, , , pkg]) => pkg === "@types/errors");
         const declarations = await ownDeclarations(source);
-        expect(references).toContainEqual(["createError", "method-call", "index.d.createError", "@types/errors"]);
+        expect(references).toContainEqual(["createError", "method-call", "index.createError", "@types/errors"]);
         expect(references.filter(reference => !meets(reference, declarations, Object.keys(source)))).toEqual([]);
     });
 
@@ -1645,7 +1645,25 @@ describe("a name in a package", () => {
                 import {go} from "@acme/typed";
                 go();
             `)
-        }, "use.js")).toContainEqual(["go", "method-call", "lib/index.d.go", "@acme/typed"]);
+        }, "use.js")).toContainEqual(["go", "method-call", "lib/index.go", "@acme/typed"]);
+    });
+
+    test("of a function is the one the code beside its declaration file declares", async () => {
+        const source = {
+            "package.json": JSON.stringify({name: "split", version: "1.0.0", types: "lib/helpers.d.ts", main: "lib/helpers.js"}),
+            "lib/helpers.d.ts": "export declare function isBrowser(): boolean;",
+            "lib/helpers.js": "export function isBrowser() { return typeof window !== 'undefined'; }",
+        };
+        const use = await packaged({
+            ...installed("split", source),
+            "use.ts": trimIndent(`
+                import {isBrowser} from "split";
+                isBrowser();
+            `)
+        }, "use.ts");
+        const [code] = await parseAll(source, ["lib/helpers.js"]);
+        expect(use).toContainEqual(["isBrowser", "method-call", "lib/helpers.isBrowser", "split"]);
+        expect(await rowsOf(code)).toContainEqual(["isBrowser", "method", "lib/helpers.isBrowser", null]);
     });
 
     test("of a DefinitelyTyped package carries its own id", async () => {
@@ -1656,7 +1674,7 @@ describe("a name in a package", () => {
                 import {go} from "typed";
                 go();
             `)
-        }, "use.ts")).toContainEqual(["go", "method-call", "index.d.go", "@types/typed"]);
+        }, "use.ts")).toContainEqual(["go", "method-call", "index.go", "@types/typed"]);
     });
 
     test("in a content addressed store is named as any other", async () => {
@@ -1665,7 +1683,7 @@ describe("a name in a package", () => {
             "node_modules/.pnpm/typed@1.2.3/node_modules/typed/index.d.ts": typedPackage["node_modules/typed/index.d.ts"],
             "use.js": useTyped
         }, "use.js", {"node_modules/typed": "node_modules/.pnpm/typed@1.2.3/node_modules/typed"}))
-            .toContainEqual(["go", "method-call", "index.d.go", "typed"]);
+            .toContainEqual(["go", "method-call", "index.go", "typed"]);
     });
 
     test("of an ambient module is its file, and of its function the file's module", async () => {
@@ -1685,7 +1703,7 @@ describe("a name in a package", () => {
             ["fs", "import-ref", "fs.d.ts", "@types/node"],
             [`"fs"`, "import-ref", "fs.d.ts", "@types/node"],
             ["fs", "type-ref", "fs.d.ts", "@types/node"],
-            ["readFileSync", "method-call", "fs.d.readFileSync", "@types/node"],
+            ["readFileSync", "method-call", "fs.readFileSync", "@types/node"],
         ]);
     });
 
@@ -1694,7 +1712,7 @@ describe("a name in a package", () => {
         expect(names).toEqual([
             ["map", "method-call", "Array.map", null],
             ["String", "type-ref", "String", null],
-            ["parseInt", "method-call", "lib/lib.es5.d.parseInt", null],
+            ["parseInt", "method-call", "lib/lib.es5.parseInt", null],
         ]);
     });
 
@@ -1757,7 +1775,7 @@ describe("a name in a package", () => {
                 import {go} from "@acme/nameless";
                 go();
             `)
-        }, "use.ts")).toContainEqual(["go", "method-call", "index.d.go", "@acme/nameless"]);
+        }, "use.ts")).toContainEqual(["go", "method-call", "index.go", "@acme/nameless"]);
     });
 
     test("with no version in its manifest is named all the same, since the chain has the version", async () => {
@@ -1768,6 +1786,6 @@ describe("a name in a package", () => {
                 import {go} from "versionless";
                 go();
             `)
-        }, "use.ts")).toContainEqual(["go", "method-call", "index.d.go", "versionless"]);
+        }, "use.ts")).toContainEqual(["go", "method-call", "index.go", "versionless"]);
     });
 });

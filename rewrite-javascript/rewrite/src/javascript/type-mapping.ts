@@ -16,7 +16,7 @@
 import ts from "typescript";
 import * as path from "path";
 import {Type} from "../java";
-import {moduleName, packageNameOf} from "./package-name";
+import {moduleName, moduleOfFile, packageNameOf} from "./package-name";
 import {escapeLoneSurrogates} from "./parser-utils";
 import FUNCTION_TYPE_NAME = Type.FUNCTION_TYPE_NAME;
 import OBJECT_TYPE_NAME = Type.OBJECT_TYPE_NAME;
@@ -878,8 +878,7 @@ export class JavaScriptTypeMapping {
 
     private sourceModuleName(sourceFile: ts.SourceFile): string {
         const fileName = sourceFile.fileName;
-        const relative = this.sourceRoot && path.isAbsolute(fileName) ? path.relative(this.sourceRoot, fileName) : fileName;
-        return relative.replace(/\.[^/.]+$/, '');
+        return moduleOfFile(this.sourceRoot && path.isAbsolute(fileName) ? path.relative(this.sourceRoot, fileName) : fileName);
     }
 
     /**
