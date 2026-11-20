@@ -185,7 +185,9 @@ public class ChangeTableRowValue extends Recipe {
                     List<String> name = TomlKeyParts.of(requireNonNull(table.getName()));
                     if (name.equals(rowName)) {
                         row = table;
-                    } else if (row != null && startsWith(name, rowName) &&
+                    } else if (TomlKeyParts.startsWith(rowName, name)) {
+                        row = null;
+                    } else if (row != null && TomlKeyParts.startsWith(name, rowName) &&
                                overlaps(name.subList(rowName.size(), name.size()))) {
                         rows.add(row.getId());
                     }
@@ -194,7 +196,7 @@ public class ChangeTableRowValue extends Recipe {
             }
 
             private boolean overlaps(List<String> key) {
-                return startsWith(key, property) || startsWith(property, key);
+                return TomlKeyParts.startsWith(key, property) || TomlKeyParts.startsWith(property, key);
             }
 
             /**
@@ -216,8 +218,4 @@ public class ChangeTableRowValue extends Recipe {
     }
 
     private static final String ROWS_WITH_PROPERTY_IN_SUBTABLE = "ROWS_WITH_PROPERTY_IN_SUBTABLE";
-
-    private static boolean startsWith(List<String> key, List<String> prefix) {
-        return key.size() >= prefix.size() && key.subList(0, prefix.size()).equals(prefix);
-    }
 }

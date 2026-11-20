@@ -93,18 +93,14 @@ public class DeleteTableRow extends Recipe {
                     List<String> name = TomlKeyParts.of(requireNonNull(table.getName()));
                     if (name.equals(rowName)) {
                         inDeletedRow[0] = TableRowMatcher.hasMatchingKeyValue(table, identifyingKey, identifyingValue, useRegex);
-                    } else if (startsWith(rowName, name)) {
+                    } else if (TomlKeyParts.startsWith(rowName, name)) {
                         inDeletedRow[0] = false;
-                    } else if (!startsWith(name, rowName)) {
+                    } else if (!TomlKeyParts.startsWith(name, rowName)) {
                         return value;
                     }
                     return inDeletedRow[0] ? null : value;
                 });
             }
         };
-    }
-
-    private static boolean startsWith(List<String> key, List<String> prefix) {
-        return key.size() >= prefix.size() && key.subList(0, prefix.size()).equals(prefix);
     }
 }

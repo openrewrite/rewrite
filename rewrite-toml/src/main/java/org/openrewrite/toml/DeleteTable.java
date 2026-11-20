@@ -74,7 +74,7 @@ public class DeleteTable extends Recipe {
                     return false;
                 }
                 List<String> parts = TomlKeyParts.of(t.getName());
-                return parts.size() >= deleted.size() && parts.subList(0, deleted.size()).equals(deleted);
+                return TomlKeyParts.startsWith(parts, deleted);
             }
         };
     }
