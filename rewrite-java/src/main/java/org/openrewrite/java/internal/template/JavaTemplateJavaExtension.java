@@ -22,6 +22,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.internal.LineStart;
 import org.openrewrite.java.service.SourceFileStatementService;
 import org.openrewrite.java.trait.Scope;
 import org.openrewrite.java.tree.*;
@@ -46,7 +47,6 @@ import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
-import static org.openrewrite.internal.StringUtils.repeat;
 import static org.openrewrite.java.tree.Space.Location.*;
 
 /**
@@ -83,30 +83,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
              * lines above it, and formats the lines it nests as usual.
              */
             private <J2 extends J> J2 keepLineStart(J2 formatted, Space original) {
-                if (!startsLine(original)) {
-                    return formatted;
-                }
-                String whitespace = original.getWhitespace();
-                String formattedWhitespace = formatted.getPrefix().getWhitespace();
-                int lastBreak = whitespace.lastIndexOf('\n');
-                if (lastBreak >= 0 && formattedWhitespace.indexOf('\n') >= 0) {
-                    String lineBreak = whitespace.contains("\r\n") ? "\r\n" : "\n";
-                    int breaks = (int) formattedWhitespace.chars().filter(c -> c == '\n').count();
-                    whitespace = repeat(lineBreak, breaks) + whitespace.substring(lastBreak + 1);
-                }
-                return formatted.withPrefix(original.withWhitespace(whitespace));
-            }
-
-            private boolean startsLine(Space prefix) {
-                if (prefix.getWhitespace().contains("\n")) {
-                    return true;
-                }
-                for (Comment comment : prefix.getComments()) {
-                    if (comment.getSuffix().contains("\n")) {
-                        return true;
-                    }
-                }
-                return false;
+                return formatted.withPrefix(LineStart.keep(formatted.getPrefix(), original, original));
             }
 
             @Override

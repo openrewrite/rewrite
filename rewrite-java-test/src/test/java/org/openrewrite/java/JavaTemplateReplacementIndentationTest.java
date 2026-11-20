@@ -19,9 +19,14 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.Tree;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.Space;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.test.RewriteTest;
 
+import static java.util.Collections.emptyList;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
@@ -142,6 +147,90 @@ class JavaTemplateReplacementIndentationTest implements RewriteTest {
                       log(
                         "FIRST",
                         "second");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void maybeAutoFormatKeepsTheIndentationOfWhatChangedInPlace() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable,
+                                                                      ExecutionContext ctx) {
+                  J.VariableDeclarations v = super.visitVariableDeclarations(multiVariable, ctx);
+                  if (!(getCursor().getParentTreeCursor().getValue() instanceof J.Block) || v.hasModifier(J.Modifier.Type.Final)) {
+                      return v;
+                  }
+                  J.Modifier finalModifier = new J.Modifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, null,
+                    J.Modifier.Type.Final, emptyList());
+                  J.VariableDeclarations withFinal = v.withModifiers(ListUtils.concat(finalModifier, v.getModifiers()));
+                  if (withFinal.getTypeExpression() != null) {
+                      withFinal = withFinal.withTypeExpression(withFinal.getTypeExpression().withPrefix(Space.SINGLE_SPACE));
+                  }
+                  return maybeAutoFormat(v, withFinal, ctx);
+              }
+          })),
+          java(
+            """
+              class A {
+                  void test() {
+                      int i = 0;
+              \t\tint j = 1;
+                        // a comment indented by hand
+                        int k = 2;
+                  }
+              }
+              """,
+            """
+              class A {
+                  void test() {
+                      final int i = 0;
+              \t\tfinal int j = 1;
+                        // a comment indented by hand
+                        final int k = 2;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void maybeAutoFormatIndentsCodeMovedToAnotherLevel() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitIf(J.If iff, ExecutionContext ctx) {
+                  // Hoists the then branch's only statement into the place of the if, one level out
+                  if (iff.getElsePart() != null || !(iff.getThenPart() instanceof J.Block)) {
+                      return iff;
+                  }
+                  J.Block then = (J.Block) iff.getThenPart();
+                  if (then.getStatements().size() != 1) {
+                      return iff;
+                  }
+                  J inner = then.getStatements().get(0);
+                  return maybeAutoFormat(inner, inner.withPrefix(iff.getPrefix()), ctx, getCursor().getParentTreeCursor());
+              }
+          })),
+          java(
+            """
+              class A {
+                  void test(boolean b) {
+                      if (b) {
+                          System.out.println(b);
+                      }
+                  }
+              }
+              """,
+            """
+              class A {
+                  void test(boolean b) {
+                      System.out.println(b);
                   }
               }
               """
