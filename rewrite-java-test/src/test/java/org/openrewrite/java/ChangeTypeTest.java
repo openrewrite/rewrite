@@ -4802,6 +4802,21 @@ class ChangeTypeTest implements RewriteTest {
         );
     }
 
+    /** Strips the type off every identifier with this simple name outside the imports. */
+    private static J.CompilationUnit withoutTypeOn(J.CompilationUnit cu, String simpleName) {
+        return (J.CompilationUnit) new JavaIsoVisitor<Integer>() {
+            @Override
+            public J.Import visitImport(J.Import anImport, Integer p) {
+                return anImport;
+            }
+
+            @Override
+            public J.Identifier visitIdentifier(J.Identifier ident, Integer p) {
+                return simpleName.equals(ident.getSimpleName()) ? ident.withType(null) : ident;
+            }
+        }.visitNonNull(cu, 0);
+    }
+
     /**
      * A source parsed without the original type on its classpath has use sites the LST gives no type, while its
      * import still names the type. Strip the type from {@code @NotNull} to stand in for that.
@@ -4935,6 +4950,57 @@ class ChangeTypeTest implements RewriteTest {
               }
               """,
             spec -> spec.mapBeforeRecipe(cu -> withoutTypeOnNotNull(cu, false))
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/10043")
+    @Test
+    void aNestedOriginalImportedDirectlyAndUsedWithoutATypeIsLeftAlone() {
+        // the name the import binds is `Entry`, not the `Map.Entry` the class name spells
+        rewriteRun(
+          spec -> spec
+            .recipe(new ChangeType("java.util.Map$Entry", "java.util.Optional", true))
+            .typeValidationOptions(TypeValidation.none()),
+          java(
+            """
+              import java.util.Map.Entry;
+
+              class A {
+                  Entry<String, String> e;
+              }
+              """,
+            spec -> spec.mapBeforeRecipe(cu -> withoutTypeOn(cu, "Entry"))
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/10043")
+    @Test
+    void aTypeParameterNamedAsTheOriginalIsNotAReferenceToIt() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("org.jetbrains.annotations.NotNull", "org.jspecify.annotations.NonNull", true)),
+          java(
+            """
+              import org.jetbrains.annotations.NotNull;
+
+              class A {
+                  @NotNull String f = "";
+
+                  <NotNull> void m(NotNull t) {
+                  }
+              }
+              """,
+            """
+              import org.jspecify.annotations.NonNull;
+
+              class A {
+                  @NonNull String f = "";
+
+                  <NotNull> void m(NotNull t) {
+                  }
+              }
+              """
           )
         );
     }

@@ -581,9 +581,10 @@ public class ChangeType extends Recipe implements RenamingRecipe {
          * so the spelling keeps resolving. See https://github.com/openrewrite/rewrite/pull/9889.
          */
         private boolean wouldStrandTheOriginalName(JavaSourceFile cu) {
-            String name = originalType.getClassName();
+            // for a nested type getClassName() is `Outer.Inner`, which is no name an import binds
+            String name = simpleName(originalType.getClassName());
             JavaType.FullyQualified target = TypeUtils.asFullyQualified(targetType);
-            if (target != null && (name.equals(target.getClassName()) ||
+            if (target != null && (name.equals(simpleName(target.getClassName())) ||
                     name.equals(getTopLevelClassName(target).getClassName()))) {
                 return false;
             }
@@ -601,7 +602,7 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                     JavaType type = ident.getType();
                     if (ident.getFieldType() == null && name.equals(ident.getSimpleName()) &&
                             (type == null || type instanceof JavaType.Unknown) &&
-                            !namesSomethingElse(getCursor().getParentTreeCursor().getValue(), ident)) {
+                            isABareUseOfTheName(getCursor().getParentTreeCursor().getValue(), ident)) {
                         unresolved.set(true);
                     }
                     return ident;
@@ -610,12 +611,16 @@ public class ChangeType extends Recipe implements RenamingRecipe {
         }
 
         /**
-         * Whether the identifier names a method or a label rather than standing where a type can be named. The
-         * import binds the name only where a type can be named, and these are the positions the parser leaves
-         * untyped in a well attributed file, so an identifier in one of them is no sign of a reference the recipe
-         * cannot see. A method named as the type is the one that happens in practice.
+         * Whether the identifier spells the type's name on its own, the only use an unattributed file leaves
+         * the recipe no way to rewrite. A declaration's own name, a label and a type parameter are not uses of
+         * the type, and are where the parser leaves a name untyped in a well attributed file; a method named as
+         * the type is the one that happens in practice. The last segment of a qualified name is a use, but
+         * ChangeType matches that one by spelling rather than by type, so it is rewritten either way.
          */
-        private static boolean namesSomethingElse(Object parent, J.Identifier ident) {
+        private static boolean isABareUseOfTheName(Object parent, J.Identifier ident) {
+            if (isDeclarationName(parent, ident)) {
+                return false;
+            }
             J named = null;
             if (parent instanceof J.Label) {
                 named = ((J.Label) parent).getLabel();
@@ -623,8 +628,16 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                 named = ((J.Break) parent).getLabel();
             } else if (parent instanceof J.Continue) {
                 named = ((J.Continue) parent).getLabel();
+            } else if (parent instanceof J.FieldAccess) {
+                named = ((J.FieldAccess) parent).getName();
+            } else if (parent instanceof J.TypeParameter) {
+                named = ((J.TypeParameter) parent).getName();
             }
-            return isDeclarationName(parent, ident) || named != null && named.getId().equals(ident.getId());
+            return named == null || !named.getId().equals(ident.getId());
+        }
+
+        private static String simpleName(String className) {
+            return className.substring(className.lastIndexOf('.') + 1);
         }
 
         private boolean importsOriginalAs(JavaSourceFile cu, String name) {
