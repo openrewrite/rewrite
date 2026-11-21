@@ -61,6 +61,37 @@ class PythonResolutionResultTest {
     }
 
     @Test
+    void constructorWithoutProjectUrls() {
+        // the parameter list the marker had before project URLs were recorded
+        PythonResolutionResult marker = new PythonResolutionResult(
+          randomId(),
+          "test-project",
+          "1.0.0",
+          "A description",
+          "MIT",
+          "pyproject.toml",
+          ">=3.10",
+          "hatchling.build",
+          emptyList(),
+          emptyList(),
+          emptyMap(),
+          emptyMap(),
+          emptyList(),
+          emptyList(),
+          emptyList(),
+          PackageManager.Uv,
+          singletonList(new PythonResolutionResult.SourceIndex("pypi", "https://pypi.org/simple", true))
+        );
+
+        assertThat(marker.getProjectUrls()).isNull();
+        assertThat(marker.getName()).isEqualTo("test-project");
+        assertThat(marker.getPackageManager()).isEqualTo(PackageManager.Uv);
+        assertThat(marker.getSourceIndexes()).hasSize(1);
+        assertThat(marker.withProjectUrls(singletonMap("Source", "https://github.com/example/test-project"))
+          .getProjectUrls()).containsEntry("Source", "https://github.com/example/test-project");
+    }
+
+    @Test
     void getResolvedDependencyNormalizesName() {
         ResolvedDependency dep = new ResolvedDependency(
           "my-cool-package", "1.0.0", null, null);

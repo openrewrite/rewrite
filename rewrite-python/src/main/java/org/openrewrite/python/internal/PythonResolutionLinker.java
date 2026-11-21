@@ -15,6 +15,7 @@
  */
 package org.openrewrite.python.internal;
 
+import lombok.AllArgsConstructor;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.python.marker.PythonResolutionResult;
@@ -93,8 +94,10 @@ public final class PythonResolutionLinker {
             String newVersion = updatedVersion(dep, versionUpdates);
             List<String> depNames = dep.getDependencies() == null ? emptyList() :
                     dep.getDependencies().stream().map(ResolvedDependency::getName).collect(toList());
+            // the URLs were read from the metadata of the version that was installed
             packages.add(new UnlinkedPackage(dep.getName(),
-                    newVersion != null ? newVersion : dep.getVersion(), dep.getSource(), depNames));
+                    newVersion != null ? newVersion : dep.getVersion(), dep.getSource(), depNames,
+                    newVersion != null ? null : dep.getProjectUrls()));
         }
         return relink(marker, buildGraph(packages));
     }
@@ -130,11 +133,20 @@ public final class PythonResolutionLinker {
      * metadata, before graph linking.
      */
     @Value
+    @AllArgsConstructor
     public static class UnlinkedPackage {
         String name;
         @Nullable String version;
         @Nullable String source;
         List<String> dependencyNames;
+
+        /** As {@link ResolvedDependency#getProjectUrls()}. */
+        @Nullable Map<String, String> projectUrls;
+
+        public UnlinkedPackage(String name, @Nullable String version, @Nullable String source,
+                               List<String> dependencyNames) {
+            this(name, version, source, dependencyNames, null);
+        }
     }
 
     /**
@@ -164,7 +176,7 @@ public final class PythonResolutionLinker {
             UnlinkedPackage pkg = packages.get(i);
             boolean anyResolvable = normalizedDepNames.get(i).stream().anyMatch(knownNames::contains);
             ResolvedDependency entry = new ResolvedDependency(pkg.getName(), pkg.getVersion(),
-                    pkg.getSource(), anyResolvable ? new ArrayList<>() : null);
+                    pkg.getSource(), anyResolvable ? new ArrayList<>() : null, pkg.getProjectUrls());
             resolved.add(entry);
             byName.putIfAbsent(normalizedNames.get(i), entry);
         }

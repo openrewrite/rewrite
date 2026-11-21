@@ -23,9 +23,11 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.entry;
 
 class InstalledEnvParserTest {
 
@@ -85,5 +87,68 @@ class InstalledEnvParserTest {
         assertThat(b.getDependencies().get(0)).isSameAs(c);
         assertThat(a.getDependencies().get(0).getDependencies().get(0)).isSameAs(c);
         assertThat(c.getDependencies()).isNull();
+    }
+
+    @Test
+    void readsProjectUrlsFromMetadata(@TempDir Path env) throws IOException {
+        Path sitePackages = env.resolve("lib/python3.12/site-packages");
+        writeDistInfo(sitePackages, "a", "1.0.0", """
+          Metadata-Version: 2.4
+          Name: a
+          Version: 1.0.0
+          Home-page: https://a.example.com
+          Project-URL: Source, https://github.com/example/a
+          Requires-Dist: b>=1.0
+          """);
+        writeDistInfo(sitePackages, "b", "1.0.0", """
+          Metadata-Version: 2.4
+          Name: b
+          Version: 1.0.0
+          """);
+        Files.createDirectories(sitePackages.resolve("c-1.0.0.dist-info"));
+
+        List<ResolvedDependency> resolved = InstalledEnvParser.parse(env);
+
+        assertThat(resolved.get(0).getProjectUrls()).containsExactly(
+          entry("Source", "https://github.com/example/a"),
+          entry("Homepage", "https://a.example.com"));
+        assertThat(resolved.get(1).getProjectUrls())
+          .as("metadata that declares no URL is read, and has none")
+          .isEmpty();
+        assertThat(resolved.get(2).getProjectUrls())
+          .as("a distribution without METADATA has nothing to read")
+          .isNull();
+    }
+
+    @Test
+    void lockedDependenciesTakeProjectUrlsFromTheEnvTheyAreInstalledIn(@TempDir Path env) throws IOException {
+        Path sitePackages = env.resolve("lib/python3.12/site-packages");
+        writeDistInfo(sitePackages, "typing_extensions", "4.12.2", """
+          Metadata-Version: 2.4
+          Name: typing_extensions
+          Version: 4.12.2
+          Project-URL: Repository, https://github.com/python/typing_extensions
+          """);
+        writeDistInfo(sitePackages, "b", "2.0.0", """
+          Metadata-Version: 2.4
+          Name: b
+          Version: 2.0.0
+          Project-URL: Source, https://github.com/example/b
+          """);
+        ResolvedDependency typingExtensions = new ResolvedDependency("typing-extensions", "4.12.2", "https://pypi.org/simple", null);
+        ResolvedDependency b = new ResolvedDependency("b", "1.0.0", null, new ArrayList<>());
+        b.getDependencies().add(typingExtensions);
+
+        List<ResolvedDependency> resolved = InstalledEnvParser.withProjectUrls(List.of(b, typingExtensions), env);
+
+        assertThat(resolved.get(1).getProjectUrls())
+          .containsExactly(entry("Repository", "https://github.com/python/typing_extensions"));
+        assertThat(resolved.get(1).getSource()).isEqualTo("https://pypi.org/simple");
+        assertThat(resolved.get(0).getProjectUrls())
+          .as("the env holds another version of b, whose URLs are not this one's")
+          .isNull();
+        assertThat(resolved.get(0).getDependencies().get(0))
+          .as("the graph still shares one instance per package")
+          .isSameAs(resolved.get(1));
     }
 }

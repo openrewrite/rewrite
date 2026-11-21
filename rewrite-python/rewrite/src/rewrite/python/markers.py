@@ -203,6 +203,8 @@ class PythonResolutionResult(Marker, Heavyweight):
         _version: str
         _source: Optional[str]
         _dependencies: Optional[List[PythonResolutionResult.ResolvedDependency]]
+        # label to URL, from the distribution's Project-URL metadata; None when that was not available
+        _project_urls: Optional[Dict[str, str]] = None
 
         @property
         def name(self) -> str:
@@ -231,6 +233,13 @@ class PythonResolutionResult(Marker, Heavyweight):
 
         def with_dependencies(self, dependencies: Optional[List[PythonResolutionResult.ResolvedDependency]]) -> PythonResolutionResult.ResolvedDependency:
             return self if dependencies is self._dependencies else replace(self, _dependencies=dependencies)
+
+        @property
+        def project_urls(self) -> Optional[Dict[str, str]]:
+            return self._project_urls
+
+        def with_project_urls(self, project_urls: Optional[Dict[str, str]]) -> PythonResolutionResult.ResolvedDependency:
+            return self if project_urls is self._project_urls else replace(self, _project_urls=project_urls)
 
     @lst_dataclass
     class Dependency:
@@ -292,6 +301,8 @@ class PythonResolutionResult(Marker, Heavyweight):
     _resolved_dependencies: List[ResolvedDependency]
     _package_manager: Optional[PackageManager]
     _source_indexes: Optional[List[SourceIndex]]
+    # label to URL, as the project's own manifest declares them
+    _project_urls: Optional[Dict[str, str]] = None
 
     def with_id(self, id_: int | UUID) -> PythonResolutionResult:
         return replace_if_changed(self, _id=id_)
@@ -407,3 +418,10 @@ class PythonResolutionResult(Marker, Heavyweight):
 
     def with_source_indexes(self, source_indexes: Optional[List[SourceIndex]]) -> PythonResolutionResult:
         return self if source_indexes is self._source_indexes else replace(self, _source_indexes=source_indexes)
+
+    @property
+    def project_urls(self) -> Optional[Dict[str, str]]:
+        return self._project_urls
+
+    def with_project_urls(self, project_urls: Optional[Dict[str, str]]) -> PythonResolutionResult:
+        return self if project_urls is self._project_urls else replace(self, _project_urls=project_urls)

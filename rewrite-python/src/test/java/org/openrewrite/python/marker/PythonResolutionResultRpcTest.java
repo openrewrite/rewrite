@@ -40,7 +40,9 @@ import java.util.ArrayList;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static java.util.Arrays.asList;
@@ -123,6 +125,50 @@ class PythonResolutionResultRpcTest {
             assertThat(read.getDependencyGroups().get("test").get(0).getResolved()).isSameAs(dev.getResolved());
             assertThat(read.findDependencyInAnyScope("unlocked")).isNotNull();
             assertThat(read.getAllDeclaredDependencies()).hasSize(3);
+        } finally {
+            client.shutdown();
+            server.shutdown();
+        }
+    }
+
+    @Test
+    void projectUrlsOverTheWire() throws IOException {
+        Map<String, String> dependencyUrls = new LinkedHashMap<>();
+        dependencyUrls.put("Source", "https://github.com/psf/requests");
+        dependencyUrls.put("Documentation", "https://requests.readthedocs.io");
+        ResolvedDependency requests = new ResolvedDependency("requests", "2.31.0", null, null, dependencyUrls);
+        ResolvedDependency certifi = new ResolvedDependency("certifi", "2024.2.2", null, null);
+        Map<String, String> projectUrls = new LinkedHashMap<>();
+        projectUrls.put("Repository", "https://github.com/example/my-app");
+        projectUrls.put("Homepage", "https://example.com");
+        PythonResolutionResult marker = new PythonResolutionResult(UUID.randomUUID(), "my-app", "1.0.0",
+                null, null, "pyproject.toml", null, null,
+                emptyList(),
+                singletonList(new Dependency("requests", ">=2", null, null, requests)),
+                emptyMap(), emptyMap(), emptyList(), emptyList(),
+                asList(requests, certifi),
+                null, null, projectUrls);
+
+        PythonResolutionResult queued = sendAndReceive(marker);
+        assertThat(queued.getProjectUrls()).containsExactlyEntriesOf(projectUrls);
+        assertThat(queued.getResolvedDependencies().get(0).getProjectUrls()).containsExactlyEntriesOf(dependencyUrls);
+        assertThat(queued.getResolvedDependencies().get(1).getProjectUrls()).isNull();
+
+        PlainText sent = PlainText.builder().sourcePath(Paths.get("pyproject.toml")).text("").build();
+        sent = sent.withMarkers(sent.getMarkers().add(marker));
+        PipedOutputStream serverOut = new PipedOutputStream();
+        PipedOutputStream clientOut = new PipedOutputStream();
+        RewriteRpc server = peer(new PipedInputStream(clientOut), serverOut);
+        RewriteRpc client = peer(new PipedInputStream(serverOut), clientOut);
+        try {
+            server.print(sent);
+            PlainText received = client.getObject(sent.getId().toString(), PlainText.class.getName());
+            PythonResolutionResult read = received.getMarkers().findFirst(PythonResolutionResult.class).orElseThrow();
+
+            assertThat(read.getProjectUrls()).containsExactlyEntriesOf(projectUrls);
+            assertThat(read.getResolvedDependencies().get(0).getProjectUrls()).containsExactlyEntriesOf(dependencyUrls);
+            assertThat(read.getResolvedDependencies().get(1).getProjectUrls()).isNull();
+            assertThat(read.getDependencies().get(0).getResolved()).isSameAs(read.getResolvedDependencies().get(0));
         } finally {
             client.shutdown();
             server.shutdown();

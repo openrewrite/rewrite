@@ -22,6 +22,7 @@ import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.marker.PythonResolutionResult.Dependency;
+import org.openrewrite.python.marker.PythonResolutionResult.ResolvedDependency;
 import org.openrewrite.toml.tree.Toml;
 
 import java.nio.file.Files;
@@ -32,6 +33,7 @@ import java.util.List;
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.entry;
 
 class PyProjectTomlParserTest {
 
@@ -261,6 +263,55 @@ class PyProjectTomlParserTest {
         Dependency click = marker.getDependencies().get(0);
         assertThat(click.getResolved()).isNotNull();
         assertThat(click.getResolved().getVersion()).isEqualTo("8.1.7");
+    }
+
+    @Test
+    void lockedDependenciesTakeProjectUrlsFromInstalledEnv(@TempDir Path tempDir) throws Exception {
+        Files.write(tempDir.resolve("pyproject.toml"), """
+          [project]
+          name = "my-project"
+          version = "1.0.0"
+          dependencies = ["click>=8.0"]
+
+          [project.urls]
+          Source = "https://github.com/example/my-project"
+          """.getBytes());
+        Files.write(tempDir.resolve("uv.lock"), """
+          version = 1
+          requires-python = ">=3.10"
+
+          [[package]]
+          name = "click"
+          version = "8.1.7"
+          source = { registry = "https://pypi.org/simple" }
+          """.getBytes());
+        Path distInfo = Files.createDirectories(
+          tempDir.resolve(".venv/lib/python3.12/site-packages/click-8.1.7.dist-info"));
+        Files.write(distInfo.resolve("METADATA"), """
+          Metadata-Version: 2.1
+          Name: click
+          Version: 8.1.7
+          Project-URL: Source Code, https://github.com/pallets/click/
+          """.getBytes());
+
+        Parser.Input input = Parser.Input.fromFile(tempDir.resolve("pyproject.toml"));
+        PythonResolutionResult withEnv = new PyProjectTomlParser(tempDir.resolve(".venv"))
+          .parseInputs(singletonList(input), tempDir, new InMemoryExecutionContext(Throwable::printStackTrace))
+          .findFirst().orElseThrow().getMarkers().findFirst(PythonResolutionResult.class).orElseThrow();
+        PythonResolutionResult withoutEnv = new PyProjectTomlParser()
+          .parseInputs(singletonList(input), tempDir, new InMemoryExecutionContext(Throwable::printStackTrace))
+          .findFirst().orElseThrow().getMarkers().findFirst(PythonResolutionResult.class).orElseThrow();
+
+        assertThat(withEnv.getProjectUrls()).containsExactly(entry("Source", "https://github.com/example/my-project"));
+        assertThat(withEnv.getPackageManager()).isEqualTo(PythonResolutionResult.PackageManager.Uv);
+        assertThat(withEnv.getResolvedDependencies()).singleElement().satisfies(click -> {
+            assertThat(click.getProjectUrls()).containsExactly(entry("Source Code", "https://github.com/pallets/click/"));
+            assertThat(withEnv.getDependencies().get(0).getResolved()).isSameAs(click);
+        });
+        assertThat(withoutEnv.getResolvedDependencies()).singleElement()
+          .extracting(ResolvedDependency::getProjectUrls)
+          .as("a lock file records no project URLs")
+          .isNull();
     }
 
     @Test

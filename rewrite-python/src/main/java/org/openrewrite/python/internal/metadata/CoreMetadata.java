@@ -19,6 +19,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * The subset of Python core metadata (METADATA / PKG-INFO) needed for dependency resolution.
@@ -45,6 +46,12 @@ public class CoreMetadata {
      * Lower-cased field names declared {@code Dynamic:} (PEP 643).
      */
     List<String> dynamic;
+
+    /**
+     * The {@code Project-URL} entries, label to URL in declaration order, with {@code Home-page} under
+     * the label {@code Homepage} when no entry has that label. Empty when the metadata declares none.
+     */
+    Map<String, String> projectUrls;
 
     /**
      * PEP 643 trust gate for sdist PKG-INFO: {@code Requires-Dist} is reliable only when

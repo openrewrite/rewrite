@@ -30,12 +30,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Stream;
 
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.entry;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 class SetupCfgParserTest {
@@ -127,6 +129,43 @@ class SetupCfgParserTest {
             assertThat(six.getResolved()).isNotNull()
                     .extracting(ResolvedDependency::getVersion).isEqualTo("1.16.0");
         });
+    }
+
+    @Test
+    void markerCarriesProjectUrlsFromMetadata(@TempDir Path tempDir) throws Exception {
+        Files.writeString(tempDir.resolve("setup.cfg"), """
+                [metadata]
+                name = myapp
+                url = https://example.com
+                project_urls =
+                    Bug Tracker = https://github.com/example/myapp/issues
+                    Source = https://github.com/example/myapp
+
+                [options]
+                install_requires =
+                    six
+                """);
+        Path env = tempDir.resolve(".venv");
+        Path distInfo = Files.createDirectories(env.resolve("lib/python3.12/site-packages/six-1.16.0.dist-info"));
+        Files.writeString(distInfo.resolve("METADATA"), """
+                Metadata-Version: 2.1
+                Name: six
+                Version: 1.16.0
+                Home-page: https://github.com/benjaminp/six
+                """);
+
+        SourceFile parsed = new SetupCfgParser(env).parseInputs(
+                singletonList(Parser.Input.fromFile(tempDir.resolve("setup.cfg"))), tempDir,
+                new InMemoryExecutionContext(Throwable::printStackTrace)).findFirst().orElseThrow();
+
+        PythonResolutionResult marker = parsed.getMarkers().findFirst(PythonResolutionResult.class).orElseThrow();
+        assertThat(marker.getProjectUrls()).containsExactly(
+                entry("Homepage", "https://example.com"),
+                entry("Bug Tracker", "https://github.com/example/myapp/issues"),
+                entry("Source", "https://github.com/example/myapp"));
+        assertThat(marker.getResolvedDependencies()).singleElement()
+                .extracting(ResolvedDependency::getProjectUrls)
+                .isEqualTo(Map.of("Homepage", "https://github.com/benjaminp/six"));
     }
 
     private static List<Path> listFiles(Path dir) throws IOException {

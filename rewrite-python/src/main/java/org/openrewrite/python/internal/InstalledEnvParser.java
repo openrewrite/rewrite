@@ -16,6 +16,7 @@
 package org.openrewrite.python.internal;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.python.internal.metadata.CoreMetadata;
 import org.openrewrite.python.internal.metadata.MetadataParser;
 import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.marker.PythonResolutionResult.ResolvedDependency;
@@ -67,9 +68,11 @@ public final class InstalledEnvParser {
                 String base = dir.substring(0, dir.length() - ".dist-info".length());
                 int dash = base.lastIndexOf('-');
                 if (dash > 0) {
+                    CoreMetadata metadata = readMetadata(distInfo.resolve("METADATA"));
                     packages.add(new PythonResolutionLinker.UnlinkedPackage(
                             base.substring(0, dash), base.substring(dash + 1), null,
-                            readRequiresDist(distInfo.resolve("METADATA"))));
+                            metadata == null ? emptyList() : requiredNames(metadata.getRequiresDist()),
+                            metadata == null ? null : metadata.getProjectUrls()));
                 }
             }
         } catch (IOException e) {
@@ -142,25 +145,68 @@ public final class InstalledEnvParser {
             List<String> requiresDist = requiresDistByPackage.getOrDefault(
                     PythonResolutionResult.normalizeName(r.getName()) + "@" + r.getVersion(), emptyList());
             packages.add(new PythonResolutionLinker.UnlinkedPackage(
-                    r.getName(), r.getVersion(), r.getSource(), requiresDist));
+                    r.getName(), r.getVersion(), r.getSource(), requiresDist, r.getProjectUrls()));
         }
         return PythonResolutionLinker.buildGraph(packages);
     }
 
     /**
-     * Read the names of a package's required (non-extra) dependencies: the
+     * Give dependencies resolved from a lock file, which records no project URLs, those of the same
+     * version of each package as installed in {@code env}. A package the env holds no such version of
+     * keeps the URLs it has.
+     *
+     * @param resolved the resolved dependencies of a lock file
+     * @param env      the environment the project's dependencies are installed in
+     * @return {@code resolved} when the env has nothing to add, or else the same graph built anew
+     */
+    public static List<ResolvedDependency> withProjectUrls(List<ResolvedDependency> resolved, Path env) {
+        Path sitePackages = findSitePackages(env);
+        if (sitePackages == null) {
+            return resolved;
+        }
+        Map<String, Map<String, String>> urlsByPackage = new HashMap<>();
+        for (PythonResolutionLinker.UnlinkedPackage pkg : scanDistInfos(sitePackages)) {
+            if (pkg.getProjectUrls() != null) {
+                urlsByPackage.putIfAbsent(
+                        PythonResolutionResult.normalizeName(pkg.getName()) + "@" + pkg.getVersion(),
+                        pkg.getProjectUrls());
+            }
+        }
+        boolean found = false;
+        List<PythonResolutionLinker.UnlinkedPackage> packages = new ArrayList<>(resolved.size());
+        for (ResolvedDependency r : resolved) {
+            Map<String, String> urls = urlsByPackage.get(
+                    PythonResolutionResult.normalizeName(r.getName()) + "@" + r.getVersion());
+            found |= urls != null;
+            List<String> dependencyNames = new ArrayList<>();
+            if (r.getDependencies() != null) {
+                for (ResolvedDependency dependency : r.getDependencies()) {
+                    dependencyNames.add(dependency.getName());
+                }
+            }
+            packages.add(new PythonResolutionLinker.UnlinkedPackage(
+                    r.getName(), r.getVersion(), r.getSource(), dependencyNames,
+                    urls != null ? urls : r.getProjectUrls()));
+        }
+        return found ? PythonResolutionLinker.buildGraph(packages) : resolved;
+    }
+
+    private static @Nullable CoreMetadata readMetadata(Path metadataFile) {
+        try {
+            return MetadataParser.parse(Files.readAllBytes(metadataFile));
+        } catch (IOException e) {
+            return null;
+        }
+    }
+
+    /**
+     * The names of a package's required (non-extra) dependencies: the
      * {@code Requires-Dist} headers of its METADATA file, minus entries gated by
      * {@code extra ==} markers (optional extras, not always installed).
      *
      * @return list of required package names (not normalized)
      */
-    private static List<String> readRequiresDist(Path metadataFile) {
-        List<String> requiresDist;
-        try {
-            requiresDist = MetadataParser.parse(Files.readAllBytes(metadataFile)).getRequiresDist();
-        } catch (IOException e) {
-            return emptyList();
-        }
+    private static List<String> requiredNames(List<String> requiresDist) {
         List<String> names = new ArrayList<>();
         for (String value : requiresDist) {
             if (EXTRA_MARKER_PATTERN.matcher(value).find()) {
