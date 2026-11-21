@@ -149,6 +149,38 @@ class RegistryTransportTest {
     }
 
     @Test
+    void theHostsProxyVariablesAreTheHostSendersWhileConfiguredRoutesMustStillBeBound() {
+        Map<String, String> host = Map.of("HTTPS_PROXY", "http://127.0.0.1:3128", "HTTP_PROXY", "http://127.0.0.1:3128",
+                "NO_PROXY", "localhost,127.0.0.1");
+        HttpSender custom = request -> { throw new AssertionError("selection only"); };
+        for (RegistryTransport transport : java.util.List.of(RegistryTransport.npm(Map.of(), host),
+                RegistryTransport.pnpm(Map.of(), host), RegistryTransport.pnpmBootstrap(Map.of(), host),
+                RegistryTransport.npm(Map.of(), Map.of("HTTPS_PROXY", "http://user:synthetic-secret@proxy.invalid:3128")))) {
+            assertThat(transport.sender(custom, "https://registry.npmjs.org/")).isSameAs(custom);
+            assertThat(transport.sender(custom, "http://registry.npmjs.org/")).isSameAs(custom);
+        }
+        // A host sender that can bind a route is still given the host's.
+        ProxyRecorder recorder = new ProxyRecorder();
+        RegistryTransport.npm(Map.of(), host).sender(recorder, "https://registry.npmjs.org/");
+        assertThat(((InetSocketAddress) recorder.route.address()).getPort()).isEqualTo(3128);
+        // The default URL sender binds the host's route as before.
+        assertThat(RegistryTransport.npm(Map.of(), host).sender(new HttpUrlConnectionSender(), "https://registry.npmjs.org/"))
+                .isInstanceOf(HttpUrlConnectionSender.class);
+        // What a manager's configuration routes, a sender that cannot bind it still refuses.
+        for (RegistryTransport configured : java.util.List.of(
+                RegistryTransport.npm(Map.of("https-proxy", "http://127.0.0.1:3128"), host),
+                RegistryTransport.npm(Map.of(), Map.of("npm_config_https_proxy", "http://127.0.0.1:3128")),
+                RegistryTransport.npm(Map.of("noproxy", "example.test"), host),
+                RegistryTransport.pnpm(Map.of("httpsProxy", "http://127.0.0.1:3128"), host),
+                RegistryTransport.pnpm(Map.of("proxy", "http://127.0.0.1:3128"), host),
+                RegistryTransport.pnpm(Map.of("noProxy", "example.test"), host),
+                RegistryTransport.pnpmBootstrap(Map.of("https-proxy", "http://127.0.0.1:3128"), host))) {
+            assertThatThrownBy(() -> configured.sender(custom, "https://registry.npmjs.org/"))
+                    .isInstanceOf(CannotKnow.class).hasMessageContaining("withProxy");
+        }
+    }
+
+    @Test
     void tlsOptionsPreserveTheExistingInjectedSenderContract() {
         HttpSender custom = request -> { throw new AssertionError("selection only"); };
         for (Map<String, Object> config : java.util.List.of(Map.<String, Object>of("cafile", "synthetic-ca.pem"),

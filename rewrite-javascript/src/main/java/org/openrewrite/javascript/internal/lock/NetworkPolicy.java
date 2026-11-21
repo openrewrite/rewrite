@@ -17,8 +17,11 @@ package org.openrewrite.javascript.internal.lock;
 
 import org.openrewrite.javascript.internal.registry.Environment;
 
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * A conservative boundary for manager request policies the live adapter cannot yet bind. It never renders values:
@@ -37,6 +40,32 @@ public final class NetworkPolicy {
                                      ", which this registry adapter cannot safely apply");
             }
         }
+    }
+
+    /**
+     * The host's own proxy and certificate variables: what describes the network of the machine the engine runs on,
+     * rather than what a manager or project configures.
+     */
+    private static final Set<String> HOST_VARIABLES = new HashSet<>(Arrays.asList(
+            "HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy",
+            "NODE_EXTRA_CA_CERTS", "SSL_CERT_FILE", "SSL_CERT_DIR"));
+
+    /**
+     * {@link #requireDirect}, for the host settings a live request is sent under. A host's own client applies the
+     * host's network itself, as it does TLS; only the default URL sender, which applies neither, must refuse them.
+     */
+    public static void requireDirect(String manager, Map<String, ?> hostNetwork, boolean sendsThroughHostNetwork) {
+        if (!sendsThroughHostNetwork) {
+            requireDirect(manager, hostNetwork);
+            return;
+        }
+        Map<String, Object> configured = new LinkedHashMap<>();
+        for (Map.Entry<String, ?> setting : hostNetwork.entrySet()) {
+            if (!HOST_VARIABLES.contains(setting.getKey())) {
+                configured.put(setting.getKey(), setting.getValue());
+            }
+        }
+        requireDirect(manager, configured);
     }
 
     /** Capture only named host settings, without copying credentials or changing the host environment. */

@@ -55,7 +55,7 @@ final class BunRegistryManifests implements ManifestSource {
 
     @Override
     public @Nullable String packument(String registry, String name, boolean extended) {
-        NetworkPolicy.requireDirect("Bun", hostNetwork);
+        NetworkPolicy.requireDirect("Bun", hostNetwork, client.sendsThroughHostNetwork());
         try {
             NodeRegistry request = scope(name, registry);
             if (hasAuthorization(request) && hasCredentialPath(registry)) {
