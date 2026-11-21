@@ -28,6 +28,7 @@ import {homedir} from "os";
 export const NodeResolutionResultKind = "org.openrewrite.javascript.marker.NodeResolutionResult" as const;
 export const DependencyKind = "org.openrewrite.javascript.marker.NodeResolutionResult$Dependency" as const;
 export const ResolvedDependencyKind = "org.openrewrite.javascript.marker.NodeResolutionResult$ResolvedDependency" as const;
+export const RepositoryKind = "org.openrewrite.javascript.marker.NodeResolutionResult$Repository" as const;
 
 /**
  * Parsed package.json content structure.
@@ -43,6 +44,7 @@ export interface PackageJsonContent {
     readonly bundledDependencies?: string[];
     readonly bundleDependencies?: string[];  // Legacy alias
     readonly engines?: Record<string, string>;
+    readonly repository?: unknown;  // A string shorthand or {type, url, directory}
 }
 
 /**
@@ -60,6 +62,8 @@ export interface PackageLockEntry {
     readonly peerDependencies?: Record<string, string>;
     readonly optionalDependencies?: Record<string, string>;
     readonly engines?: Record<string, string> | string[];  // Can be legacy array format
+    // No lock file has this: it is the `repository` of the installed package's own package.json
+    readonly repository?: unknown;
 }
 
 /**
@@ -175,6 +179,43 @@ export interface Npmrc {
 }
 
 /**
+ * The `repository` of a package.json: where the source of the package lives.
+ *
+ * Kept as the package wrote it. A `repository` written as a string, be it a shorthand such as
+ * "github:user/repo" or "user/repo" or a URL, is that string as the `url`, with no `type`.
+ * Nothing here is normalized, so a reader that wants a canonical URL makes one.
+ */
+export interface Repository {
+    readonly kind: typeof RepositoryKind;
+    readonly type?: string;      // The version control system (e.g., "git")
+    readonly url: string;        // The repository as written (e.g., "git+https://github.com/expressjs/express.git")
+    readonly directory?: string; // The directory of the package within a monorepo (e.g., "packages/react-dom")
+}
+
+/**
+ * Reads the `repository` of a package.json, which is a string or `{type, url, directory}`.
+ * One with no `url` to keep is none.
+ */
+export function parseRepository(repository: unknown): Repository | undefined {
+    if (typeof repository === 'string') {
+        return repository ? {kind: RepositoryKind, url: repository} : undefined;
+    }
+    if (!repository || typeof repository !== 'object') {
+        return undefined;
+    }
+    const {type, url, directory} = repository as { type?: unknown; url?: unknown; directory?: unknown };
+    if (typeof url !== 'string' || !url) {
+        return undefined;
+    }
+    return {
+        kind: RepositoryKind,
+        ...(typeof type === 'string' && {type}),
+        url,
+        ...(typeof directory === 'string' && {directory}),
+    };
+}
+
+/**
  * Represents a dependency request as declared in package.json.
  * This is what a package asks for (name + version constraint).
  *
@@ -212,6 +253,10 @@ export interface ResolvedDependency {
 
     // SPDX license identifier (e.g., "MIT", "Apache-2.0")
     readonly license?: string;
+
+    // The `repository` of the installed package's own package.json: undefined when the package
+    // was not installed where it was parsed, or declares none
+    readonly repository?: Repository;
 }
 
 /**
@@ -260,6 +305,9 @@ export interface NodeResolutionResult extends Marker {
 
     // npm configuration from various scopes (global, user, project, env)
     readonly npmrcConfigs?: Npmrc[];
+
+    // The `repository` of package.json: the source repository this project is built from
+    readonly repository?: Repository;
 }
 
 registerHeavyweight(NodeResolutionResultKind);
@@ -430,6 +478,7 @@ export function createNodeResolutionResultMarker(
                 optionalDependencies: undefined,
                 engines: normalizeEngines(pkgEntry?.engines),
                 license: normalizeLicense(pkgEntry?.license),
+                repository: parseRepository(pkgEntry?.repository),
             }) as ResolvedDependency;
             resolvedDependencyCache.set(key, resolved);
 
@@ -704,6 +753,7 @@ export function createNodeResolutionResultMarker(
         packageManager,
         engines: normalizeEngines(packageJsonContent.engines),
         npmrcConfigs: npmrcConfigs?.length ? npmrcConfigs : undefined,
+        repository: parseRepository(packageJsonContent.repository),
     } as NodeResolutionResult;
 }
 
@@ -992,6 +1042,25 @@ RpcCodecs.registerCodec(NpmrcKind, {
 });
 
 /**
+ * Register RPC codec for Repository.
+ */
+RpcCodecs.registerCodec(RepositoryKind, {
+    rpcReceive(before: Repository, q: RpcReceiveQueue): Repository {
+        return updateIfChanged(before, {
+            type: q.receive(before.type),
+            url: q.receive(before.url),
+            directory: q.receive(before.directory),
+        });
+    },
+
+    rpcSend(after: Repository, q: RpcSendQueue): void {
+        q.getAndSend(after, a => a.type);
+        q.getAndSend(after, a => a.url);
+        q.getAndSend(after, a => a.directory);
+    }
+});
+
+/**
  * Register RPC codec for Dependency.
  */
 RpcCodecs.registerCodec(DependencyKind, {
@@ -1026,6 +1095,7 @@ RpcCodecs.registerCodec(ResolvedDependencyKind, {
         resolved.optionalDependencies = (q.receiveList(before.optionalDependencies)) || undefined;
         resolved.engines = q.receive(before.engines);
         resolved.license = q.receive(before.license);
+        resolved.repository = q.receive(before.repository);
         return before;
     },
 
@@ -1042,6 +1112,7 @@ RpcCodecs.registerCodec(ResolvedDependencyKind, {
             dep => `${dep.name}@${dep.versionConstraint}`);
         q.getAndSend(after, a => a.engines);
         q.getAndSend(after, a => a.license);
+        q.getAndSend(after, a => a.repository);
     }
 });
 
@@ -1069,6 +1140,7 @@ RpcCodecs.registerCodec(NodeResolutionResultKind, {
             engines: q.receive(before.engines),
             // an empty list is how having none is sent
             npmrcConfigs: (npmrcConfigs = q.receiveList(before.npmrcConfigs))?.length ? npmrcConfigs : undefined,
+            repository: q.receive(before.repository),
         });
     },
 
@@ -1097,5 +1169,6 @@ RpcCodecs.registerCodec(NodeResolutionResultKind, {
         q.getAndSend(after, a => a.engines);
         q.getAndSendList(after, a => a.npmrcConfigs || [],
             npmrc => npmrc.scope);
+        q.getAndSend(after, a => a.repository);
     }
 });
