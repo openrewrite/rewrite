@@ -449,6 +449,27 @@ public class TypeUtils {
     }
 
     /**
+     * A type that is its own supertype has none. Python's {@code class Url(namedtuple('Url', ...))} declares one
+     * where types are keyed by fully qualified name, and following it would never end.
+     */
+    private static JavaType.@Nullable FullyQualified supertype(JavaType.FullyQualified type) {
+        JavaType.FullyQualified supertype = type.getSupertype();
+        return supertype == type ? null : supertype;
+    }
+
+    private static List<JavaType.FullyQualified> interfaces(JavaType.FullyQualified type) {
+        List<JavaType.FullyQualified> interfaces = type.getInterfaces();
+        for (JavaType.FullyQualified i : interfaces) {
+            if (i == type) {
+                List<JavaType.FullyQualified> others = new ArrayList<>(interfaces);
+                others.removeIf(o -> o == type);
+                return others;
+            }
+        }
+        return interfaces;
+    }
+
+    /**
      * @param type          The declaring type of the method invocation or constructor.
      * @param matchOverride Whether to match the {@code Object} type.
      * @return True if the declaring type matches the criteria of this matcher.
@@ -471,11 +492,11 @@ public class TypeUtils {
                 return true;
             }
 
-            if (isOfTypeWithName(type.getSupertype(), true, matcher)) {
+            if (isOfTypeWithName(supertype(type), true, matcher)) {
                 return true;
             }
 
-            for (JavaType.FullyQualified anInterface : type.getInterfaces()) {
+            for (JavaType.FullyQualified anInterface : interfaces(type)) {
                 if (isOfTypeWithName(anInterface, true, matcher)) {
                     return true;
                 }
@@ -674,10 +695,10 @@ public class TypeUtils {
         if (from instanceof JavaType.FullyQualified) {
             JavaType.FullyQualified classFrom = (JavaType.FullyQualified) from;
             if (!TypeUtils.fullyQualifiedNamesAreEqual(to.getFullyQualifiedName(), classFrom.getFullyQualifiedName())) {
-                if (isAssignableToFullyQualified(to, maybeResolveParameters(classFrom, classFrom.getSupertype()), context)) {
+                if (isAssignableToFullyQualified(to, maybeResolveParameters(classFrom, supertype(classFrom)), context)) {
                     return true;
                 }
-                for (JavaType.FullyQualified i : classFrom.getInterfaces()) {
+                for (JavaType.FullyQualified i : interfaces(classFrom)) {
                     if (isAssignableToFullyQualified(to, maybeResolveParameters(classFrom, i), context)) {
                         return true;
                     }
@@ -907,10 +928,10 @@ public class TypeUtils {
                 }
                 JavaType.FullyQualified classFrom = (JavaType.FullyQualified) from;
                 if (fullyQualifiedNamesAreEqual(to, classFrom.getFullyQualifiedName()) ||
-                    isAssignableTo(to, classFrom.getSupertype())) {
+                    isAssignableTo(to, supertype(classFrom))) {
                     return true;
                 }
-                for (JavaType.FullyQualified i : classFrom.getInterfaces()) {
+                for (JavaType.FullyQualified i : interfaces(classFrom)) {
                     if (isAssignableTo(to, i)) {
                         return true;
                     }
@@ -963,10 +984,10 @@ public class TypeUtils {
             if (from instanceof JavaType.FullyQualified) {
                 JavaType.FullyQualified classFrom = (JavaType.FullyQualified) from;
 
-                if (predicate.test(classFrom) || isAssignableTo(predicate, classFrom.getSupertype())) {
+                if (predicate.test(classFrom) || isAssignableTo(predicate, supertype(classFrom))) {
                     return true;
                 }
-                for (JavaType.FullyQualified anInterface : classFrom.getInterfaces()) {
+                for (JavaType.FullyQualified anInterface : interfaces(classFrom)) {
                     if (isAssignableTo(predicate, anInterface)) {
                         return true;
                     }
@@ -1045,9 +1066,9 @@ public class TypeUtils {
         }
         JavaType.FullyQualified dt = method.getDeclaringType();
         List<JavaType> argTypes = method.getParameterTypes();
-        Optional<JavaType.Method> methodResult = findDeclaredMethod(dt.getSupertype(), method.getName(), argTypes);
+        Optional<JavaType.Method> methodResult = findDeclaredMethod(supertype(dt), method.getName(), argTypes);
         if (!methodResult.isPresent()) {
-            for (JavaType.FullyQualified i : dt.getInterfaces()) {
+            for (JavaType.FullyQualified i : interfaces(dt)) {
                 methodResult = findDeclaredMethod(i, method.getName(), argTypes);
                 if (methodResult.isPresent()) {
                     break;
