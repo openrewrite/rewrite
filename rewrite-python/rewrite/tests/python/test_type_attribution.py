@@ -2680,6 +2680,59 @@ class TestFqnDedupSupertypes:
         assert supertype.fully_qualified_name != 'mymodule.Pair'
         assert supertype is mapping._resolve_type(3)
 
+    @staticmethod
+    def _namesake_registry(mapping):
+        # class Pair(namedtuple('Pair', ...)) overriding __str__, with the generated Pair
+        # declaring _replace, __str__ and a `name` field
+        mapping._type_registry[3] = {'kind': 'classLiteral', 'className': 'tuple', 'moduleName': 'builtins',
+                                     'supertypes': []}
+        mapping._type_registry[10] = {'kind': 'function', 'name': '_replace', 'parameters': []}
+        mapping._type_registry[11] = {'kind': 'function', 'name': '__str__', 'parameters': []}
+        mapping._type_registry[12] = {'kind': 'function', 'name': '__str__', 'parameters': []}
+        mapping._type_registry[13] = {'kind': 'instance', 'className': 'str'}
+        mapping._type_registry[1] = {'kind': 'classLiteral', 'className': 'Pair', 'moduleName': 'mymodule',
+                                     'supertypes': [3],
+                                     'members': [{'name': '_replace', 'typeId': 10},
+                                                 {'name': '__str__', 'typeId': 11},
+                                                 {'name': 'name', 'typeId': 13, 'instanceAttribute': True}]}
+        mapping._type_registry[2] = {'kind': 'classLiteral', 'className': 'Pair', 'moduleName': 'mymodule',
+                                     'supertypes': [1], 'members': [{'name': '__str__', 'typeId': 12}]}
+
+    def test_namesake_members_fold_into_the_class(self):
+        """The class keeps what it inherited from the namesake it no longer extends,
+        and its own declarations override the namesake's."""
+        mapping = PythonTypeMapping('x = 1')
+        self._namesake_registry(mapping)
+
+        pair = mapping._resolve_type(2)
+        namesake = mapping._resolve_type(1)
+
+        methods = {m._name: m for m in pair._methods}
+        assert sorted(methods) == ['__str__', '_replace']
+        assert all(m._declaring_type is pair for m in pair._methods)
+        assert [v._name for v in pair._members] == ['name']
+        assert pair._members[0]._owner is pair
+        # the class's own __str__, not a copy of the namesake's
+        assert methods['__str__'] not in namesake._methods
+        # the namesake is left as it was
+        assert all(m._declaring_type is namesake for m in namesake._methods)
+        assert namesake._members[0]._owner is namesake
+
+    def test_class_sharing_the_namesake_does_not_see_the_class_methods(self):
+        """Another class extending the same generated namedtuple keeps it as its
+        supertype, which does not gain the folding class's overrides."""
+        mapping = PythonTypeMapping('x = 1')
+        self._namesake_registry(mapping)
+        mapping._type_registry[4] = {'kind': 'classLiteral', 'className': 'Other', 'moduleName': 'mymodule',
+                                     'supertypes': [1]}
+
+        mapping._resolve_type(2)
+        other = mapping._resolve_type(4)
+
+        assert other._supertype is mapping._resolve_type(1)
+        assert [m._name for m in other._supertype._methods] == ['_replace', '__str__']
+        assert all(m._declaring_type is other._supertype for m in other._supertype._methods)
+
 
 def _parse_with_types(files: dict, main_filename: str = 'm.py'):
     """Parse ``main_filename`` with type attribution enabled.

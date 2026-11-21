@@ -25,6 +25,7 @@ to work on Python.
 from __future__ import annotations
 
 import ast
+import dataclasses
 import os
 import re
 import tempfile
@@ -827,9 +828,10 @@ class PythonTypeMapping:
                         break
 
             # Populate supertypes: first → _supertype, rest → _interfaces
+            namesakes: List[JavaType.FullyQualified] = []
             if supertypes:
                 resolved = [self._resolve_type(st_id) for st_id in supertypes]
-                bases = _without_namesakes(fqn, [st for st in resolved if isinstance(st, JavaType.FullyQualified)])
+                bases, namesakes = _without_namesakes(fqn, [st for st in resolved if isinstance(st, JavaType.FullyQualified)])
                 if bases and isinstance(resolved[0], JavaType.FullyQualified):
                     class_type._supertype = bases[0]
                     bases = bases[1:]
@@ -891,6 +893,7 @@ class PythonTypeMapping:
                 seen_names.add(member_name)
             class_type._methods = methods or None
             class_type._members = variables or None
+            _fold_namesakes(class_type, namesakes)
 
             return class_type
 
@@ -1100,10 +1103,11 @@ class PythonTypeMapping:
                 bases = [base_type for base_type in map(self.type, node.bases)
                          if isinstance(base_type, JavaType.FullyQualified)
                          and not isinstance(base_type, JavaType.Unknown)]
-                bases = _without_namesakes(fqn, bases)
+                bases, namesakes = _without_namesakes(fqn, bases)
                 if bases:
                     declared._supertype = bases[0]
                     declared._interfaces = bases[1:] or None
+                _fold_namesakes(declared, namesakes)
 
         annotations = []
         for decorator in decorators:
@@ -2255,13 +2259,16 @@ class PythonTypeMapping:
         return None
 
 
-def _without_namesakes(fqn: str, bases: List[JavaType.FullyQualified]) -> List[JavaType.FullyQualified]:
+def _without_namesakes(fqn: str, bases: List[JavaType.FullyQualified]
+                       ) -> Tuple[List[JavaType.FullyQualified], List[JavaType.FullyQualified]]:
     """Replace a base named like the class, as in ``class Url(namedtuple('Url', ...))``, by its own bases.
 
     Types are keyed by fully qualified name once they leave the parser, which would
-    otherwise make the class its own supertype.
+    otherwise make the class its own supertype. Returns the remaining bases and the
+    namesakes replaced, nearest first, whose members ``_fold_namesakes`` keeps.
     """
     result: List[JavaType.FullyQualified] = []
+    namesakes: List[JavaType.FullyQualified] = []
     pending = list(bases)
     seen: Set[int] = set()
     while pending:
@@ -2272,7 +2279,27 @@ def _without_namesakes(fqn: str, bases: List[JavaType.FullyQualified]) -> List[J
         if getattr(base, "fully_qualified_name", None) != fqn:
             result.append(base)
             continue
+        namesakes.append(base)
         inherited = [t for t in [getattr(base, '_supertype', None), *(getattr(base, '_interfaces', None) or [])]
                      if isinstance(t, JavaType.FullyQualified)]
         pending[:0] = inherited
-    return result
+    return result, namesakes
+
+
+def _fold_namesakes(cls: JavaType.FullyQualified, namesakes: List[JavaType.FullyQualified]) -> None:
+    """Give the class the methods and members of the namesakes it no longer extends.
+
+    The class's own declarations win, as they override the namesake's. Each folded
+    method or member is a copy owned by the class, so the namesake, which other
+    classes may still reference, is left as it was.
+    """
+    for attr, owner in (('_methods', '_declaring_type'), ('_members', '_owner')):
+        own = list(getattr(cls, attr, None) or [])
+        names = {x._name for x in own}
+        for namesake in namesakes:
+            for x in getattr(namesake, attr, None) or []:
+                if x._name not in names:
+                    own.append(dataclasses.replace(x, **{owner: cls}))
+                    names.add(x._name)
+        if own:
+            setattr(cls, attr, own)
