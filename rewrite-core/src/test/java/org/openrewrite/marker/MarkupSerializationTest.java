@@ -19,6 +19,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.internal.ObjectMappers;
+import org.openrewrite.text.PlainText;
 
 import java.util.List;
 
@@ -27,6 +28,30 @@ import static org.openrewrite.Tree.randomId;
 
 class MarkupSerializationTest {
     private static final ObjectMapper mapper = ObjectMappers.propertyBasedMapper(null);
+
+    @Test
+    void warningMessageDoesNotRequireAnException() {
+        PlainText source = PlainText.builder().text("unchanged").build();
+        PlainText marked = Markup.warn(source, "Verification found different behavior");
+        Markup.Warn warning = marked.getMarkers().findFirst(Markup.Warn.class).orElseThrow();
+
+        assertThat(marked.getText()).isEqualTo(source.getText());
+        assertThat(warning.getMessage()).isEqualTo("Verification found different behavior");
+        assertThat(warning.getDetail()).isNull();
+        assertThat(Markup.warn(marked, warning.getMessage())).isSameAs(marked);
+    }
+
+    @Test
+    void warningDetailsSurviveSerializationWithoutAStackTrace() throws Exception {
+        PlainText source = PlainText.builder().text("unchanged").build();
+        PlainText marked = Markup.warn(source, "Behavior differs", "Input x = 2147483647");
+        Markup.Warn warning = marked.getMarkers().findFirst(Markup.Warn.class).orElseThrow();
+        Markup.Warn read = mapper.readValue(mapper.writeValueAsString(warning), Markup.Warn.class);
+
+        assertThat(read.getMessage()).isEqualTo("Behavior differs");
+        assertThat(read.getDetail()).isEqualTo("Input x = 2147483647");
+        assertThat(Markup.warn(marked, read.getMessage(), read.getDetail())).isSameAs(marked);
+    }
 
     @Test
     void recipeNameSurvivesRoundTrip() throws Exception {
