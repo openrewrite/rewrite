@@ -15,21 +15,27 @@
  */
 package org.openrewrite.javascript;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.javascript.internal.NodeDependencyEdits;
+import org.openrewrite.javascript.internal.NodeDependencyScan;
+import org.openrewrite.javascript.internal.PackageJsonHelper;
+import org.openrewrite.javascript.semver.NodeSemver;
 import org.openrewrite.javascript.table.NodeDependencyEditsDeclined;
 import org.openrewrite.javascript.table.NodeDependencyProtocolsSkipped;
 import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
 
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 @EqualsAndHashCode(callSuper = false)
 @Value
@@ -53,6 +59,30 @@ public class UpgradeDependencyVersions extends ScanningRecipe<NodeDependencyEdit
             required = false)
     @Nullable Boolean reconcileNpmPeerDependencies;
 
+    @Option(displayName = "Unless resolving",
+            description = "Leave a `package.json` as it is when it declares, in any scope, a package that one of these " +
+                    "`name@range` entries holds for. An entry is split at the last `@`, and its name is a glob " +
+                    "pattern. It holds for a declared package the pattern matches when the version the lock file " +
+                    "resolves satisfies the range or, without one, when the declared constraint admits a version in " +
+                    "the range, so `^20.0.0` holds for `<23`. A dependency that is not a version range, such as a " +
+                    "`file:` or `workspace:` reference, holds for none. Declarations are read as they stand before the recipes " +
+                    "in a cycle edit them. Leave unset to upgrade in every `package.json`.",
+            example = "ag-grid-*@<23",
+            required = false)
+    @Nullable List<String> unlessResolving;
+
+    public UpgradeDependencyVersions(Map<String, String> versions, @Nullable Boolean reconcileNpmPeerDependencies) {
+        this(versions, reconcileNpmPeerDependencies, null);
+    }
+
+    @JsonCreator
+    public UpgradeDependencyVersions(Map<String, String> versions, @Nullable Boolean reconcileNpmPeerDependencies,
+                                     @Nullable List<String> unlessResolving) {
+        this.versions = versions;
+        this.reconcileNpmPeerDependencies = reconcileNpmPeerDependencies;
+        this.unlessResolving = unlessResolving;
+    }
+
     @Override
     public String getDisplayName() {
         return "Upgrade npm dependency versions together";
@@ -63,7 +93,8 @@ public class UpgradeDependencyVersions extends ScanningRecipe<NodeDependencyEdit
         return "Upgrades matching npm dependencies as one coordinated edit and regenerates the lock file once. " +
                 "Uses the same version-range, peer-range, protocol and catalog rules as `UpgradeDependencyVersion`. " +
                 "Optionally reconciles stale npm lock peer conflicts after verifying the upgraded dependencies " +
-                "resolve together. Not safe to use as a precondition: consults the package registry over the " +
+                "resolve together. Optionally leaves alone a `package.json` that declares a given package at a " +
+                "given version. Not safe to use as a precondition: consults the package registry over the " +
                 "network and publishes per-project state shared with other dependency recipes.";
     }
 
@@ -72,6 +103,12 @@ public class UpgradeDependencyVersions extends ScanningRecipe<NodeDependencyEdit
         Validated<Object> validated = super.validate().and(Validated.test("versions",
                 "Must contain at least one package pattern and target version.", versions,
                 v -> v != null && !v.isEmpty()));
+        if (unlessResolving != null) {
+            for (String entry : unlessResolving) {
+                validated = validated.and(Validated.test("unlessResolving",
+                        "entries are `name@range` with a valid npm semver range", entry, e -> nameAndRange(e) != null));
+            }
+        }
         if (versions == null) {
             return validated;
         }
@@ -167,10 +204,64 @@ public class UpgradeDependencyVersions extends ScanningRecipe<NodeDependencyEdit
     }
 
     private void decide(NodeDependencyEdits.Decision decision, ExecutionContext ctx) {
+        if (resolvesAny(decision)) {
+            return;
+        }
         for (Map.Entry<String, String> entry : versions.entrySet()) {
             new UpgradeDependencyVersion(null, entry.getKey(), entry.getValue())
                     .decide(decision, ctx, protocolsSkipped);
         }
+    }
+
+    // whether the manifest declares a package an unlessResolving entry holds for
+    private boolean resolvesAny(NodeDependencyEdits.Decision decision) {
+        if (unlessResolving == null) {
+            return false;
+        }
+        NodeDependencyScan.Manifest manifest = decision.scanned();
+        for (String entry : unlessResolving) {
+            Map.Entry<String, String> nameAndRange = nameAndRange(entry);
+            if (nameAndRange == null) {
+                continue;
+            }
+            Pattern name = PackageJsonHelper.compileGlobPattern(nameAndRange.getKey());
+            for (Map<String, String> declared : manifest.getDeclared().values()) {
+                for (Map.Entry<String, String> dependency : declared.entrySet()) {
+                    if (name.matcher(dependency.getKey()).matches() &&
+                        resolves(manifest, dependency.getKey(), dependency.getValue(), nameAndRange.getValue())) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean resolves(NodeDependencyScan.Manifest manifest, String name, String constraint, String range) {
+        try {
+            String resolved = manifest.resolvedVersion(name);
+            if (resolved != null) {
+                return NodeSemver.satisfies(resolved, range, NodeSemver.Options.LOOSE);
+            }
+            return NodeSemver.validRange(constraint, NodeSemver.Options.LOOSE) != null &&
+                   NodeSemver.intersects(constraint, range, NodeSemver.Options.LOOSE);
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
+    }
+
+    private static Map.@Nullable Entry<String, String> nameAndRange(@Nullable String entry) {
+        if (entry == null) {
+            return null;
+        }
+        String trimmed = entry.trim();
+        int at = trimmed.lastIndexOf('@');
+        if (at <= 0 || at == trimmed.length() - 1) {
+            return null;
+        }
+        String range = trimmed.substring(at + 1);
+        return NodeSemver.validRange(range, NodeSemver.Options.LOOSE) == null ? null :
+                new AbstractMap.SimpleImmutableEntry<>(trimmed.substring(0, at), range);
     }
 
     @Override
