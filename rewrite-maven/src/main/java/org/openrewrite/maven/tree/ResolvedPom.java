@@ -51,7 +51,7 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
 // make sure `dependencyManagement` is serialized before `dependencyManagementSorted`
 @JsonPropertyOrder({"requested", "activeProfiles", "properties", "dependencyManagement",
         "dependencyManagementSorted", "initialRepositories", "repositories",
-        "pluginRepositories", "requestedDependencies", "plugins", "pluginManagement", "subprojects"})
+        "pluginRepositories", "requestedDependencies", "plugins", "pluginManagement", "subprojects", "scm"})
 @Getter
 @Builder
 public class ResolvedPom implements Heavyweight {
@@ -90,8 +90,12 @@ public class ResolvedPom implements Heavyweight {
         this(requested, activeProfiles, emptyMap(), emptyList(), true, null, emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), emptyList());
     }
 
-    @JsonCreator
     ResolvedPom(Pom requested, Iterable<String> activeProfiles, Map<String, String> properties, List<ResolvedManagedDependency> dependencyManagement, boolean dependencyManagementSorted, @Nullable List<MavenRepository> initialRepositories, List<MavenRepository> repositories, List<MavenRepository> pluginRepositories, List<Dependency> requestedDependencies, List<Plugin> plugins, List<Plugin> pluginManagement, List<String> subprojects) {
+        this(requested, activeProfiles, properties, dependencyManagement, dependencyManagementSorted, initialRepositories, repositories, pluginRepositories, requestedDependencies, plugins, pluginManagement, subprojects, null);
+    }
+
+    @JsonCreator
+    ResolvedPom(Pom requested, Iterable<String> activeProfiles, Map<String, String> properties, List<ResolvedManagedDependency> dependencyManagement, boolean dependencyManagementSorted, @Nullable List<MavenRepository> initialRepositories, List<MavenRepository> repositories, List<MavenRepository> pluginRepositories, List<Dependency> requestedDependencies, List<Plugin> plugins, List<Plugin> pluginManagement, List<String> subprojects, @Nullable Scm scm) {
         this.requested = requested;
         this.activeProfiles = activeProfiles;
         this.properties = properties;
@@ -106,6 +110,7 @@ public class ResolvedPom implements Heavyweight {
         this.plugins = plugins;
         this.pluginManagement = pluginManagement;
         this.subprojects = subprojects;
+        this.scm = scm;
     }
 
     @NonFinal
@@ -150,6 +155,25 @@ public class ResolvedPom implements Heavyweight {
     @Builder.Default
     @Nullable // on older LSTs, this field is not yet present
     List<String> subprojects = emptyList();
+
+    /**
+     * The effective {@code <scm>}. Each of its four values comes from the nearest POM that declares it, starting at
+     * this one and going up the parent chain, with property placeholders resolved against this POM, so that
+     * {@code ${project.artifactId}} in a parent's value is the child's.
+     * <p>
+     * Unlike Maven's own inheritance, the child's artifactId is <em>not</em> appended to a value inherited from a
+     * parent. What is wanted here is the repository an artifact was built from, and a path appended by inheritance
+     * cannot be told apart from one that is part of the repository's address, as on hosts with nested groups.
+     * <p>
+     * {@link Scm#getInheritedFrom()} says whether the address of the repository is this POM's own or an ancestor's,
+     * and which ancestor's. An inherited one can be the repository of the parent rather than of this artifact.
+     * <p>
+     * {@code null} when no POM in the chain declares an {@code <scm>}, and on models serialized before this
+     * field existed.
+     */
+    @NonFinal
+    @Nullable
+    Scm scm;
 
     // Annotation present to ensure that serialized data is always sorted
     // TO-BE-REMOVED(2025-11-30): Remove this method and instead do simpler eager sorting in `resolveParentDependenciesRecursively()`.
@@ -225,6 +249,11 @@ public class ResolvedPom implements Heavyweight {
         ).resolver(ctx, downloader).resolve();
 
         if (!getVersion().equals(resolved.getVersion())) {
+            return resolved;
+        }
+
+        // A POM that declares an <scm> and nothing else that is compared below is otherwise taken for unchanged
+        if (!Objects.equals(scm, resolved.getScm())) {
             return resolved;
         }
 
@@ -446,9 +475,20 @@ public class ResolvedPom implements Heavyweight {
             if (initialRepositories != null) {
                 mergeRepositories(initialRepositories);
             }
+            scm = null;
             resolveParentPropertiesAndRepositoriesRecursively(new ArrayList<>(pomAncestry));
             if (initialRepositories == null) {
                 initialRepositories = repositories;
+            }
+            if (scm != null) {
+                // Only once every ancestor's properties are merged can the placeholders be resolved
+                GroupArtifactVersion inheritedFrom = scm.getInheritedFrom();
+                if (inheritedFrom != null) {
+                    inheritedFrom = new GroupArtifactVersion(getValue(inheritedFrom.getGroupId()),
+                            inheritedFrom.getArtifactId(), getValue(inheritedFrom.getVersion()));
+                }
+                scm = new Scm(getValue(scm.getConnection()), getValue(scm.getDeveloperConnection()),
+                        getValue(scm.getUrl()), getValue(scm.getTag()), inheritedFrom);
             }
 
             //Once properties have been merged, update any property placeholders in the resolved gav
@@ -485,6 +525,7 @@ public class ResolvedPom implements Heavyweight {
                 mergeRepositories(profile.getRepositories());
             }
             mergeRepositories(pom.getRepositories());
+            mergeScm(pom, pomAncestry.size() > 1);
 
             if (pom.getParent() != null) {
                 Pom parentPom = resolveParentPom(pom);
@@ -900,6 +941,34 @@ public class ResolvedPom implements Heavyweight {
             }
         }
 
+        /**
+         * The nearest POM to declare a value wins, so a value already set by a descendant is kept. The first
+         * ancestor to provide where the repository is, rather than only its tag, is remembered as
+         * {@link Scm#getInheritedFrom()}.
+         *
+         * @param ancestor Whether the POM is an ancestor of the one being resolved rather than that POM itself.
+         */
+        private void mergeScm(Pom pom, boolean ancestor) {
+            Scm incoming = pom.getScm();
+            if (incoming == null) {
+                return;
+            }
+            Scm nearer = scm == null ? new Scm(null, null, null, null) : scm;
+            GroupArtifactVersion inheritedFrom = nearer.getInheritedFrom();
+            if (inheritedFrom == null && ancestor && (
+                    nearer.getConnection() == null && incoming.getConnection() != null ||
+                    nearer.getDeveloperConnection() == null && incoming.getDeveloperConnection() != null ||
+                    nearer.getUrl() == null && incoming.getUrl() != null)) {
+                inheritedFrom = new GroupArtifactVersion(pom.getGroupId(), pom.getArtifactId(), pom.getVersion());
+            }
+            scm = new Scm(
+                    nearer.getConnection() == null ? incoming.getConnection() : nearer.getConnection(),
+                    nearer.getDeveloperConnection() == null ? incoming.getDeveloperConnection() : nearer.getDeveloperConnection(),
+                    nearer.getUrl() == null ? incoming.getUrl() : nearer.getUrl(),
+                    nearer.getTag() == null ? incoming.getTag() : nearer.getTag(),
+                    inheritedFrom);
+        }
+
         private void mergeProperties(Map<String, String> incomingProperties, Pom pom) {
             if (!incomingProperties.isEmpty()) {
                 if (properties == null || properties.isEmpty()) {
@@ -1147,7 +1216,8 @@ public class ResolvedPom implements Heavyweight {
                             dd.getDependency().getClassifier(),
                             Boolean.valueOf(dd.getDependency().getOptional()),
                             depth,
-                            emptyList());
+                            emptyList(),
+                            resolvedPom.getScm());
 
                     MavenExecutionContextView.view(ctx)
                             .getResolutionListener()

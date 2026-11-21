@@ -16,6 +16,7 @@
 
 package org.openrewrite.maven.tree;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.*;
@@ -37,8 +38,37 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
 @Value
 @With
 @Builder
-@AllArgsConstructor(access = AccessLevel.PUBLIC)
 public class ResolvedDependency implements Heavyweight, Serializable {
+
+    /**
+     * The constructor as it was before {@link #scm} was added, for callers compiled against it.
+     */
+    public ResolvedDependency(@Nullable MavenRepository repository, ResolvedGroupArtifactVersion gav,
+                              Dependency requested, List<ResolvedDependency> dependencies, List<License> licenses,
+                              @Nullable String type, @Nullable String classifier, @Nullable Boolean optional,
+                              int depth, @Nullable List<GroupArtifact> effectiveExclusions) {
+        this(repository, gav, requested, dependencies, licenses, type, classifier, optional, depth,
+                effectiveExclusions, null);
+    }
+
+    // Written out rather than generated, so that it can say which of the two constructors Jackson is to use
+    @JsonCreator
+    public ResolvedDependency(@Nullable MavenRepository repository, ResolvedGroupArtifactVersion gav,
+                              Dependency requested, List<ResolvedDependency> dependencies, List<License> licenses,
+                              @Nullable String type, @Nullable String classifier, @Nullable Boolean optional,
+                              int depth, @Nullable List<GroupArtifact> effectiveExclusions, @Nullable Scm scm) {
+        this.repository = repository;
+        this.gav = gav;
+        this.requested = requested;
+        this.dependencies = dependencies;
+        this.licenses = licenses;
+        this.type = type;
+        this.classifier = classifier;
+        this.optional = optional;
+        this.depth = depth;
+        this.effectiveExclusions = effectiveExclusions;
+        this.scm = scm;
+    }
 
     /**
      * This will be {@code null} when this is a project dependency.
@@ -75,6 +105,14 @@ public class ResolvedDependency implements Heavyweight, Serializable {
     @Nullable
     @NonFinal
     List<GroupArtifact> effectiveExclusions;
+
+    /**
+     * The source repository this dependency was built from, as the effective {@code <scm>} of its POM says:
+     * see {@link ResolvedPom#getScm()}. {@code null} when neither its POM nor any of its parents declares one,
+     * when no POM was read for it, and on models serialized before this field existed.
+     */
+    @Nullable
+    Scm scm;
 
     public List<GroupArtifact> getEffectiveExclusions() {
         return effectiveExclusions == null ? emptyList() : effectiveExclusions;

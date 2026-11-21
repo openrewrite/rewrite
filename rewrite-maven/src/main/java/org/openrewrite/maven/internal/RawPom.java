@@ -125,7 +125,10 @@ public class RawPom {
     @Nullable
     SubProjects subprojects;
 
-    public RawPom(@Nullable String pomVersion, @Nullable Parent parent, @Nullable String groupId, String artifactId, @Nullable String version, @Nullable String currentVersion, @Nullable String name, @Nullable String description, @Nullable Prerequisites prerequisites, @Nullable String packaging, @Nullable Dependencies dependencies, @Nullable DependencyManagement dependencyManagement, @Nullable Map<String, String> properties, @Nullable Build build, @Nullable RawRepositories repositories, @Nullable RawPluginRepositories pluginRepositories, @Nullable Licenses licenses, @Nullable Profiles profiles, @Nullable Modules modules, @Nullable SubProjects subprojects) {
+    @Nullable
+    Scm scm;
+
+    public RawPom(@Nullable String pomVersion, @Nullable Parent parent, @Nullable String groupId, String artifactId, @Nullable String version, @Nullable String currentVersion, @Nullable String name, @Nullable String description, @Nullable Prerequisites prerequisites, @Nullable String packaging, @Nullable Dependencies dependencies, @Nullable DependencyManagement dependencyManagement, @Nullable Map<String, String> properties, @Nullable Build build, @Nullable RawRepositories repositories, @Nullable RawPluginRepositories pluginRepositories, @Nullable Licenses licenses, @Nullable Profiles profiles, @Nullable Modules modules, @Nullable SubProjects subprojects, @Nullable Scm scm) {
         this.pomVersion = pomVersion;
         this.parent = parent;
         this.groupId = groupId;
@@ -146,6 +149,7 @@ public class RawPom {
         this.profiles = profiles;
         this.modules = modules;
         this.subprojects = subprojects;
+        this.scm = scm;
     }
 
     public static RawPom parse(InputStream inputStream, @Nullable String snapshotVersion) {
@@ -377,6 +381,22 @@ public class RawPom {
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @Data
+    public static class Scm {
+        @Nullable
+        String connection;
+
+        @Nullable
+        String developerConnection;
+
+        @Nullable
+        String url;
+
+        @Nullable
+        String tag;
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Data
     public static class Profile {
         @Nullable
         String id;
@@ -459,6 +479,7 @@ public class RawPom {
                 .packaging(packaging)
                 .properties(getProperties() == null ? emptyMap() : getProperties())
                 .licenses(mapLicenses(getLicenses()))
+                .scm(mapScm(getScm()))
                 .profiles(mapProfiles(getProfiles()))
                 .subprojects(mapSubProjects(getModules(), getSubprojects()));
         if (StringUtils.isBlank(pomVersion)) {
@@ -484,6 +505,28 @@ public class RawPom {
             }
         }
         return licenses;
+    }
+
+    private org.openrewrite.maven.tree.@Nullable Scm mapScm(@Nullable Scm rawScm) {
+        if (rawScm == null) {
+            return null;
+        }
+        String connection = trimToNull(rawScm.getConnection());
+        String developerConnection = trimToNull(rawScm.getDeveloperConnection());
+        String url = trimToNull(rawScm.getUrl());
+        String tag = trimToNull(rawScm.getTag());
+        if (connection == null && developerConnection == null && url == null && tag == null) {
+            return null;
+        }
+        return new org.openrewrite.maven.tree.Scm(connection, developerConnection, url, tag);
+    }
+
+    private static @Nullable String trimToNull(@Nullable String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     private List<org.openrewrite.maven.tree.Profile> mapProfiles(@Nullable Profiles rawProfiles) {
