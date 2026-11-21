@@ -19,6 +19,9 @@ import org.openrewrite.Cursor;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.xml.XmlVisitor;
+import org.openrewrite.xml.marker.HtmlBooleanAttribute;
+import org.openrewrite.xml.marker.HtmlImpliedClose;
+import org.openrewrite.xml.marker.HtmlUnquotedAttributeValue;
 import org.openrewrite.xml.marker.HtmlVoidElement;
 import org.openrewrite.xml.tree.Xml;
 
@@ -72,6 +75,10 @@ public class XmlPrinter<P> extends XmlVisitor<PrintOutputCapture<P>> {
         if (tag.getMarkers().findFirst(HtmlVoidElement.class).isPresent()) {
             // HTML void element such as <br> printed with a bare '>' (no slash, no closing tag).
             p.append('>');
+        } else if (tag.getMarkers().findFirst(HtmlImpliedClose.class).isPresent()) {
+            // HTML element whose end tag was left off, such as <li>one<li>two.
+            p.append('>');
+            visit(tag.getContent(), p);
         } else if (tag.getClosing() == null) {
             p.append("/>");
         } else {
@@ -98,10 +105,12 @@ public class XmlPrinter<P> extends XmlVisitor<PrintOutputCapture<P>> {
     public Xml visitAttribute(Xml.Attribute attribute, PrintOutputCapture<P> p) {
         beforeSyntax(attribute, p);
         p.append(attribute.getKey().getPrefix())
-                .append(attribute.getKeyAsString())
-                .append(attribute.getBeforeEquals())
-                .append('=');
-        visit(attribute.getValue(), p);
+                .append(attribute.getKeyAsString());
+        if (!attribute.getMarkers().findFirst(HtmlBooleanAttribute.class).isPresent()) {
+            p.append(attribute.getBeforeEquals())
+                    .append('=');
+            visit(attribute.getValue(), p);
+        }
         afterSyntax(attribute, p);
         return attribute;
     }
@@ -109,6 +118,11 @@ public class XmlPrinter<P> extends XmlVisitor<PrintOutputCapture<P>> {
     @Override
     public Xml visitAttributeValue(Xml.Attribute.Value value, PrintOutputCapture<P> p) {
         beforeSyntax(value, p);
+        if (value.getMarkers().findFirst(HtmlUnquotedAttributeValue.class).isPresent()) {
+            p.append(value.getValue());
+            afterSyntax(value, p);
+            return value;
+        }
         char valueDelim;
         if (Xml.Attribute.Value.Quote.Double == value.getQuote()) {
             valueDelim = '"';

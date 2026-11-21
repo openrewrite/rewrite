@@ -27,6 +27,7 @@ import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 import org.openrewrite.xml.internal.XmlParserVisitor;
+import org.openrewrite.xml.internal.HtmlXmlLexer;
 import org.openrewrite.xml.internal.grammar.XMLLexer;
 import org.openrewrite.xml.internal.grammar.XMLParser;
 import org.openrewrite.xml.tree.Xml;
@@ -104,12 +105,15 @@ public class XmlParser implements Parser {
             try (EncodingDetectingInputStream is = input.getSource(ctx)) {
                 String sourceStr = is.readFully();
 
-                XMLLexer lexer = new XMLLexer(CharStreams.fromString(sourceStr));
+                boolean htmlMode = isHtmlLike(path);
+                XMLLexer lexer = htmlMode ?
+                        new HtmlXmlLexer(CharStreams.fromString(sourceStr)) :
+                        new XMLLexer(CharStreams.fromString(sourceStr));
                 lexer.removeErrorListeners();
                 lexer.addErrorListener(new ForwardingErrorListener(input.getPath(), ctx));
 
                 XMLParser parser = new XMLParser(new CommonTokenStream(lexer));
-                parser.htmlMode = isHtmlLike(path);
+                parser.htmlMode = htmlMode;
                 parser.removeErrorListeners();
                 parser.addErrorListener(new ForwardingErrorListener(input.getPath(), ctx));
 

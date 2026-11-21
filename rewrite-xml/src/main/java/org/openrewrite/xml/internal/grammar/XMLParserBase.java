@@ -46,6 +46,13 @@ public abstract class XMLParserBase extends Parser {
     }
 
     public boolean isVoidElement(@Nullable String name) {
-        return htmlMode && name != null && VOID_ELEMENTS.contains(name.toLowerCase());
+        return htmlMode && isHtmlVoidElement(name);
+    }
+
+    /**
+     * @return Whether the name is that of an HTML void element, regardless of {@link #htmlMode}.
+     */
+    public static boolean isHtmlVoidElement(@Nullable String name) {
+        return name != null && VOID_ELEMENTS.contains(name.toLowerCase());
     }
 }
