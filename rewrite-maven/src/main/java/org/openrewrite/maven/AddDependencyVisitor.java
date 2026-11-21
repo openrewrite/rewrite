@@ -120,7 +120,7 @@ public class AddDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
                 } else {
                     String versionToUse = null;
                     String managedVersion = getResolutionResult().getPom().getManagedVersion(groupId, artifactId, type, classifier);
-                    if (managedVersion == null || (versionComparator != null && !versionComparator.isValid(managedVersion, managedVersion))) {
+                    if (managedVersion == null || !acceptsManagedVersion(managedVersion)) {
                         versionToUse = tryGetFamilyVersion();
                         if (versionToUse == null) {
                             try {
@@ -249,7 +249,7 @@ public class AddDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
                             return e.warn(tag);
                         }
                     }
-                } else if (versionComparator != null && !versionComparator.isValid(managedVersion, managedVersion)) {
+                } else if (!acceptsManagedVersion(managedVersion)) {
                     scheduleVersionUpgrade = true;
                 }
 
@@ -280,6 +280,18 @@ public class AddDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
 
             return super.visitTag(tag, ctx);
         }
+    }
+
+    private boolean acceptsManagedVersion(String managedVersion) {
+        if (versionComparator == null) {
+            return true;
+        }
+        VersionComparator managedVersionComparator = versionComparator;
+        if (versionComparator.getClass() == LatestRelease.class) {
+            // An already-managed version need not satisfy the release-only filter.
+            managedVersionComparator = requireNonNull(Semver.validate("latest.integration", versionPattern).getValue());
+        }
+        return managedVersionComparator.isValid(managedVersion, managedVersion);
     }
 
     private boolean matchesCoordinate(ResolvedDependency d, String wantedType) {
