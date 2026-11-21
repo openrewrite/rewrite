@@ -384,7 +384,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                     }
                     Object scanResult = acc.versionVariableUpdates.get(varName);
                     if (scanResult instanceof MavenDownloadingException) {
-                        return ((MavenDownloadingException) scanResult).warn(m);
+                        return warnOnce(m, (MavenDownloadingException) scanResult);
                     }
                     if (scanResult instanceof String) {
                         return dep.withDeclaredVersion((String) scanResult).getTree();
@@ -404,7 +404,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                         return dep.withDeclaredVersion(resolvedVersion).getTree();
                     }
                 } catch (MavenDownloadingException e) {
-                    return e.warn(m);
+                    return warnOnce(m, e);
                 }
                 return m;
             }
@@ -458,7 +458,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                 }
                 Object scanResult = acc.versionVariableUpdates.get(v.getSimpleName());
                 if (scanResult instanceof MavenDownloadingException) {
-                    return Markup.warn(v, (MavenDownloadingException) scanResult);
+                    return warnOnce(v, (MavenDownloadingException) scanResult);
                 }
                 if (scanResult instanceof String && v.getInitializer() instanceof J.Literal) {
                     String resolvedVersion = (String) scanResult;
@@ -474,6 +474,11 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                 if (acc.failedResolutions.contains(new GroupArtifact(dep.getGroupId(), dep.getArtifactId()))) {
                     return m;
                 }
+                String varName = dep.getVersionVariable();
+                Object scanResult = varName == null ? null : acc.versionVariableUpdates.get(varName);
+                if (scanResult instanceof MavenDownloadingException) {
+                    return warnOnce(m, (MavenDownloadingException) scanResult);
+                }
 
                 GradleDependency updated = dep;
 
@@ -484,12 +489,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                     updated = updated.withDeclaredArtifactId(newArtifactId);
                 }
 
-                String varName = dep.getVersionVariable();
                 if (varName != null && !canSafelyUpdateVariable(varName, depMatcher, survivorAlsoAllowed(), acc)) {
-                    Object scanResult = acc.versionVariableUpdates.get(varName);
-                    if (scanResult instanceof MavenDownloadingException) {
-                        return ((MavenDownloadingException) scanResult).warn(m);
-                    }
                     if (scanResult instanceof String) {
                         updated = updated.withDeclaredVersion((String) scanResult);
                     }
@@ -504,7 +504,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                                                     !StringUtils.isBlank(newArtifactId) ? newArtifactId : dep.getArtifactId()),
                                             dep.getConfigurationName(), newVersion, versionPattern, ctx);
                         } catch (MavenDownloadingException e) {
-                            return e.warn(m);
+                            return warnOnce(m, e);
                         }
                         if (resolvedVersion != null && !resolvedVersion.equals(declaredVersion)) {
                             updated = updated.withDeclaredVersion(resolvedVersion);
@@ -553,7 +553,8 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                                     gav = gav.withVersion(resolvedVersion);
                                 }
                             } catch (MavenDownloadingException ignored) {
-                                // Failure is already recorded in metadataFailures.
+                                // The script and catalog also keep a dependency whose new version can't be downloaded
+                                return requested;
                             }
                         }
                         return gav == requested.getGav() ? requested : requested.withGav(gav);
@@ -599,7 +600,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                                 }
                                 Object scanResult = acc.versionVariableUpdates.get(entry.getKey());
                                 if (scanResult instanceof MavenDownloadingException) {
-                                    return Markup.warn(entry, (MavenDownloadingException) scanResult);
+                                    return warnOnce(entry, (MavenDownloadingException) scanResult);
                                 }
                                 if (scanResult instanceof String) {
                                     String resolvedVersion = (String) scanResult;
@@ -644,7 +645,9 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                     selectedVersion = selectCatalogVersion(versionSelector, newCoordinates,
                             coordinatesChanged ? null : currentVersion, ctx);
                 } catch (MavenDownloadingException e) {
+                    // A rename needs the new artifact's version, which a failed download leaves unknown
                     failures.add(e);
+                    continue;
                 }
             }
             if (selectedVersion == null && shouldSelectCatalogVersion(currentVersion) && !coordinatesChanged) {
@@ -684,6 +687,13 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                 new GroupArtifactVersion(
                         newCoordinates.getGroupId(), newCoordinates.getArtifactId(), currentVersion),
                 null, newVersion, versionPattern, ctx);
+    }
+
+    /**
+     * A failed download can fail again in a later cycle with another message, which would add a second warning.
+     */
+    private static <T extends Tree> T warnOnce(T tree, MavenDownloadingException failure) {
+        return tree.getMarkers().findFirst(Markup.Warn.class).isPresent() ? tree : failure.warn(tree);
     }
 
     private boolean shouldSelectCatalogVersion(@Nullable String currentVersion) {
