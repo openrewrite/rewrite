@@ -83,7 +83,7 @@ class KotlinParserTest implements RewriteTest {
     }
 
     @Test
-    void dependsOnDoesNotLeakAsParseErrorWhenParseThrows() {
+    void unreadableInputFailsAloneWithoutLeakingDependsOn() {
         KotlinParser parser = KotlinParser.builder()
           .dependsOn(
             """
@@ -94,9 +94,8 @@ class KotlinParserTest implements RewriteTest {
           )
           .build();
 
-        // An input whose source supplier throws on its first call forces KotlinParser#parse
-        // to fail before any per-CU processing, exercising the catch block in parseInputs.
-        // Subsequent calls return an empty stream so ParseError.build can still capture the input.
+        // The first call is the compiler reading the source. Later calls return an empty stream so
+        // ParseError.build can still capture the input.
         AtomicInteger callCount = new AtomicInteger();
         Parser.Input throwingInput = new Parser.Input(
           Paths.get("Bad.kt"),
@@ -109,16 +108,19 @@ class KotlinParserTest implements RewriteTest {
           },
           true
         );
+        Parser.Input goodInput = Parser.Input.fromString(Paths.get("Good.kt"), "class Good");
 
         List<SourceFile> results = parser
-          .parseInputs(singletonList(throwingInput), null, new InMemoryExecutionContext(t -> {
+          .parseInputs(List.of(throwingInput, goodInput), null, new InMemoryExecutionContext(t -> {
           }))
           .collect(toList());
 
-        // dependsOn must not leak into the returned stream on the error path
         assertThat(results)
           .extracting(SourceFile::getSourcePath)
-          .containsExactly(Paths.get("Bad.kt"));
+          .containsExactly(Paths.get("Bad.kt"), Paths.get("Good.kt"));
+        assertThat(results.get(0)).isInstanceOf(ParseError.class);
+
+        assertThat(results.get(1)).isNotInstanceOf(ParseError.class);
     }
 
     @Test

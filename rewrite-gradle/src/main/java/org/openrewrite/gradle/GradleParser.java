@@ -37,13 +37,14 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Properties;
 import java.util.function.Function;
 import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
 
 import static java.util.Collections.singletonList;
+import static java.util.stream.Collectors.toList;
 
 @RequiredArgsConstructor
 public class GradleParser implements Parser {
@@ -132,18 +133,31 @@ public class GradleParser implements Parser {
                     .build();
         }
 
-        return StreamSupport.stream(sources.spliterator(), false)
+        List<Input> inputs = new ArrayList<>();
+        sources.forEach(inputs::add);
+        // Parsing all build scripts in one KotlinParser call loads the classpath once for them. The iterator is lazy, so
+        // the call happens when the stream first reaches a build script.
+        Iterator<SourceFile> kotlinBuildScripts = Stream.of(inputs.stream()
+                        .filter(input -> isKotlinBuildScript(input.getPath()))
+                        .collect(toList()))
+                .flatMap(scripts -> kotlinBuildParser.parseInputs(scripts, relativeTo, ctx))
+                .iterator();
+        return inputs.stream()
                 .flatMap(source -> {
                     Path sourcePath = source.getPath();
                     if (sourcePath.endsWith("settings.gradle.kts")) {
                         return kotlinSettingsParser.parseInputs(singletonList(source), relativeTo, ctx);
                     } else if (sourcePath.endsWith("settings.gradle")) {
                         return groovySettingsParser.parseInputs(singletonList(source), relativeTo, ctx);
-                    } else if (sourcePath.toString().endsWith(".gradle.kts")) {
-                        return kotlinBuildParser.parseInputs(singletonList(source), relativeTo, ctx);
+                    } else if (isKotlinBuildScript(sourcePath)) {
+                        return Stream.of(kotlinBuildScripts.next());
                     }
                     return groovyBuildParser.parseInputs(singletonList(source), relativeTo, ctx);
                 });
+    }
+
+    private static boolean isKotlinBuildScript(Path path) {
+        return path.toString().endsWith(".gradle.kts") && !path.endsWith("settings.gradle.kts");
     }
 
     @Override
