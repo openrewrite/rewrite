@@ -33,6 +33,7 @@ import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.TypeValidation;
 
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Collections.emptyList;
@@ -4801,6 +4802,67 @@ class ChangeTypeTest implements RewriteTest {
         );
     }
 
+    /** Strips the type off every identifier with this simple name outside the imports. */
+    private static J.CompilationUnit withoutTypeOn(J.CompilationUnit cu, String simpleName) {
+        return (J.CompilationUnit) new JavaIsoVisitor<Integer>() {
+            @Override
+            public J.Import visitImport(J.Import anImport, Integer p) {
+                return anImport;
+            }
+
+            @Override
+            public J.Identifier visitIdentifier(J.Identifier ident, Integer p) {
+                return simpleName.equals(ident.getSimpleName()) ? ident.withType(null) : ident;
+            }
+        }.visitNonNull(cu, 0);
+    }
+
+    /**
+     * A source parsed without the original type on its classpath has use sites the LST gives no type, while its
+     * import still names the type. Strip the type from {@code @NotNull} to stand in for that.
+     *
+     * @param onlyTheFirst strip only the first, leaving the rest attributed, for a file the LST sees in part
+     */
+    private static J.CompilationUnit withoutTypeOnNotNull(J.CompilationUnit cu, boolean onlyTheFirst) {
+        AtomicBoolean stripped = new AtomicBoolean();
+        return (J.CompilationUnit) new JavaIsoVisitor<Integer>() {
+            @Override
+            public J.Annotation visitAnnotation(J.Annotation annotation, Integer p) {
+                if (annotation.getAnnotationType() instanceof J.Identifier &&
+                    "NotNull".equals(((J.Identifier) annotation.getAnnotationType()).getSimpleName()) &&
+                    (!onlyTheFirst || stripped.compareAndSet(false, true))) {
+                    return annotation.withAnnotationType(((J.Identifier) annotation.getAnnotationType()).withType(null));
+                }
+                return super.visitAnnotation(annotation, p);
+            }
+        }.visitNonNull(cu, 0);
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/10043")
+    @Test
+    void importIsKeptWhereTheUseSitesHaveNoType() {
+        // retiring the import would leave `@NotNull` bound to nothing, so the file is left alone
+        rewriteRun(
+          spec -> spec
+            .recipe(new ChangeType("org.jetbrains.annotations.NotNull", "org.jspecify.annotations.NonNull", true))
+            .typeValidationOptions(TypeValidation.none()),
+          java(
+            """
+              import org.jetbrains.annotations.NotNull;
+
+              class A {
+                  private final @NotNull String field = "";
+
+                  public @NotNull String get(final @NotNull String in) {
+                      return in;
+                  }
+              }
+              """,
+            spec -> spec.mapBeforeRecipe(cu -> withoutTypeOnNotNull(cu, false))
+          )
+        );
+    }
+
     @Test
     void visitorChangesASubtreeToAnAttributedTarget() {
         JavaType.FullyQualified linkedList = JavaParser.fromJavaVersion().build().findType("java.util.LinkedList");
@@ -4843,6 +4905,177 @@ class ChangeTypeTest implements RewriteTest {
                       Object o = list;
                   }
                   void kept(ArrayList<String> list) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/10043")
+    @Test
+    void aUseSiteWithoutATypeIsNotHalfMigratedAlongsideOneWithAType() {
+        // the attributed use is left alone too: migrating only what can be seen is what breaks the file
+        rewriteRun(
+          spec -> spec
+            .recipe(new ChangeType("org.jetbrains.annotations.NotNull", "org.jspecify.annotations.NonNull", true))
+            .typeValidationOptions(TypeValidation.none()),
+          java(
+            """
+              import org.jetbrains.annotations.NotNull;
+
+              class A {
+                  private final @NotNull String unseen = "";
+                  private final @NotNull String seen = "";
+              }
+              """,
+            spec -> spec.mapBeforeRecipe(cu -> withoutTypeOnNotNull(cu, true))
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/10043")
+    @Test
+    void aStarImportDoesNotBindTheNameSoTheFileIsLeftAlone() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new ChangeType("org.jetbrains.annotations.NotNull", "org.jspecify.annotations.NonNull", true))
+            .typeValidationOptions(TypeValidation.none()),
+          java(
+            """
+              import org.jetbrains.annotations.*;
+
+              class A {
+                  private final @NotNull String field = "";
+              }
+              """,
+            spec -> spec.mapBeforeRecipe(cu -> withoutTypeOnNotNull(cu, false))
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/10043")
+    @Test
+    void aNestedOriginalImportedDirectlyAndUsedWithoutATypeIsLeftAlone() {
+        // the name the import binds is `Entry`, not the `Map.Entry` the class name spells
+        rewriteRun(
+          spec -> spec
+            .recipe(new ChangeType("java.util.Map$Entry", "java.util.Optional", true))
+            .typeValidationOptions(TypeValidation.none()),
+          java(
+            """
+              import java.util.Map.Entry;
+
+              class A {
+                  Entry<String, String> e;
+              }
+              """,
+            spec -> spec.mapBeforeRecipe(cu -> withoutTypeOn(cu, "Entry"))
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/10043")
+    @Test
+    void aTypeParameterNamedAsTheOriginalIsNotAReferenceToIt() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("org.jetbrains.annotations.NotNull", "org.jspecify.annotations.NonNull", true)),
+          java(
+            """
+              import org.jetbrains.annotations.NotNull;
+
+              class A {
+                  @NotNull String f = "";
+
+                  <NotNull> void m(NotNull t) {
+                  }
+              }
+              """,
+            """
+              import org.jspecify.annotations.NonNull;
+
+              class A {
+                  @NonNull String f = "";
+
+                  <NotNull> void m(NotNull t) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/10043")
+    @Test
+    void aMethodNamedAsTheOriginalIsNotAReferenceToIt() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("org.jetbrains.annotations.NotNull", "org.jspecify.annotations.NonNull", true)),
+          java(
+            """
+              import org.jetbrains.annotations.NotNull;
+
+              class A {
+                  @NotNull String get() {
+                      return NotNull();
+                  }
+
+                  String NotNull() {
+                      return "";
+                  }
+              }
+              """,
+            """
+              import org.jspecify.annotations.NonNull;
+
+              class A {
+                  @NonNull String get() {
+                      return NotNull();
+                  }
+
+                  String NotNull() {
+                      return "";
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/10043")
+    @Test
+    void aLabelNamedAsTheOriginalIsNotAReferenceToIt() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("org.jetbrains.annotations.NotNull", "org.jspecify.annotations.NonNull", true)),
+          java(
+            """
+              import org.jetbrains.annotations.NotNull;
+
+              class A {
+                  @NotNull String get() {
+                      NotNull:
+                      for (int i = 0; i < 2; i++) {
+                          if (i == 0) {
+                              continue NotNull;
+                          }
+                          break NotNull;
+                      }
+                      return "";
+                  }
+              }
+              """,
+            """
+              import org.jspecify.annotations.NonNull;
+
+              class A {
+                  @NonNull String get() {
+                      NotNull:
+                      for (int i = 0; i < 2; i++) {
+                          if (i == 0) {
+                              continue NotNull;
+                          }
+                          break NotNull;
+                      }
+                      return "";
                   }
               }
               """

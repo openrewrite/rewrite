@@ -253,6 +253,9 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                 if (targetFromName && !(cu instanceof J.CompilationUnit) && targetType instanceof JavaType.FullyQualified) {
                     targetType = targetType(cu);
                 }
+                if (wouldStrandTheOriginalName(cu)) {
+                    return cu;
+                }
                 keepsDefinition = ignoreDefinition ||
                         declaresNestedTypeThatStays(cu, originalType.getFullyQualifiedName(), newFullyQualifiedTypeName);
                 if (!keepsDefinition) {
@@ -566,6 +569,87 @@ public class ChangeType extends Recipe implements RenamingRecipe {
             }
             ident = ident.withType(updateType(ident.getType()));
             return visitAndCast(ident, ctx, super::visitIdentifier);
+        }
+
+        /**
+         * Whether changing this file would leave the original type's simple name spelled where no import binds it.
+         * In a file parsed without the original type on its classpath the use sites have no type, so none is
+         * rewritten, while the import that binds their name is retired on the strength of the import itself. Such a
+         * file is left alone: its references cannot be seen, so there is nothing to migrate.
+         * <p>
+         * A target whose own or outermost simple name is the original's is no hazard: its import binds the same name,
+         * so the spelling keeps resolving. See https://github.com/openrewrite/rewrite/pull/9889.
+         */
+        private boolean wouldStrandTheOriginalName(JavaSourceFile cu) {
+            // for a nested type getClassName() is `Outer.Inner`, which is no name an import binds
+            String name = simpleName(originalType.getClassName());
+            JavaType.FullyQualified target = TypeUtils.asFullyQualified(targetType);
+            if (target != null && (name.equals(simpleName(target.getClassName())) ||
+                    name.equals(getTopLevelClassName(target).getClassName()))) {
+                return false;
+            }
+            if (!importsOriginalAs(cu, name)) {
+                return false;
+            }
+            return new JavaIsoVisitor<AtomicBoolean>() {
+                @Override
+                public J.Import visitImport(J.Import anImport, AtomicBoolean unresolved) {
+                    return anImport; // the import binds the name, it does not use it
+                }
+
+                @Override
+                public J.Identifier visitIdentifier(J.Identifier ident, AtomicBoolean unresolved) {
+                    JavaType type = ident.getType();
+                    if (ident.getFieldType() == null && name.equals(ident.getSimpleName()) &&
+                            (type == null || type instanceof JavaType.Unknown) &&
+                            isABareUseOfTheName(getCursor().getParentTreeCursor().getValue(), ident)) {
+                        unresolved.set(true);
+                    }
+                    return ident;
+                }
+            }.reduce(cu, new AtomicBoolean()).get();
+        }
+
+        /**
+         * Whether the identifier spells the type's name on its own, the only use an unattributed file leaves
+         * the recipe no way to rewrite. A declaration's own name, a label and a type parameter are not uses of
+         * the type, and are where the parser leaves a name untyped in a well attributed file; a method named as
+         * the type is the one that happens in practice. The last segment of a qualified name is a use, but
+         * ChangeType matches that one by spelling rather than by type, so it is rewritten either way.
+         */
+        private static boolean isABareUseOfTheName(Object parent, J.Identifier ident) {
+            if (isDeclarationName(parent, ident)) {
+                return false;
+            }
+            J named = null;
+            if (parent instanceof J.Label) {
+                named = ((J.Label) parent).getLabel();
+            } else if (parent instanceof J.Break) {
+                named = ((J.Break) parent).getLabel();
+            } else if (parent instanceof J.Continue) {
+                named = ((J.Continue) parent).getLabel();
+            } else if (parent instanceof J.FieldAccess) {
+                named = ((J.FieldAccess) parent).getName();
+            } else if (parent instanceof J.TypeParameter) {
+                named = ((J.TypeParameter) parent).getName();
+            }
+            return named == null || !named.getId().equals(ident.getId());
+        }
+
+        private static String simpleName(String className) {
+            return className.substring(className.lastIndexOf('.') + 1);
+        }
+
+        private boolean importsOriginalAs(JavaSourceFile cu, String name) {
+            for (J.Import anImport : cu.getImports()) {
+                if (!anImport.isStatic() && anImport.getAlias() == null &&
+                        name.equals(anImport.getQualid().getSimpleName()) &&
+                        TypeUtils.fullyQualifiedNamesAreEqual(anImport.getTypeName(),
+                                originalType.getFullyQualifiedName())) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         private static boolean isDeclarationName(Object parent, J.Identifier ident) {
