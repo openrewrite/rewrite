@@ -40,7 +40,7 @@ public class IsLikelyTest extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.or(
+        return Preconditions.check(Preconditions.or(
                 new HasSourceSet("test").getVisitor(),
                 new HasSourceSetNameContainingTestVisitor<>(),
                 new UsesType<>("io.mockk..*", true),
@@ -51,7 +51,12 @@ public class IsLikelyTest extends Recipe {
                 new UsesType<>("org.powermock..*", true),
                 new UsesType<>("org.assertj..*", true),
                 new UsesType<>("spock.lang..*", true)
-        );
+        ), new TreeVisitor<Tree, ExecutionContext>() {
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                return SearchResult.found(tree);
+            }
+        });
     }
 
     private static class HasSourceSetNameContainingTestVisitor<P> extends JavaIsoVisitor<P> {
