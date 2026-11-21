@@ -256,6 +256,20 @@ class ClassDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void keywordsInCommentsAmongModifiers() {
+        rewriteRun(
+          scala(
+            """
+              private /* sealed */ class A(private /* val */ val i: Int) {
+                private[A] /* final */ def f = 1
+              }
+              sealed /* class */ trait B
+              """
+          )
+        );
+    }
+
+    @Test
     void classWithTypeParameter() {
         rewriteRun(
             scala(

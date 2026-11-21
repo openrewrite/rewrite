@@ -29,6 +29,19 @@ import static org.openrewrite.scala.Assertions.scala;
 class AnnotationTest implements RewriteTest {
 
     @Test
+    void commentHoldingAParenthesisBeforeTheFirstArgument() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  @deprecated(/* ( */ "x") def f = 1
+                }
+                """
+            )
+        );
+    }
+
+    @Test
     void simpleAnnotation() {
         rewriteRun(
             scala(

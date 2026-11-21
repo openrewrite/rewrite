@@ -29,6 +29,19 @@ import static org.openrewrite.scala.Assertions.scala;
 class FunctionTypeTest implements RewriteTest {
 
     @Test
+    void commentHoldingAParenthesisBeforeTheArrow() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              val f: (Int) /* ) */ => Int = x => x
+            }
+            """
+          )
+        );
+    }
+
+    @Test
     void functionType() {
         rewriteRun(
           scala(

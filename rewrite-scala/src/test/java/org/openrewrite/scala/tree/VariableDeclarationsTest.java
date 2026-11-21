@@ -22,6 +22,7 @@ import org.openrewrite.scala.ScalaParser;
 import org.openrewrite.scala.ScalaVisitor;
 import org.openrewrite.scala.tree.S;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -162,6 +163,68 @@ class VariableDeclarationsTest implements RewriteTest {
               object Test {
                 private /* a /* b */ c */ val (a, b) /* d /* e */ f */ = /* g /* h */ i */ (1, 2)
                 private /* a /* b */ c */ lazy /* val */ val (c, d) = (1, 2)
+                val e /* x /* y */ , */ , f = 1
+                private /* lazy */ val (g, h) = (1, 2)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void commentsAndLineBreaksAmongValModifiers() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                private /* c */ final val a = 1
+                final /* val */ val b = 1
+                private
+                final val c = 1
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void softModifierBeforeVal() {
+        rewriteRun(
+          // Soft modifiers are not mapped yet, so `inline` is held as whitespace.
+          spec -> spec.typeValidationOptions(TypeValidation.builder().allowNonWhitespaceInWhitespace(true).build()),
+          scala(
+            """
+              object Test {
+                inline val a = 1
+                private inline val b = 2
+                inline private val c = 3
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void accessQualifierAfterASpace() {
+        rewriteRun(
+          scala(
+            """
+              package p
+              object Test {
+                private [p] val a = 1
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void commentsAroundValDefinition() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                val x /* a /* b */ c */ : Int /* d /* e */ f */ = /* g /* h */ i */ 1
               }
               """
           )

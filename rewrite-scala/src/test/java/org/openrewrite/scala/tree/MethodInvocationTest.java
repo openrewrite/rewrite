@@ -25,6 +25,21 @@ import static org.openrewrite.scala.Assertions.scala;
 class MethodInvocationTest implements RewriteTest {
 
     @Test
+    void commentsHoldingTheColonOrStarOfASplat() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                def f(xs: Int*) = xs.size
+                f(List(1) /* * */ : _*)
+                f(List(1) /* : */ : _*)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void simpleMethodCall() {
         rewriteRun(
           scala(
