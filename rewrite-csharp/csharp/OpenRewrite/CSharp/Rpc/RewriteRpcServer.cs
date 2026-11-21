@@ -271,6 +271,58 @@ public class RewriteRpcServer
             "org.openrewrite.ParseExceptionResult");
     }
 
+    /// <summary>
+    /// Parses sources that belong to no project (<see cref="SolutionParser.ParseSources"/>).
+    /// Returns one tree id per input, in order.
+    /// </summary>
+    [JsonRpcMethod("Parse", UseSingleObjectParameterDeserialization = true)]
+    public List<string> Parse(ParseRequest request)
+    {
+        var relativize = !string.IsNullOrEmpty(request.RelativeTo);
+        var rootDir = ResolvePath(relativize ? request.RelativeTo! : Directory.GetCurrentDirectory());
+        var sources = request.Inputs.Select(input =>
+        {
+            // A source path is kept as given when there is nothing to relativize it against.
+            var sourcePath = !relativize
+                ? input.SourcePath
+                : Path.GetRelativePath(rootDir, ResolvePath(Path.GetFullPath(input.SourcePath, rootDir)));
+            var text = input.Text ?? ReadFilePreservingBom(Path.GetFullPath(input.SourcePath, rootDir));
+            var bomMarked = text.StartsWith('\uFEFF');
+            return new SolutionParser.Source(sourcePath, bomMarked ? text[1..] : text, bomMarked);
+        }).ToList();
+
+        // Each reference is a NuGet package as id@version or the path of an assembly.
+        var references = (request.Options?.GetValueOrDefault("org.openrewrite.csharp.assemblyReferences") switch
+            {
+                JsonElement { ValueKind: JsonValueKind.String } je => je.GetString(),
+                string str => str,
+                _ => null,
+            })?.Split('\n', StringSplitOptions.RemoveEmptyEntries) ?? [];
+        var assemblies = references.Where(r => !r.Contains('@'))
+            .Select(r => Path.GetFullPath(r, rootDir))
+            // Like a package that cannot be restored, a missing assembly costs its types, not the parse.
+            .Where(path =>
+            {
+                if (File.Exists(path))
+                    return true;
+                Log.Warning("Assembly reference {Path} does not exist, so its types stay unresolved", path);
+                return false;
+            })
+            .Concat(DependencyWorkspace.CompileAssemblies(references.Where(r => r.Contains('@'))))
+            .ToList();
+
+        var sourceFiles = new SolutionParser().ParseSources(sources, rootDir, assemblies,
+            RequirePrintEqualsInput(request.Options?.GetValueOrDefault("org.openrewrite.requirePrintEqualsInput")));
+        var ids = new List<string>(sourceFiles.Count);
+        foreach (var sourceFile in sourceFiles)
+        {
+            var id = sourceFile.Id.ToString();
+            _localObjects[id] = sourceFile;
+            ids.Add(id);
+        }
+        return ids;
+    }
+
     [JsonRpcMethod("ParseSolution", UseSingleObjectParameterDeserialization = true)]
     public async Task<ParseSolutionResponse> ParseSolution(ParseSolutionRequest request)
     {
@@ -286,19 +338,8 @@ public class RewriteRpcServer
         // is recovered from git at that point too.
         using var globalJsonGuard = GlobalJsonGuard.Neutralize(rootDir);
 
-        var requirePrintEqualsInput = true;
-        if (request.Options?.TryGetValue("org.openrewrite.requirePrintEqualsInput", out var val) == true)
-        {
-            // SystemTextJsonFormatter delivers object-typed option values as JsonElement.
-            requirePrintEqualsInput = val switch
-            {
-                JsonElement { ValueKind: JsonValueKind.True } => true,
-                JsonElement { ValueKind: JsonValueKind.False } => false,
-                JsonElement { ValueKind: JsonValueKind.String } je => bool.Parse(je.GetString()!),
-                JsonElement je => Convert.ToBoolean(je.ToString()),
-                _ => Convert.ToBoolean(val),
-            };
-        }
+        var requirePrintEqualsInput =
+            RequirePrintEqualsInput(request.Options?.GetValueOrDefault("org.openrewrite.requirePrintEqualsInput"));
 
         var restoreMsBefore = SolutionRestore.TotalRestoreMs;
         var solution = await solutionParser.LoadAsync(path, CancellationToken.None);
@@ -455,6 +496,18 @@ public class RewriteRpcServer
         Log.Debug("RPC ParseSolution: completed, {ItemCount} source files", response.Items.Count);
         return response;
     }
+
+    private static bool RequirePrintEqualsInput(object? option) => option switch
+    {
+        null => true,
+        // SystemTextJsonFormatter delivers object-typed option values as JsonElement.
+        JsonElement { ValueKind: JsonValueKind.True } => true,
+        JsonElement { ValueKind: JsonValueKind.False } => false,
+        JsonElement { ValueKind: JsonValueKind.String } je => bool.Parse(je.GetString()!),
+        JsonElement je => Convert.ToBoolean(je.ToString()),
+        string str => bool.Parse(str),
+        _ => Convert.ToBoolean(option),
+    };
 
     /// <summary>
     /// Reads a text file while preserving a leading UTF-8 BOM as a `\uFEFF` character in
@@ -2555,11 +2608,13 @@ public class ParseRequest
 {
     public List<ParseInput> Inputs { get; set; } = new();
     public string? RelativeTo { get; set; }
+    public Dictionary<string, object>? Options { get; set; }
 }
 
 public class ParseInput
 {
-    public string Text { get; set; } = "";
+    /// <summary>The source text; null names a file at <see cref="SourcePath"/> to read.</summary>
+    public string? Text { get; set; }
     public string SourcePath { get; set; } = "";
 }
 

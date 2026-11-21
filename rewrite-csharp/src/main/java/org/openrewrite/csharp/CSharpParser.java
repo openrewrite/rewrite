@@ -24,76 +24,64 @@ import org.openrewrite.csharp.rpc.CSharpRewriteRpc;
 import org.openrewrite.csharp.tree.Cs;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 
 @RequiredArgsConstructor
 public class CSharpParser implements Parser {
     private final List<String> assemblyReferences;
 
-    private static final String TEMP_CSPROJ_TEMPLATE =
-            "<Project Sdk=\"Microsoft.NET.Sdk\">\n" +
-            "  <PropertyGroup>\n" +
-            "    <TargetFramework>net10.0</TargetFramework>\n" +
-            "  </PropertyGroup>%s\n" +
-            "</Project>\n";
-
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
         List<Input> inputs = new ArrayList<>();
         for (Input input : sources) {
-            inputs.add(input);
+            inputs.add(keepingByteOrderMark(input, ctx));
         }
-
         if (inputs.isEmpty()) {
             return Stream.empty();
         }
 
-        try {
-            // Create a temporary project directory with a .csproj and the source files
-            Path tempDir = Files.createTempDirectory("csharp-parse-");
-            Path csproj = tempDir.resolve("Temp.csproj");
+        Map<String, String> options = new HashMap<>();
+        options.put(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT,
+                String.valueOf((boolean) ctx.getMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, true)));
+        options.put("org.openrewrite.csharp.assemblyReferences", String.join("\n", assemblyReferences));
+        return CSharpRewriteRpc.getOrStart().parse(inputs, relativeTo == null ? null : relativeTo.toAbsolutePath(),
+                this, Cs.CompilationUnit.class.getName(), ctx, options);
+    }
 
-            // Build PackageReference elements for assembly references
-            StringBuilder packageRefs = new StringBuilder();
-            if (!assemblyReferences.isEmpty()) {
-                packageRefs.append("\n  <ItemGroup>");
-                for (String ref : assemblyReferences) {
-                    if (ref.contains("@")) {
-                        String[] parts = ref.split("@", 2);
-                        packageRefs.append(String.format(
-                                "\n    <PackageReference Include=\"%s\" Version=\"%s\" />",
-                                parts[0], parts[1]));
-                    }
-                }
-                packageRefs.append("\n  </ItemGroup>");
+    /**
+     * The text sent for an input not read from disk is what its stream decodes, and the stream
+     * consumes a byte order mark. The C# side takes a leading one in that text as the file being
+     * marked, so a marked input gets a second mark for the stream to consume.
+     */
+    private static Input keepingByteOrderMark(Input input, ExecutionContext ctx) {
+        if (!input.isSynthetic() && Files.isRegularFile(input.getPath())) {
+            return input;
+        }
+        try (EncodingDetectingInputStream is = input.getSource(ctx)) {
+            // The first read settles whether the input carries a byte order mark.
+            //noinspection ResultOfMethodCallIgnored
+            is.read();
+            if (!is.isCharsetBomMarked()) {
+                return input;
             }
-
-            writeString(csproj, String.format(TEMP_CSPROJ_TEMPLATE, packageRefs));
-
-            // Write source files to the temp directory
-            for (Input input : inputs) {
-                String sourcePath = relativeTo != null
-                        ? relativeTo.relativize(input.getPath()).toString()
-                        : input.getPath().getFileName().toString();
-                Path target = tempDir.resolve(sourcePath);
-                Files.createDirectories(target.getParent());
-                try (EncodingDetectingInputStream is = input.getSource(ctx)) {
-                    String source = is.readFully();
-                    // the stream consumes a byte order mark, and the file needs it back to be parsed as marked
-                    writeString(target, is.isCharsetBomMarked() ? '\uFEFF' + source : source);
-                }
-            }
-
-            return CSharpRewriteRpc.getOrStart().parseSolution(csproj, tempDir, ctx)
-                    .filter(sf -> sf.getSourcePath().toString().endsWith(".cs") || sf instanceof org.openrewrite.tree.ParseError);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        try (EncodingDetectingInputStream is = input.getSource(ctx)) {
+            String source = is.readFully();
+            return new Input(input.getPath(), input.getFileAttributes(),
+                    () -> new ByteArrayInputStream(("\uFEFF\uFEFF" + source).getBytes(StandardCharsets.UTF_8)),
+                    input.isSynthetic());
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -121,12 +109,6 @@ public class CSharpParser implements Parser {
      */
     public static Stream<SourceFile> parseSolution(Path path, Path rootDir, ExecutionContext ctx) {
         return CSharpRewriteRpc.getOrStart().parseSolution(path, rootDir, ctx);
-    }
-
-    private static void writeString(Path path, String content) throws IOException {
-        try (OutputStream os = Files.newOutputStream(path)) {
-            os.write(content.getBytes(StandardCharsets.UTF_8));
-        }
     }
 
     public static Builder builder() {
