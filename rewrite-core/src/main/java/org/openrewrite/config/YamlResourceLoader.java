@@ -50,6 +50,7 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.*;
+import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
@@ -342,7 +343,7 @@ public class YamlResourceLoader implements ResourceLoader {
     void loadRecipe(@Language("markdown") String name,
                     int i,
                     Object recipeData,
-                    Consumer<String> addLazyLoadRecipe,
+                    BiConsumer<String, Map<String, Object>> addLazyLoadRecipe,
                     Consumer<Recipe> addRecipe,
                     Consumer<Validated<Object>> addValidation) {
         if (recipeData instanceof String) {
@@ -351,7 +352,7 @@ public class YamlResourceLoader implements ResourceLoader {
                 addRecipe.accept(recipeLoader.apply(recipeName, null));
             } catch (IllegalArgumentException ignored) {
                 // it's probably declarative
-                addLazyLoadRecipe.accept(recipeName);
+                addLazyLoadRecipe.accept(recipeName, emptyMap());
             } catch (RecipeNotFoundException e) {
                 addInvalidRecipeValidation(
                         addValidation,
@@ -378,13 +379,9 @@ public class YamlResourceLoader implements ResourceLoader {
                         addRecipe.accept(recipe);
                         validateOptionNames(recipeName, recipe, options, addValidation);
                     } catch (IllegalArgumentException e) {
-                        if (e.getCause() instanceof InvalidTypeIdException) {
-                            addInvalidRecipeValidation(
-                                    addValidation,
-                                    recipeName,
-                                    recipeArgs,
-                                    "Recipe class " + recipeName + " cannot be found",
-                                    e);
+                        if (e.getCause() instanceof InvalidTypeIdException &&
+                            recipeName.equals(((InvalidTypeIdException) e.getCause()).getTypeId())) {
+                            addLazyLoadRecipe.accept(recipeName, options);
                         } else {
                             addInvalidRecipeValidation(
                                     addValidation,
