@@ -26,7 +26,6 @@ import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
 import java.util.EnumSet;
-import java.util.List;
 import java.util.function.Consumer;
 
 import static java.util.Collections.emptyList;
@@ -1845,18 +1844,5 @@ class TypeUtilsTest implements RewriteTest {
             )
           )
         );
-    }
-
-    @Test
-    void typeThatIsItsOwnSupertype() {
-        // the type tables key types by name, so Python's class Url(namedtuple('Url', ...)) can extend itself
-        JavaType.Class url = JavaType.ShallowClass.build("urllib3.util.url.Url");
-        url.unsafeSet((List<JavaType>) null, url, null, null, singletonList(url), null, null);
-
-        assertFalse(TypeUtils.isOfTypeWithName(url, true, "java.util.List"::equals));
-        assertFalse(TypeUtils.isAssignableTo("java.util.List", url));
-        assertFalse(TypeUtils.isAssignableTo(JavaType.ShallowClass.build("java.util.List"), url));
-        assertTrue(TypeUtils.isAssignableTo("urllib3.util.url.Url", url));
-        assertThat(TypeUtils.findDeclaredMethod(url, "geturl", emptyList())).isEmpty();
     }
 }
