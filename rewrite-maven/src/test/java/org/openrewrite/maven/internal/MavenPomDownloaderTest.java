@@ -1678,6 +1678,23 @@ class MavenPomDownloaderTest implements RewriteTest {
             }
         }
 
+        @Test
+        void credentialsAreNotRetriedOnAnEndpointAProxyCouldNotConnectTo() throws IOException {
+            try (MockWebServer mockRepo = proxyStatusServer(504, "test-proxy; next-hop=\"%1$s:%2$d\"; error=connection_timeout")) {
+                var repository = MavenRepository.builder()
+                  .id("id")
+                  .uri("https://%s:%d/maven/".formatted(mockRepo.getHostName(), mockRepo.getPort()))
+                  .username("user")
+                  .password("pass")
+                  .build();
+
+                var normalized = new MavenPomDownloader(emptyMap(), ctx).normalizeRepository(repository, MavenExecutionContextView.view(ctx), null);
+
+                assertThat(normalized).isNull();
+                assertThat(mockRepo.getRequestCount()).isEqualTo(2);
+            }
+        }
+
         private MockWebServer proxyStatusServer(int status, String proxyStatus) throws IOException {
             MockWebServer mockRepo = getMockServer();
             mockRepo.setDispatcher(new Dispatcher() {

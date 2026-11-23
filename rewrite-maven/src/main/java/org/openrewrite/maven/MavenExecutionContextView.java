@@ -82,9 +82,9 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
     }
 
     /**
-     * Connection endpoints, each a {@code host:port}, that have proven unreachable (a connection-level
-     * failure, as opposed to an HTTP error response, or a proxy's 502 or 504 whose {@code Proxy-Status}
-     * reports it could not connect to that endpoint) during this execution. Repositories on these
+     * Connection endpoints, each a {@code host:port}, that have proven unreachable during this execution:
+     * either a connection-level failure, as opposed to an HTTP error response, or a proxy's 502 or 504
+     * whose {@code Proxy-Status} reports it could not connect to that endpoint. Repositories on these
      * endpoints are skipped for the remainder of the run rather than re-probed for every declaration,
      * so a single dead repository costs one connection timeout instead of one per artifact. The key is
      * {@code host:port} rather than the full repository URI because a connection failure occurs before

@@ -1116,7 +1116,8 @@ public class MavenPomDownloader {
      */
     private ReachabilityResult reachable(MavenRepository repository, HttpSender.Method method, String url) {
         ReachabilityResult anonymous = reachable(applyTimeoutToRequest(repository, httpSender.newRequest(url).withMethod(method)));
-        if (anonymous.isReachable() || !hasAuthentication(repository)) {
+        if (anonymous.isReachable() || anonymous.getReachability() == Reachability.PROXY_COULD_NOT_CONNECT ||
+            !hasAuthentication(repository)) {
             return anonymous;
         }
         ReachabilityResult authenticated = reachable(applyAuthenticationAndTimeoutToRequest(repository, httpSender.newRequest(url).withMethod(method)));
@@ -1145,6 +1146,7 @@ public class MavenPomDownloader {
     enum Reachability {
         SUCCESS,
         ERROR,
+        PROXY_COULD_NOT_CONNECT,
         UNREACHABLE
     }
 
@@ -1157,8 +1159,9 @@ public class MavenPomDownloader {
             if (t instanceof HttpSenderResponseException) {
                 HttpSenderResponseException e = (HttpSenderResponseException) t;
                 // response was returned from the server, but it was not a 200 OK. The server therefore exists.
-                if (e.isServerReached() && !proxyCouldNotConnect(built.getUrl(), e)) {
-                    return new ReachabilityResult(Reachability.ERROR, t);
+                if (e.isServerReached()) {
+                    return new ReachabilityResult(proxyCouldNotConnect(built.getUrl(), e) ?
+                            Reachability.PROXY_COULD_NOT_CONNECT : Reachability.ERROR, t);
                 }
             }
             return new ReachabilityResult(Reachability.UNREACHABLE, t);
@@ -1177,7 +1180,7 @@ public class MavenPomDownloader {
             return false;
         }
         for (ProxyStatus member : e.getProxyStatus()) {
-            if (member.getError() != null && NEXT_HOP_NOT_REACHED.contains(member.getError()) &&
+            if (NEXT_HOP_NOT_REACHED.contains(member.getError()) &&
                 member.getNextHop() != null && isNextHop(requested, member.getNextHop())) {
                 return true;
             }
