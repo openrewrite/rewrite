@@ -323,18 +323,12 @@ class RemoveImportTest implements RewriteTest {
     }
 
     @Test
-    void removeStarStaticImportWhenRemovingSpecificMethod() {
+    void keepStarStaticImportWhenRemovingSpecificMethod() {
         rewriteRun(
           spec -> spec.recipe(removeImport("java.util.Collections.emptyList")),
           java(
             """
               import static java.util.Collections.*;
-              class A {
-                  Object o = emptySet();
-              }
-              """,
-            """
-              import static java.util.Collections.emptySet;
               class A {
                   Object o = emptySet();
               }
@@ -373,12 +367,6 @@ class RemoveImportTest implements RewriteTest {
           java(
             """
               import static java.util.Collections.*;
-              class A {
-                 Object o = emptyList();
-              }
-              """,
-            """
-              import static java.util.Collections.emptyList;
               class A {
                  Object o = emptyList();
               }
@@ -1116,7 +1104,7 @@ class RemoveImportTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/918")
     @Test
-    void unfoldStaticImportIfTwoOrLessAreUsed() {
+    void leaveAloneIfTwoOrLessStaticsAreInUse() {
         rewriteRun(
           spec -> spec.recipe(removeImport("org.test.Example.VALUE_1")),
           java(
@@ -1135,19 +1123,6 @@ class RemoveImportTest implements RewriteTest {
               package org.test.a;
 
               import static org.test.Example.*;
-
-              public class Test {
-                  public void method() {
-                      int value2 = VALUE_2;
-                      int methodValue = method1();
-                  }
-              }
-              """,
-            """
-              package org.test.a;
-
-              import static org.test.Example.method1;
-              import static org.test.Example.VALUE_2;
 
               public class Test {
                   public void method() {
@@ -1350,45 +1325,6 @@ class RemoveImportTest implements RewriteTest {
             """
               import java.util.List;
               import static java.util.Collections.*;
-
-              class Test {
-                  List<Integer> l = emptyList();
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void unfoldStaticSubpackage() {
-        rewriteRun(
-          spec -> spec.recipe(removeImport("java.util.Collections.emptyMap")).parser(
-            JavaParser.fromJavaVersion().styles(
-              singletonList(
-                new NamedStyles(
-                  randomId(), "test", "test", "test", emptySet(), singletonList(
-                  ImportLayoutStyle.builder()
-                    .packageToFold("java.util.*", false)
-                    .importAllOthers()
-                    .importStaticAllOthers()
-                    .build()
-                )
-                )
-              )
-            )
-          ),
-          java(
-            """
-              import java.util.List;
-              import static java.util.Collections.*;
-
-              class Test {
-                  List<Integer> l = emptyList();
-              }
-              """,
-            """
-              import java.util.List;
-              import static java.util.Collections.emptyList;
 
               class Test {
                   List<Integer> l = emptyList();

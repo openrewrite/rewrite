@@ -195,21 +195,12 @@ class RemoveImportTest implements RewriteTest {
     }
 
     @Test
-    void removeStarFoldTypeMembers() {
+    void keepStarFoldTypeMembersWhileFewAreInUse() {
         rewriteRun(
           spec -> spec.recipe(removeMemberImportRecipe("java.util.regex.Pattern", "MULTILINE")),
           kotlin(
             """
               import java.util.regex.Pattern.*
-
-              class A {
-                  val i = CASE_INSENSITIVE
-                  val x = COMMENTS
-              }
-              """,
-            """
-              import java.util.regex.Pattern.CASE_INSENSITIVE
-              import java.util.regex.Pattern.COMMENTS
 
               class A {
                   val i = CASE_INSENSITIVE

@@ -169,10 +169,6 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                         if (methodsAndFieldsUsed.isEmpty() && otherMethodsAndFieldsInTypeUsed.isEmpty()) {
                             spaceForNextImport.set(import_.getPrefix());
                             return null;
-                        } else if (!isPackageAlwaysFolded(importLayoutStyle.getPackagesToFold(), import_) &&
-                                methodsAndFieldsUsed.size() + otherMethodsAndFieldsInTypeUsed.size() < importLayoutStyle.getNameCountToUseStarImport()) {
-                            methodsAndFieldsUsed.addAll(otherMethodsAndFieldsInTypeUsed);
-                            return unfoldStarImport(import_, methodsAndFieldsUsed, cu);
                         }
                     } else if (TypeUtils.fullyQualifiedNamesAreEqual(typeName, type) && !methodsAndFieldsUsed.contains(imported)) {
                         // e.g. remove java.util.Collections.emptySet when type is java.util.Collections
@@ -326,21 +322,13 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
         return Space.build(comments.get(0).getSuffix(), comments.subList(1, comments.size()));
     }
 
-    private Object unfoldStarImport(J.Import starImport, Set<String> otherImportsUsed, JavaSourceFile cu) {
-        List<J.Import> unfoldedImports = new ArrayList<>(otherImportsUsed.size());
+    private Object unfoldStarImport(J.Import starImport, Set<String> otherTypesUsed, JavaSourceFile cu) {
+        List<J.Import> unfoldedImports = new ArrayList<>(otherTypesUsed.size());
         int i = 0;
-        for (String other : otherImportsUsed) {
-            J.FieldAccess newQualid = starImport.getQualid().withName(starImport
-                    .getQualid().getName().withSimpleName(other));
-
-            // Set type attribution on the unfolded import so downstream recipes
-            // can properly match and transform it
-            if (!starImport.isStatic()) {
-                String fqn = starImport.getPackageName() + "." + other;
-                JavaType.FullyQualified typeForImport = findType(fqn, cu);
-                newQualid = newQualid.withType(typeForImport);
-            }
-
+        for (String other : otherTypesUsed) {
+            J.FieldAccess newQualid = starImport.getQualid()
+                    .withName(starImport.getQualid().getName().withSimpleName(other))
+                    .withType(findType(starImport.getPackageName() + "." + other, cu));
             J.Import unfolded = starImport.withQualid(newQualid).withId(randomId());
             unfoldedImports.add(i++ == 0 ? unfolded : unfolded.withPrefix(Space.format("\n")));
         }
