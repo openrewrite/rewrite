@@ -419,7 +419,8 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
             }
             JavaType.Variable var = (JavaType.Variable) memberToShorten;
             JavaType.FullyQualified targetType = (JavaType.FullyQualified) var.getOwner();
-            if (targetType != null) {
+            // only the member the static import brings in can lose its qualifier, not the other fields of its type
+            if (targetType != null && fieldAccess.getSimpleName().equals(var.getName())) {
                 if (fieldAccess.getTarget() instanceof J.FieldAccess) {
                     J.FieldAccess target = (J.FieldAccess) fieldAccess.getTarget();
                     if (target.isFullyQualifiedClassReference(targetType.getFullyQualifiedName())) {
