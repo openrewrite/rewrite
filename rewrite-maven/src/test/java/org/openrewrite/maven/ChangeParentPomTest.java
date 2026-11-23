@@ -1631,6 +1631,100 @@ class ChangeParentPomTest implements RewriteTest {
             );
         }
 
+        @Test
+        void doesNotRetainManagementOfBomImportedByLocalParent() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeParentPom(
+                "org.springframework.boot", null,
+                "spring-boot-starter-parent", null,
+                "2.4.13",
+                null, null, null, null, null)),
+              mavenProject("parent",
+                pomXml(
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <groupId>com.mycompany</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1.0.0-SNAPSHOT</version>
+                        <packaging>pom</packaging>
+                        <parent>
+                            <groupId>org.springframework.boot</groupId>
+                            <artifactId>spring-boot-starter-parent</artifactId>
+                            <version>2.3.12.RELEASE</version>
+                            <relativePath/>
+                        </parent>
+                        <modules>
+                            <module>child</module>
+                        </modules>
+                        <dependencyManagement>
+                            <dependencies>
+                                <dependency>
+                                    <groupId>org.springframework.cloud</groupId>
+                                    <artifactId>spring-cloud-dependencies</artifactId>
+                                    <version>Hoxton.SR12</version>
+                                    <type>pom</type>
+                                    <scope>import</scope>
+                                </dependency>
+                            </dependencies>
+                        </dependencyManagement>
+                    </project>
+                    """,
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <groupId>com.mycompany</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1.0.0-SNAPSHOT</version>
+                        <packaging>pom</packaging>
+                        <parent>
+                            <groupId>org.springframework.boot</groupId>
+                            <artifactId>spring-boot-starter-parent</artifactId>
+                            <version>2.4.13</version>
+                            <relativePath/>
+                        </parent>
+                        <modules>
+                            <module>child</module>
+                        </modules>
+                        <dependencyManagement>
+                            <dependencies>
+                                <dependency>
+                                    <groupId>org.springframework.cloud</groupId>
+                                    <artifactId>spring-cloud-dependencies</artifactId>
+                                    <version>Hoxton.SR12</version>
+                                    <type>pom</type>
+                                    <scope>import</scope>
+                                </dependency>
+                            </dependencies>
+                        </dependencyManagement>
+                    </project>
+                    """
+                ),
+                mavenProject("child",
+                  pomXml(
+                    """
+                      <project>
+                          <modelVersion>4.0.0</modelVersion>
+                          <parent>
+                              <groupId>com.mycompany</groupId>
+                              <artifactId>parent</artifactId>
+                              <version>1.0.0-SNAPSHOT</version>
+                          </parent>
+                          <artifactId>child</artifactId>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>org.springframework.cloud</groupId>
+                                  <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+                              </dependency>
+                          </dependencies>
+                      </project>
+                      """
+                  )
+                )
+              )
+            );
+        }
+
         @Issue("https://github.com/openrewrite/rewrite/issues/8595")
         @Test
         void chainedUpgradesRetainVersionStrippedByEarlierUpgrade() {
