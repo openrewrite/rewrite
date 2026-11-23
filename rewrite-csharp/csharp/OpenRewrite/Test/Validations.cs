@@ -33,8 +33,8 @@ public sealed class Validations
     public bool WhitespaceInSpaces { get; init; } = true;
 
     /// <summary>
-    /// Whether the printed output must match the original input (round-trip fidelity).
-    /// Default: enabled.
+    /// Whether the printed output must match the original input (round-trip fidelity), and a fresh parse of the text a
+    /// recipe changes must print back that text. Default: enabled.
     /// </summary>
     public bool PrintEqualsInput { get; init; } = true;
 

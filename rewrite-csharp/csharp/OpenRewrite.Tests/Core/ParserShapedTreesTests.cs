@@ -89,6 +89,23 @@ public class ParserShapedTreesTests : RewriteTest
             failure.Message);
     }
 
+    [Fact]
+    public void OutputThatDoesNotPrintBackAsParsedFails()
+    {
+        var failure = Assert.Throws<FailException>(() => RewriteRun(
+            spec => spec
+                .SetRecipe(new ReturnNull(literal => literal.WithValue(null).WithValueSource("null null")))
+                .SetValidations(new Validations { ParserShapedTrees = false }),
+            CSharp(Returns("0"), Returns("null null"))
+        ));
+
+        Assert.StartsWith(
+            "The output of OpenRewrite.Tests.Core.ParserShapedTreesTests+ReturnNull doesn't print back as the parser " +
+            "reads it, so the checks of a fresh parse of it didn't run:\n  source.cs\n",
+            failure.Message);
+        Assert.Contains("-        return null null;\n+        return null ;null;", failure.Message);
+    }
+
     /// <summary>A recipe that keeps code the parser couldn't read, such as a test's broken code, didn't break it.</summary>
     [Fact]
     public void ASourceThatAlreadyDidNotParsePasses()

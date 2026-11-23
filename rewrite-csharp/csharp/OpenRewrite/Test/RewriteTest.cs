@@ -307,7 +307,8 @@ public abstract class RewriteTest
                         $"Expected recipe to complete in {PluralCycles(expectedCycles)}, but cycle {cycle} changed");
                 }
                 var fresh = results.Count > 0 &&
-                            (cycles > expectedCycles || validations.ParserShapedTrees || validations.TypesAttributed)
+                            (cycles > expectedCycles || validations.ParserShapedTrees || validations.TypesAttributed ||
+                             validations.PrintEqualsInput)
                     ? ParseAgain([..run.Finals, ..skipped], FreshParseSetup(recipeSpec, setup), projects)
                     : null;
                 if (cycles > expectedCycles && fresh != null)
@@ -322,6 +323,10 @@ public abstract class RewriteTest
                 if (validations.TypesAttributed && fresh != null)
                 {
                     TreeShapes.AssertTyped(recipeSpec.Recipe, results, fresh);
+                }
+                if (validations.PrintEqualsInput && fresh != null)
+                {
+                    AssertFreshParsePrintsBack(recipeSpec.Recipe, results, fresh);
                 }
                 if (validations.UniqueIds)
                 {
@@ -577,7 +582,8 @@ public abstract class RewriteTest
 
     /// <param name="SyntaxTree">Roslyn's parse of the printed text.</param>
     /// <param name="Unit">The LST of the printed text, or null when the parser doesn't print it back.</param>
-    internal sealed record FreshParse(SyntaxTree SyntaxTree, CompilationUnit? Unit);
+    /// <param name="Mismatch">Why <paramref name="Unit"/> is null: how the parser printed the text back, or how it failed.</param>
+    internal sealed record FreshParse(SyntaxTree SyntaxTree, CompilationUnit? Unit, string? Mismatch = null);
 
     /// <summary>The printed text of each compilation unit the cycles left, parsed as the next run reads it.</summary>
     private static Dictionary<SourceFile, FreshParse> ParseAgain(List<SourceFile> finals, CompileSetup? setup,
@@ -600,23 +606,51 @@ public abstract class RewriteTest
         var fresh = new Dictionary<SourceFile, FreshParse>(ReferenceEqualityComparer.Instance);
         foreach (var (unit, text, tree) in units)
         {
-            CompilationUnit? reparsed = null;
             try
             {
-                reparsed = parser.Parse(text, sourcePath: unit.SourcePath,
+                var reparsed = parser.Parse(text, sourcePath: unit.SourcePath,
                     semanticModel: compilations?[tree].GetSemanticModel(tree));
-                if (PrintTree(reparsed, MarkerPrinter.Sanitized) != text)
-                {
-                    reparsed = null;
-                }
+                var reprinted = PrintTree(reparsed, MarkerPrinter.Sanitized);
+                fresh[unit] = reprinted == text
+                    ? new FreshParse(tree, reparsed)
+                    : new FreshParse(tree, null, DiffUtils.UnifiedDiff(text, reprinted, unit.SourcePath));
             }
-            catch (Exception)
+            catch (Exception e)
             {
-                // A file that does not parse again keeps the LST the recipe produced
+                fresh[unit] = new FreshParse(tree, null, $"parsing and printing it again failed with {e}");
             }
-            fresh[unit] = new FreshParse(tree, reparsed);
         }
         return fresh;
+    }
+
+    /// <summary>
+    /// A changed source file whose printed text the parser doesn't print back would otherwise pass every check of a
+    /// fresh parse, as those checks have nothing to compare it with.
+    /// </summary>
+    private static void AssertFreshParsePrintsBack(Recipe recipe, List<Result> results,
+        Dictionary<SourceFile, FreshParse> fresh)
+    {
+        var found = new List<string>();
+        foreach (var (before, after) in results)
+        {
+            if (after != null && fresh.TryGetValue(after, out var parse) && parse.Mismatch != null &&
+                (before == null ||
+                 PrintTree(before, MarkerPrinter.Sanitized) != PrintTree(after, MarkerPrinter.Sanitized)))
+            {
+                found.Add($"  {after.SourcePath}\n{parse.Mismatch}");
+            }
+        }
+
+        if (found.Count > 0)
+        {
+            Assert.Fail(string.Join("\n", [
+                $"The output of {recipe.Name} doesn't print back as the parser reads it, so the checks of a fresh " +
+                "parse of it didn't run:",
+                ..found,
+                "The next run parses this text, and gets a ParseError where the parser loses part of it. Either the " +
+                "recipe writes code that doesn't parse, or the parser has a bug that the output exposes."
+            ]));
+        }
     }
 
     /// <summary>
