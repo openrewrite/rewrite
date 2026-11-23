@@ -2080,4 +2080,205 @@ class ChangeDependencyTest implements RewriteTest {
             );
         }
     }
+
+    @Nested
+    class ExtraPropertyVersionVariable {
+        private static final String COMMONS_LANG_3_VERSION = "3\\.\\d+\\.\\d+";
+
+        private final ChangeDependency commonsLangToLang3 = new ChangeDependency(
+          "commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.x", null, null, null);
+
+        @Test
+        void extBlock() {
+            rewriteRun(
+              spec -> spec.recipe(commonsLangToLang3),
+              buildGradle(
+                """
+                  plugins {
+                      id 'java-library'
+                  }
+                  repositories {
+                      mavenCentral()
+                  }
+                  ext {
+                      commonsLangVersion = '2.6'
+                  }
+                  dependencies {
+                      implementation "commons-lang:commons-lang:$commonsLangVersion"
+                  }
+                  """,
+                spec -> spec.after(actual -> assertThat(actual)
+                  .containsPattern("commonsLangVersion = '" + COMMONS_LANG_3_VERSION + "'")
+                  .contains("implementation \"org.apache.commons:commons-lang3:$commonsLangVersion\"")
+                  .actual())
+              )
+            );
+        }
+
+        @Test
+        void extFieldAccess() {
+            rewriteRun(
+              spec -> spec.recipe(commonsLangToLang3),
+              buildGradle(
+                """
+                  plugins {
+                      id 'java-library'
+                  }
+                  repositories {
+                      mavenCentral()
+                  }
+                  ext.commonsLangVersion = '2.6'
+                  dependencies {
+                      implementation "commons-lang:commons-lang:$commonsLangVersion"
+                  }
+                  """,
+                spec -> spec.after(actual -> assertThat(actual)
+                  .containsPattern("ext.commonsLangVersion = '" + COMMONS_LANG_3_VERSION + "'")
+                  .contains("implementation \"org.apache.commons:commons-lang3:$commonsLangVersion\"")
+                  .actual())
+              )
+            );
+        }
+
+        @Test
+        void gradleProperties() {
+            rewriteRun(
+              spec -> spec.recipe(commonsLangToLang3),
+              properties(
+                """
+                  commonsLangVersion=2.6
+                  """,
+                spec -> spec.path("gradle.properties")
+                  .after(actual -> assertThat(actual)
+                    .containsPattern("commonsLangVersion=" + COMMONS_LANG_3_VERSION)
+                    .actual())
+              ),
+              buildGradle(
+                """
+                  plugins {
+                      id 'java-library'
+                  }
+                  repositories {
+                      mavenCentral()
+                  }
+                  dependencies {
+                      implementation "commons-lang:commons-lang:$commonsLangVersion"
+                  }
+                  """,
+                """
+                  plugins {
+                      id 'java-library'
+                  }
+                  repositories {
+                      mavenCentral()
+                  }
+                  dependencies {
+                      implementation "org.apache.commons:commons-lang3:$commonsLangVersion"
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void kotlinDslExtraDelegate() {
+            rewriteRun(
+              spec -> spec.recipe(commonsLangToLang3),
+              buildGradleKts(
+                """
+                  plugins {
+                      `java-library`
+                  }
+                  repositories {
+                      mavenCentral()
+                  }
+                  val commonsLangVersion by extra("2.6")
+                  dependencies {
+                      implementation("commons-lang:commons-lang:$commonsLangVersion")
+                  }
+                  """,
+                spec -> spec.after(actual -> assertThat(actual)
+                  .containsPattern("val commonsLangVersion by extra\\(\"" + COMMONS_LANG_3_VERSION + "\"\\)")
+                  .contains("implementation(\"org.apache.commons:commons-lang3:$commonsLangVersion\")")
+                  .actual())
+              )
+            );
+        }
+
+        @Test
+        void sharedWithUnrelatedDependencyGetsLiteralVersion() {
+            rewriteRun(
+              spec -> spec.recipe(commonsLangToLang3),
+              buildGradle(
+                """
+                  plugins {
+                      id 'java-library'
+                  }
+                  repositories {
+                      mavenCentral()
+                  }
+                  ext {
+                      sharedVersion = '2.6'
+                  }
+                  dependencies {
+                      implementation "commons-lang:commons-lang:$sharedVersion"
+                      implementation "commons-io:commons-io:$sharedVersion"
+                  }
+                  """,
+                spec -> spec.after(actual -> assertThat(actual)
+                  .contains("sharedVersion = '2.6'")
+                  .containsPattern("implementation \"org.apache.commons:commons-lang3:" + COMMONS_LANG_3_VERSION + "\"")
+                  .contains("implementation \"commons-io:commons-io:$sharedVersion\"")
+                  .actual())
+              )
+            );
+        }
+
+        @Test
+        void declaredInRootProjectUsedInSubproject() {
+            rewriteRun(
+              spec -> spec.recipe(commonsLangToLang3),
+              settingsGradle(
+                """
+                  rootProject.name = 'root'
+                  include 'app'
+                  """
+              ),
+              buildGradle(
+                """
+                  ext {
+                      commonsLangVersion = '2.6'
+                  }
+                  subprojects {
+                      repositories {
+                          mavenCentral()
+                      }
+                  }
+                  """,
+                spec -> spec.after(actual -> assertThat(actual)
+                  .containsPattern("commonsLangVersion = '" + COMMONS_LANG_3_VERSION + "'")
+                  .actual())
+              ),
+              buildGradle(
+                """
+                  plugins {
+                      id 'java-library'
+                  }
+                  dependencies {
+                      implementation "commons-lang:commons-lang:$commonsLangVersion"
+                  }
+                  """,
+                """
+                  plugins {
+                      id 'java-library'
+                  }
+                  dependencies {
+                      implementation "org.apache.commons:commons-lang3:$commonsLangVersion"
+                  }
+                  """,
+                spec -> spec.path("app/build.gradle")
+              )
+            );
+        }
+    }
 }

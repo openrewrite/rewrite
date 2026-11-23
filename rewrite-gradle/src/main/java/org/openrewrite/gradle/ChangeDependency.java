@@ -20,11 +20,11 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.gradle.internal.ChangeStringLiteral;
 import org.openrewrite.gradle.internal.ProjectRepositories;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.search.FindGradleProject;
+import org.openrewrite.gradle.trait.ExtraProperty;
 import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.gradle.trait.GradleMultiDependency;
 import org.openrewrite.gradle.trait.VersionCatalog;
@@ -278,6 +278,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
         TreeVisitor<?, ExecutionContext> gradleVisitor = Preconditions.check(new FindGradleProject(FindGradleProject.SearchCriteria.Marker).getVisitor(), new JavaIsoVisitor<ExecutionContext>() {
             final DependencyMatcher depMatcher = requireNonNull(DependencyMatcher.build(oldGroupId + ":" + oldArtifactId).getValue());
             final DependencyMatcher existingMatcher = requireNonNull(DependencyMatcher.build(newGroupId + ":" + newArtifactId).getValue());
+            final ExtraProperty.Matcher extraPropertyMatcher = new ExtraProperty.Matcher();
 
             @SuppressWarnings("NotNullFieldNotInitialized")
             GradleProject gradleProject;
@@ -451,23 +452,25 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
             }
 
             @Override
-            public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext ctx) {
-                J.VariableDeclarations.NamedVariable v = super.visitVariable(variable, ctx);
-                if (!canSafelyUpdateVariable(v.getSimpleName(), depMatcher, survivorAlsoAllowed(), acc)) {
-                    return v;
+            public @Nullable J postVisit(J tree, ExecutionContext ctx) {
+                J t = super.postVisit(tree, ctx);
+                if (t == null || acc.versionVariableUpdates.isEmpty()) {
+                    return t;
                 }
-                Object scanResult = acc.versionVariableUpdates.get(v.getSimpleName());
+                ExtraProperty property = extraPropertyMatcher.get(new Cursor(getCursor().getParent(), t)).orElse(null);
+                String name = property != null ? property.getName() :
+                        t instanceof J.VariableDeclarations.NamedVariable ? ((J.VariableDeclarations.NamedVariable) t).getSimpleName() : null;
+                if (name == null || !canSafelyUpdateVariable(name, depMatcher, survivorAlsoAllowed(), acc)) {
+                    return t;
+                }
+                Object scanResult = acc.versionVariableUpdates.get(name);
                 if (scanResult instanceof MavenDownloadingException) {
-                    return Markup.warn(v, (MavenDownloadingException) scanResult);
+                    return Markup.warn(t, (MavenDownloadingException) scanResult);
                 }
-                if (scanResult instanceof String && v.getInitializer() instanceof J.Literal) {
-                    String resolvedVersion = (String) scanResult;
-                    J.Literal initializer = (J.Literal) v.getInitializer();
-                    if (initializer.getValue() instanceof String && !resolvedVersion.equals(initializer.getValue())) {
-                        v = v.withInitializer(ChangeStringLiteral.withStringValue(initializer, resolvedVersion));
-                    }
+                if (scanResult instanceof String && property != null) {
+                    return property.withValue((String) scanResult).getTree();
                 }
-                return v;
+                return t;
             }
 
             private J.MethodInvocation updateDependency(J.MethodInvocation m, GradleDependency dep, ExecutionContext ctx) {
