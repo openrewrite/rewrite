@@ -19,6 +19,7 @@ import org.jetbrains.annotations.Contract;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
+import org.openrewrite.Cursor;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.*;
@@ -65,6 +66,10 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     @Nullable
     private transient MavenResolutionResult resolutionResult;
 
+    private transient Xml.@Nullable Document beforeRefresh;
+
+    private transient Xml.@Nullable Document afterRefresh;
+
     @Override
     public String getLanguage() {
         return "maven";
@@ -74,6 +79,27 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     public boolean isAcceptable(SourceFile sourceFile, P p) {
         return super.isAcceptable(sourceFile, p) &&
                 sourceFile.getMarkers().findFirst(MavenResolutionResult.class).isPresent();
+    }
+
+    @Override
+    public @Nullable Xml preVisit(Xml tree, P p) {
+        if (tree instanceof Xml.Document && p instanceof ExecutionContext) {
+            Xml.Document refreshed = UpdateMavenModel.withRefreshedModel((Xml.Document) tree, (ExecutionContext) p);
+            if (refreshed != tree) {
+                beforeRefresh = (Xml.Document) tree;
+                afterRefresh = refreshed;
+                setCursor(new Cursor(getCursor().getParentOrThrow(), refreshed));
+                return super.preVisit(refreshed, p);
+            }
+        }
+        return super.preVisit(tree, p);
+    }
+
+    @Override
+    public @Nullable Xml postVisit(Xml tree, P p) {
+        Xml t = super.postVisit(tree, p);
+        // Keep the refreshed model only alongside a real change, so preconditions don't see a marker swap as a match
+        return t != null && t == afterRefresh ? beforeRefresh : t;
     }
 
     protected MavenResolutionResult getResolutionResult() {
@@ -237,10 +263,10 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     }
 
     public void maybeUpdateModel() {
-        for (TreeVisitor<?, P> afterVisit : getAfterVisit()) {
-            if (afterVisit instanceof UpdateMavenModel) {
-                return;
-            }
+        // An earlier queued update would run before edits queued since, so only reuse it when nothing follows it
+        List<TreeVisitor<?, P>> afterVisit = getAfterVisit();
+        if (!afterVisit.isEmpty() && afterVisit.get(afterVisit.size() - 1) instanceof UpdateMavenModel) {
+            return;
         }
         doAfterVisit(new UpdateMavenModel<>());
     }
