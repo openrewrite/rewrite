@@ -412,8 +412,11 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                                 JavaType.FullyQualified type = (JavaType.FullyQualified) maybeType;
                                 if (originalType.getFullyQualifiedName().equals(type.getFullyQualifiedName())) {
                                     sf = (JavaSourceFile) service(ImportService.class).<ExecutionContext>removeImportVisitor(originalType.getFullyQualifiedName()).visitNonNull(sf, ctx, getCursor().getParentOrThrow());
-                                } else if (originalType.getOwningClass() != null && originalType.getOwningClass().getFullyQualifiedName().equals(type.getFullyQualifiedName())) {
-                                    sf = (JavaSourceFile) service(ImportService.class).<ExecutionContext>removeImportVisitor(originalType.getOwningClass().getFullyQualifiedName()).visitNonNull(sf, ctx, getCursor().getParentOrThrow());
+                                } else {
+                                    JavaType.FullyQualified owner = outerClassNamed(type);
+                                    if (owner != null) {
+                                        sf = (JavaSourceFile) service(ImportService.class).<ExecutionContext>removeImportVisitor(owner.getFullyQualifiedName()).visitNonNull(sf, ctx, getCursor().getParentOrThrow());
+                                    }
                                 }
                             }
                         }
@@ -443,6 +446,19 @@ public class ChangeType extends Recipe implements RenamingRecipe {
             }
 
             return j;
+        }
+
+        private JavaType.@Nullable FullyQualified outerClassNamed(JavaType.FullyQualified imported) {
+            for (JavaType.FullyQualified owner = originalType.getOwningClass(); owner != null; owner = owner.getOwningClass()) {
+                if (owner.getFullyQualifiedName().equals(imported.getFullyQualifiedName())) {
+                    return owner;
+                }
+                if (owner.getOwningClass() != null &&
+                    TypeUtils.fullyQualifiedNamesAreEqual(owner.getFullyQualifiedName(), owner.getOwningClass().getFullyQualifiedName())) {
+                    return null;
+                }
+            }
+            return null;
         }
 
         @Override
