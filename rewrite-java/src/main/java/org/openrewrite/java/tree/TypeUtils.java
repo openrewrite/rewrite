@@ -459,24 +459,33 @@ public class TypeUtils {
             boolean matchOverride,
             Predicate<String> matcher
     ) {
+        return isOfTypeWithName(type, matchOverride, matcher, Collections.newSetFromMap(new IdentityHashMap<>()));
+    }
+
+    private static boolean isOfTypeWithName(
+            JavaType.@Nullable FullyQualified type,
+            boolean matchOverride,
+            Predicate<String> matcher,
+            Set<JavaType> seen
+    ) {
         if (type == null || type instanceof JavaType.Unknown) {
             return false;
         }
         if (matcher.test(type.getFullyQualifiedName())) {
             return true;
         }
-        if (matchOverride) {
+        if (matchOverride && seen.add(type)) {
             if (!"java.lang.Object".equals(type.getFullyQualifiedName()) &&
-                isOfTypeWithName(TYPE_OBJECT, true, matcher)) {
+                isOfTypeWithName(TYPE_OBJECT, true, matcher, seen)) {
                 return true;
             }
 
-            if (isOfTypeWithName(type.getSupertype(), true, matcher)) {
+            if (isOfTypeWithName(type.getSupertype(), true, matcher, seen)) {
                 return true;
             }
 
             for (JavaType.FullyQualified anInterface : type.getInterfaces()) {
-                if (isOfTypeWithName(anInterface, true, matcher)) {
+                if (isOfTypeWithName(anInterface, true, matcher, seen)) {
                     return true;
                 }
             }
@@ -575,7 +584,8 @@ public class TypeUtils {
 
         // Handle fully qualified types (e.g., java.util.List, java.util.List<String>)
         if (to instanceof JavaType.FullyQualified) {
-            return isAssignableToFullyQualified((JavaType.FullyQualified) to, from, context);
+            return isAssignableToFullyQualified((JavaType.FullyQualified) to, from, context,
+                    Collections.newSetFromMap(new IdentityHashMap<>()));
         }
         // Handle arrays types (e.g., String[])
         else if (to instanceof JavaType.Array) {
@@ -670,15 +680,19 @@ public class TypeUtils {
     }
 
     // Contract, from is FullyQualified, Array or Primitive
-    private static boolean isAssignableToFullyQualified(JavaType.FullyQualified to, @Nullable JavaType from, ComparisonContext context) {
+    private static boolean isAssignableToFullyQualified(JavaType.FullyQualified to, @Nullable JavaType from,
+                                                        ComparisonContext context, Set<JavaType> seen) {
         if (from instanceof JavaType.FullyQualified) {
             JavaType.FullyQualified classFrom = (JavaType.FullyQualified) from;
             if (!TypeUtils.fullyQualifiedNamesAreEqual(to.getFullyQualifiedName(), classFrom.getFullyQualifiedName())) {
-                if (isAssignableToFullyQualified(to, maybeResolveParameters(classFrom, classFrom.getSupertype()), context)) {
+                if (!seen.add(from)) {
+                    return false;
+                }
+                if (isAssignableToFullyQualified(to, maybeResolveParameters(classFrom, classFrom.getSupertype()), context, seen)) {
                     return true;
                 }
                 for (JavaType.FullyQualified i : classFrom.getInterfaces()) {
-                    if (isAssignableToFullyQualified(to, maybeResolveParameters(classFrom, i), context)) {
+                    if (isAssignableToFullyQualified(to, maybeResolveParameters(classFrom, i), context, seen)) {
                         return true;
                     }
                 }
@@ -729,7 +743,7 @@ public class TypeUtils {
             String fqn = to.getFullyQualifiedName();
             return "java.io.Serializable".equals(fqn) || "java.lang.Cloneable".equals(fqn);
         } else if (from instanceof JavaType.Primitive) {
-            return isAssignableToFullyQualified(to, BOXED_TYPES.get(from), context);
+            return isAssignableToFullyQualified(to, BOXED_TYPES.get(from), context, seen);
         }
         return false;
     }
@@ -896,6 +910,14 @@ public class TypeUtils {
     }
 
     public static boolean isAssignableTo(String to, @Nullable JavaType from) {
+        return isAssignableTo(to, from, Collections.newSetFromMap(new IdentityHashMap<>()));
+    }
+
+    private static boolean isAssignableTo(String to, @Nullable JavaType from, Set<JavaType> seen) {
+        // the catch of Exception below is no backstop here, as StackOverflowError is an Error
+        if (from != null && !seen.add(from)) {
+            return false;
+        }
         try {
             if (from instanceof JavaType.FullyQualified) {
                 if (from instanceof JavaType.Parameterized) {
@@ -907,11 +929,11 @@ public class TypeUtils {
                 }
                 JavaType.FullyQualified classFrom = (JavaType.FullyQualified) from;
                 if (fullyQualifiedNamesAreEqual(to, classFrom.getFullyQualifiedName()) ||
-                    isAssignableTo(to, classFrom.getSupertype())) {
+                    isAssignableTo(to, classFrom.getSupertype(), seen)) {
                     return true;
                 }
                 for (JavaType.FullyQualified i : classFrom.getInterfaces()) {
-                    if (isAssignableTo(to, i)) {
+                    if (isAssignableTo(to, i, seen)) {
                         return true;
                     }
                 }
@@ -919,7 +941,7 @@ public class TypeUtils {
             } else if (from instanceof JavaType.GenericTypeVariable) {
                 JavaType.GenericTypeVariable genericFrom = (JavaType.GenericTypeVariable) from;
                 for (JavaType bound : genericFrom.getBounds()) {
-                    if (isAssignableTo(to, bound)) {
+                    if (isAssignableTo(to, bound, seen)) {
                         return true;
                     }
                 }
@@ -931,12 +953,12 @@ public class TypeUtils {
                     return isAssignableTo(JavaType.Primitive.String, from);
                 }
             } else if (from instanceof JavaType.Variable) {
-                return isAssignableTo(to, ((JavaType.Variable) from).getType());
+                return isAssignableTo(to, ((JavaType.Variable) from).getType(), seen);
             } else if (from instanceof JavaType.Method) {
-                return isAssignableTo(to, ((JavaType.Method) from).getReturnType());
+                return isAssignableTo(to, ((JavaType.Method) from).getReturnType(), seen);
             } else if (from instanceof JavaType.Intersection) {
                 for (JavaType bound : ((JavaType.Intersection) from).getBounds()) {
-                    if (isAssignableTo(to, bound)) {
+                    if (isAssignableTo(to, bound, seen)) {
                         return true;
                     }
                 }
@@ -959,15 +981,22 @@ public class TypeUtils {
     }
 
     public static boolean isAssignableTo(Predicate<JavaType> predicate, @Nullable JavaType from) {
+        return isAssignableTo(predicate, from, Collections.newSetFromMap(new IdentityHashMap<>()));
+    }
+
+    private static boolean isAssignableTo(Predicate<JavaType> predicate, @Nullable JavaType from, Set<JavaType> seen) {
+        if (from != null && !seen.add(from)) {
+            return false;
+        }
         try {
             if (from instanceof JavaType.FullyQualified) {
                 JavaType.FullyQualified classFrom = (JavaType.FullyQualified) from;
 
-                if (predicate.test(classFrom) || isAssignableTo(predicate, classFrom.getSupertype())) {
+                if (predicate.test(classFrom) || isAssignableTo(predicate, classFrom.getSupertype(), seen)) {
                     return true;
                 }
                 for (JavaType.FullyQualified anInterface : classFrom.getInterfaces()) {
-                    if (isAssignableTo(predicate, anInterface)) {
+                    if (isAssignableTo(predicate, anInterface, seen)) {
                         return true;
                     }
                 }
@@ -975,14 +1004,14 @@ public class TypeUtils {
             } else if (from instanceof JavaType.GenericTypeVariable) {
                 JavaType.GenericTypeVariable genericFrom = (JavaType.GenericTypeVariable) from;
                 for (JavaType bound : genericFrom.getBounds()) {
-                    if (isAssignableTo(predicate, bound)) {
+                    if (isAssignableTo(predicate, bound, seen)) {
                         return true;
                     }
                 }
             } else if (from instanceof JavaType.Variable) {
-                return isAssignableTo(predicate, ((JavaType.Variable) from).getType());
+                return isAssignableTo(predicate, ((JavaType.Variable) from).getType(), seen);
             } else if (from instanceof JavaType.Method) {
-                return isAssignableTo(predicate, ((JavaType.Method) from).getReturnType());
+                return isAssignableTo(predicate, ((JavaType.Method) from).getReturnType(), seen);
             } else if (from instanceof JavaType.Primitive) {
                 JavaType.Primitive primitive = (JavaType.Primitive) from;
                 return predicate.test(primitive);
@@ -1055,6 +1084,12 @@ public class TypeUtils {
             }
         }
 
+        // A cyclic hierarchy cannot say what overrides what, naming a method as much below the declaring
+        // type as above it. Checked after the search, which has already walked the closure on a miss.
+        if (methodResult.isPresent() && hierarchyIsCyclic(dt)) {
+            return Optional.empty();
+        }
+
         return methodResult
                 .filter(m -> !m.getFlags().contains(Flag.Private))
                 .filter(m -> !m.getFlags().contains(Flag.Static))
@@ -1064,6 +1099,35 @@ public class TypeUtils {
                 .filter(m -> m.getFlags().contains(Flag.Public) ||
                              (m.getFlags().contains(Flag.Protected) && !isInterface(dt)) ||
                              m.getDeclaringType().getPackageName().equals(dt.getPackageName()));
+    }
+
+    /**
+     * Whether the type is reachable from itself through supertypes and interfaces. Java source cannot
+     * declare that, but a model built for another language on the Java tree can: Go interfaces are
+     * structurally typed, so two declaring the same method satisfy each other, and the Go mapper
+     * records each as extending the other.
+     */
+    private static boolean hierarchyIsCyclic(JavaType.FullyQualified start) {
+        Set<JavaType.FullyQualified> seen = Collections.newSetFromMap(new IdentityHashMap<>());
+        Deque<JavaType.FullyQualified> remaining = new ArrayDeque<>();
+        addSupertypes(start, remaining);
+        while (!remaining.isEmpty()) {
+            JavaType.FullyQualified next = remaining.poll();
+            if (next == start) {
+                return true;
+            }
+            if (seen.add(next)) {
+                addSupertypes(next, remaining);
+            }
+        }
+        return false;
+    }
+
+    private static void addSupertypes(JavaType.FullyQualified type, Deque<JavaType.FullyQualified> remaining) {
+        if (type.getSupertype() != null) {
+            remaining.add(type.getSupertype());
+        }
+        remaining.addAll(type.getInterfaces());
     }
 
     private static boolean isInterface(JavaType.FullyQualified type) {
