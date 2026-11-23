@@ -188,8 +188,7 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
                                 }
                             }
 
-                            statements.add(i, addDependencyInvocation.withPrefix(
-                                    split.prependSameLine(addDependencyInvocation.getPrefix())));
+                            statements.add(i, split.prependSameLineTo(addDependencyInvocation));
                             break;
                         }
                     }
@@ -209,7 +208,7 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
                         }
                         CommentSplit split = CommentSplit.of(body.getEnd());
                         body = body.withEnd(split.getRest());
-                        statements.add(addDependencyInvocation.withPrefix(split.prependSameLine(addDependencyInvocation.getPrefix())));
+                        statements.add(split.prependSameLineTo(addDependencyInvocation));
                     }
                     return lambda.withBody(body.withStatements(statements));
                 }
@@ -506,22 +505,22 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
             } else if (lineBreak > 0 && suffix.charAt(lineBreak - 1) == '\r') {
                 lineBreak--;
             }
-            List<Comment> sameLine = new ArrayList<>(comments.subList(0, last + 1));
-            sameLine.set(last, comments.get(last).withSuffix(suffix.substring(0, lineBreak)));
+            String sameLineSuffix = suffix.substring(0, lineBreak);
             return new CommentSplit(
-                    Space.build(space.getWhitespace(), sameLine),
+                    Space.build(space.getWhitespace(), ListUtils.mapLast(comments.subList(0, last + 1),
+                            comment -> comment.withSuffix(sameLineSuffix))),
                     Space.build(suffix.substring(lineBreak), comments.subList(last + 1, comments.size())));
         }
 
-        Space prependSameLine(Space prefix) {
+        <J2 extends J> J2 prependSameLineTo(J2 tree) {
             if (sameLine.getComments().isEmpty()) {
-                return prefix;
+                return tree;
             }
-            List<Comment> comments = new ArrayList<>(sameLine.getComments());
-            Comment last = comments.get(comments.size() - 1);
-            comments.set(comments.size() - 1, last.withSuffix(last.getSuffix() + prefix.getWhitespace()));
-            comments.addAll(prefix.getComments());
-            return Space.build(sameLine.getWhitespace(), comments);
+            Space prefix = tree.getPrefix();
+            return tree.withPrefix(Space.build(sameLine.getWhitespace(), ListUtils.concatAll(
+                    ListUtils.mapLast(sameLine.getComments(),
+                            comment -> comment.withSuffix(comment.getSuffix() + prefix.getWhitespace())),
+                    prefix.getComments())));
         }
     }
 }
