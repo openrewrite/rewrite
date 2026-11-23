@@ -654,6 +654,9 @@ public class ImportLayoutStyle implements JavaStyle {
                     for (String className : index.classNamesByPackage.getOrDefault(packageOrType, emptyList())) {
                         nameToPackages.computeIfAbsent(className, p -> new HashSet<>(3)).add(packageOrType);
                     }
+                    for (String nestedName : index.nestedTypeNamesByOwner.getOrDefault(packageOrType, emptyList())) {
+                        nameToPackages.computeIfAbsent(nestedName, p -> new HashSet<>(3)).add(packageOrType);
+                    }
                     for (int position : index.positionsByName.getOrDefault(packageOrType, ClasspathIndex.NONE)) {
                         JavaType.FullyQualified type = ((List<JavaType.FullyQualified>) classpath).get(position);
                         // A type whose package is imported contributes its class name above, not its static members
@@ -666,6 +669,11 @@ public class ImportLayoutStyle implements JavaStyle {
             }
 
             for (JavaType.FullyQualified classGraphFqn : classpath) {
+                JavaType.FullyQualified owningClass = classGraphFqn.getOwningClass();
+                if (owningClass != null && checkPackageForClasses.contains(owningClass.getFullyQualifiedName())) {
+                    nameToPackages.computeIfAbsent(nestedTypeName(classGraphFqn), p -> new HashSet<>(3))
+                            .add(owningClass.getFullyQualifiedName());
+                }
                 String packageName = classGraphFqn.getPackageName();
                 if (checkPackageForClasses.contains(packageName)) {
                     String className = classGraphFqn.getClassName();
@@ -705,6 +713,8 @@ public class ImportLayoutStyle implements JavaStyle {
         private static int next;
 
         final Map<String, List<String>> classNamesByPackage = new HashMap<>();
+        // Binary names put nested types in the outer package, so a static import finds them by their owning class
+        final Map<String, List<String>> nestedTypeNamesByOwner = new HashMap<>();
         final Map<String, int[]> positionsByName = new HashMap<>();
         final Set<String> javaLangClassNames = new HashSet<>();
 
@@ -714,6 +724,11 @@ public class ImportLayoutStyle implements JavaStyle {
                 String packageName = type.getPackageName();
                 classNamesByPackage.computeIfAbsent(packageName, p -> new ArrayList<>()).add(type.getClassName());
                 positionsByName.merge(type.getFullyQualifiedName(), new int[]{i}, ClasspathIndex::concat);
+                JavaType.FullyQualified owningClass = type.getOwningClass();
+                if (owningClass != null) {
+                    nestedTypeNamesByOwner.computeIfAbsent(owningClass.getFullyQualifiedName(), o -> new ArrayList<>())
+                            .add(nestedTypeName(type));
+                }
                 if ("java.lang".equals(packageName)) {
                     javaLangClassNames.add(type.getClassName());
                 }
@@ -926,13 +941,13 @@ public class ImportLayoutStyle implements JavaStyle {
                         J.Identifier name = qualid.getName();
 
                         Set<String> typeNamesInThisGroup = importGroup.stream()
-                                .map(im -> im.getElement().getClassName())
+                                .map(ImportLayoutStyle::importedName)
                                 .collect(toSet());
 
                         Optional<String> oneOfTheTypesIsInAnotherGroupToo = groupedImports.values().stream()
                                 .filter(group -> group != importGroup)
                                 .flatMap(group -> group.stream()
-                                        .filter(im -> typeNamesInThisGroup.contains(im.getElement().getClassName())))
+                                        .filter(im -> typeNamesInThisGroup.contains(importedName(im))))
                                 .map(im -> im.getElement().getTypeName())
                                 .findAny();
 
@@ -1018,6 +1033,16 @@ public class ImportLayoutStyle implements JavaStyle {
             s.append(block).append("\n");
         }
         return s.toString();
+    }
+
+    private static String nestedTypeName(JavaType.FullyQualified nested) {
+        String className = nested.getClassName();
+        return className.substring(className.lastIndexOf('.') + 1);
+    }
+
+    private static String importedName(JRightPadded<J.Import> anImport) {
+        return anImport.getElement().isStatic() ?
+                anImport.getElement().getQualid().getSimpleName() : anImport.getElement().getClassName();
     }
 
     private static String packageOrOuterClassName(JRightPadded<J.Import> anImport) {

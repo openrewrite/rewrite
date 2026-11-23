@@ -117,8 +117,10 @@ public final class StaticImportBindings {
                 continue;
             }
             for (Map.Entry<String, String> binding : bindings.entrySet()) {
+                int namespace = namespaces.getOrDefault(binding.getKey(), 7);
                 if (!owner.equals(binding.getValue()) &&
-                        mayDeclare(anImport.getQualid().getTarget().getType(), binding.getKey(), namespaces.getOrDefault(binding.getKey(), 7), new HashSet<>())) {
+                        !((namespace & METHOD) == 0 && isSinglyImported(after, binding.getKey(), binding.getValue())) &&
+                        mayDeclare(anImport.getQualid().getTarget().getType(), binding.getKey(), namespace, new HashSet<>())) {
                     List<JRightPadded<J.Import>> group = originalGroups.get(owner);
                     if (group != null) {
                         imports = new ArrayList<>(imports);
@@ -218,6 +220,18 @@ public final class StaticImportBindings {
             }
         }
         return after.getPadding().withImports(imports);
+    }
+
+    /// A single static import of a field or type shadows any of that name a static import on demand brings in
+    /// (JLS 6.4.1), so a fold cannot rebind it. A method is shadowed only by signature, so overloads still compete.
+    private static boolean isSinglyImported(J.CompilationUnit cu, String name, String owner) {
+        for (J.Import anImport : cu.getImports()) {
+            if (anImport.isStatic() && name.equals(anImport.getQualid().getSimpleName()) &&
+                    owner.equals(anImport.getQualid().getTarget().printTrimmed())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean mayDeclare(@Nullable JavaType type, String name, int namespace, Set<String> visited) {
