@@ -32,6 +32,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.*;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
+import org.openrewrite.ipc.http.ProxyStatus;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.MavenParser;
@@ -132,6 +133,30 @@ class MavenPomDownloaderTest implements RewriteTest {
         assertThat(downloader.normalizeRepository(first, ctx, null)).isNull();
         assertThat(downloader.normalizeRepository(second, ctx, null)).isNull();
         assertThat(failed).containsExactly(first.getUri(), second.getUri());
+    }
+
+    @CsvSource(delimiter = '|', textBlock = """
+      https://repo.internal.example.com/maven/      | repo.internal.example.com                 | true
+      https://repo.internal.example.com/maven/      | repo.internal.example.com:443             | true
+      http://repo.internal.example.com/maven/       | repo.internal.example.com:80              | true
+      https://repo.internal.example.com/maven/      | https://REPO.internal.example.com/maven   | true
+      https://repo.internal.example.com:8443/maven/ | https://repo.internal.example.com:8443/   | true
+      https://repo.internal.example.com/maven/      | repo.internal.example.com:80              | false
+      http://repo.internal.example.com/maven/       | https://repo.internal.example.com/maven   | false
+      https://repo.internal.example.com:8443/maven/ | https://repo.internal.example.com/maven   | false
+      https://repo.internal.example.com/maven/      | https://mirror.internal.example.com/maven | false
+      """)
+    @ParameterizedTest
+    void proxyCouldNotConnectToTheNextHopItNames(String requested, String nextHop, boolean couldNotConnect) throws Exception {
+        // given
+        var e = new MavenPomDownloader.HttpSenderResponseException(null, 502, "",
+          List.of(new ProxyStatus("test-proxy", nextHop, "connection_timeout", null, null)));
+
+        // when
+        boolean result = MavenPomDownloader.proxyCouldNotConnect(URI.create(requested).toURL(), e);
+
+        // then
+        assertThat(result).isEqualTo(couldNotConnect);
     }
 
     @Nested
@@ -1585,6 +1610,87 @@ class MavenPomDownloaderTest implements RewriteTest {
                   .isInstanceOf(MavenDownloadingException.class);
                 assertThat(mockRepo.getRequestCount()).isEqualTo(2);
             });
+        }
+
+        // %1$s is the repository's host, %2$d its port, %3$s its host in upper case
+        @CsvSource(delimiter = '|', textBlock = """
+          502 | test-proxy; next-hop="%1$s:%2$d"; error=connection_timeout
+          504 | test-proxy; next-hop="%1$s:%2$d"; error=connection_timeout
+          502 | test-proxy; next-hop="%1$s"; error=connection_timeout
+          502 | test-proxy; next-hop="%3$s:%2$d"; error=connection_timeout
+          502 | gateway; next-hop="https://%1$s:%2$d/maven/"; error=connection_timeout
+          502 | test-proxy; next-hop="%1$s:%2$d"; error=dns_error
+          502 | test-proxy; next-hop="%1$s:%2$d"; error=connection_refused
+          """)
+        @ParameterizedTest
+        void endpointAProxyCouldNotConnectToIsProbedOncePerRun(int status, String proxyStatus) throws IOException {
+            var ctx = MavenExecutionContextView.view(this.ctx);
+            List<String> failed = new ArrayList<>();
+            List<String> skipped = new ArrayList<>();
+            ctx.setResolutionListener(new ResolutionEventListener() {
+                @Override
+                public void repositoryAccessFailed(String uri, Throwable t) {
+                    failed.add(uri);
+                }
+
+                @Override
+                public void repositoryAccessFailedPreviously(String uri) {
+                    skipped.add(uri);
+                }
+            });
+            try (MockWebServer mockRepo = proxyStatusServer(status, proxyStatus)) {
+                String uri = "https://%s:%d/maven/".formatted(mockRepo.getHostName(), mockRepo.getPort());
+                var downloader = new MavenPomDownloader(emptyMap(), ctx);
+
+                assertThat(downloader.normalizeRepository(MavenRepository.builder().id("a").uri(uri).build(), ctx, null)).isNull();
+                int probes = mockRepo.getRequestCount();
+                assertThat(downloader.normalizeRepository(MavenRepository.builder().id("b").uri(uri).build(), ctx, null)).isNull();
+
+                assertThat(mockRepo.getRequestCount()).isEqualTo(probes);
+                assertThat(failed).containsExactly(uri);
+                assertThat(skipped).containsExactly(uri);
+            }
+        }
+
+        // %1$s is the repository's host, %2$d its port
+        @CsvSource(delimiter = '|', textBlock = """
+          502 | test-proxy; next-hop="%1$s:%2$d"; error=connection_read_timeout
+          502 | test-proxy; next-hop="%1$s:%2$d"; error=connection_terminated
+          502 | test-proxy; next-hop="repo.internal.example.com:%2$d"; error=connection_timeout
+          502 | test-proxy; next-hop="%1$s:1"; error=connection_timeout
+          502 | test-proxy; error=connection_timeout
+          404 | gateway; next-hop="https://mirror.example.com/maven"; error=connection_timeout
+          404 | test-proxy; next-hop="%1$s:%2$d"; error=connection_timeout
+          502 | ''
+          """)
+        @ParameterizedTest
+        void endpointIsKeptUnlessAProxyCouldNotConnectToIt(int status, String proxyStatus) throws IOException {
+            try (MockWebServer mockRepo = proxyStatusServer(status, proxyStatus)) {
+                var repository = MavenRepository.builder()
+                  .id("id")
+                  .uri("https://%s:%d/maven/".formatted(mockRepo.getHostName(), mockRepo.getPort()))
+                  .build();
+
+                var normalized = new MavenPomDownloader(emptyMap(), ctx).normalizeRepository(repository, MavenExecutionContextView.view(ctx), null);
+
+                assertThat(normalized).isEqualTo(repository);
+                assertThat(MavenExecutionContextView.view(ctx).getUnreachableEndpoints()).isEmpty();
+            }
+        }
+
+        private MockWebServer proxyStatusServer(int status, String proxyStatus) throws IOException {
+            MockWebServer mockRepo = getMockServer();
+            mockRepo.setDispatcher(new Dispatcher() {
+                @Override
+                public MockResponse dispatch(RecordedRequest recordedRequest) {
+                    MockResponse response = new MockResponse().setResponseCode(status);
+                    return proxyStatus.isEmpty() ? response :
+                      response.addHeader("Proxy-Status", proxyStatus.formatted(mockRepo.getHostName(), mockRepo.getPort(),
+                        mockRepo.getHostName().toUpperCase(Locale.ROOT)));
+                }
+            });
+            mockRepo.start();
+            return mockRepo;
         }
 
         @Issue("https://github.com/openrewrite/rewrite/issues/8682")
