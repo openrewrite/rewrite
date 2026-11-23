@@ -65,7 +65,7 @@ public abstract class RewriteTest
 
         // An .editorconfig styles the C# sources, as SolutionParser has it do, and is not a source itself
         var editorConfigSpecs = specs.Where(EditorConfigSources.Is).ToList();
-        if (editorConfigSpecs.Any(s => s.After != null))
+        if (editorConfigSpecs.Any(s => s.After != null || s.ExpectsDeletion))
         {
             throw new ArgumentException("An .editorconfig styles the sources of a test, and no recipe changes it.");
         }
@@ -73,6 +73,16 @@ public abstract class RewriteTest
         if (specs.Any(s => s.Skipped && (s.After != null || s.AfterFromActual != null)))
         {
             throw new ArgumentException("A source the test skips is kept from the recipe, which doesn't change it.");
+        }
+        if (specs.Any(s => s.ExpectsDeletion &&
+                           (s.After != null || s.AfterFromActual != null || s.Skipped || !s.AfterRecipeHooks.IsEmpty)))
+        {
+            throw new ArgumentException(
+                "A source the test expects the recipe to delete has no content or trees after the recipe.");
+        }
+        if (recipeSpec.Recipe == null && specs.Any(s => s.ExpectsDeletion))
+        {
+            throw new ArgumentException("A source the test expects deleted needs a recipe to delete it.");
         }
         using var editorConfigs = editorConfigSpecs.Count > 0 ? new EditorConfigSources(editorConfigSpecs) : null;
 
@@ -273,6 +283,14 @@ public abstract class RewriteTest
                     var result = results.FirstOrDefault(r =>
                         r.Before != null && r.Before.Id == source.Id);
 
+                    if (spec.ExpectsDeletion)
+                    {
+                        Assert.True(result is { After: null },
+                            result == null
+                                ? $"Recipe was expected to delete {source.SourcePath} but did not change it."
+                                : $"Recipe was expected to delete {source.SourcePath} but changed it instead.");
+                        continue;
+                    }
                     var expected = spec.AfterFromActual != null
                         ? spec.AfterFromActual(result?.After is { } printed ? PrintTree(printed) : spec.Before)
                         : spec.After;
@@ -972,6 +990,7 @@ public record SourceSpec(
     internal Func<string, string?>? AfterFromActual { get; init; }
     internal bool PlainXml { get; init; }
     internal bool Skipped { get; private init; }
+    internal bool ExpectsDeletion { get; private init; }
     internal ImmutableList<Func<SourceFile, SourceFile>> BeforeRecipeHooks { get; private init; } = [];
     internal ImmutableList<Action<SourceFile, SourceFile>> AfterRecipeHooks { get; private init; } = [];
     internal ImmutableArray<string>? ProjectTargetFrameworks { get; private init; }
@@ -1045,6 +1064,12 @@ public record SourceSpec(
     /// the recipe runs on use. The output compiles with it, and the recipe doesn't change it.
     /// </summary>
     public SourceSpec Skip() => this with { Skipped = true };
+
+    /// <summary>
+    /// Expects the recipe to delete the source, which it still runs on, such as a <c>packages.config</c> that a
+    /// recipe migrates to <c>PackageReference</c> items, and which has no <see cref="After"/> content then.
+    /// </summary>
+    public SourceSpec Deleted() => this with { ExpectsDeletion = true };
 
     /// <summary>
     /// Assertions on the source after the recipe ran, which get the source as the last expected cycle left it, or as
