@@ -31,13 +31,13 @@ public class UnchangedIsSameInstanceTests : RewriteTest
     [Fact]
     public void ARecipeThatDeletesAnUnchangedSourceFails()
     {
-        var failure = Assert.Throws<TrueException>(() => RewriteRun(
+        var failure = Assert.Throws<FailException>(() => RewriteRun(
             spec => spec.SetRecipe(new DeleteCompilationUnit()),
             CSharp("class C { }")
         ));
 
-        Assert.Equal("Recipe made unexpected changes to a source file that was not expected to change.",
-            failure.Message);
+        Assert.Equal("Recipe deleted source.cs, which the test doesn't expect it to delete. " +
+                     "Mark the source Deleted() when the recipe is to delete it.", failure.Message);
     }
 
     [Fact]

@@ -81,6 +81,53 @@ public class DeletedSourceTests : RewriteTest
         Assert.Equal("A source the test expects deleted needs a recipe to delete it.", failure.Message);
     }
 
+    [Fact]
+    public void ASourceExpectedDeletedInNoCycleIsRejected()
+    {
+        var failure = Assert.Throws<ArgumentException>(() => RewriteRun(
+            spec => spec.SetRecipe(new DeleteSource("Legacy.cs")).SetExpectedCyclesThatMakeChanges(0),
+            CSharp("class Legacy { }", sourcePath: "Legacy.cs").Deleted()
+        ));
+
+        Assert.Equal("A source the test expects deleted needs a cycle that makes changes to delete it.",
+            failure.Message);
+    }
+
+    [Fact]
+    public void ASkippedSourceExpectedDeletedIsRejected()
+    {
+        var failure = Assert.Throws<ArgumentException>(() => RewriteRun(
+            spec => spec.SetRecipe(new DeleteSource("Legacy.cs")),
+            CSharp("class Legacy { }", sourcePath: "Legacy.cs").Skip().Deleted()
+        ));
+
+        Assert.Equal("A source the test skips is kept from the recipe, which doesn't change it.", failure.Message);
+    }
+
+    [Fact]
+    public void ASourceTheRecipeDeletesFailsWhenExpectedUnchanged()
+    {
+        var failure = Assert.Throws<FailException>(() => RewriteRun(
+            spec => spec.SetRecipe(new DeleteSource("Legacy.cs")),
+            CSharp("class Legacy { }", sourcePath: "Legacy.cs")
+        ));
+
+        Assert.Equal("Recipe deleted Legacy.cs, which the test doesn't expect it to delete. " +
+                     "Mark the source Deleted() when the recipe is to delete it.", failure.Message);
+    }
+
+    [Fact]
+    public void ASourceTheRecipeDeletesFailsWhenExpectedChanged()
+    {
+        var failure = Assert.Throws<FailException>(() => RewriteRun(
+            spec => spec.SetRecipe(new DeleteSource("Legacy.cs")),
+            CSharp("class Legacy { }", "class Legacy2 { }", "Legacy.cs")
+        ));
+
+        Assert.Equal("Recipe deleted Legacy.cs, which the test doesn't expect it to delete. " +
+                     "Mark the source Deleted() when the recipe is to delete it.", failure.Message);
+    }
+
     private class DeleteSource(string sourcePath) : global::OpenRewrite.Core.Recipe
     {
         public override string DisplayName => "Delete a source";

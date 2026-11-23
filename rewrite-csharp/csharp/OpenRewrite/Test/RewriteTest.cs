@@ -70,12 +70,12 @@ public abstract class RewriteTest
             throw new ArgumentException("An .editorconfig styles the sources of a test, and no recipe changes it.");
         }
         specs = specs.Where(s => !EditorConfigSources.Is(s)).ToArray();
-        if (specs.Any(s => s.Skipped && (s.After != null || s.AfterFromActual != null)))
+        if (specs.Any(s => s.Skipped && (s.After != null || s.AfterFromActual != null || s.ExpectsDeletion)))
         {
             throw new ArgumentException("A source the test skips is kept from the recipe, which doesn't change it.");
         }
         if (specs.Any(s => s.ExpectsDeletion &&
-                           (s.After != null || s.AfterFromActual != null || s.Skipped || !s.AfterRecipeHooks.IsEmpty)))
+                           (s.After != null || s.AfterFromActual != null || !s.AfterRecipeHooks.IsEmpty)))
         {
             throw new ArgumentException(
                 "A source the test expects the recipe to delete has no content or trees after the recipe.");
@@ -83,6 +83,11 @@ public abstract class RewriteTest
         if (recipeSpec.Recipe == null && specs.Any(s => s.ExpectsDeletion))
         {
             throw new ArgumentException("A source the test expects deleted needs a recipe to delete it.");
+        }
+        if (recipeSpec.ExpectedCyclesThatMakeChanges == 0 && specs.Any(s => s.ExpectsDeletion))
+        {
+            throw new ArgumentException(
+                "A source the test expects deleted needs a cycle that makes changes to delete it.");
         }
         using var editorConfigs = editorConfigSpecs.Count > 0 ? new EditorConfigSources(editorConfigSpecs) : null;
 
@@ -291,6 +296,11 @@ public abstract class RewriteTest
                                 : $"Recipe was expected to delete {source.SourcePath} but changed it instead.");
                         continue;
                     }
+                    if (result is { After: null })
+                    {
+                        Assert.Fail($"Recipe deleted {source.SourcePath}, which the test doesn't expect it to delete. " +
+                                    "Mark the source Deleted() when the recipe is to delete it.");
+                    }
                     var expected = spec.AfterFromActual != null
                         ? spec.AfterFromActual(result?.After is { } printed ? PrintTree(printed) : spec.Before)
                         : spec.After;
@@ -315,7 +325,7 @@ public abstract class RewriteTest
                         Assert.True(result == null || result.Before == result.After,
                             "Recipe made unexpected changes to a source file that was not expected to change.");
                     }
-                    AfterRecipe(spec, source, result == null ? source : result.After);
+                    AfterRecipe(spec, source, result?.After ?? source);
                 }
                 AssertOutputCompiles(recipeSpec, [..run.Finals, ..skipped], setup, projects);
 
@@ -381,16 +391,8 @@ public abstract class RewriteTest
         }
     }
 
-    private static void AfterRecipe(SourceSpec spec, SourceFile before, SourceFile? after)
+    private static void AfterRecipe(SourceSpec spec, SourceFile before, SourceFile after)
     {
-        if (spec.AfterRecipeHooks.IsEmpty)
-        {
-            return;
-        }
-        if (after == null)
-        {
-            Assert.Fail($"The recipe deleted {before.SourcePath}, which has AfterRecipe assertions.");
-        }
         foreach (var assertion in spec.AfterRecipeHooks)
         {
             assertion(before, after);
