@@ -1434,6 +1434,10 @@ public class GroovyParserVisitor {
             return parenthesized;
         }
 
+        /**
+         * Any statement can carry labels (e.g. Spock's {@code given:}/{@code when:}/{@code then:}),
+         * so every statement visitor goes through this.
+         */
         private Statement labeled(org.codehaus.groovy.ast.stmt.Statement statement, Supplier<Statement> labeledTree) {
             List<J.Label> labels = null;
             if (statement.getStatementLabels() != null && !statement.getStatementLabels().isEmpty()) {
