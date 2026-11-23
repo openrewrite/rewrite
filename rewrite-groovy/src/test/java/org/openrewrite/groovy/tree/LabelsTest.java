@@ -306,6 +306,36 @@ class LabelsTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/9873")
     @Test
+    void twoLabelsWrapASwitch() {
+        rewriteRun(
+          groovy(
+            """
+              when:
+              b: switch (x) {
+                default:
+                  break b
+              }
+              """,
+            spec -> spec.beforeRecipe(cu -> {
+                assertThat(cu.getStatements().get(0)).isInstanceOf(J.Label.class);
+                J.Label when = (J.Label) cu.getStatements().get(0);
+                assertThat(when.getLabel().getSimpleName()).isEqualTo("when");
+                assertThat(when.getStatement()).isInstanceOf(J.Label.class);
+                J.Label b = (J.Label) when.getStatement();
+                assertThat(b.getLabel().getSimpleName()).isEqualTo("b");
+                assertThat(b.getStatement()).isInstanceOf(J.Switch.class);
+                J.Case default_ = (J.Case) ((J.Switch) b.getStatement()).getCases().getStatements().get(0);
+                assertThat(default_.getStatements().get(0)).isInstanceOf(J.Break.class);
+                J.Break break_ = (J.Break) default_.getStatements().get(0);
+                assertThat(break_.getLabel()).isNotNull();
+                assertThat(break_.getLabel().getSimpleName()).isEqualTo("b");
+            })
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9873")
+    @Test
     void labelsOnAForAndAnIfParseAlready() {
         rewriteRun(
           groovy(
