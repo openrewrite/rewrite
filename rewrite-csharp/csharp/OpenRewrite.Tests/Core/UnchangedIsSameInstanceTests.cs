@@ -29,6 +29,18 @@ namespace OpenRewrite.Tests.Core;
 public class UnchangedIsSameInstanceTests : RewriteTest
 {
     [Fact]
+    public void ARecipeThatDeletesAnUnchangedSourceFails()
+    {
+        var failure = Assert.Throws<TrueException>(() => RewriteRun(
+            spec => spec.SetRecipe(new DeleteCompilationUnit()),
+            CSharp("class C { }")
+        ));
+
+        Assert.Equal("Recipe made unexpected changes to a source file that was not expected to change.",
+            failure.Message);
+    }
+
+    [Fact]
     public void ARecipeThatReturnsAnEqualCopyFails()
     {
         var failure = Assert.Throws<FailException>(() => RewriteRun(
@@ -41,6 +53,19 @@ public class UnchangedIsSameInstanceTests : RewriteTest
             "OpenRewrite.Tests.Core.UnchangedIsSameInstanceTests+CopyCompilationUnit returned a new tree for " +
             "source.cs that prints the same, so the run reports the source file as changed, with an empty diff.",
             failure.Message);
+    }
+
+    private class DeleteCompilationUnit : global::OpenRewrite.Core.Recipe
+    {
+        public override string DisplayName => "Delete the compilation unit";
+        public override string Description => "Deletes every compilation unit.";
+
+        public override ITreeVisitor<ExecutionContext> GetVisitor() => new Visitor();
+
+        private class Visitor : CSharpVisitor<ExecutionContext>
+        {
+            public override J? Visit(global::OpenRewrite.Core.Tree? tree, ExecutionContext ctx) => null;
+        }
     }
 
     private class CopyCompilationUnit : global::OpenRewrite.Core.Recipe

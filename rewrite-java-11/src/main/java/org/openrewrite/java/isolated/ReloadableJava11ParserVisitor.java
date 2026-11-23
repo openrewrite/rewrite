@@ -1543,18 +1543,18 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
         if (vartype == null) {
             typeExpr = null;
         } else if (endPos(vartype) < 0) {
-            if (!hasLombokGeneratedSymbol(node)) {
+            String keyword = inferredTypeKeyword(node);
+            if (keyword == null) {
                 // Inferred lambda parameter types and unresolved types have no source representation.
                 typeExpr = null;
             } else {
                 Space space = whitespace();
-                boolean lombokVal = source.startsWith("val", cursor);
-                cursor += 3; // skip `val` or `var`
+                cursor += keyword.length();
                 typeExpr = new J.Identifier(randomId(),
                         space,
                         Markers.build(singletonList(JavaVarKeyword.build())),
                         emptyList(),
-                        lombokVal ? "val" : "var",
+                        keyword,
                         typeMapping.type(vartype),
                         null);
             }
@@ -2008,6 +2008,18 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
             }
         }
         return true;
+    }
+
+    /**
+     * The {@code var} or {@code val} written where javac inferred the type, or null if neither precedes the name.
+     * Read from the source, because Lombok releases differ in whether they leave an annotation on the declaration.
+     */
+    private @Nullable String inferredTypeKeyword(JCVariableDecl node) {
+        int idx = indexOfNextNonWhitespace(cursor, source);
+        if (idx < 0 || idx + 3 >= node.pos || Character.isJavaIdentifierPart(source.charAt(idx + 3))) {
+            return null;
+        }
+        return source.startsWith("var", idx) ? "var" : source.startsWith("val", idx) ? "val" : null;
     }
 
     private static boolean hasLombokGeneratedSymbol(Tree t) {

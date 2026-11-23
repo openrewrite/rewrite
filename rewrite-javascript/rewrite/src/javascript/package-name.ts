@@ -25,6 +25,19 @@ export function moduleName(specifier: string): string {
     return specifier.startsWith('node:') && isBuiltin(bare) ? bare : specifier;
 }
 
+/** A declaration file's whole extension: `.d.ts`, `.d.mts`, `.d.cts`, or `.d.css.ts` for a file of another kind. */
+const DECLARATION_FILE_EXTENSION = /\.d(\.[^/.]+)?\.[cm]?ts$/;
+
+/**
+ * The module a file is: its path without its extension, as TypeScript names it. A declaration file's
+ * extension is all of `.d.ts`, so `helpers.d.ts` is the module `helpers`, as `helpers.js` beside it is.
+ */
+export function moduleOfFile(file: string): string {
+    return DECLARATION_FILE_EXTENSION.test(file) ?
+        file.replace(DECLARATION_FILE_EXTENSION, '') :
+        file.replace(/\.[^/.]+$/, '');
+}
+
 /** Whether two specifiers import the same module, so `node:util` and `util` match. */
 export function sameModule(a: string, b: string): boolean {
     return a === b || moduleName(a) === moduleName(b);

@@ -59,7 +59,7 @@ public class ScalaScopeService extends ScopeService {
             for (J parameter : ((J.Lambda) tree).getParameters().getParameters()) {
                 if (parameter instanceof J.Identifier) {
                     bindings.add(new Scope.Binding(new Cursor(parameters, parameter), ((J.Identifier) parameter).getSimpleName(),
-                            Scope.Namespace.VARIABLE, scope, ((J.Identifier) parameter).getFieldType()));
+                            Scope.Namespace.VARIABLE, scope, ((J.Identifier) parameter).getFieldType(), this));
                 }
             }
         }
@@ -79,7 +79,8 @@ public class ScalaScopeService extends ScopeService {
                     String name = ((J.Import) statement).getQualid().getSimpleName();
                     if (!"_".equals(name) && !"*".equals(name)) {
                         for (Scope.Namespace namespace : Scope.Namespace.values()) {
-                            bindings.add(new Scope.Binding(anchor, name, namespace, scope, ((J.Import) statement).getQualid().getType()));
+                            bindings.add(new Scope.Binding(anchor, name, namespace, scope,
+                                    ((J.Import) statement).getQualid().getType(), this));
                         }
                     }
                 }
@@ -126,6 +127,15 @@ public class ScalaScopeService extends ScopeService {
         return super.namespaceOf(identifier);
     }
 
+    /**
+     * Scala has no static context. A class, trait or object nested in a class has the instance of the outer one,
+     * and an object's members belong to the one instance there is.
+     */
+    @Override
+    public boolean isStaticContext(Cursor cursor) {
+        return false;
+    }
+
     @Override
     public boolean localMayShadowLocal() {
         return true;
@@ -156,7 +166,7 @@ public class ScalaScopeService extends ScopeService {
                 public J.Identifier visitIdentifier(J.Identifier identifier, List<Scope.Binding> found) {
                     if (isPatternVariable(getCursor())) {
                         found.add(new Scope.Binding(getCursor(), identifier.getSimpleName(), Scope.Namespace.VARIABLE,
-                                scope, identifier.getFieldType()));
+                                scope, identifier.getFieldType(), ScalaScopeService.this));
                     }
                     return identifier;
                 }

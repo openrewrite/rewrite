@@ -580,7 +580,7 @@ class ParseProjectIntegTest {
                 .findFirst()
                 .orElseThrow();
 
-        List<J.Literal> literals = new java.util.ArrayList<>();
+        List<J.Literal> literals = new ArrayList<>();
         new JavaIsoVisitor<Integer>() {
             @Override
             public J.Literal visitLiteral(J.Literal literal, Integer p) {

@@ -81,6 +81,57 @@ public class ConfigureExecutionContextTests : RewriteTest
         Assert.Contains("put \"renamed\" on the ExecutionContext", failure.Message);
     }
 
+    [Fact]
+    public void ATestAssertsOnWhatTheRecipeLeftOnTheContext()
+    {
+        var seen = false;
+        RewriteRun(
+            spec => spec
+                .SetRecipe(new RenameCallsInProjectsTargeting("net6.0",
+                    ctx => MSBuildProjectHelper.MarkAttestationStale(ctx, "src/A/A.csproj")))
+                .ConfigureExecutionContext(CaptureNet6Project)
+                .ExpectExecutionContext(ctx => seen = MSBuildProjectHelper.IsAttestationStale(ctx, "src/A/A.csproj")),
+            CSharp(Calls("Foo"), Calls("Bar"))
+        );
+
+        Assert.True(seen);
+    }
+
+    [Fact]
+    public void AFailingAssertionOnTheContextFailsTheTest()
+    {
+        Assert.Throws<TrueException>(() => RewriteRun(
+            spec => spec
+                .SetRecipe(new RenameCallsInProjectsTargeting("net6.0"))
+                .ConfigureExecutionContext(CaptureNet6Project)
+                .ExpectExecutionContext(ctx => Assert.True(MSBuildProjectHelper.IsAttestationStale(ctx, "src/A/A.csproj"))),
+            CSharp(Calls("Foo"), Calls("Bar"))
+        ));
+    }
+
+    [Fact]
+    public void AFollowUpRunFindsWhatAnEarlierRunLeftOnTheContext()
+    {
+        var ctx = new ExecutionContext();
+        RewriteRun(
+            spec => spec
+                .SetRecipe(new RenameCallsInProjectsTargeting("net6.0",
+                    c => MSBuildProjectHelper.MarkAttestationStale(c, "src/A/A.csproj")))
+                .ConfigureExecutionContext(CaptureNet6Project)
+                .SetExecutionContext(ctx),
+            CSharp(Calls("Foo"), Calls("Bar"))
+        );
+
+        RewriteRun(
+            spec => spec
+                .SetRecipe(new RenameCallsInProjectsTargeting("net6.0"))
+                .SetExecutionContext(ctx)
+                .ExpectExecutionContext(c =>
+                    Assert.True(MSBuildProjectHelper.IsAttestationStale(c, "src/A/A.csproj"))),
+            CSharp(Calls("Foo"), Calls("Bar"))
+        );
+    }
+
     /// <summary>Renames calls to Foo when the build files of the run name the framework.</summary>
     private class RenameCallsInProjectsTargeting(string framework, Action<ExecutionContext>? onRename = null)
         : global::OpenRewrite.Core.Recipe

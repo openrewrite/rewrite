@@ -314,6 +314,57 @@ class RecipeClassLoaderTest {
     }
 
     @Test
+    void parsersAndTheTypeCacheComeFromTheHostWhenTheRecipeShipsThemToo(@TempDir Path tempDir) throws Exception {
+        String[] shared = {
+          "org/openrewrite/gradle/GradleParser",
+          "org/openrewrite/gradle/GradleParser$Builder",
+          "org/openrewrite/java/internal/JavaTypeCache"
+        };
+
+        Path parentLib = stubLib(tempDir.resolve("parent"), shared);
+        Path childLib = stubLib(tempDir.resolve("child"), shared);
+
+        try (URLClassLoader parent = new URLClassLoader(new URL[]{parentLib.toUri().toURL()}, null);
+             RecipeClassLoader classLoader = new RecipeClassLoader(new URL[]{childLib.toUri().toURL()}, parent)) {
+            for (String type : shared) {
+                assertThat(classLoader.loadClass(type.replace('/', '.')).getClassLoader())
+                  .as(type)
+                  .isSameAs(parent);
+            }
+        }
+    }
+
+    @Test
+    void groovyParserComesFromTheLoaderGradleParserComesFrom(@TempDir Path tempDir) throws Exception {
+        String gradleParser = "org/openrewrite/gradle/GradleParser";
+        String groovyParser = "org/openrewrite/groovy/GroovyParser";
+        Path hostWithGroovy = stubLib(tempDir.resolve("host"), groovyParser);
+        Path recipeWithGradle = stubLib(tempDir.resolve("recipeWithGradle"), groovyParser, gradleParser);
+        Path recipeWithGroovy = stubLib(tempDir.resolve("recipeWithGroovy"), groovyParser);
+
+        try (URLClassLoader parent = new URLClassLoader(new URL[]{hostWithGroovy.toUri().toURL()}, null);
+             RecipeClassLoader classLoader = new RecipeClassLoader(
+               new URL[]{recipeWithGradle.toUri().toURL()}, parent)) {
+            assertThat(classLoader.loadClass(groovyParser.replace('/', '.')).getClassLoader()).isSameAs(classLoader);
+        }
+
+        try (URLClassLoader parent = new URLClassLoader(new URL[]{hostWithGroovy.toUri().toURL()}, null);
+             RecipeClassLoader classLoader = new RecipeClassLoader(
+               new URL[]{recipeWithGroovy.toUri().toURL()}, parent)) {
+            assertThat(classLoader.loadClass(groovyParser.replace('/', '.')).getClassLoader()).isSameAs(parent);
+        }
+    }
+
+    private static Path stubLib(Path lib, String... internalNames) throws Exception {
+        for (String internalName : internalNames) {
+            Path classFile = lib.resolve(internalName + ".class");
+            Files.createDirectories(classFile.getParent());
+            Files.write(classFile, stubClass(internalName));
+        }
+        return lib;
+    }
+
+    @Test
     void allResourcesShouldFindFromParentLast(@TempDir Path tempDir) throws Exception {
         Path lib1 = tempDir.resolve("lib1");
         Files.createDirectories(lib1);

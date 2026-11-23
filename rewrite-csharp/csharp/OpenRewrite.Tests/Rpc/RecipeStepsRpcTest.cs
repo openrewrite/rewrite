@@ -14,9 +14,7 @@
  * limitations under the License.
  */
 using OpenRewrite.Core;
-using OpenRewrite.Core.Rpc;
 using OpenRewrite.CSharp;
-using OpenRewrite.CSharp.Rpc;
 using OpenRewrite.Java;
 using OpenRewrite.Test;
 using ExecutionContext = OpenRewrite.Core.ExecutionContext;
@@ -34,9 +32,9 @@ public class RecipeStepsRpcTest(RpcFixture fixture) : RpcRewriteTest(fixture)
     {
         RewriteRun(
             spec => spec.SetRecipes(
-                new ChangeMethodName("Test Touch()", "BeforeRecipe"),
+                ChangeMethodName("Test Touch()", "BeforeRecipe"),
                 new ChangeLiteral("1", "0"),
-                new ChangeMethodName("System.Security.Cryptography.HashAlgorithm ComputeHash(byte[], int, int)",
+                ChangeMethodName("System.Security.Cryptography.HashAlgorithm ComputeHash(byte[], int, int)",
                     "ComputeHashForTest")),
             CSharp(
                 """
@@ -59,26 +57,12 @@ public class RecipeStepsRpcTest(RpcFixture fixture) : RpcRewriteTest(fixture)
         );
     }
 
-    private class ChangeMethodName(string methodPattern, string newMethodName)
-        : global::OpenRewrite.Core.Recipe, IDelegatesTo
-    {
-        public override string DisplayName => "Change method name";
-        public override string Description => "Renames a method in Java.";
-
-        public string JavaRecipeName => "org.openrewrite.java.ChangeMethodName";
-
-        public Dictionary<string, object?> Options => new()
+    private static RemoteRecipe ChangeMethodName(string methodPattern, string newMethodName) =>
+        new("org.openrewrite.java.ChangeMethodName", new()
         {
             ["methodPattern"] = methodPattern,
             ["newMethodName"] = newMethodName
-        };
-
-        public override ITreeVisitor<ExecutionContext> GetVisitor()
-        {
-            var rpc = RewriteRpcServer.Current!;
-            return new RpcVisitor(rpc, rpc.PrepareRecipeOnRemote(JavaRecipeName, Options).EditVisitor);
-        }
-    }
+        });
 
     private class ChangeLiteral(string from, string to) : global::OpenRewrite.Core.Recipe
     {

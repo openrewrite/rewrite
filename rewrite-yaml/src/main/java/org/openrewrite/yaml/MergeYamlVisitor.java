@@ -23,6 +23,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.style.Style;
 import org.openrewrite.yaml.MergeYaml.InsertMode;
+import org.openrewrite.yaml.internal.MultilineScalarIndents;
 import org.openrewrite.yaml.trait.BlockScalar;
 import org.openrewrite.yaml.tree.Yaml;
 
@@ -39,7 +40,6 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static org.openrewrite.Cursor.ROOT_VALUE;
-import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.internal.ListUtils.*;
 import static org.openrewrite.internal.StringUtils.*;
 import static org.openrewrite.yaml.MergeYaml.InsertMode.*;
@@ -84,6 +84,8 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
 
     private boolean shouldAutoFormat = true;
 
+    private MultilineScalarIndents multilineScalarIndents = new MultilineScalarIndents();
+
     @Nullable
     private String linebreak = null;
 
@@ -100,6 +102,17 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
     public MergeYamlVisitor(Yaml.Block block, Yaml incoming, boolean acceptTheirs, @Nullable String objectIdentifyingProperty, boolean shouldAutoFormat, @Nullable InsertMode insertMode, @Nullable String insertProperty) {
         this(block, incoming, acceptTheirs, objectIdentifyingProperty, insertMode, insertProperty);
         this.shouldAutoFormat = shouldAutoFormat;
+    }
+
+    private MergeYamlVisitor<P> nested(Yaml.Block block, Yaml incoming) {
+        MergeYamlVisitor<P> nested = new MergeYamlVisitor<>(block, incoming, acceptTheirs, objectIdentifyingProperty,
+                shouldAutoFormat, insertMode, insertProperty);
+        nested.multilineScalarIndents = multilineScalarIndents;
+        return nested;
+    }
+
+    private <Y extends Yaml> Y autoFormatMultiline(Y y, P p, Cursor cursor) {
+        return multilineScalarIndents.applyDuring(cursor, () -> autoFormat(y, p, cursor));
     }
 
     @Override
@@ -136,7 +149,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                 // Distribute the incoming mapping to each entry in the sequence
                 return existingSeq.withEntries(map(existingSeq.getEntries(), (i, existingSeqEntry) ->
                         existingSeqEntry.withBlock((Yaml.Block)
-                                new MergeYamlVisitor<>(existingSeqEntry.getBlock(), incoming, acceptTheirs, objectIdentifyingProperty, shouldAutoFormat, insertMode, insertProperty)
+                                nested(existingSeqEntry.getBlock(), incoming)
                                         .visitNonNull(existingSeqEntry.getBlock(), p, new Cursor(getCursor(), existingSeqEntry))
                         )
                 ));
@@ -216,10 +229,11 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                 if (keyMatches(existingEntry, incomingEntry)) {
                     Yaml.Block value = incomingEntry.getValue();
                     if (shouldAutoFormat && incomingEntry.getValue() instanceof Yaml.Scalar && hasLineBreak(((Yaml.Scalar) value).getValue())) {
-                        MultilineScalarChanged marker = new MultilineScalarChanged(randomId(), false, calculateMultilineIndent(incomingEntry));
-                        value = autoFormat(value.withMarkers(value.getMarkers().add(marker)), p);
+                        Yaml.Scalar multiline = multilineScalarIndents.add((Yaml.Scalar) value, false,
+                                calculateMultilineIndent(incomingEntry, 0));
+                        value = autoFormatMultiline(multiline, p, getCursor());
                     }
-                    Yaml mergedYaml = new MergeYamlVisitor<>(existingEntry.getValue(), value, acceptTheirs, objectIdentifyingProperty, shouldAutoFormat, insertMode, insertProperty)
+                    Yaml mergedYaml = nested(existingEntry.getValue(), value)
                             .visitNonNull(existingEntry.getValue(), p, new Cursor(cursor, existingEntry));
                     return existingEntry.withValue((Yaml.Block) mergedYaml);
                 }
@@ -240,13 +254,13 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                 }
             }
             if (shouldAutoFormat && it.getValue() instanceof Yaml.Scalar && hasLineBreak(((Yaml.Scalar) it.getValue()).getValue())) {
-                MultilineScalarChanged marker = new MultilineScalarChanged(randomId(), true, calculateMultilineIndent(it));
-                it = it.withValue(it.getValue().withMarkers(it.getValue().getMarkers().add(marker)));
+                it = it.withValue(multilineScalarIndents.add((Yaml.Scalar) it.getValue(), true,
+                        calculateMultilineIndent(it, 0)));
             }
             if (!shouldAutoFormat) {
                 return it;
             }
-            return alignToIndent((Yaml.Mapping.Entry) autoFormat(it, p, cursor), existingIndent);
+            return alignToIndent(autoFormatMultiline(it, p, cursor), existingIndent);
         });
 
         // Merge existing and new entries together
@@ -459,12 +473,16 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                     return e1;
                 }
             }
-            return entry;
+            if (!shouldAutoFormat) {
+                return entry;
+            }
+            int firstKeyIndent = Math.max(lastLineIndent(entry.getPrefix()), 0) + 1 + incomingMapping.getPrefix().length();
+            return entry.withBlock(addMultilineScalarIndents(incomingMapping, firstKeyIndent));
         });
 
         List<Yaml.Sequence.Entry> entries = concatAll(
                 filter(s1.getEntries(), it -> !mutatedEntries.contains(it)),
-                map(mutatedEntries, it -> autoFormat(it, p, cursor)),
+                map(mutatedEntries, it -> autoFormatMultiline(it, p, cursor)),
                 it -> {
                     if (it.getBlock() instanceof Yaml.Scalar) {
                         return ((Yaml.Scalar) it.getBlock()).getValue();
@@ -478,6 +496,19 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                 }).ls;
 
         return s1.withEntries(keepInlineCommentOnItsLine(s1, entries));
+    }
+
+    // An appended sequence entry skips mergeMapping, which is where multiline scalars get their indent
+    private Yaml.Mapping addMultilineScalarIndents(Yaml.Mapping mapping, int firstKeyIndent) {
+        return mapping.withEntries(map(mapping.getEntries(), it -> {
+            if (it.getValue() instanceof Yaml.Scalar && hasLineBreak(((Yaml.Scalar) it.getValue()).getValue())) {
+                return it.withValue(multilineScalarIndents.add((Yaml.Scalar) it.getValue(), true,
+                        calculateMultilineIndent(it, firstKeyIndent + it.getPrefix().length())));
+            } else if (it.getValue() instanceof Yaml.Mapping) {
+                return it.withValue(addMultilineScalarIndents((Yaml.Mapping) it.getValue(), 0));
+            }
+            return it;
+        }));
     }
 
     private static boolean containsScalar(Yaml.Sequence sequence, String value) {
@@ -710,9 +741,12 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
         return idx < 0 ? -1 : prefix.length() - idx - 1;
     }
 
-    private int calculateMultilineIndent(Yaml.Mapping.Entry entry) {
-        String[] lines = LINE_BREAK.split(entry.getPrefix(), -1);
-        int keyIndent = (lines.length > 1 ? lines[lines.length - 1] : "").length();
+    /// @param sameLineKeyIndent the key's column when it shares a line with what precedes it, such as a sequence dash
+    private int calculateMultilineIndent(Yaml.Mapping.Entry entry, int sameLineKeyIndent) {
+        int keyIndent = lastLineIndent(entry.getPrefix());
+        if (keyIndent < 0) {
+            keyIndent = sameLineKeyIndent;
+        }
         int indent = minCommonIndentLevel(substringOfAfterFirstLineBreak(((Yaml.Scalar) entry.getValue()).getValue()));
         return Math.max(indent - keyIndent, 0);
     }

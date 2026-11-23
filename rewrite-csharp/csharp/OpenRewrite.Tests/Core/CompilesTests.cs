@@ -53,6 +53,17 @@ public class CompilesTests : RewriteTest
         }
         """;
 
+    private const string Hashing =
+        """
+        using static System.HashCode;
+
+        class C
+        {
+            int Foo(int a, int b) => a ^ b;
+            int M(int a, int b) => Foo(a, b);
+        }
+        """;
+
     [Fact]
     public void OutputThatCompilesPasses()
     {
@@ -115,6 +126,18 @@ public class CompilesTests : RewriteTest
             "namespace 'System.Runtime.Remoting' (are you missing an assembly reference?)\n" +
             "source.cs:\n" + Remoting.Replace("=> Foo(o)", "=> Bar(o)"),
             failure.Message);
+    }
+
+    [Fact]
+    public void TheRecipeRunsAgainOnItsOutputAsTheFrameworkItMigratesToBindsIt()
+    {
+        RewriteRun(
+            spec => spec
+                .SetRecipe(new CombineWhereItResolves())
+                .SetReferenceAssemblies(Assemblies.Net48)
+                .ExpectOutputCompiles(Assemblies.Net90),
+            CSharp(Hashing, Hashing.Replace("=> Foo(a, b)", "=> Combine(a, b)"))
+        );
     }
 
     [Fact]
@@ -284,6 +307,70 @@ public class CompilesTests : RewriteTest
         );
     }
 
+    [Fact]
+    public void TheInputFailsToCompileWithTheErrorsTheTestExpectsAndTheOutputGetsItsOwnReferences()
+    {
+        var library = CSharpCompilation.Create("Library",
+            [CSharpSyntaxTree.ParseText("public static class Library { public static int Bar() => 1; }")],
+            ReferenceAssemblies(Assemblies.Net90),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        const string source = "class C { int M() => Library.Foo(); }";
+        RewriteRun(
+            spec => spec
+                .SetRecipe(new RenameCalls("Foo", "Bar"))
+                .ExpectInputCompiles(expectedErrors: ["CS0103"])
+                .ExpectOutputCompiles(addReferences: [library.ToMetadataReference()]),
+            CSharp(source, source.Replace("Foo()", "Bar()"))
+        );
+    }
+
+    [Fact]
+    public void ReferencesOnlyTheOutputGetsAreNotThereForTheInput()
+    {
+        var library = CSharpCompilation.Create("Library",
+            [CSharpSyntaxTree.ParseText("public static class Library { public static int Bar() => 1; }")],
+            ReferenceAssemblies(Assemblies.Net90),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        const string source = "class C { int M() => Library.Bar(); }";
+
+        var failure = Assert.Throws<FailException>(() => RewriteRun(
+            spec => spec
+                .ExpectInputCompiles()
+                .ExpectOutputCompiles(addReferences: [library.ToMetadataReference()]),
+            CSharp(source)
+        ));
+
+        Assert.Contains("error CS0103: The name 'Library' does not exist in the current context", failure.Message);
+    }
+
+    [Fact]
+    public void AnExpectedErrorTheCompilerDoesNotReportFails()
+    {
+        var failure = Assert.Throws<FailException>(() => RewriteRun(
+            spec => spec.SetRecipe(new RenameCalls("Foo", "Bar")).ExpectInputCompiles(expectedErrors: ["CS0103"]),
+            CSharp(Calls("Foo"), Calls("Bar"))
+        ));
+
+        Assert.Equal(
+            "The sources of the test were expected to fail to compile with CS0103, which the compiler didn't report.",
+            failure.Message);
+    }
+
+    [Fact]
+    public void ErrorsOtherThanTheExpectedOnesStillFail()
+    {
+        var failure = Assert.Throws<FailException>(() => RewriteRun(
+            spec => spec.SetRecipe(new RenameCalls("Foo", "Bar")).ExpectInputCompiles(expectedErrors: ["CS0246"]),
+            CSharp(Calls("Baz"))
+        ));
+
+        Assert.StartsWith(
+            "The sources of the test don't compile against net9.0, so types the recipe looks at are missing or " +
+            "wrong:\n" +
+            "  source.cs(7,9): error CS0103: The name 'Baz' does not exist in the current context\n",
+            failure.Message);
+    }
+
     private static IEnumerable<MetadataReference> ReferenceAssemblies(
         Microsoft.CodeAnalysis.Testing.ReferenceAssemblies assemblies) =>
         assemblies.ResolveAsync(LanguageNames.CSharp, CancellationToken.None).GetAwaiter().GetResult();
@@ -303,6 +390,33 @@ public class CompilesTests : RewriteTest
                 return visited is MethodInvocation call && call.Name.SimpleName == from
                     ? call.WithName(call.Name.WithSimpleName(to))
                     : visited;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Renames the calls to Foo to calls to <c>HashCode.Combine</c>, and those of Combine that don't resolve back, as
+    /// on a framework without it.
+    /// </summary>
+    private class CombineWhereItResolves : global::OpenRewrite.Core.Recipe
+    {
+        public override string DisplayName => "Combine where it resolves";
+        public override string Description => "Renames calls to Foo to Combine, and back where Combine doesn't resolve.";
+
+        public override ITreeVisitor<ExecutionContext> GetVisitor() => new Visitor();
+
+        private class Visitor : CSharpVisitor<ExecutionContext>
+        {
+            public override J VisitMethodInvocation(MethodInvocation method, ExecutionContext ctx)
+            {
+                var visited = base.VisitMethodInvocation(method, ctx);
+                return visited switch
+                {
+                    MethodInvocation { Name.SimpleName: "Foo" } call => call.WithName(call.Name.WithSimpleName("Combine")),
+                    MethodInvocation { Name.SimpleName: "Combine", MethodType: null } call =>
+                        call.WithName(call.Name.WithSimpleName("Foo")),
+                    _ => visited
+                };
             }
         }
     }

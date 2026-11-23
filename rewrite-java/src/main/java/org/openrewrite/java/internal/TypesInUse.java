@@ -632,8 +632,16 @@ public class TypesInUse {
             MethodEntry[] entries = new MethodEntry[methods.size()];
             int i = 0;
             for (JavaType.Method m : methods) {
-                String fqn = m.getDeclaringType().getFullyQualifiedName();
+                JavaType.FullyQualified declaringType = m.getDeclaringType();
+                // Foreign-language methods can have no Java declaring type to index.
+                if (declaringType == null) {
+                    continue;
+                }
+                String fqn = declaringType.getFullyQualifiedName();
                 entries[i++] = new MethodEntry(fqn.indexOf('$') < 0 ? fqn : fqn.replace('$', '.'), m);
+            }
+            if (i != entries.length) {
+                entries = Arrays.copyOf(entries, i);
             }
             Arrays.sort(entries, Comparator.comparing(e -> e.key));
             return entries;

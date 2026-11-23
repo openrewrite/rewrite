@@ -27,17 +27,39 @@ import org.openrewrite.table.SourcesFileResults;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Schedules an in-process run so that the checks {@link RewriteTest} sets on its sources see each cycle.
  */
 @RequiredArgsConstructor
 final class CheckingScheduler extends RecipeScheduler {
+    /**
+     * Templates cache what they compile on the root cursor, which the scheduler clears after every cycle.
+     * Every root cursor of the run, and of the reruns and probes that copy its context, is handed the cache kept here.
+     */
+    static final String RUN_TEMPLATE_CACHE = "org.openrewrite.test.templateCache";
+
+    private static final String TEMPLATE_CACHE = "__org.openrewrite.java.internal.template.JavaTemplateParser.cache__";
+
     private final @Nullable UnchangedTreeIdentity unchangedTreeIdentity;
     private final @Nullable AccumulatorContents accumulatorContents;
     private final @Nullable Collection<String> scannerEdits;
 
-    static RecipeScheduler of(LargeSourceSet sources) {
+    static RecipeScheduler of(LargeSourceSet sources, ExecutionContext ctx) {
+        RecipeScheduler scheduler = checking(sources);
+        Map<?, ?> templates = ctx.getMessage(RUN_TEMPLATE_CACHE);
+        if (templates != null) {
+            scheduler.rootCursorProvider(() -> {
+                Cursor root = new Cursor(null, Cursor.ROOT_VALUE);
+                root.putMessage(TEMPLATE_CACHE, templates);
+                return root;
+            });
+        }
+        return scheduler;
+    }
+
+    private static RecipeScheduler checking(LargeSourceSet sources) {
         if (!(sources instanceof LargeSourceSetCheckingExpectedCycles)) {
             return new RecipeScheduler();
         }

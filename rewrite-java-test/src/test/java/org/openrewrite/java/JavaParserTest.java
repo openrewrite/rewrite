@@ -28,6 +28,8 @@ import org.openrewrite.Tree;
 import org.openrewrite.java.format.NormalizeTabsOrSpaces;
 import org.openrewrite.java.search.FindCompileErrors;
 import org.openrewrite.java.style.IntelliJ;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RewriteTest;
 
@@ -564,5 +566,26 @@ class JavaParserTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Test
+    void findTypeResolvesAgainstTheClasspath() {
+        JavaParser parser = JavaParser.fromJavaVersion()
+          .classpathFromResources(new InMemoryExecutionContext(), "guava")
+          .build();
+
+        JavaType.FullyQualified list = parser.findType("com.google.common.collect.ImmutableList");
+        assertThat(list).isInstanceOf(JavaType.Class.class);
+        assertThat(list.getMethods()).anyMatch(m -> "copyOf".equals(m.getName()));
+        assertThat(TypeUtils.isAssignableTo("java.util.List", list)).isTrue();
+
+        assertThat(parser.findType("com.google.common.collect.ImmutableList$Builder"))
+          .as("A nested type is named by its binary name")
+          .satisfies(builder -> assertThat(builder.getFullyQualifiedName()).isEqualTo("com.google.common.collect.ImmutableList$Builder"));
+    }
+
+    @Test
+    void findTypeOfATypeNotOnTheClasspathIsNull() {
+        assertThat(JavaParser.fromJavaVersion().build().findType("com.google.common.collect.ImmutableList")).isNull();
     }
 }

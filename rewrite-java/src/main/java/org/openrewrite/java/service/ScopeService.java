@@ -195,6 +195,241 @@ public class ScopeService {
     }
 
     /**
+     * Whether the tree at the cursor is a static context (JLS 8.1.3), so that code under it runs with no instance
+     * of the class around it. An enum constant is one for its arguments and its body. A class or field an
+     * interface declares is one without the modifier (JLS 9.3 and 9.5), which its attribution tells.
+     */
+    public boolean isStaticContext(Cursor cursor) {
+        Object tree = cursor.getValue();
+        if (tree instanceof J.ClassDeclaration) {
+            J.ClassDeclaration classDeclaration = (J.ClassDeclaration) tree;
+            return classDeclaration.hasModifier(J.Modifier.Type.Static) ||
+                   classDeclaration.getKind() != J.ClassDeclaration.Kind.Type.Class ||
+                   classDeclaration.getType() != null && classDeclaration.getType().hasFlags(Flag.Static);
+        }
+        return tree instanceof J.MethodDeclaration
+                && ((J.MethodDeclaration) tree).hasModifier(J.Modifier.Type.Static) ||
+               tree instanceof J.VariableDeclarations && isStaticField((J.VariableDeclarations) tree) ||
+               tree instanceof J.Block && ((J.Block) tree).isStatic() ||
+               tree instanceof J.EnumValue;
+    }
+
+    private static boolean isStaticField(J.VariableDeclarations declarations) {
+        if (declarations.hasModifier(J.Modifier.Type.Static)) {
+            return true;
+        }
+        for (J.VariableDeclarations.NamedVariable variable : declarations.getVariables()) {
+            if (variable.getVariableType() != null && variable.getVariableType().hasFlags(Flag.Static)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Whether code at the position uses the member of a class before the language has initialized it. Java's rules
+     * are those for a forward reference to a field (JLS 8.3.3) and for an enum's static field read while a constant
+     * is constructed (JLS 8.9.2).
+     */
+    public boolean isUsedBeforeInitialized(Scope.Binding member, Cursor position) {
+        return isForwardReference(member, position) || isEnumFieldReadDuringConstruction(member, position);
+    }
+
+    /**
+     * Whether the use of the field at the position is a forward reference (JLS 8.3.3). It is one in an initializer
+     * of the field's own class that stands before the field's declaration or is the field's own, where both are
+     * static or neither is, unless the use is the target of an assignment. A class body between the two lifts the
+     * restriction.
+     */
+    private boolean isForwardReference(Scope.Binding field, Cursor position) {
+        Cursor variable = field.getTree() instanceof J.Identifier ?
+                field.getCursor().getParentTreeCursor() : field.getCursor();
+        if (!(variable.getValue() instanceof J.VariableDeclarations.NamedVariable) || isAssignedAt(position)) {
+            return false;
+        }
+        Cursor declaration = variable.getParentTreeCursor();
+        Cursor body = declaration.getParentTreeCursor();
+        if (!(declaration.getValue() instanceof J.VariableDeclarations && body.getValue() instanceof J.Block)) {
+            return false;
+        }
+        J declarator = null;
+        J member = null;
+        Cursor memberAt = position;
+        for (Cursor c = position; c != null && !isTree(c, body); c = c.getParent()) {
+            if (c.getValue() instanceof J) {
+                if (c.getValue() instanceof J.ClassDeclaration ||
+                    c.getValue() instanceof J.NewClass && member == ((J.NewClass) c.getValue()).getBody()) {
+                    return false;
+                }
+                declarator = member;
+                member = c.getValue();
+                memberAt = c;
+            }
+        }
+        boolean initializesStatic;
+        if (member instanceof J.Block) {
+            initializesStatic = isStaticContext(memberAt);
+        } else if (member instanceof J.VariableDeclarations) {
+            initializesStatic = ((J.VariableDeclarations) member).hasModifier(J.Modifier.Type.Static);
+        } else if (member instanceof J.EnumValueSet) {
+            initializesStatic = true;
+        } else {
+            return false;
+        }
+        J.VariableDeclarations declared = declaration.getValue();
+        if (initializesStatic != declared.hasModifier(J.Modifier.Type.Static)) {
+            return false;
+        }
+        if (member.getId().equals(declared.getId())) {
+            return declarator instanceof J.VariableDeclarations.NamedVariable &&
+                   indexOf(declared.getVariables(), declarator) <=
+                   indexOf(declared.getVariables(), variable.getValue());
+        }
+        List<Statement> members = body.<J.Block>getValue().getStatements();
+        int at = indexOf(members, member);
+        return at >= 0 && at < indexOf(members, declared);
+    }
+
+    private static boolean isAssignedAt(Cursor position) {
+        if (!(position.getValue() instanceof J.Identifier)) {
+            return false;
+        }
+        Object parent = position.getParentTreeCursor().getValue();
+        return parent instanceof J.Assignment &&
+               ((J.Assignment) parent).getVariable().getId().equals(position.<J>getValue().getId());
+    }
+
+    /**
+     * Whether the position reads an enum's own static field while a constant of the enum is constructed, which is
+     * before the field is assigned (JLS 8.9.2). That is in a constructor, an instance initializer or an instance
+     * variable initializer of the enum or of the body of one of its constants, unless the field is a constant
+     * variable. Any other class body in between lifts the restriction.
+     */
+    private boolean isEnumFieldReadDuringConstruction(Scope.Binding field, Cursor position) {
+        Cursor scope = field.getScope().getCursor();
+        if (field.getNamespace() != Scope.Namespace.VARIABLE || !(scope.getValue() instanceof J.ClassDeclaration)) {
+            return false;
+        }
+        J.ClassDeclaration enumClass = scope.getValue();
+        if (enumClass.getKind() != J.ClassDeclaration.Kind.Type.Enum || !isStatic(field, scope) ||
+            isConstantVariable(field)) {
+            return false;
+        }
+        // A field the body does not declare is the enum's own only where attribution says so
+        if (!(field.getTree() instanceof J.Identifier) && !(field.getType() instanceof JavaType.Variable &&
+              TypeUtils.isOfType(((JavaType.Variable) field.getType()).getOwner(), enumClass.getType()))) {
+            return false;
+        }
+        J member = null;
+        Cursor memberAt = position;
+        Cursor body = position;
+        while (!(body.getValue() instanceof J.Block && isClassBody(body))) {
+            if (body.getValue() instanceof J) {
+                member = body.getValue();
+                memberAt = body;
+            }
+            body = body.getParent();
+            if (body == null) {
+                return false;
+            }
+        }
+        Cursor constructed = body.getParentTreeCursor();
+        if (constructed.getValue() instanceof J.NewClass &&
+            constructed.getParentTreeCursor().getValue() instanceof J.EnumValue) {
+            constructed = constructed.dropParentUntil(J.ClassDeclaration.class::isInstance);
+        }
+        if (!isTree(constructed, scope)) {
+            return false;
+        }
+        return member instanceof J.MethodDeclaration && isConstructor((J.MethodDeclaration) member) ||
+               member instanceof J.Block && !isStaticContext(memberAt) ||
+               member instanceof J.VariableDeclarations &&
+               !((J.VariableDeclarations) member).hasModifier(J.Modifier.Type.Static);
+    }
+
+    /**
+     * Whether the member needs no instance of the class binding it, going by its attributed flags or by a static
+     * context between its declaration and that class.
+     */
+    private boolean isStatic(Scope.Binding member, Cursor scope) {
+        JavaType type = member.getType();
+        if (type instanceof JavaType.Variable && ((JavaType.Variable) type).hasFlags(Flag.Static)) {
+            return true;
+        }
+        if (member.getTree() instanceof J.Identifier) {
+            for (Cursor c = member.getCursor().getParent(); c != null && !isTree(c, scope); c = c.getParent()) {
+                if (isStaticContext(c)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean isClassBody(Cursor block) {
+        Object owner = block.getParentTreeCursor().getValue();
+        return owner instanceof J.ClassDeclaration || owner instanceof J.NewClass;
+    }
+
+    /**
+     * Whether the field is a constant variable (JLS 4.12.4): final, of a primitive type or {@code String}, and
+     * initialized with a constant expression. An initializer that names another constant is not taken for one.
+     */
+    private static boolean isConstantVariable(Scope.Binding field) {
+        Cursor variable = field.getDeclaration().orElse(null);
+        if (variable == null || !(variable.getValue() instanceof J.VariableDeclarations.NamedVariable)) {
+            return false;
+        }
+        Object declaration = variable.getParentTreeCursor().getValue();
+        J.VariableDeclarations.NamedVariable named = variable.getValue();
+        return declaration instanceof J.VariableDeclarations &&
+               ((J.VariableDeclarations) declaration).hasModifier(J.Modifier.Type.Final) &&
+               isConstantType(named.getType()) &&
+               named.getInitializer() != null && isConstantExpression(named.getInitializer());
+    }
+
+    private static boolean isConstantType(@Nullable JavaType type) {
+        return type instanceof JavaType.Primitive || TypeUtils.isString(type);
+    }
+
+    /**
+     * Whether the expression is a constant expression (JLS 15.29) that names no variable.
+     */
+    private static boolean isConstantExpression(J expression) {
+        if (expression instanceof J.Literal) {
+            return ((J.Literal) expression).getValue() != null;
+        } else if (expression instanceof J.Parentheses) {
+            return isConstantExpression(((J.Parentheses<?>) expression).getTree());
+        } else if (expression instanceof J.Unary) {
+            return isConstantExpression(((J.Unary) expression).getExpression());
+        } else if (expression instanceof J.Binary) {
+            J.Binary binary = (J.Binary) expression;
+            return isConstantExpression(binary.getLeft()) && isConstantExpression(binary.getRight());
+        } else if (expression instanceof J.Ternary) {
+            J.Ternary ternary = (J.Ternary) expression;
+            return isConstantExpression(ternary.getCondition()) && isConstantExpression(ternary.getTruePart()) &&
+                   isConstantExpression(ternary.getFalsePart());
+        } else if (expression instanceof J.TypeCast) {
+            J.TypeCast cast = (J.TypeCast) expression;
+            return isConstantType(cast.getType()) && isConstantExpression(cast.getExpression());
+        }
+        return false;
+    }
+
+    private static boolean isTree(Cursor cursor, Cursor other) {
+        return cursor.getValue() instanceof J && cursor.<J>getValue().getId().equals(other.<J>getValue().getId());
+    }
+
+    private static int indexOf(List<? extends J> trees, J tree) {
+        for (int i = 0; i < trees.size(); i++) {
+            if (trees.get(i).getId().equals(tree.getId())) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /**
      * The namespace the identifier at the cursor refers into, or null where it declares a name or names a member
      * selected with a dot, an enum constant in a case label, a label or a package. An ambiguous name such as
      * {@code A} in {@code A.b} reads a type only where attribution marks it one and no variable of its name is in
@@ -307,13 +542,13 @@ public class ScopeService {
         return false;
     }
 
-    private static Scope.Binding declared(Cursor identifier, Cursor scope, Scope.Namespace namespace) {
+    private Scope.Binding declared(Cursor identifier, Cursor scope, Scope.Namespace namespace) {
         J.Identifier ident = identifier.getValue();
         return new Scope.Binding(identifier, ident.getSimpleName(), namespace, scope,
-                namespace == Scope.Namespace.VARIABLE ? ident.getFieldType() : ident.getType());
+                namespace == Scope.Namespace.VARIABLE ? ident.getFieldType() : ident.getType(), this);
     }
 
-    private static void imports(Cursor scope, JavaSourceFile cu, List<Scope.Binding> bindings) {
+    private void imports(Cursor scope, JavaSourceFile cu, List<Scope.Binding> bindings) {
         List<Scope.Binding> onDemand = new ArrayList<>();
         for (J.Import anImport : cu.getImports()) {
             Cursor importCursor = new Cursor(scope, anImport);
@@ -322,7 +557,7 @@ public class ScopeService {
                 if (!"*".equals(name)) {
                     J.Identifier alias = anImport.getAlias();
                     bindings.add(new Scope.Binding(importCursor, alias != null ? alias.getSimpleName() : name,
-                            Scope.Namespace.TYPE, scope, anImport.getQualid().getType()));
+                            Scope.Namespace.TYPE, scope, anImport.getQualid().getType(), this));
                 }
                 continue;
             }
@@ -330,7 +565,7 @@ public class ScopeService {
             if (owner == null) {
                 if (!"*".equals(name)) {
                     for (Scope.Namespace namespace : Scope.Namespace.values()) {
-                        bindings.add(new Scope.Binding(importCursor, name, namespace, scope, null));
+                        bindings.add(new Scope.Binding(importCursor, name, namespace, scope, null, this));
                     }
                 }
                 continue;
@@ -340,20 +575,22 @@ public class ScopeService {
             for (JavaType.Variable field : membersOf(owner, true, null, true, JavaType.FullyQualified::getMembers,
                     JavaType.Variable::getFlagsBitMap, JavaType.Variable::getName)) {
                 if ("*".equals(name) || field.getName().equals(name)) {
-                    imported.add(new Scope.Binding(importCursor, field.getName(), Scope.Namespace.VARIABLE, scope, field));
+                    imported.add(new Scope.Binding(importCursor, field.getName(), Scope.Namespace.VARIABLE, scope,
+                            field, this));
                     found = true;
                 }
             }
             for (JavaType.Method method : membersOf(owner, true, null, true, JavaType.FullyQualified::getMethods,
                     JavaType.Method::getFlagsBitMap, JavaType.Method::getName)) {
                 if (!method.isConstructor() && ("*".equals(name) || method.getName().equals(name))) {
-                    imported.add(new Scope.Binding(importCursor, method.getName(), Scope.Namespace.METHOD, scope, method));
+                    imported.add(new Scope.Binding(importCursor, method.getName(), Scope.Namespace.METHOD, scope,
+                            method, this));
                     found = true;
                 }
             }
             if (!found && !"*".equals(name)) {
                 // A static import of a name that is neither a field nor a method imports a member type.
-                bindings.add(new Scope.Binding(importCursor, name, Scope.Namespace.TYPE, scope, null));
+                bindings.add(new Scope.Binding(importCursor, name, Scope.Namespace.TYPE, scope, null, this));
             }
         }
         // An import of one name shadows an on-demand import of it (JLS 6.4.1), so it is found first
@@ -366,7 +603,7 @@ public class ScopeService {
      * the inherited one it hides. A named class also has members only its attribution lists, as an enum's
      * {@code values()}. An anonymous class is given by the type it extends, whose members it all inherits.
      */
-    private static void inherited(Cursor scope, JavaType.FullyQualified type, String fromPackage, boolean anonymous,
+    private void inherited(Cursor scope, JavaType.FullyQualified type, String fromPackage, boolean anonymous,
                                   List<Scope.Binding> bindings) {
         if (!anonymous) {
             Set<String> fields = new HashSet<>();
@@ -374,26 +611,29 @@ public class ScopeService {
             for (Scope.Binding binding : bindings) {
                 (binding.getNamespace() == Scope.Namespace.METHOD ? methods : fields).add(binding.getName());
             }
+            // A class reaches its own members whatever their access, as it does a private field an annotation
+            // processor generates
             for (JavaType.Variable field : type.getMembers()) {
-                if (isVisibleFrom(field.getFlagsBitMap(), type, fromPackage) && fields.add(field.getName())) {
-                    bindings.add(new Scope.Binding(scope, field.getName(), Scope.Namespace.VARIABLE, scope, field));
+                if (fields.add(field.getName())) {
+                    bindings.add(new Scope.Binding(scope, field.getName(), Scope.Namespace.VARIABLE, scope, field,
+                            this));
                 }
             }
             for (JavaType.Method method : type.getMethods()) {
-                if (!method.isConstructor() && isVisibleFrom(method.getFlagsBitMap(), type, fromPackage) &&
-                    methods.add(method.getName())) {
-                    bindings.add(new Scope.Binding(scope, method.getName(), Scope.Namespace.METHOD, scope, method));
+                if (!method.isConstructor() && methods.add(method.getName())) {
+                    bindings.add(new Scope.Binding(scope, method.getName(), Scope.Namespace.METHOD, scope, method,
+                            this));
                 }
             }
         }
         for (JavaType.Variable field : membersOf(type, anonymous, fromPackage, false,
                 JavaType.FullyQualified::getMembers, JavaType.Variable::getFlagsBitMap, JavaType.Variable::getName)) {
-            bindings.add(new Scope.Binding(scope, field.getName(), Scope.Namespace.VARIABLE, scope, field));
+            bindings.add(new Scope.Binding(scope, field.getName(), Scope.Namespace.VARIABLE, scope, field, this));
         }
         for (JavaType.Method method : membersOf(type, anonymous, fromPackage, false,
                 JavaType.FullyQualified::getMethods, JavaType.Method::getFlagsBitMap, JavaType.Method::getName)) {
             if (!method.isConstructor()) {
-                bindings.add(new Scope.Binding(scope, method.getName(), Scope.Namespace.METHOD, scope, method));
+                bindings.add(new Scope.Binding(scope, method.getName(), Scope.Namespace.METHOD, scope, method, this));
             }
         }
     }
@@ -403,7 +643,8 @@ public class ScopeService {
                !Flag.hasFlags(flags, Flag.Private) && (fromPackage == null || fromPackage.equals(owner.getPackageName()));
     }
 
-    private static void inheritedMemberTypes(Cursor scope, JavaType.FullyQualified type, String fromPackage, boolean includeSelf,
+    private void inheritedMemberTypes(Cursor scope, JavaType.FullyQualified type, String fromPackage,
+            boolean includeSelf,
                                              List<Scope.Binding> bindings) {
         JavaSourceFile sourceFile = scope.firstEnclosing(JavaSourceFile.class);
         if (sourceFile == null) {
@@ -442,7 +683,7 @@ public class ScopeService {
                 String raw = member.getRawClassName();
                 String name = raw.substring(raw.lastIndexOf('$') + 1);
                 if (declared.add(name)) {
-                    bindings.add(new Scope.Binding(scope, name, Scope.Namespace.TYPE, scope, member));
+                    bindings.add(new Scope.Binding(scope, name, Scope.Namespace.TYPE, scope, member, this));
                 }
             }
         }

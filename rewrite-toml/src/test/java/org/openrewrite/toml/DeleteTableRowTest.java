@@ -234,4 +234,24 @@ class DeleteTableRowTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void arrayTableNamedWithAQuotedPart() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteTableRow("tool.poetry.source", "name", "old", null)),
+          toml(
+            """
+              [[tool."poetry".source]]
+              name = "old"
+
+              [[tool.poetry.source]]
+              name = "new"
+              """,
+            """
+              [[tool.poetry.source]]
+              name = "new"
+              """
+          )
+        );
+    }
 }

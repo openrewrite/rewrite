@@ -493,4 +493,54 @@ class AddOrUpdateChildTagTest implements RewriteTest {
                 )
         );
     }
+
+    @Test
+    void replacedTagKeepsTheIndentationOfItsLine() {
+        rewriteRun(spec -> spec.recipe(new AddOrUpdateChildTag("/project/build/plugins/plugin/configuration",
+                        "<skip>true</skip>", true)),
+                xml(
+                        """
+                                <project>
+                                    <build>
+                                        <plugins>
+                                            <plugin>
+                                                <configuration>
+                                \t\t\t\t\t<skip>false</skip>
+                                                    <encoding>UTF-8</encoding>
+                                                </configuration>
+                                            </plugin>
+                                        </plugins>
+                                    </build>
+                                </project>
+                                """,
+                        """
+                                <project>
+                                    <build>
+                                        <plugins>
+                                            <plugin>
+                                                <configuration>
+                                \t\t\t\t\t<skip>true</skip>
+                                                    <encoding>UTF-8</encoding>
+                                                </configuration>
+                                            </plugin>
+                                        </plugins>
+                                    </build>
+                                </project>
+                                """
+                )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"\n", "\r\n"})
+    void replacedTagKeepsTheBlankLinesAboveIt(String lineBreak) {
+        rewriteRun(spec -> spec.recipe(new AddOrUpdateChildTag("/project/configuration", "<skip>true</skip>", true)),
+                xml(
+                        "<project>\n  <configuration>\n    <encoding>UTF-8</encoding>\n \t \n    <skip>false</skip>\n  </configuration>\n</project>"
+                                .replace("\n", lineBreak),
+                        "<project>\n  <configuration>\n    <encoding>UTF-8</encoding>\n \t \n    <skip>true</skip>\n  </configuration>\n</project>"
+                                .replace("\n", lineBreak)
+                )
+        );
+    }
 }

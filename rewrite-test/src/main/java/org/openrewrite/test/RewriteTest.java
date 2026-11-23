@@ -443,6 +443,8 @@ public interface RewriteTest extends SourceSpecs {
                     recipeFields, scannerEdits);
         }
 
+        // put before the view, which would report the cache as a change the recipe made to the context
+        recipeCtx.putMessage(CheckingScheduler.RUN_TEMPLATE_CACHE, new ConcurrentHashMap<>());
         recipeCtx = unneededOptOuts.executionContextView(recipeCtx)
                 .setValidateImmutableExecutionContext(quality.executionContextUnchanged());
         RewriteRunner runner = testMethodSpec.getRunner() != null ? testMethodSpec.getRunner() :
@@ -457,6 +459,8 @@ public interface RewriteTest extends SourceSpecs {
                                              unneededOptOuts.runsOnTheSide("matchByTypeNotName") ?
                 NameMatching.ignoringOptOuts(recipe, runner, runnerContext, beforeSourceFiles, parsersFor, relativeTo,
                         ctx) : null;
+        ShiftedIndentation shiftedIndentation = ShiftedIndentation.of(recipe, quality.keepEditedLineIndentation(),
+                runner, runnerContext, beforeSourceFiles, parsersFor, relativeTo, ctx);
         FormattingScope formattingScope = new FormattingScope(recipe,
                 quality.minimalFormatting() || unneededOptOuts.runsOnTheSide("minimalFormatting"));
         ImportedNames importedNames = ImportedNames.of(
@@ -726,6 +730,11 @@ public interface RewriteTest extends SourceSpecs {
         }
         unneededOptOuts.check("minimalFormatting", quality.minimalFormatting(), () ->
                 formattingScope.assertFormattedOnlyWhatChanged(recipeRun.getChangeset().getAllResults()));
+        unneededOptOuts.check("keepEditedLineIndentation", quality.keepEditedLineIndentation(), () ->
+                EditedLineIndentation.assertKept(recipe, recipeRun.getChangeset().getAllResults()));
+        if (shiftedIndentation != null) {
+            shiftedIndentation.assertKept(recipeRun.getChangeset().getAllResults());
+        }
         importedNames.assertImports(recipeRun.getChangeset().getAllResults(), quality.importReferencedTypes(),
                 quality.removeUnusedImports());
         unneededOptOuts.checkOnTheSideLater("importReferencedTypes", () ->

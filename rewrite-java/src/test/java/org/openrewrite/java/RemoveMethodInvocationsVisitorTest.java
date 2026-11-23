@@ -483,6 +483,50 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
     }
 
     @Test
+    void emptyExpressionLambdaWithVoidBody() {
+        rewriteRun(
+          spec -> spec.recipe(createRemoveMethodsRecipe("java.util.List clear()")),
+          // language=java
+          java(
+            """
+              import java.util.List;
+              import java.util.function.Consumer;
+
+              public class Test {
+                  Consumer<List<String>> c = list -> list.clear();
+              }
+              """,
+            """
+              import java.util.List;
+              import java.util.function.Consumer;
+
+              public class Test {
+                  Consumer<List<String>> c = list -> {};
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepExpressionLambdaWithValueBody() {
+        rewriteRun(
+          spec -> spec.recipe(createRemoveMethodsRecipe("java.util.List add(java.lang.Object)")),
+          // language=java
+          java(
+            """
+              import java.util.List;
+              import java.util.function.Predicate;
+
+              public class Test {
+                  Predicate<List<Object>> p = list -> list.add("x");
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void keepEnclosingCallsOfNestedLambdas() {
         rewriteRun(
           spec -> spec.recipe(createRemoveMethodsRecipe("java.lang.StringBuilder append(java.lang.String)")),
