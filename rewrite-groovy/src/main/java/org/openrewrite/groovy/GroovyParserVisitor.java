@@ -1434,22 +1434,6 @@ public class GroovyParserVisitor {
             return parenthesized;
         }
 
-        /**
-         * Any statement can carry labels (Spock's `when:`, `then:`, `expect:` before a switch, a
-         * while, a try, a return…), not only the ones whose visitors called {@link #labeled}; the rest kept the label
-         * as whitespace. Visits the statement, then wraps it in its labels.
-         */
-        private void withLabels(org.codehaus.groovy.ast.stmt.Statement statement, Runnable visit) {
-            if (statement.getStatementLabels() == null || statement.getStatementLabels().isEmpty()) {
-                visit.run();
-                return;
-            }
-            queue.add(labeled(statement, () -> {
-                visit.run();
-                return (Statement) queue.poll();
-            }));
-        }
-
         private Statement labeled(org.codehaus.groovy.ast.stmt.Statement statement, Supplier<Statement> labeledTree) {
             List<J.Label> labels = null;
             if (statement.getStatementLabels() != null && !statement.getStatementLabels().isEmpty()) {
@@ -1933,70 +1917,69 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitBlockStatement(BlockStatement block) {
-            withLabels(block, () -> visitBlockStatementUnlabeled(block));
-        }
-
-        private void visitBlockStatementUnlabeled(BlockStatement block) {
-            if (isUnwrappedDesugaredResourceBlock(block)) {
-                // A try-with-resources without a catch or finally clause is desugared by Groovy 4 into a
-                // bare block (rather than being wrapped in a TryCatchStatement like the cases that have a
-                // catch/finally). Re-wrap it so the try-with-resources handling in visitTryCatchFinally applies.
-                BlockStatement wrapper = new BlockStatement();
-                wrapper.addStatement(block);
-                visitTryCatchFinally(new TryCatchStatement(wrapper, EmptyStatement.INSTANCE));
-                return;
-            }
-            Space fmt = EMPTY;
-            Space staticInitPadding = EMPTY;
-            boolean isStaticInit = sourceStartsWith("static");
-            Cursor parentCursor = nodeCursor.getParent();
-            Object parent = parentCursor == null ? null : parentCursor.getValue();
-            boolean withinClosure = !isLambda(parent) && parent instanceof ClosureExpression ||
-                    (parent instanceof ExpressionStatement &&
-                            !isLambda(((ExpressionStatement) parent).getExpression()) &&
-                            ((ExpressionStatement) parent).getExpression() instanceof ClosureExpression
-                    );
-            if (isStaticInit) {
-                fmt = sourceBefore("static");
-                staticInitPadding = whitespace();
-                skip("{");
-            } else if (!withinClosure) {
-                fmt = sourceBefore("{");
-            }
-            List<JRightPadded<Statement>> statements = new ArrayList<>(block.getStatements().size());
-            List<org.codehaus.groovy.ast.stmt.Statement> blockStatements = block.getStatements();
-            for (int i = 0; i < blockStatements.size(); i++) {
-                addEmptyStatements(statements);
-                ASTNode statement = blockStatements.get(i);
-                J expr = doVisit(statement);
-                if (i == blockStatements.size() - 1 && (expr instanceof Expression)) {
-                    if (parent instanceof ClosureExpression || (parent instanceof MethodNode &&
-                            JavaType.Primitive.Void != typeMapping.type(((MethodNode) parent).getReturnType()))) {
-                        expr = new J.Return(randomId(), expr.getPrefix(), Markers.EMPTY,
-                                expr.withPrefix(EMPTY));
-                        expr = expr.withMarkers(expr.getMarkers().add(new ImplicitReturn(randomId())));
+            queue.add(labeled(block, () -> {
+                if (isUnwrappedDesugaredResourceBlock(block)) {
+                    // A try-with-resources without a catch or finally clause is desugared by Groovy 4 into a
+                    // bare block (rather than being wrapped in a TryCatchStatement like the cases that have a
+                    // catch/finally). Re-wrap it so the try-with-resources handling in visitTryCatchFinally applies.
+                    BlockStatement wrapper = new BlockStatement();
+                    wrapper.addStatement(block);
+                    visitTryCatchFinally(new TryCatchStatement(wrapper, EmptyStatement.INSTANCE));
+                    return pollQueue();
+                }
+                Space fmt = EMPTY;
+                Space staticInitPadding = EMPTY;
+                boolean isStaticInit = sourceStartsWith("static");
+                Cursor parentCursor = nodeCursor.getParent();
+                Object parent = parentCursor == null ? null : parentCursor.getValue();
+                boolean withinClosure = !isLambda(parent) && parent instanceof ClosureExpression ||
+                        (parent instanceof ExpressionStatement &&
+                                !isLambda(((ExpressionStatement) parent).getExpression()) &&
+                                ((ExpressionStatement) parent).getExpression() instanceof ClosureExpression
+                        );
+                if (isStaticInit) {
+                    fmt = sourceBefore("static");
+                    staticInitPadding = whitespace();
+                    skip("{");
+                } else if (!withinClosure) {
+                    fmt = sourceBefore("{");
+                }
+                List<JRightPadded<Statement>> statements = new ArrayList<>(block.getStatements().size());
+                List<org.codehaus.groovy.ast.stmt.Statement> blockStatements = block.getStatements();
+                for (int i = 0; i < blockStatements.size(); i++) {
+                    addEmptyStatements(statements);
+                    ASTNode statement = blockStatements.get(i);
+                    J expr = doVisit(statement);
+                    if (i == blockStatements.size() - 1 && (expr instanceof Expression)) {
+                        if (parent instanceof ClosureExpression || (parent instanceof MethodNode &&
+                                JavaType.Primitive.Void != typeMapping.type(((MethodNode) parent).getReturnType()))) {
+                            expr = new J.Return(randomId(), expr.getPrefix(), Markers.EMPTY,
+                                    expr.withPrefix(EMPTY));
+                            expr = expr.withMarkers(expr.getMarkers().add(new ImplicitReturn(randomId())));
+                        }
                     }
-                }
 
-                JRightPadded<Statement> stat = JRightPadded.build((Statement) expr);
-                int saveCursor = cursor;
-                Space beforeSemicolon = whitespace();
-                if (source.charAt(cursor) == ';') {
-                    stat = stat
-                            .withMarkers(stat.getMarkers().add(new Semicolon(randomId())))
-                            .withAfter(beforeSemicolon);
-                    skip(";");
-                } else {
-                    cursor = saveCursor;
-                }
+                    JRightPadded<Statement> stat = JRightPadded.build((Statement) expr);
+                    int saveCursor = cursor;
+                    Space beforeSemicolon = whitespace();
+                    if (source.charAt(cursor) == ';') {
+                        stat = stat
+                                .withMarkers(stat.getMarkers().add(new Semicolon(randomId())))
+                                .withAfter(beforeSemicolon);
+                        skip(";");
+                    } else {
+                        cursor = saveCursor;
+                    }
 
-                statements.add(stat);
-            }
-            addEmptyStatements(statements);
-            queue.add(new J.Block(randomId(), fmt, Markers.EMPTY, new JRightPadded<>(isStaticInit, staticInitPadding, Markers.EMPTY), statements, whitespace()));
-            if (!withinClosure) {
-                skip("}");
-            }
+                    statements.add(stat);
+                }
+                addEmptyStatements(statements);
+                J.Block result = new J.Block(randomId(), fmt, Markers.EMPTY, new JRightPadded<>(isStaticInit, staticInitPadding, Markers.EMPTY), statements, whitespace());
+                if (!withinClosure) {
+                    skip("}");
+                }
+                return result;
+            }));
         }
 
         @Override
@@ -2107,19 +2090,14 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitBreakStatement(BreakStatement statement) {
-            withLabels(statement, () -> visitBreakStatementUnlabeled(statement));
-        }
-
-        private void visitBreakStatementUnlabeled(BreakStatement statement) {
-            queue.add(new J.Break(randomId(),
+            queue.add(labeled(statement, () -> new J.Break(randomId(),
                     sourceBefore("break"),
                     Markers.EMPTY,
                     (statement.getLabel() == null) ?
                             null :
                             new J.Identifier(randomId(),
                                     sourceBefore(statement.getLabel()),
-                                    Markers.EMPTY, emptyList(), statement.getLabel(), null, null))
-            );
+                                    Markers.EMPTY, emptyList(), statement.getLabel(), null, null))));
         }
 
         @Override
@@ -2431,19 +2409,14 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitContinueStatement(ContinueStatement statement) {
-            withLabels(statement, () -> visitContinueStatementUnlabeled(statement));
-        }
-
-        private void visitContinueStatementUnlabeled(ContinueStatement statement) {
-            queue.add(new J.Continue(randomId(),
+            queue.add(labeled(statement, () -> new J.Continue(randomId(),
                     sourceBefore("continue"),
                     Markers.EMPTY,
                     (statement.getLabel() == null) ?
                             null :
                             new J.Identifier(randomId(),
                                     sourceBefore(statement.getLabel()),
-                                    Markers.EMPTY, emptyList(), statement.getLabel(), null, null))
-            );
+                                    Markers.EMPTY, emptyList(), statement.getLabel(), null, null))));
         }
 
         @Override
@@ -3348,17 +3321,15 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitReturnStatement(ReturnStatement return_) {
-            withLabels(return_, () -> visitReturnStatementUnlabeled(return_));
-        }
-
-        private void visitReturnStatementUnlabeled(ReturnStatement return_) {
-            Space fmt = sourceBefore("return");
-            if (return_.getExpression() instanceof ConstantExpression && isSynthetic(return_.getExpression()) &&
-                    (((ConstantExpression) return_.getExpression()).getValue() == null)) {
-                queue.add(new J.Return(randomId(), fmt, Markers.EMPTY, null));
-            } else {
-                queue.add(new J.Return(randomId(), fmt, Markers.EMPTY, doVisit(return_.getExpression())));
-            }
+            queue.add(labeled(return_, () -> {
+                Space fmt = sourceBefore("return");
+                if (return_.getExpression() instanceof ConstantExpression && isSynthetic(return_.getExpression()) &&
+                        (((ConstantExpression) return_.getExpression()).getValue() == null)) {
+                    return new J.Return(randomId(), fmt, Markers.EMPTY, null);
+                } else {
+                    return new J.Return(randomId(), fmt, Markers.EMPTY, doVisit(return_.getExpression()));
+                }
+            }));
         }
 
         @Override
@@ -3376,11 +3347,7 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitSwitch(SwitchStatement statement) {
-            withLabels(statement, () -> visitSwitchUnlabeled(statement));
-        }
-
-        private void visitSwitchUnlabeled(SwitchStatement statement) {
-            queue.add(new J.Switch(
+            queue.add(labeled(statement, () -> new J.Switch(
                     randomId(),
                     sourceBefore("switch"),
                     Markers.EMPTY,
@@ -3393,20 +3360,18 @@ public class GroovyParserVisitor {
                                     convertAll(statement.getCaseStatements(), t -> EMPTY, t -> EMPTY),
                                     statement.getDefaultStatement().isEmpty() ? null : JRightPadded.build(visitDefaultCaseStatement((BlockStatement) statement.getDefaultStatement()))
                             ),
-                            sourceBefore("}"))));
+                            sourceBefore("}")))));
         }
 
         @Override
         public void visitSynchronizedStatement(SynchronizedStatement statement) {
-            withLabels(statement, () -> visitSynchronizedStatementUnlabeled(statement));
-        }
-
-        private void visitSynchronizedStatementUnlabeled(SynchronizedStatement statement) {
-            Space fmt = sourceBefore("synchronized");
-            queue.add(new J.Synchronized(randomId(), fmt, Markers.EMPTY,
-                    new J.ControlParentheses<>(randomId(), sourceBefore("("), Markers.EMPTY,
-                            JRightPadded.build((Expression) doVisit(statement.getExpression())).withAfter(sourceBefore(")"))),
-                    doVisit(statement.getCode())));
+            queue.add(labeled(statement, () -> {
+                Space fmt = sourceBefore("synchronized");
+                return new J.Synchronized(randomId(), fmt, Markers.EMPTY,
+                        new J.ControlParentheses<>(randomId(), sourceBefore("("), Markers.EMPTY,
+                                JRightPadded.build((Expression) doVisit(statement.getExpression())).withAfter(sourceBefore(")"))),
+                        doVisit(statement.getCode()));
+            }));
         }
 
         @Override
@@ -3427,12 +3392,10 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitThrowStatement(ThrowStatement statement) {
-            withLabels(statement, () -> visitThrowStatementUnlabeled(statement));
-        }
-
-        private void visitThrowStatementUnlabeled(ThrowStatement statement) {
-            Space fmt = sourceBefore("throw");
-            queue.add(new J.Throw(randomId(), fmt, Markers.EMPTY, doVisit(statement.getExpression())));
+            queue.add(labeled(statement, () -> {
+                Space fmt = sourceBefore("throw");
+                return new J.Throw(randomId(), fmt, Markers.EMPTY, doVisit(statement.getExpression()));
+            }));
         }
 
         @Override
@@ -3539,101 +3502,99 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitTryCatchFinally(TryCatchStatement node) {
-            withLabels(node, () -> visitTryCatchFinallyUnlabeled(node));
-        }
+            queue.add(labeled(node, () -> {
+                Space prefix = sourceBefore("try");
 
-        private void visitTryCatchFinallyUnlabeled(TryCatchStatement node) {
-            Space prefix = sourceBefore("try");
+                // Groovy 4 desugars try-with-resources at parse time (getResourceStatements() is always empty).
+                // Detect from source: if "(" follows "try", parse resources from source text.
+                JContainer<J.Try.Resource> resources = null;
+                // The body lives at the bottom of the nested resource structure; it defaults to the try
+                // statement itself when there are no resources, and is reassigned as resources are consumed.
+                org.codehaus.groovy.ast.stmt.Statement bodyStatement = node.getTryStatement();
+                boolean hasTryWithResources = source.charAt(indexOfNextNonWhitespace(cursor, source)) == '(';
+                if (hasTryWithResources) {
+                    Space beforeParen = sourceBefore("(");
+                    List<JRightPadded<J.Try.Resource>> resourceList = new ArrayList<>();
 
-            // Groovy 4 desugars try-with-resources at parse time (getResourceStatements() is always empty).
-            // Detect from source: if "(" follows "try", parse resources from source text.
-            JContainer<J.Try.Resource> resources = null;
-            // The body lives at the bottom of the nested resource structure; it defaults to the try
-            // statement itself when there are no resources, and is reassigned as resources are consumed.
-            org.codehaus.groovy.ast.stmt.Statement bodyStatement = node.getTryStatement();
-            boolean hasTryWithResources = source.charAt(indexOfNextNonWhitespace(cursor, source)) == '(';
-            if (hasTryWithResources) {
-                Space beforeParen = sourceBefore("(");
-                List<JRightPadded<J.Try.Resource>> resourceList = new ArrayList<>();
+                    // Groovy 4 desugars each resource into a nested structure:
+                    //   BlockStatement -> BlockStatement -> [resourceDecl, sentinel, innerTryCatch]
+                    // Multiple resources nest recursively: innerTryCatch.tryStmt wraps the next resource.
+                    org.codehaus.groovy.ast.stmt.Statement current = node.getTryStatement();
+                    while (isDesugaredResourceBlock(current)) {
+                        BlockStatement innerBlock = (BlockStatement) ((BlockStatement) current).getStatements().get(0);
+                        ExpressionStatement resourceStmt = (ExpressionStatement) innerBlock.getStatements().get(0);
+                        J resourceVar = doVisit(resourceStmt.getExpression());
+                        Space resourcePrefix = resourceVar.getPrefix();
+                        resourceVar = resourceVar.withPrefix(EMPTY);
 
-                // Groovy 4 desugars each resource into a nested structure:
-                //   BlockStatement -> BlockStatement -> [resourceDecl, sentinel, innerTryCatch]
-                // Multiple resources nest recursively: innerTryCatch.tryStmt wraps the next resource.
-                org.codehaus.groovy.ast.stmt.Statement current = node.getTryStatement();
-                while (isDesugaredResourceBlock(current)) {
-                    BlockStatement innerBlock = (BlockStatement) ((BlockStatement) current).getStatements().get(0);
-                    ExpressionStatement resourceStmt = (ExpressionStatement) innerBlock.getStatements().get(0);
-                    J resourceVar = doVisit(resourceStmt.getExpression());
-                    Space resourcePrefix = resourceVar.getPrefix();
-                    resourceVar = resourceVar.withPrefix(EMPTY);
+                        TryCatchStatement innerTry = (TryCatchStatement) innerBlock.getStatements().get(innerBlock.getStatements().size() - 1);
 
-                    TryCatchStatement innerTry = (TryCatchStatement) innerBlock.getStatements().get(innerBlock.getStatements().size() - 1);
+                        int nextNonWs = indexOfNextNonWhitespace(cursor, source);
+                        boolean semicolonPresent = nextNonWs < source.length() && source.charAt(nextNonWs) == ';';
+                        if (semicolonPresent && resourceVar instanceof J.VariableDeclarations) {
+                            J.VariableDeclarations resourceVarDecl = (J.VariableDeclarations) resourceVar;
+                            resourceVar = resourceVarDecl.getPadding().withVariables(Space.formatLastSuffix(resourceVarDecl
+                                    .getPadding().getVariables(), sourceBefore(";")));
+                        }
 
-                    int nextNonWs = indexOfNextNonWhitespace(cursor, source);
-                    boolean semicolonPresent = nextNonWs < source.length() && source.charAt(nextNonWs) == ';';
-                    if (semicolonPresent && resourceVar instanceof J.VariableDeclarations) {
-                        J.VariableDeclarations resourceVarDecl = (J.VariableDeclarations) resourceVar;
-                        resourceVar = resourceVarDecl.getPadding().withVariables(Space.formatLastSuffix(resourceVarDecl
-                                .getPadding().getVariables(), sourceBefore(";")));
+                        J.Try.Resource tryResource = new J.Try.Resource(randomId(), resourcePrefix, Markers.EMPTY,
+                                resourceVar.withPrefix(EMPTY), semicolonPresent);
+                        skip(";");
+
+                        // Whether another resource follows must be decided from the source, not the AST:
+                        // a nested try-with-resources in the body desugars to the same shape as an additional
+                        // resource, so only the closing ')' of the resource list can disambiguate them.
+                        boolean hasMoreResources = source.charAt(indexOfNextNonWhitespace(cursor, source)) != ')';
+                        if (hasMoreResources) {
+                            resourceList.add(padRight(tryResource, EMPTY));
+                            current = innerTry.getTryStatement();
+                        } else {
+                            resourceList.add(padRight(tryResource, sourceBefore(")")));
+                            bodyStatement = innerTry.getTryStatement();
+                            break;
+                        }
                     }
+                    resources = JContainer.build(beforeParen, resourceList, Markers.EMPTY);
+                }
 
-                    J.Try.Resource tryResource = new J.Try.Resource(randomId(), resourcePrefix, Markers.EMPTY,
-                            resourceVar.withPrefix(EMPTY), semicolonPresent);
-                    skip(";");
+                J.Block body = doVisit(bodyStatement);
 
-                    // Whether another resource follows must be decided from the source, not the AST:
-                    // a nested try-with-resources in the body desugars to the same shape as an additional
-                    // resource, so only the closing ')' of the resource list can disambiguate them.
-                    boolean hasMoreResources = source.charAt(indexOfNextNonWhitespace(cursor, source)) != ')';
-                    if (hasMoreResources) {
-                        resourceList.add(padRight(tryResource, EMPTY));
-                        current = innerTry.getTryStatement();
-                    } else {
-                        resourceList.add(padRight(tryResource, sourceBefore(")")));
-                        bodyStatement = innerTry.getTryStatement();
-                        break;
+                // Handle catches, merging multi-catch statements.
+                // Groovy 4 splits catch(A | B e) into separate CatchStatements at the same source position.
+                List<J.Try.Catch> catches;
+                if (node.getCatchStatements().isEmpty()) {
+                    catches = emptyList();
+                } else {
+                    catches = new ArrayList<>(node.getCatchStatements().size());
+                    List<CatchStatement> catchStatements = node.getCatchStatements();
+                    for (int i = 0; i < catchStatements.size(); ) {
+                        CatchStatement catchStatement = catchStatements.get(i);
+                        // Detect multi-catch: consecutive catches at the same line/col
+                        int j = i + 1;
+                        while (j < catchStatements.size() &&
+                                catchStatements.get(j).getLineNumber() == catchStatement.getLineNumber() &&
+                                catchStatements.get(j).getColumnNumber() == catchStatement.getColumnNumber()) {
+                            j++;
+                        }
+                        if (j > i + 1) {
+                            // Multi-catch: parse a single catch with J.MultiCatch type
+                            visitMultiCatchStatement(catchStatements.subList(i, j));
+                        } else {
+                            visitCatchStatement(catchStatement);
+                        }
+                        catches.add((J.Try.Catch) queue.poll());
+                        i = j;
                     }
                 }
-                resources = JContainer.build(beforeParen, resourceList, Markers.EMPTY);
-            }
 
-            J.Block body = doVisit(bodyStatement);
+                // Strangely, groovy parses the finally's block as a BlockStatement which contains another BlockStatement
+                // The true contents of the block are within the first statement of this apparently pointless enclosing BlockStatement
+                JLeftPadded<J.Block> finally_ = !(node.getFinallyStatement() instanceof BlockStatement) ? null :
+                        padLeft(sourceBefore("finally"), doVisit(((BlockStatement) node.getFinallyStatement()).getStatements().get(0)));
 
-            // Handle catches, merging multi-catch statements.
-            // Groovy 4 splits catch(A | B e) into separate CatchStatements at the same source position.
-            List<J.Try.Catch> catches;
-            if (node.getCatchStatements().isEmpty()) {
-                catches = emptyList();
-            } else {
-                catches = new ArrayList<>(node.getCatchStatements().size());
-                List<CatchStatement> catchStatements = node.getCatchStatements();
-                for (int i = 0; i < catchStatements.size(); ) {
-                    CatchStatement catchStatement = catchStatements.get(i);
-                    // Detect multi-catch: consecutive catches at the same line/col
-                    int j = i + 1;
-                    while (j < catchStatements.size() &&
-                            catchStatements.get(j).getLineNumber() == catchStatement.getLineNumber() &&
-                            catchStatements.get(j).getColumnNumber() == catchStatement.getColumnNumber()) {
-                        j++;
-                    }
-                    if (j > i + 1) {
-                        // Multi-catch: parse a single catch with J.MultiCatch type
-                        visitMultiCatchStatement(catchStatements.subList(i, j));
-                    } else {
-                        visitCatchStatement(catchStatement);
-                    }
-                    catches.add((J.Try.Catch) queue.poll());
-                    i = j;
-                }
-            }
-
-            // Strangely, groovy parses the finally's block as a BlockStatement which contains another BlockStatement
-            // The true contents of the block are within the first statement of this apparently pointless enclosing BlockStatement
-            JLeftPadded<J.Block> finally_ = !(node.getFinallyStatement() instanceof BlockStatement) ? null :
-                    padLeft(sourceBefore("finally"), doVisit(((BlockStatement) node.getFinallyStatement()).getStatements().get(0)));
-
-            //noinspection ConstantConditions
-            queue.add(new J.Try(randomId(), prefix, Markers.EMPTY, resources, body, catches, finally_));
+                //noinspection ConstantConditions
+                return new J.Try(randomId(), prefix, Markers.EMPTY, resources, body, catches, finally_);
+            }));
         }
 
         @Override
@@ -3779,34 +3740,30 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitDoWhileLoop(DoWhileStatement loop) {
-            withLabels(loop, () -> visitDoWhileLoopUnlabeled(loop));
-        }
-
-        private void visitDoWhileLoopUnlabeled(DoWhileStatement loop) {
-            Space fmt = sourceBefore("do");
-            Statement body = visitLoopBody(loop.getLoopBlock());
-            Space beforeWhile = sourceBefore("while");
-            J.ControlParentheses<Expression> condition = new J.ControlParentheses<>(randomId(), sourceBefore("("), Markers.EMPTY,
-                    JRightPadded.build((Expression) doVisit(loop.getBooleanExpression().getExpression()))
-                            .withAfter(sourceBefore(")")));
-            queue.add(new J.DoWhileLoop(randomId(), fmt, Markers.EMPTY,
-                    JRightPadded.build(body).withAfter(beforeWhile),
-                    padLeft(EMPTY, condition)));
+            queue.add(labeled(loop, () -> {
+                Space fmt = sourceBefore("do");
+                Statement body = visitLoopBody(loop.getLoopBlock());
+                Space beforeWhile = sourceBefore("while");
+                J.ControlParentheses<Expression> condition = new J.ControlParentheses<>(randomId(), sourceBefore("("), Markers.EMPTY,
+                        JRightPadded.build((Expression) doVisit(loop.getBooleanExpression().getExpression()))
+                                .withAfter(sourceBefore(")")));
+                return new J.DoWhileLoop(randomId(), fmt, Markers.EMPTY,
+                        JRightPadded.build(body).withAfter(beforeWhile),
+                        padLeft(EMPTY, condition));
+            }));
         }
 
         @Override
         public void visitWhileLoop(WhileStatement loop) {
-            withLabels(loop, () -> visitWhileLoopUnlabeled(loop));
-        }
-
-        private void visitWhileLoopUnlabeled(WhileStatement loop) {
-            Space fmt = sourceBefore("while");
-            queue.add(new J.WhileLoop(randomId(), fmt, Markers.EMPTY,
-                    new J.ControlParentheses<>(randomId(), sourceBefore("("), Markers.EMPTY,
-                            JRightPadded.build((Expression) doVisit(loop.getBooleanExpression().getExpression()))
-                                    .withAfter(sourceBefore(")"))),
-                    JRightPadded.build(visitLoopBody(loop.getLoopBlock()))
-            ));
+            queue.add(labeled(loop, () -> {
+                Space fmt = sourceBefore("while");
+                return new J.WhileLoop(randomId(), fmt, Markers.EMPTY,
+                        new J.ControlParentheses<>(randomId(), sourceBefore("("), Markers.EMPTY,
+                                JRightPadded.build((Expression) doVisit(loop.getBooleanExpression().getExpression()))
+                                        .withAfter(sourceBefore(")"))),
+                        JRightPadded.build(visitLoopBody(loop.getLoopBlock()))
+                );
+            }));
         }
 
         /**
