@@ -19,8 +19,11 @@ import org.openrewrite.Cursor;
 import org.openrewrite.java.internal.template.BlockStatementTemplateGenerator;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaCoordinates;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
+import org.openrewrite.scala.tree.S;
 
 import java.util.Collection;
 import java.util.Set;
@@ -31,8 +34,14 @@ public class ScalaBlockStatementTemplateGenerator extends BlockStatementTemplate
     }
 
     @Override
-    protected void contextFreeTemplate(Cursor cursor, J j, Collection<JavaType.GenericTypeVariable> typeVariables, StringBuilder before, StringBuilder after) {
-        if (j instanceof J.MethodInvocation) {
+    protected void contextFreeTemplate(Cursor cursor, J j, Collection<JavaType.GenericTypeVariable> typeVariables, StringBuilder before, StringBuilder after,
+                                       Space.Location location, JavaCoordinates.Mode mode) {
+        if (j instanceof S.SplatExpression) {
+            // `xs: _*` is only valid as the last argument of a call
+            before.insert(0, "class Template {\n");
+            before.append("val o: Any = Seq(");
+            after.append(")\n}");
+        } else if (j instanceof J.MethodInvocation) {
             before.insert(0, "class Template {\n");
             JavaType.Method methodType = ((J.MethodInvocation) j).getMethodType();
             if (methodType == null || methodType.getReturnType() != JavaType.Primitive.Void) {

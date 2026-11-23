@@ -102,7 +102,7 @@ public class AddProperty extends ScanningRecipe<AddProperty.NeedsProperty> {
 
     @Override
     public Collection<? extends SourceFile> generate(NeedsProperty acc, ExecutionContext ctx) {
-        if (!acc.hasGradleProperties) {
+        if (acc.isGradleProject && !acc.hasGradleProperties) {
             return PropertiesParser.builder().build()
                     .parseInputs(singletonList(Parser.Input.fromString(Paths.get("gradle.properties"),
                             key + "=" + value)), null, ctx)

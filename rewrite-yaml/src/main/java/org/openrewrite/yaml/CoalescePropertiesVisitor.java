@@ -46,7 +46,7 @@ public class CoalescePropertiesVisitor<P> extends YamlIsoVisitor<P> {
 
     @Override
     public Yaml.Document visitDocument(Yaml.Document document, P p) {
-        if (document != new ReplaceAliasWithAnchorValueVisitor<P>().visit(document, p)) {
+        if (ReplaceAliasWithAnchorValueVisitor.hasResolvableAlias(document)) {
             return document;
         }
         findIndent.visit(document, p);

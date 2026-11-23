@@ -17,11 +17,11 @@
 package printer
 
 import (
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
-// GoPrinter prints an OpenRewrite LST back to Go source code.
 type GoPrinter struct {
 	visitor.GoVisitor
 }
@@ -31,7 +31,7 @@ func NewGoPrinter() *GoPrinter {
 }
 
 // Print renders the given tree to a string.
-func Print(t tree.Tree) string {
+func Print(t java.Tree) string {
 	p := NewGoPrinter()
 	out := NewPrintOutputCapture()
 	p.Visit(t, out)
@@ -40,8 +40,15 @@ func Print(t tree.Tree) string {
 
 // PrintWithMarkers renders the given tree to a string, printing cross-cutting markers
 // (SearchResult, Markup) using the given MarkerPrinter.
-func PrintWithMarkers(t tree.Tree, mp MarkerPrinter) string {
+func PrintWithMarkers(t java.Tree, mp MarkerPrinter) string {
+	return PrintWithCursor(t, nil, mp)
+}
+
+// PrintWithCursor renders a tree that sits under the given cursor, from whose
+// values a method takes its receiver and an if or switch its init.
+func PrintWithCursor(t java.Tree, parent *visitor.Cursor, mp MarkerPrinter) string {
 	p := NewGoPrinter()
+	p.SetCursor(parent)
 	out := NewPrintOutputCaptureWithMarkers(mp)
 	p.Visit(t, out)
 	return out.String()
@@ -49,19 +56,45 @@ func PrintWithMarkers(t tree.Tree, mp MarkerPrinter) string {
 
 // beforeSyntax handles the common pattern of emitting marker hooks and prefix space
 // before a node's syntax. It replaces direct visitSpace calls for node prefixes.
-func (p *GoPrinter) beforeSyntax(prefix tree.Space, markers tree.Markers, out *PrintOutputCapture) {
+func (p *GoPrinter) beforeSyntax(prefix java.Space, markers java.Markers, out *PrintOutputCapture) {
 	out.BeforePrefix(markers)
 	p.visitSpace(prefix, out)
 	out.BeforeSyntax(markers)
 }
 
 // afterSyntax emits marker hooks after a node's syntax.
-func (p *GoPrinter) afterSyntax(markers tree.Markers, out *PrintOutputCapture) {
+func (p *GoPrinter) afterSyntax(markers java.Markers, out *PrintOutputCapture) {
 	out.AfterSyntax(markers)
 }
 
-func (p *GoPrinter) VisitCompilationUnit(cu *tree.CompilationUnit, param any) tree.J {
+// beforeWrapped is beforeSyntax for a node that may sit in a wrapper. The
+// wrapper prints nothing of its own, so its prefix and markers are emitted
+// here, around the node's.
+func (p *GoPrinter) beforeWrapped(wrapperPrefix java.Space, wrapper java.Markers, prefix java.Space, markers java.Markers, out *PrintOutputCapture) {
+	out.BeforePrefix(wrapper)
+	out.BeforePrefix(markers)
+	p.visitSpace(wrapperPrefix, out)
+	p.visitSpace(prefix, out)
+	out.BeforeSyntax(wrapper)
+	out.BeforeSyntax(markers)
+}
+
+// printDirectives emits each annotation as a `//<name>[ <args>]` line. The
+// annotation's Prefix supplies the whitespace before `//`.
+func (p *GoPrinter) printDirectives(annotations []*java.Annotation, out *PrintOutputCapture) {
+	for _, ann := range annotations {
+		p.beforeSyntax(ann.Prefix, ann.Markers, out)
+		out.Append("//")
+		p.printDirectiveBody(ann, out)
+		p.afterSyntax(ann.Markers, out)
+	}
+}
+
+func (p *GoPrinter) VisitCompilationUnit(cu *golang.CompilationUnit, param any) java.J {
 	out := param.(*PrintOutputCapture)
+	if cu.CharsetBomMarked {
+		out.Append("\ufeff")
+	}
 	p.beforeSyntax(cu.Prefix, cu.Markers, out)
 	out.Append("package")
 
@@ -74,14 +107,14 @@ func (p *GoPrinter) VisitCompilationUnit(cu *tree.CompilationUnit, param any) tr
 		p.visitSpace(cu.Imports.Before, out)
 		out.Append("import")
 
-		grouped := tree.FindMarker[tree.GroupedImport](cu.Imports.Markers)
+		grouped := java.FindMarker[golang.GroupedImport](cu.Imports.Markers)
 		isGrouped := grouped != nil
 		if isGrouped {
 			p.visitSpace(grouped.Before, out)
 			out.Append("(")
 		}
 		for _, rp := range cu.Imports.Elements {
-			block := tree.FindMarker[tree.ImportBlock](rp.Element.Markers)
+			block := java.FindMarker[golang.ImportBlock](rp.Element.Markers)
 			if block != nil {
 				if block.ClosePrevious {
 					out.Append(")")
@@ -96,6 +129,9 @@ func (p *GoPrinter) VisitCompilationUnit(cu *tree.CompilationUnit, param any) tr
 			}
 			p.Visit(rp.Element, out)
 			p.visitSpace(rp.After, out)
+			if java.FindMarker[golang.Semicolon](rp.Markers) != nil {
+				out.Append(";")
+			}
 		}
 		if isGrouped {
 			out.Append(")")
@@ -105,14 +141,17 @@ func (p *GoPrinter) VisitCompilationUnit(cu *tree.CompilationUnit, param any) tr
 	for _, rp := range cu.Statements {
 		p.Visit(rp.Element, out)
 		p.visitSpace(rp.After, out)
+		if java.FindMarker[golang.Semicolon](rp.Markers) != nil {
+			out.Append(";")
+		}
 	}
 
-	p.visitSpace(cu.EOF, out)
 	p.afterSyntax(cu.Markers, out)
+	p.visitSpace(cu.EOF, out)
 	return cu
 }
 
-func (p *GoPrinter) VisitIdentifier(ident *tree.Identifier, param any) tree.J {
+func (p *GoPrinter) VisitIdentifier(ident *java.Identifier, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(ident.Prefix, ident.Markers, out)
 	out.Append(ident.Name)
@@ -120,7 +159,7 @@ func (p *GoPrinter) VisitIdentifier(ident *tree.Identifier, param any) tree.J {
 	return ident
 }
 
-func (p *GoPrinter) VisitLiteral(lit *tree.Literal, param any) tree.J {
+func (p *GoPrinter) VisitLiteral(lit *java.Literal, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(lit.Prefix, lit.Markers, out)
 	out.Append(lit.Source)
@@ -128,7 +167,7 @@ func (p *GoPrinter) VisitLiteral(lit *tree.Literal, param any) tree.J {
 	return lit
 }
 
-func (p *GoPrinter) VisitBinary(bin *tree.Binary, param any) tree.J {
+func (p *GoPrinter) VisitBinary(bin *java.Binary, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(bin.Prefix, bin.Markers, out)
 	p.Visit(bin.Left, out)
@@ -139,13 +178,16 @@ func (p *GoPrinter) VisitBinary(bin *tree.Binary, param any) tree.J {
 	return bin
 }
 
-func (p *GoPrinter) VisitBlock(block *tree.Block, param any) tree.J {
+func (p *GoPrinter) VisitBlock(block *java.Block, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(block.Prefix, block.Markers, out)
 	out.Append("{")
 	for _, rp := range block.Statements {
 		p.Visit(rp.Element, out)
 		p.visitSpace(rp.After, out)
+		if java.FindMarker[golang.Semicolon](rp.Markers) != nil {
+			out.Append(";")
+		}
 	}
 	p.visitSpace(block.End, out)
 	out.Append("}")
@@ -153,7 +195,18 @@ func (p *GoPrinter) VisitBlock(block *tree.Block, param any) tree.J {
 	return block
 }
 
-func (p *GoPrinter) VisitReturn(ret *tree.Return, param any) tree.J {
+func (p *GoPrinter) VisitReturn(ret *java.Return, param any) java.J {
+	out := param.(*PrintOutputCapture)
+	p.beforeSyntax(ret.Prefix, ret.Markers, out)
+	out.Append("return")
+	if ret.Expression != nil {
+		p.Visit(ret.Expression, out)
+	}
+	p.afterSyntax(ret.Markers, out)
+	return ret
+}
+
+func (p *GoPrinter) VisitGoReturn(ret *golang.Return, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(ret.Prefix, ret.Markers, out)
 	out.Append("return")
@@ -168,32 +221,66 @@ func (p *GoPrinter) VisitReturn(ret *tree.Return, param any) tree.J {
 	return ret
 }
 
-func (p *GoPrinter) VisitIf(ifStmt *tree.If, param any) tree.J {
+func (p *GoPrinter) VisitIf(ifStmt *java.If, param any) java.J {
 	out := param.(*PrintOutputCapture)
-	p.beforeSyntax(ifStmt.Prefix, ifStmt.Markers, out)
-	out.Append("if")
-	if ifStmt.Init != nil {
-		p.Visit(ifStmt.Init.Element, out)
-		p.visitSpace(ifStmt.Init.After, out)
-		out.Append(";")
+	// An `if` with an init clause is wrapped in a golang.StatementWithInit, which
+	// owns the prefix and the init statement (java.If has no init slot). When
+	// wrapped, the prefix and `<init>;` are sourced from that parent and emitted
+	// between `if` and the condition.
+	wrapper, wrapped := p.statementWithInitWrapper()
+	wrapperPrefix := java.EmptySpace
+	var wrapperMarkers java.Markers
+	if wrapped {
+		wrapperPrefix, wrapperMarkers = wrapper.Prefix, wrapper.Markers
 	}
-	p.Visit(ifStmt.Condition, out)
-	p.Visit(ifStmt.Then, out)
+	p.beforeWrapped(wrapperPrefix, wrapperMarkers, ifStmt.Prefix, ifStmt.Markers, out)
+	out.Append("if")
+	if wrapped {
+		p.Visit(wrapper.Init.Element, out)
+		p.visitSpace(wrapper.Init.After, out)
+		if java.FindMarker[golang.Semicolon](wrapper.Init.Markers) != nil {
+			out.Append(";")
+		}
+	}
+	// The condition is a ControlParentheses (matching J.If), but Go has no parens,
+	// so emit only its inner element. The wrapper's own spaces are empty for
+	// parsed Go; print them for robustness against Java-side edits.
+	p.printUnparenthesized(ifStmt.Condition, out)
+	p.Visit(ifStmt.ThenPart.Element, out)
+	p.visitSpace(ifStmt.ThenPart.After, out)
 	if ifStmt.ElsePart != nil {
-		p.visitSpace(ifStmt.ElsePart.After, out)
-		out.Append("else")
-		p.Visit(ifStmt.ElsePart.Element, out)
+		p.Visit(ifStmt.ElsePart, out)
 	}
 	p.afterSyntax(ifStmt.Markers, out)
+	p.afterSyntax(wrapperMarkers, out)
 	return ifStmt
 }
 
-func (p *GoPrinter) VisitAssignment(assign *tree.Assignment, param any) tree.J {
+func (p *GoPrinter) VisitElse(el *java.Else, param any) java.J {
+	out := param.(*PrintOutputCapture)
+	p.beforeSyntax(el.Prefix, el.Markers, out)
+	out.Append("else")
+	p.Visit(el.Body.Element, out)
+	p.visitSpace(el.Body.After, out)
+	p.afterSyntax(el.Markers, out)
+	return el
+}
+
+// printUnparenthesized emits the condition of an if or the selector of a
+// switch, which J holds in parentheses that Go does not write.
+func (p *GoPrinter) printUnparenthesized(cp *java.ControlParentheses, out *PrintOutputCapture) {
+	p.beforeSyntax(cp.Prefix, cp.Markers, out)
+	p.Visit(cp.Tree.Element, out)
+	p.visitSpace(cp.Tree.After, out)
+	p.afterSyntax(cp.Markers, out)
+}
+
+func (p *GoPrinter) VisitAssignment(assign *java.Assignment, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(assign.Prefix, assign.Markers, out)
 	p.Visit(assign.Variable, out)
 	p.visitSpace(assign.Value.Before, out)
-	if tree.FindMarker[tree.ShortVarDecl](assign.Markers) != nil {
+	if java.FindMarker[golang.ShortVarDecl](assign.Markers) != nil {
 		out.Append(":=")
 	} else {
 		out.Append("=")
@@ -203,18 +290,36 @@ func (p *GoPrinter) VisitAssignment(assign *tree.Assignment, param any) tree.J {
 	return assign
 }
 
-func (p *GoPrinter) VisitMethodDeclaration(md *tree.MethodDeclaration, param any) tree.J {
+func (p *GoPrinter) VisitMethodDeclaration(md *java.MethodDeclaration, param any) java.J {
 	out := param.(*PrintOutputCapture)
-	p.beforeSyntax(md.Prefix, md.Markers, out)
-	isInterfaceMethod := tree.FindMarker[tree.InterfaceMethod](md.Markers) != nil
+	// A method with a receiver is wrapped in a golang.MethodDeclaration, which
+	// owns the prefix (J.MethodDeclaration has no receiver slot). When wrapped,
+	// the prefix and the receiver `(s *Service)` come from that parent; the
+	// inner declaration's own prefix is empty.
+	wrapper, wrapped := p.methodDeclarationWrapper()
+	wrapperPrefix := java.EmptySpace
+	var wrapperMarkers java.Markers
+	if wrapped {
+		wrapperPrefix, wrapperMarkers = wrapper.Prefix, wrapper.Markers
+	}
+	// Each leading annotation emits as a `//<name>[ <args>]` line. The
+	// annotation's Prefix supplies the whitespace before `//` (newline
+	// + indent for non-first directives). The newline that follows the
+	// last directive lives on the prefix below.
+	p.printDirectives(md.LeadingAnnotations, out)
+	p.beforeWrapped(wrapperPrefix, wrapperMarkers, md.Prefix, md.Markers, out)
+	isInterfaceMethod := java.FindMarker[golang.InterfaceMethod](md.Markers) != nil
 	if !isInterfaceMethod {
 		out.Append("func")
 	}
-	if md.Receiver != nil {
-		p.printParamList(*md.Receiver, out)
+	if wrapped {
+		// receiver printed between `func` and the name
+		p.printParamList(wrapper.Receiver, out)
 	}
-	if md.Name.Name != "" {
-		p.Visit(md.Name, out)
+	// a function literal has an empty name, which still prints its space and markers
+	p.Visit(md.Name, out)
+	if md.TypeParameters != nil {
+		p.Visit(md.TypeParameters, out)
 	}
 	p.printParamList(md.Parameters, out)
 	if md.ReturnType != nil {
@@ -224,30 +329,110 @@ func (p *GoPrinter) VisitMethodDeclaration(md *tree.MethodDeclaration, param any
 		p.Visit(md.Body, out)
 	}
 	p.afterSyntax(md.Markers, out)
+	p.afterSyntax(wrapperMarkers, out)
 	return md
 }
 
-func (p *GoPrinter) printParamList(params tree.Container[tree.Statement], out *PrintOutputCapture) {
-	p.visitSpace(params.Before, out)
-	out.Append("(")
-	tc := tree.FindMarker[tree.TrailingComma](params.Markers)
-	for i, rp := range params.Elements {
+// wrapper owns the prefix and the receiver, but both are emitted by the inner
+// declaration's VisitMethodDeclaration (which sources them via the cursor),
+// keeping the receiver correctly positioned between `func` and the name and the
+// prefix after any leading `//go:` directives. So this just visits the inner.
+func (p *GoPrinter) VisitGoMethodDeclaration(md *golang.MethodDeclaration, param any) java.J {
+	out := param.(*PrintOutputCapture)
+	p.Visit(md.Declaration, out)
+	return md
+}
+
+// methodDeclarationWrapper returns the golang.MethodDeclaration directly
+// wrapping the J.MethodDeclaration currently being printed, if any.
+func (p *GoPrinter) methodDeclarationWrapper() (*golang.MethodDeclaration, bool) {
+	c := p.Cursor()
+	if c == nil || c.Parent() == nil {
+		return nil, false
+	}
+	wrapper, ok := c.Parent().Value().(*golang.MethodDeclaration)
+	return wrapper, ok
+}
+
+// wrapper owns the prefix and the init statement, but both are emitted by the
+// inner statement's VisitIf/VisitSwitch (which source them via the cursor),
+// keeping `<init>;` correctly positioned between the keyword and the condition.
+// So this just visits the inner statement.
+func (p *GoPrinter) VisitStatementWithInit(s *golang.StatementWithInit, param any) java.J {
+	out := param.(*PrintOutputCapture)
+	p.Visit(s.Statement, out)
+	return s
+}
+
+// statementWithInitWrapper returns the golang.StatementWithInit directly
+// wrapping the if/switch currently being printed, if any.
+func (p *GoPrinter) statementWithInitWrapper() (*golang.StatementWithInit, bool) {
+	c := p.Cursor()
+	if c == nil || c.Parent() == nil {
+		return nil, false
+	}
+	wrapper, ok := c.Parent().Value().(*golang.StatementWithInit)
+	return wrapper, ok
+}
+
+func (p *GoPrinter) VisitTypeParameters(tps *java.TypeParameters, param any) java.J {
+	out := param.(*PrintOutputCapture)
+	p.beforeSyntax(tps.Prefix, tps.Markers, out)
+	out.Append("[")
+	tc := java.FindMarker[golang.TrailingComma](tps.Markers)
+	for i, rp := range tps.TypeParameters {
 		p.Visit(rp.Element, out)
-		if i < len(params.Elements)-1 {
-			p.visitSpace(rp.After, out)
+		p.visitSpace(rp.After, out)
+		if i < len(tps.TypeParameters)-1 {
 			out.Append(",")
 		} else if tc != nil {
 			p.visitSpace(tc.Before, out)
 			out.Append(",")
 			p.visitSpace(tc.After, out)
-		} else {
+		}
+	}
+	out.Append("]")
+	p.afterSyntax(tps.Markers, out)
+	return tps
+}
+
+func (p *GoPrinter) VisitTypeParameter(tp *java.TypeParameter, param any) java.J {
+	out := param.(*PrintOutputCapture)
+	p.beforeSyntax(tp.Prefix, tp.Markers, out)
+	p.Visit(tp.Name, out)
+	if tp.Bounds != nil {
+		p.visitSpace(tp.Bounds.Before, out)
+		for i, rp := range tp.Bounds.Elements {
+			p.Visit(rp.Element, out)
 			p.visitSpace(rp.After, out)
+			if i < len(tp.Bounds.Elements)-1 {
+				out.Append(",")
+			}
+		}
+	}
+	p.afterSyntax(tp.Markers, out)
+	return tp
+}
+
+func (p *GoPrinter) printParamList(params java.Container[java.Statement], out *PrintOutputCapture) {
+	p.visitSpace(params.Before, out)
+	out.Append("(")
+	tc := java.FindMarker[golang.TrailingComma](params.Markers)
+	for i, rp := range params.Elements {
+		p.Visit(rp.Element, out)
+		p.visitSpace(rp.After, out)
+		if i < len(params.Elements)-1 {
+			out.Append(",")
+		} else if tc != nil {
+			p.visitSpace(tc.Before, out)
+			out.Append(",")
+			p.visitSpace(tc.After, out)
 		}
 	}
 	out.Append(")")
 }
 
-func (p *GoPrinter) VisitFieldAccess(fa *tree.FieldAccess, param any) tree.J {
+func (p *GoPrinter) VisitFieldAccess(fa *java.FieldAccess, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(fa.Prefix, fa.Markers, out)
 	p.Visit(fa.Target, out)
@@ -258,32 +443,32 @@ func (p *GoPrinter) VisitFieldAccess(fa *tree.FieldAccess, param any) tree.J {
 	return fa
 }
 
-func (p *GoPrinter) VisitMethodInvocation(mi *tree.MethodInvocation, param any) tree.J {
+func (p *GoPrinter) VisitMethodInvocation(mi *java.MethodInvocation, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(mi.Prefix, mi.Markers, out)
 	if mi.Select != nil {
 		p.Visit(mi.Select.Element, out)
+		p.visitSpace(mi.Select.After, out)
 		if mi.Name.Name != "" {
 			out.Append(".")
 		}
 	}
-	if mi.Name.Name != "" {
-		p.Visit(mi.Name, out)
+	p.Visit(mi.Name, out)
+	if mi.TypeParameters != nil {
+		p.printTypeArgs(mi.TypeParameters, out)
 	}
 	p.visitSpace(mi.Arguments.Before, out)
 	out.Append("(")
-	tc := tree.FindMarker[tree.TrailingComma](mi.Markers)
+	tc := java.FindMarker[golang.TrailingComma](mi.Markers)
 	for i, rp := range mi.Arguments.Elements {
 		p.Visit(rp.Element, out)
+		p.visitSpace(rp.After, out)
 		if i < len(mi.Arguments.Elements)-1 {
-			p.visitSpace(rp.After, out)
 			out.Append(",")
 		} else if tc != nil {
 			p.visitSpace(tc.Before, out)
 			out.Append(",")
 			p.visitSpace(tc.After, out)
-		} else {
-			p.visitSpace(rp.After, out)
 		}
 	}
 	out.Append(")")
@@ -291,40 +476,36 @@ func (p *GoPrinter) VisitMethodInvocation(mi *tree.MethodInvocation, param any) 
 	return mi
 }
 
-func (p *GoPrinter) VisitVariableDeclarations(vd *tree.VariableDeclarations, param any) tree.J {
+func (p *GoPrinter) VisitVariableDeclarations(vd *java.VariableDeclarations, param any) java.J {
 	out := param.(*PrintOutputCapture)
+	// On a var or const declaration the leading annotations are `//go:`-style
+	// directives, emitted before the keyword. Anything else that carries
+	// annotations is a struct field, and they are its tag, emitted after the
+	// type. The declaration's own markers decide, so a field prints the same
+	// whether or not the printer was given its ancestors.
+	isField := java.FindMarker[golang.VarKeyword](vd.Markers) == nil &&
+		java.FindMarker[golang.ConstDecl](vd.Markers) == nil
+	if !isField {
+		p.printDirectives(vd.LeadingAnnotations, out)
+	}
 	p.beforeSyntax(vd.Prefix, vd.Markers, out)
-	isGroupedSpec := tree.FindMarker[tree.GroupedSpec](vd.Markers) != nil
+	isGroupedSpec := java.FindMarker[golang.GroupedSpec](vd.Markers) != nil
 	if !isGroupedSpec {
-		if tree.FindMarker[tree.ConstDecl](vd.Markers) != nil {
+		if java.FindMarker[golang.ConstDecl](vd.Markers) != nil {
 			out.Append("const")
-		} else if tree.FindMarker[tree.VarKeyword](vd.Markers) != nil {
+		} else if java.FindMarker[golang.VarKeyword](vd.Markers) != nil {
 			out.Append("var")
 		}
-	}
-
-	if vd.Specs != nil {
-		// Grouped: var ( ... ) or const ( ... )
-		p.visitSpace(vd.Specs.Before, out)
-		out.Append("(")
-		for _, rp := range vd.Specs.Elements {
-			p.Visit(rp.Element, out)
-			p.visitSpace(rp.After, out)
-		}
-		out.Append(")")
-		p.afterSyntax(vd.Markers, out)
-		return vd
 	}
 
 	// Go order: keyword name[, name]... type [= value]
 	// Print variable names first (without initializers)
 	for i, v := range vd.Variables {
-		p.visitSpace(v.Element.Prefix, out)
-		if v.Element.Name.Name != "" {
-			p.Visit(v.Element.Name, out)
-		}
+		p.beforeSyntax(v.Element.Prefix, v.Element.Markers, out)
+		p.Visit(v.Element.Name, out)
+		p.afterSyntax(v.Element.Markers, out)
+		p.visitSpace(v.After, out)
 		if i < len(vd.Variables)-1 {
-			p.visitSpace(v.After, out)
 			out.Append(",")
 		}
 	}
@@ -336,9 +517,36 @@ func (p *GoPrinter) VisitVariableDeclarations(vd *tree.VariableDeclarations, par
 	if vd.TypeExpr != nil {
 		p.Visit(vd.TypeExpr, out)
 	}
-	// Then struct tag if present
-	if tag := tree.FindMarker[tree.StructTag](vd.Markers); tag != nil {
-		p.Visit(tag.Tag, out)
+	// Then struct tag, reconstructed from LeadingAnnotations (one
+	// Annotation per `key:"value"` pair). Only emitted when this
+	// VariableDeclarations is a struct field — non-struct positions
+	// don't allow tags syntactically.
+	if len(vd.LeadingAnnotations) > 0 && isField {
+		quote := java.FindMarker[golang.StructTagQuote](vd.Markers)
+		// The first annotation's Prefix is the space before the opening quote.
+		first := vd.LeadingAnnotations[0]
+		out.BeforePrefix(first.Markers)
+		p.visitSpace(first.Prefix, out)
+		body := NewPrintOutputCaptureWithMarkers(out.markerPrinter)
+		body.BeforeSyntax(first.Markers)
+		p.printAnnotationBody(first, body)
+		body.AfterSyntax(first.Markers)
+		for _, ann := range vd.LeadingAnnotations[1:] {
+			p.beforeSyntax(ann.Prefix, ann.Markers, body)
+			p.printAnnotationBody(ann, body)
+			p.afterSyntax(ann.Markers, body)
+		}
+		if quote == nil || quote.Quote == "`" {
+			out.Append("`" + body.String() + "`")
+		} else if quote.ValueSource != "" && quote.Value == body.String() {
+			// as written, escapes included, while the tag still says the same
+			out.Append(quote.ValueSource)
+		} else {
+			// An interpreted string spells out what a raw string carries
+			// literally — the quotes and backslashes in `json:"a"`, and
+			// any control character in the key or value.
+			out.Append(quoteString(body.String()))
+		}
 	}
 	// Then initializers
 	firstInit := true
@@ -358,7 +566,39 @@ func (p *GoPrinter) VisitVariableDeclarations(vd *tree.VariableDeclarations, par
 	return vd
 }
 
-func (p *GoPrinter) VisitVariableDeclarator(vd *tree.VariableDeclarator, param any) tree.J {
+func (p *GoPrinter) VisitDeclarationBlock(db *golang.DeclarationBlock, param any) java.J {
+	out := param.(*PrintOutputCapture)
+	// Leading `//go:` directives, emitted before the var/const keyword.
+	p.printDirectives(db.LeadingAnnotations, out)
+	p.beforeSyntax(db.Prefix, db.Markers, out)
+	if db.Kind == golang.DeclConst {
+		out.Append("const")
+	} else {
+		out.Append("var")
+	}
+	if db.Specs != nil {
+		p.visitSpace(db.Specs.Before, out)
+		out.Append("(")
+		p.printSpecGroup(db.Specs.Elements, out)
+		out.Append(")")
+	}
+	p.afterSyntax(db.Markers, out)
+	return db
+}
+
+// printSpecGroup emits the specs of a parenthesized `var`/`const`/`type`
+// group, including any explicit `;` written after one.
+func (p *GoPrinter) printSpecGroup(elements []java.RightPadded[java.Statement], out *PrintOutputCapture) {
+	for _, rp := range elements {
+		p.Visit(rp.Element, out)
+		p.visitSpace(rp.After, out)
+		if java.FindMarker[golang.Semicolon](rp.Markers) != nil {
+			out.Append(";")
+		}
+	}
+}
+
+func (p *GoPrinter) VisitVariableDeclarator(vd *java.VariableDeclarator, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(vd.Prefix, vd.Markers, out)
 	p.Visit(vd.Name, out)
@@ -366,44 +606,94 @@ func (p *GoPrinter) VisitVariableDeclarator(vd *tree.VariableDeclarator, param a
 	return vd
 }
 
-func (p *GoPrinter) VisitImport(imp *tree.Import, param any) tree.J {
+func (p *GoPrinter) VisitImport(imp *java.Import, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(imp.Prefix, imp.Markers, out)
 	if imp.Alias != nil {
+		p.visitSpace(imp.Alias.Before, out)
 		p.Visit(imp.Alias.Element, out)
 	}
-	p.Visit(imp.Qualid, out)
+	// The path is a string literal in Go, held as a field access named after
+	// its content; its parts are printed for the space and markers on them.
+	if qualid := imp.Qualid; qualid != nil {
+		p.beforeSyntax(qualid.Prefix, qualid.Markers, out)
+		p.Visit(qualid.Target, out)
+		p.visitSpace(qualid.Name.Before, out)
+		if name := qualid.Name.Element; name != nil {
+			p.beforeSyntax(name.Prefix, name.Markers, out)
+			out.Append(java.ImportPathSource(name.Name))
+			p.afterSyntax(name.Markers, out)
+		}
+		p.afterSyntax(qualid.Markers, out)
+	}
 	p.afterSyntax(imp.Markers, out)
 	return imp
 }
 
-func (p *GoPrinter) VisitSwitch(sw *tree.Switch, param any) tree.J {
+func (p *GoPrinter) VisitSwitch(sw *java.Switch, param any) java.J {
 	out := param.(*PrintOutputCapture)
-	p.beforeSyntax(sw.Prefix, sw.Markers, out)
-	if tree.FindMarker[tree.SelectStmt](sw.Markers) != nil {
-		out.Append("select")
-	} else {
-		out.Append("switch")
+	// A `switch` with an init clause is wrapped in a golang.StatementWithInit
+	// (java.Switch has no init slot); when wrapped, the prefix and `<init>;` come
+	// from that parent. `select` has no init, so it is never wrapped.
+	wrapper, wrapped := p.statementWithInitWrapper()
+	wrapperPrefix := java.EmptySpace
+	var wrapperMarkers java.Markers
+	if wrapped {
+		wrapperPrefix, wrapperMarkers = wrapper.Prefix, wrapper.Markers
 	}
-	if sw.Init != nil {
-		p.Visit(sw.Init.Element, out)
-		p.visitSpace(sw.Init.After, out)
-		out.Append(";")
+	p.beforeWrapped(wrapperPrefix, wrapperMarkers, sw.Prefix, sw.Markers, out)
+	out.Append("switch")
+	if wrapped {
+		p.Visit(wrapper.Init.Element, out)
+		p.visitSpace(wrapper.Init.After, out)
+		if java.FindMarker[golang.Semicolon](wrapper.Init.Markers) != nil {
+			out.Append(";")
+		}
 	}
-	if sw.Tag != nil {
-		p.Visit(sw.Tag.Element, out)
-		p.visitSpace(sw.Tag.After, out)
+	// The selector is a ControlParentheses (matching J.Switch), but Go has no
+	// parens, so emit only its inner element (an Empty for a tagless `switch {}`).
+	if sw.Selector != nil {
+		p.printUnparenthesized(sw.Selector, out)
 	}
 	p.Visit(sw.Body, out)
 	p.afterSyntax(sw.Markers, out)
+	p.afterSyntax(wrapperMarkers, out)
 	return sw
 }
 
-func (p *GoPrinter) VisitCase(c *tree.Case, param any) tree.J {
+func (p *GoPrinter) VisitSelect(sel *golang.Select, param any) java.J {
+	out := param.(*PrintOutputCapture)
+	p.beforeSyntax(sel.Prefix, sel.Markers, out)
+	out.Append("select")
+	p.Visit(sel.Body, out)
+	p.afterSyntax(sel.Markers, out)
+	return sel
+}
+
+// isDefaultCase reports whether a J.Case is Go's `default:` clause, modeled as a
+// single J.Identifier label named "default" (matching every other parser). Since
+// `default` is a reserved keyword, no real case expression can be that identifier.
+func isDefaultCase(c *java.Case) bool {
+	if len(c.Expressions.Elements) != 1 {
+		return false
+	}
+	id, ok := c.Expressions.Elements[0].Element.(*java.Identifier)
+	return ok && id.Name == "default"
+}
+
+func (p *GoPrinter) VisitCase(c *java.Case, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(c.Prefix, c.Markers, out)
-	if len(c.Expressions.Elements) > 0 {
+	if isDefaultCase(c) {
+		// `default:` — a single J.Identifier named "default" (mirroring Java);
+		// print the label itself, with no `case` keyword.
+		p.visitSpace(c.Expressions.Before, out)
+		rp := c.Expressions.Elements[0]
+		p.Visit(rp.Element, out)
+		p.visitSpace(rp.After, out)
+	} else if len(c.Expressions.Elements) > 0 {
 		out.Append("case")
+		p.visitSpace(c.Expressions.Before, out)
 		for i, rp := range c.Expressions.Elements {
 			p.Visit(rp.Element, out)
 			if i < len(c.Expressions.Elements)-1 {
@@ -413,20 +703,21 @@ func (p *GoPrinter) VisitCase(c *tree.Case, param any) tree.J {
 				p.visitSpace(rp.After, out)
 			}
 		}
-	} else {
-		out.Append("default")
-		p.visitSpace(c.Expressions.Before, out)
 	}
+	p.visitSpace(c.Body.Before, out)
 	out.Append(":")
-	for _, rp := range c.Body {
+	for _, rp := range c.Body.Elements {
 		p.Visit(rp.Element, out)
 		p.visitSpace(rp.After, out)
+		if java.FindMarker[golang.Semicolon](rp.Markers) != nil {
+			out.Append(";")
+		}
 	}
 	p.afterSyntax(c.Markers, out)
 	return c
 }
 
-func (p *GoPrinter) VisitAssignmentOperation(ao *tree.AssignmentOperation, param any) tree.J {
+func (p *GoPrinter) VisitAssignmentOperation(ao *java.AssignmentOperation, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(ao.Prefix, ao.Markers, out)
 	p.Visit(ao.Variable, out)
@@ -437,20 +728,38 @@ func (p *GoPrinter) VisitAssignmentOperation(ao *tree.AssignmentOperation, param
 	return ao
 }
 
-func (p *GoPrinter) VisitForLoop(forLoop *tree.ForLoop, param any) tree.J {
+func (p *GoPrinter) VisitForLoop(forLoop *java.ForLoop, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(forLoop.Prefix, forLoop.Markers, out)
 	out.Append("for")
 	p.Visit(&forLoop.Control, out)
-	p.Visit(forLoop.Body, out)
+	p.Visit(forLoop.Body.Element, out)
+	p.visitSpace(forLoop.Body.After, out)
 	p.afterSyntax(forLoop.Markers, out)
 	return forLoop
 }
 
-func (p *GoPrinter) VisitForControl(control *tree.ForControl, param any) tree.J {
+func (p *GoPrinter) VisitForControl(control *java.ForControl, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(control.Prefix, control.Markers, out)
-	if control.Init != nil {
+	if java.FindMarker[golang.ImplicitForClauses](control.Markers) != nil {
+		// Go's condition-only `for cond {}` or infinite `for {}`. Init and
+		// update hold synthetic J.Empty placeholders (kept only so the Java
+		// J.ForLoop.Control list contract holds), which print as whatever
+		// space and markers they were given, with no `;` separators.
+		if control.Init != nil {
+			p.Visit(control.Init.Element, out)
+			p.visitSpace(control.Init.After, out)
+		}
+		if control.Condition != nil {
+			p.Visit(control.Condition.Element, out)
+			p.visitSpace(control.Condition.After, out)
+		}
+		if control.Update != nil {
+			p.Visit(control.Update.Element, out)
+			p.visitSpace(control.Update.After, out)
+		}
+	} else if control.Init != nil {
 		// 3-clause form: init; cond; update
 		p.Visit(control.Init.Element, out)
 		p.visitSpace(control.Init.After, out)
@@ -474,56 +783,173 @@ func (p *GoPrinter) VisitForControl(control *tree.ForControl, param any) tree.J 
 	return control
 }
 
-func (p *GoPrinter) VisitForEachLoop(forEach *tree.ForEachLoop, param any) tree.J {
+func (p *GoPrinter) VisitForEachLoop(forEach *java.ForEachLoop, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(forEach.Prefix, forEach.Markers, out)
 	out.Append("for")
 	p.Visit(&forEach.Control, out)
-	p.Visit(forEach.Body, out)
+	p.Visit(forEach.Body.Element, out)
+	p.visitSpace(forEach.Body.After, out)
 	p.afterSyntax(forEach.Markers, out)
 	return forEach
 }
 
-func (p *GoPrinter) VisitForEachControl(control *tree.ForEachControl, param any) tree.J {
+func (p *GoPrinter) VisitForEachControl(control *java.ForEachControl, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(control.Prefix, control.Markers, out)
-	if control.Key != nil {
-		p.Visit(control.Key.Element, out)
-		p.visitSpace(control.Key.After, out)
-		if control.Value != nil {
-			out.Append(",")
-			p.Visit(control.Value.Element, out)
-			p.visitSpace(control.Value.After, out)
-		}
-		if control.Operator.Element == tree.AssignOpDefine {
-			out.Append(":=")
-		} else {
-			out.Append("=")
-		}
-		p.visitSpace(control.Operator.Before, out)
-	}
+	// Variable prints the target list and `:=`/`=` operator (or nothing for a
+	// J.Empty keyless range); the MultiAssignment owns the operator spelling.
+	p.Visit(control.Variable.Element, out)
+	p.visitSpace(control.Variable.After, out)
 	out.Append("range")
-	p.Visit(control.Iterable, out)
+	p.Visit(control.Iterable.Element, out)
+	p.visitSpace(control.Iterable.After, out)
 	p.afterSyntax(control.Markers, out)
 	return control
 }
 
-func (p *GoPrinter) VisitUnary(unary *tree.Unary, param any) tree.J {
+// (`key:"value"`) — including its leading whitespace via Prefix.
+// Backtick wrapping is the VariableDeclarations printer's job for
+// struct-field context; this method only emits the annotation's own
+// substring.
+func (p *GoPrinter) VisitAnnotation(ann *java.Annotation, param any) java.J {
+	out := param.(*PrintOutputCapture)
+	p.beforeSyntax(ann.Prefix, ann.Markers, out)
+	p.printAnnotationBody(ann, out)
+	p.afterSyntax(ann.Markers, out)
+	return ann
+}
+
+// printAnnotationBody emits an annotation's body content in struct-tag
+// form (type, colon, arguments) without the leading Prefix. Used by
+// VariableDeclarations to lay out a backtick-wrapped struct tag where
+// the first annotation's Prefix lives outside the backticks.
+func (p *GoPrinter) printAnnotationBody(ann *java.Annotation, out *PrintOutputCapture) {
+	if ann.AnnotationType != nil {
+		p.Visit(ann.AnnotationType, out)
+	}
+	if ann.Arguments != nil {
+		p.visitSpace(ann.Arguments.Before, out)
+		out.Append(":")
+		for _, rp := range ann.Arguments.Elements {
+			p.Visit(rp.Element, out)
+			p.visitSpace(rp.After, out)
+		}
+	}
+}
+
+// printDirectiveBody emits an annotation's body in source-directive
+// form: `<name>[ <args>]`. Used to render `//go:noinline`,
+// `//go:linkname x runtime.x`, `//lint:ignore`, etc., on
+// MethodDeclaration / TypeDecl / top-level VariableDeclarations. The
+// preceding `//` and the annotation's leading Prefix are emitted by
+// the caller; this helper only produces the substring after `//`.
+//
+// Arguments are emitted as their raw source (single Literal whose
+// Source field carries the rest-of-line text). The space between the
+// directive name and its arguments lives on the Arguments.Before slot
+// — typically a single space.
+func (p *GoPrinter) printDirectiveBody(ann *java.Annotation, out *PrintOutputCapture) {
+	if ann.AnnotationType != nil {
+		p.Visit(ann.AnnotationType, out)
+	}
+	if ann.Arguments != nil {
+		p.visitSpace(ann.Arguments.Before, out)
+		for _, rp := range ann.Arguments.Elements {
+			p.Visit(rp.Element, out)
+			p.visitSpace(rp.After, out)
+		}
+	}
+}
+
+func (p *GoPrinter) VisitUnary(unary *java.Unary, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(unary.Prefix, unary.Markers, out)
-	if unary.Operator.Element == tree.PostIncrement || unary.Operator.Element == tree.PostDecrement || unary.Operator.Element == tree.SpreadPostfix {
+	if unary.Operator.Element == java.PostIncrement || unary.Operator.Element == java.PostDecrement {
 		p.Visit(unary.Operand, out)
 		p.visitSpace(unary.Operator.Before, out)
-		out.Append(unaryOperatorString(unary.Operator.Element))
+		out.Append(UnaryOperatorString(unary.Operator.Element))
 	} else {
-		out.Append(unaryOperatorString(unary.Operator.Element))
+		p.visitSpace(unary.Operator.Before, out)
+		out.Append(UnaryOperatorString(unary.Operator.Element))
 		p.Visit(unary.Operand, out)
 	}
 	p.afterSyntax(unary.Markers, out)
 	return unary
 }
 
-func (p *GoPrinter) VisitBreak(b *tree.Break, param any) tree.J {
+func goUnaryOperatorString(op golang.UnaryOperator) string {
+	switch op {
+	case golang.AddressOf:
+		return "&"
+	case golang.Indirection:
+		return "*"
+	case golang.Receive:
+		return "<-"
+	default:
+		return "?"
+	}
+}
+
+func (p *GoPrinter) VisitGoUnary(unary *golang.Unary, param any) java.J {
+	out := param.(*PrintOutputCapture)
+	p.beforeSyntax(unary.Prefix, unary.Markers, out)
+	p.visitSpace(unary.Operator.Before, out)
+	out.Append(goUnaryOperatorString(unary.Operator.Element))
+	p.Visit(unary.Expression, out)
+	p.afterSyntax(unary.Markers, out)
+	return unary
+}
+
+func (p *GoPrinter) VisitGoBinary(binary *golang.Binary, param any) java.J {
+	out := param.(*PrintOutputCapture)
+	p.beforeSyntax(binary.Prefix, binary.Markers, out)
+	p.Visit(binary.Left, out)
+	p.visitSpace(binary.Operator.Before, out)
+	if binary.Operator.Element == golang.BinAndNot {
+		out.Append("&^")
+	} else {
+		out.Append("?")
+	}
+	p.Visit(binary.Right, out)
+	p.afterSyntax(binary.Markers, out)
+	return binary
+}
+
+func (p *GoPrinter) VisitGoAssignmentOperation(ao *golang.AssignmentOperation, param any) java.J {
+	out := param.(*PrintOutputCapture)
+	p.beforeSyntax(ao.Prefix, ao.Markers, out)
+	p.Visit(ao.Variable, out)
+	p.visitSpace(ao.Operator.Before, out)
+	if ao.Operator.Element == golang.AssignAndNot {
+		out.Append("&^=")
+	} else {
+		out.Append("?=")
+	}
+	p.Visit(ao.Assignment, out)
+	p.afterSyntax(ao.Markers, out)
+	return ao
+}
+
+func (p *GoPrinter) VisitGoVariadic(v *golang.Variadic, param any) java.J {
+	out := param.(*PrintOutputCapture)
+	p.beforeSyntax(v.Prefix, v.Markers, out)
+	if v.Postfix {
+		// `args...` — element, then the ellipsis.
+		p.Visit(v.Element, out)
+		p.visitSpace(v.Dots, out)
+		out.Append("...")
+	} else {
+		// `...T` — the ellipsis, then the element (its prefix is the gap).
+		p.visitSpace(v.Dots, out)
+		out.Append("...")
+		p.Visit(v.Element, out)
+	}
+	p.afterSyntax(v.Markers, out)
+	return v
+}
+
+func (p *GoPrinter) VisitBreak(b *java.Break, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(b.Prefix, b.Markers, out)
 	out.Append("break")
@@ -534,7 +960,7 @@ func (p *GoPrinter) VisitBreak(b *tree.Break, param any) tree.J {
 	return b
 }
 
-func (p *GoPrinter) VisitContinue(c *tree.Continue, param any) tree.J {
+func (p *GoPrinter) VisitContinue(c *java.Continue, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(c.Prefix, c.Markers, out)
 	out.Append("continue")
@@ -545,7 +971,7 @@ func (p *GoPrinter) VisitContinue(c *tree.Continue, param any) tree.J {
 	return c
 }
 
-func (p *GoPrinter) VisitLabel(l *tree.Label, param any) tree.J {
+func (p *GoPrinter) VisitLabel(l *java.Label, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(l.Prefix, l.Markers, out)
 	p.Visit(l.Name.Element, out)
@@ -556,7 +982,7 @@ func (p *GoPrinter) VisitLabel(l *tree.Label, param any) tree.J {
 	return l
 }
 
-func (p *GoPrinter) VisitGoStmt(g *tree.GoStmt, param any) tree.J {
+func (p *GoPrinter) VisitGoStmt(g *golang.GoStmt, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(g.Prefix, g.Markers, out)
 	out.Append("go")
@@ -565,7 +991,7 @@ func (p *GoPrinter) VisitGoStmt(g *tree.GoStmt, param any) tree.J {
 	return g
 }
 
-func (p *GoPrinter) VisitDefer(d *tree.Defer, param any) tree.J {
+func (p *GoPrinter) VisitDefer(d *golang.Defer, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(d.Prefix, d.Markers, out)
 	out.Append("defer")
@@ -574,7 +1000,7 @@ func (p *GoPrinter) VisitDefer(d *tree.Defer, param any) tree.J {
 	return d
 }
 
-func (p *GoPrinter) VisitSend(s *tree.Send, param any) tree.J {
+func (p *GoPrinter) VisitSend(s *golang.Send, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(s.Prefix, s.Markers, out)
 	p.Visit(s.Channel, out)
@@ -585,7 +1011,7 @@ func (p *GoPrinter) VisitSend(s *tree.Send, param any) tree.J {
 	return s
 }
 
-func (p *GoPrinter) VisitGoto(g *tree.Goto, param any) tree.J {
+func (p *GoPrinter) VisitGoto(g *golang.Goto, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(g.Prefix, g.Markers, out)
 	out.Append("goto")
@@ -594,7 +1020,7 @@ func (p *GoPrinter) VisitGoto(g *tree.Goto, param any) tree.J {
 	return g
 }
 
-func (p *GoPrinter) VisitFallthrough(f *tree.Fallthrough, param any) tree.J {
+func (p *GoPrinter) VisitFallthrough(f *golang.Fallthrough, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(f.Prefix, f.Markers, out)
 	out.Append("fallthrough")
@@ -602,13 +1028,11 @@ func (p *GoPrinter) VisitFallthrough(f *tree.Fallthrough, param any) tree.J {
 	return f
 }
 
-func (p *GoPrinter) VisitArrayType(at *tree.ArrayType, param any) tree.J {
+func (p *GoPrinter) VisitArrayType(at *java.ArrayType, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(at.Prefix, at.Markers, out)
+	p.visitSpace(at.Dimension.Before, out)
 	out.Append("[")
-	if at.Length != nil {
-		p.Visit(at.Length, out)
-	}
 	p.visitSpace(at.Dimension.Element, out)
 	out.Append("]")
 	p.Visit(at.ElementType, out)
@@ -616,7 +1040,19 @@ func (p *GoPrinter) VisitArrayType(at *tree.ArrayType, param any) tree.J {
 	return at
 }
 
-func (p *GoPrinter) VisitParentheses(paren *tree.Parentheses, param any) tree.J {
+func (p *GoPrinter) VisitGoArrayType(at *golang.ArrayType, param any) java.J {
+	out := param.(*PrintOutputCapture)
+	p.beforeSyntax(at.Prefix, at.Markers, out)
+	out.Append("[")
+	p.Visit(at.Length.Element, out)
+	p.visitSpace(at.Length.After, out)
+	out.Append("]")
+	p.Visit(at.ElementType, out)
+	p.afterSyntax(at.Markers, out)
+	return at
+}
+
+func (p *GoPrinter) VisitParentheses(paren *java.Parentheses, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(paren.Prefix, paren.Markers, out)
 	out.Append("(")
@@ -627,18 +1063,55 @@ func (p *GoPrinter) VisitParentheses(paren *tree.Parentheses, param any) tree.J 
 	return paren
 }
 
-func (p *GoPrinter) VisitTypeCast(tc *tree.TypeCast, param any) tree.J {
+func (p *GoPrinter) VisitParenthesizedTypeTree(ptt *java.ParenthesizedTypeTree, param any) java.J {
+	out := param.(*PrintOutputCapture)
+	p.beforeSyntax(ptt.Prefix, ptt.Markers, out)
+	p.Visit(ptt.Type, out)
+	p.afterSyntax(ptt.Markers, out)
+	return ptt
+}
+
+// VisitTypeCast renders Go's conversion `T(x)`.
+func (p *GoPrinter) VisitTypeCast(tc *java.TypeCast, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(tc.Prefix, tc.Markers, out)
-	// Go type assertion: expr.(Type)
+	var clazzMarkers java.Markers
+	if tc.Clazz != nil {
+		// The parentheses follow the type they hold, so their Prefix does too.
+		clazzMarkers = tc.Clazz.Markers
+		out.BeforePrefix(clazzMarkers)
+		out.BeforeSyntax(clazzMarkers)
+		p.Visit(tc.Clazz.Tree.Element, out)
+		p.visitSpace(tc.Clazz.Prefix, out)
+	}
+	out.Append("(")
 	p.Visit(tc.Expr, out)
-	out.Append(".")
-	p.Visit(tc.Clazz, out)
+	if tc.Clazz != nil {
+		p.visitSpace(tc.Clazz.Tree.After, out)
+	}
+	if trailing := java.FindMarker[golang.TrailingComma](tc.Markers); trailing != nil {
+		p.visitSpace(trailing.Before, out)
+		out.Append(",")
+		p.visitSpace(trailing.After, out)
+	}
+	out.Append(")")
+	p.afterSyntax(clazzMarkers, out)
 	p.afterSyntax(tc.Markers, out)
 	return tc
 }
 
-func (p *GoPrinter) VisitControlParentheses(cp *tree.ControlParentheses, param any) tree.J {
+func (p *GoPrinter) VisitTypeAssertion(ta *golang.TypeAssertion, param any) java.J {
+	out := param.(*PrintOutputCapture)
+	p.beforeSyntax(ta.Prefix, ta.Markers, out)
+	p.Visit(ta.Left.Element, out)
+	p.visitSpace(ta.Left.After, out)
+	out.Append(".")
+	p.Visit(ta.AssertedType, out)
+	p.afterSyntax(ta.Markers, out)
+	return ta
+}
+
+func (p *GoPrinter) VisitControlParentheses(cp *java.ControlParentheses, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(cp.Prefix, cp.Markers, out)
 	out.Append("(")
@@ -649,7 +1122,7 @@ func (p *GoPrinter) VisitControlParentheses(cp *tree.ControlParentheses, param a
 	return cp
 }
 
-func (p *GoPrinter) VisitArrayAccess(aa *tree.ArrayAccess, param any) tree.J {
+func (p *GoPrinter) VisitArrayAccess(aa *java.ArrayAccess, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(aa.Prefix, aa.Markers, out)
 	p.Visit(aa.Indexed, out)
@@ -658,7 +1131,7 @@ func (p *GoPrinter) VisitArrayAccess(aa *tree.ArrayAccess, param any) tree.J {
 	return aa
 }
 
-func (p *GoPrinter) VisitArrayDimension(ad *tree.ArrayDimension, param any) tree.J {
+func (p *GoPrinter) VisitArrayDimension(ad *java.ArrayDimension, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(ad.Prefix, ad.Markers, out)
 	out.Append("[")
@@ -669,45 +1142,46 @@ func (p *GoPrinter) VisitArrayDimension(ad *tree.ArrayDimension, param any) tree
 	return ad
 }
 
-func (p *GoPrinter) VisitIndexList(il *tree.IndexList, param any) tree.J {
+func (p *GoPrinter) VisitIndexList(il *golang.IndexList, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(il.Prefix, il.Markers, out)
 	p.Visit(il.Target, out)
-	p.visitSpace(il.Indices.Before, out)
-	out.Append("[")
-	for i, rp := range il.Indices.Elements {
-		p.Visit(rp.Element, out)
-		p.visitSpace(rp.After, out)
-		if i < len(il.Indices.Elements)-1 {
-			out.Append(",")
-		}
-	}
-	out.Append("]")
+	p.printTypeArgs(&il.Indices, out)
 	p.afterSyntax(il.Markers, out)
 	return il
 }
 
-func (p *GoPrinter) VisitParameterizedType(pt *tree.ParameterizedType, param any) tree.J {
+// printTypeArgs emits the `[T, U]` of a generic instantiation.
+func (p *GoPrinter) printTypeArgs(args *java.Container[java.Expression], out *PrintOutputCapture) {
+	p.visitSpace(args.Before, out)
+	out.Append("[")
+	tc := java.FindMarker[golang.TrailingComma](args.Markers)
+	for i, rp := range args.Elements {
+		p.Visit(rp.Element, out)
+		p.visitSpace(rp.After, out)
+		if i < len(args.Elements)-1 {
+			out.Append(",")
+		} else if tc != nil {
+			p.visitSpace(tc.Before, out)
+			out.Append(",")
+			p.visitSpace(tc.After, out)
+		}
+	}
+	out.Append("]")
+}
+
+func (p *GoPrinter) VisitParameterizedType(pt *java.ParameterizedType, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(pt.Prefix, pt.Markers, out)
 	p.Visit(pt.Clazz, out)
 	if pt.TypeParameters != nil {
-		p.visitSpace(pt.TypeParameters.Before, out)
-		out.Append("[")
-		for i, rp := range pt.TypeParameters.Elements {
-			p.Visit(rp.Element, out)
-			p.visitSpace(rp.After, out)
-			if i < len(pt.TypeParameters.Elements)-1 {
-				out.Append(",")
-			}
-		}
-		out.Append("]")
+		p.printTypeArgs(pt.TypeParameters, out)
 	}
 	p.afterSyntax(pt.Markers, out)
 	return pt
 }
 
-func (p *GoPrinter) VisitComposite(c *tree.Composite, param any) tree.J {
+func (p *GoPrinter) VisitComposite(c *golang.Composite, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(c.Prefix, c.Markers, out)
 	if c.TypeExpr != nil {
@@ -715,18 +1189,16 @@ func (p *GoPrinter) VisitComposite(c *tree.Composite, param any) tree.J {
 	}
 	p.visitSpace(c.Elements.Before, out)
 	out.Append("{")
-	ctc := tree.FindMarker[tree.TrailingComma](c.Markers)
+	ctc := java.FindMarker[golang.TrailingComma](c.Markers)
 	for i, rp := range c.Elements.Elements {
 		p.Visit(rp.Element, out)
+		p.visitSpace(rp.After, out)
 		if i < len(c.Elements.Elements)-1 {
-			p.visitSpace(rp.After, out)
 			out.Append(",")
 		} else if ctc != nil {
 			p.visitSpace(ctc.Before, out)
 			out.Append(",")
 			p.visitSpace(ctc.After, out)
-		} else {
-			p.visitSpace(rp.After, out)
 		}
 	}
 	out.Append("}")
@@ -734,7 +1206,7 @@ func (p *GoPrinter) VisitComposite(c *tree.Composite, param any) tree.J {
 	return c
 }
 
-func (p *GoPrinter) VisitKeyValue(kv *tree.KeyValue, param any) tree.J {
+func (p *GoPrinter) VisitKeyValue(kv *golang.KeyValue, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(kv.Prefix, kv.Markers, out)
 	p.Visit(kv.Key, out)
@@ -745,7 +1217,7 @@ func (p *GoPrinter) VisitKeyValue(kv *tree.KeyValue, param any) tree.J {
 	return kv
 }
 
-func (p *GoPrinter) VisitSlice(s *tree.Slice, param any) tree.J {
+func (p *GoPrinter) VisitSlice(s *golang.Slice, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(s.Prefix, s.Markers, out)
 	p.Visit(s.Indexed, out)
@@ -755,8 +1227,8 @@ func (p *GoPrinter) VisitSlice(s *tree.Slice, param any) tree.J {
 	p.visitSpace(s.Low.After, out)
 	out.Append(":")
 	p.Visit(s.High.Element, out)
+	p.visitSpace(s.High.After, out)
 	if s.Max != nil {
-		p.visitSpace(s.High.After, out)
 		out.Append(":")
 		p.Visit(s.Max, out)
 	}
@@ -766,7 +1238,7 @@ func (p *GoPrinter) VisitSlice(s *tree.Slice, param any) tree.J {
 	return s
 }
 
-func (p *GoPrinter) VisitMapType(mt *tree.MapType, param any) tree.J {
+func (p *GoPrinter) VisitMapType(mt *golang.MapType, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(mt.Prefix, mt.Markers, out)
 	out.Append("map")
@@ -780,7 +1252,15 @@ func (p *GoPrinter) VisitMapType(mt *tree.MapType, param any) tree.J {
 	return mt
 }
 
-func (p *GoPrinter) VisitStatementExpression(se *tree.StatementExpression, param any) tree.J {
+func (p *GoPrinter) VisitExpressionStatement(es *golang.ExpressionStatement, param any) java.J {
+	out := param.(*PrintOutputCapture)
+	p.beforeSyntax(es.Prefix, es.Markers, out)
+	p.Visit(es.Expression, out)
+	p.afterSyntax(es.Markers, out)
+	return es
+}
+
+func (p *GoPrinter) VisitStatementExpression(se *golang.StatementExpression, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(se.Prefix, se.Markers, out)
 	p.Visit(se.Statement, out)
@@ -788,7 +1268,7 @@ func (p *GoPrinter) VisitStatementExpression(se *tree.StatementExpression, param
 	return se
 }
 
-func (p *GoPrinter) VisitPointerType(pt *tree.PointerType, param any) tree.J {
+func (p *GoPrinter) VisitPointerType(pt *golang.PointerType, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(pt.Prefix, pt.Markers, out)
 	out.Append("*")
@@ -797,23 +1277,23 @@ func (p *GoPrinter) VisitPointerType(pt *tree.PointerType, param any) tree.J {
 	return pt
 }
 
-func (p *GoPrinter) VisitChannel(ch *tree.Channel, param any) tree.J {
+func (p *GoPrinter) VisitChannel(ch *golang.Channel, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(ch.Prefix, ch.Markers, out)
 
-	var dirMarker tree.Space
-	if marker := tree.FindMarker[tree.ChanDirMarker](ch.Markers); marker != nil {
+	var dirMarker java.Space
+	if marker := java.FindMarker[golang.ChanDirMarker](ch.Markers); marker != nil {
 		dirMarker = marker.Before
 	}
 
 	switch ch.Dir {
-	case tree.ChanBidi:
+	case golang.ChanBidi:
 		out.Append("chan")
-	case tree.ChanSendOnly:
+	case golang.ChanSendOnly:
 		out.Append("chan")
 		p.visitSpace(dirMarker, out)
 		out.Append("<-")
-	case tree.ChanRecvOnly:
+	case golang.ChanRecvOnly:
 		out.Append("<-")
 		p.visitSpace(dirMarker, out)
 		out.Append("chan")
@@ -823,7 +1303,7 @@ func (p *GoPrinter) VisitChannel(ch *tree.Channel, param any) tree.J {
 	return ch
 }
 
-func (p *GoPrinter) VisitFuncType(ft *tree.FuncType, param any) tree.J {
+func (p *GoPrinter) VisitFuncType(ft *golang.FuncType, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(ft.Prefix, ft.Markers, out)
 	out.Append("func")
@@ -835,18 +1315,44 @@ func (p *GoPrinter) VisitFuncType(ft *tree.FuncType, param any) tree.J {
 	return ft
 }
 
-func (p *GoPrinter) VisitTypeList(tl *tree.TypeList, param any) tree.J {
+func (p *GoPrinter) VisitUnion(u *golang.Union, param any) java.J {
+	out := param.(*PrintOutputCapture)
+	p.beforeSyntax(u.Prefix, u.Markers, out)
+	for i, rp := range u.Types {
+		p.Visit(rp.Element, out)
+		p.visitSpace(rp.After, out)
+		if i < len(u.Types)-1 {
+			out.Append("|")
+		}
+	}
+	p.afterSyntax(u.Markers, out)
+	return u
+}
+
+func (p *GoPrinter) VisitUnderlyingType(ut *golang.UnderlyingType, param any) java.J {
+	out := param.(*PrintOutputCapture)
+	p.beforeSyntax(ut.Prefix, ut.Markers, out)
+	out.Append("~")
+	p.Visit(ut.Element, out)
+	p.afterSyntax(ut.Markers, out)
+	return ut
+}
+
+func (p *GoPrinter) VisitTypeList(tl *golang.TypeList, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(tl.Prefix, tl.Markers, out)
 	p.visitSpace(tl.Types.Before, out)
 	out.Append("(")
+	tc := java.FindMarker[golang.TrailingComma](tl.Types.Markers)
 	for i, rp := range tl.Types.Elements {
 		p.Visit(rp.Element, out)
+		p.visitSpace(rp.After, out)
 		if i < len(tl.Types.Elements)-1 {
-			p.visitSpace(rp.After, out)
 			out.Append(",")
-		} else {
-			p.visitSpace(rp.After, out)
+		} else if tc != nil {
+			p.visitSpace(tc.Before, out)
+			out.Append(",")
+			p.visitSpace(tc.After, out)
 		}
 	}
 	out.Append(")")
@@ -854,7 +1360,7 @@ func (p *GoPrinter) VisitTypeList(tl *tree.TypeList, param any) tree.J {
 	return tl
 }
 
-func (p *GoPrinter) VisitCommClause(cc *tree.CommClause, param any) tree.J {
+func (p *GoPrinter) VisitCommClause(cc *golang.CommClause, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(cc.Prefix, cc.Markers, out)
 	if cc.Comm != nil {
@@ -868,31 +1374,34 @@ func (p *GoPrinter) VisitCommClause(cc *tree.CommClause, param any) tree.J {
 	for _, rp := range cc.Body {
 		p.Visit(rp.Element, out)
 		p.visitSpace(rp.After, out)
+		if java.FindMarker[golang.Semicolon](rp.Markers) != nil {
+			out.Append(";")
+		}
 	}
 	p.afterSyntax(cc.Markers, out)
 	return cc
 }
 
-func (p *GoPrinter) VisitMultiAssignment(ma *tree.MultiAssignment, param any) tree.J {
+func (p *GoPrinter) VisitMultiAssignment(ma *golang.MultiAssignment, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(ma.Prefix, ma.Markers, out)
 	for i, rp := range ma.Variables {
 		p.Visit(rp.Element, out)
+		p.visitSpace(rp.After, out)
 		if i < len(ma.Variables)-1 {
-			p.visitSpace(rp.After, out)
 			out.Append(",")
 		}
 	}
 	p.visitSpace(ma.Operator.Before, out)
-	if tree.FindMarker[tree.ShortVarDecl](ma.Markers) != nil {
+	if java.FindMarker[golang.ShortVarDecl](ma.Markers) != nil {
 		out.Append(":=")
 	} else {
 		out.Append("=")
 	}
 	for i, rp := range ma.Values {
 		p.Visit(rp.Element, out)
+		p.visitSpace(rp.After, out)
 		if i < len(ma.Values)-1 {
-			p.visitSpace(rp.After, out)
 			out.Append(",")
 		}
 	}
@@ -900,7 +1409,7 @@ func (p *GoPrinter) VisitMultiAssignment(ma *tree.MultiAssignment, param any) tr
 	return ma
 }
 
-func (p *GoPrinter) VisitStructType(st *tree.StructType, param any) tree.J {
+func (p *GoPrinter) VisitStructType(st *golang.StructType, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(st.Prefix, st.Markers, out)
 	out.Append("struct")
@@ -909,7 +1418,7 @@ func (p *GoPrinter) VisitStructType(st *tree.StructType, param any) tree.J {
 	return st
 }
 
-func (p *GoPrinter) VisitInterfaceType(it *tree.InterfaceType, param any) tree.J {
+func (p *GoPrinter) VisitInterfaceType(it *golang.InterfaceType, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(it.Prefix, it.Markers, out)
 	out.Append("interface")
@@ -918,10 +1427,11 @@ func (p *GoPrinter) VisitInterfaceType(it *tree.InterfaceType, param any) tree.J
 	return it
 }
 
-func (p *GoPrinter) VisitTypeDecl(td *tree.TypeDecl, param any) tree.J {
+func (p *GoPrinter) VisitTypeDecl(td *golang.TypeDecl, param any) java.J {
 	out := param.(*PrintOutputCapture)
+	p.printDirectives(td.LeadingAnnotations, out)
 	p.beforeSyntax(td.Prefix, td.Markers, out)
-	if tree.FindMarker[tree.GroupedSpec](td.Markers) == nil {
+	if java.FindMarker[golang.GroupedSpec](td.Markers) == nil {
 		out.Append("type")
 	}
 
@@ -929,14 +1439,14 @@ func (p *GoPrinter) VisitTypeDecl(td *tree.TypeDecl, param any) tree.J {
 		// Grouped: type ( ... )
 		p.visitSpace(td.Specs.Before, out)
 		out.Append("(")
-		for _, rp := range td.Specs.Elements {
-			p.Visit(rp.Element, out)
-			p.visitSpace(rp.After, out)
-		}
+		p.printSpecGroup(td.Specs.Elements, out)
 		out.Append(")")
 	} else {
-		// Single: type Name Type
+		// Single: type Name[TypeParams] Type
 		p.Visit(td.Name, out)
+		if td.TypeParameters != nil {
+			p.Visit(td.TypeParameters, out)
+		}
 		if td.Assign != nil {
 			p.visitSpace(td.Assign.Before, out)
 			out.Append("=")
@@ -947,9 +1457,12 @@ func (p *GoPrinter) VisitTypeDecl(td *tree.TypeDecl, param any) tree.J {
 	return td
 }
 
-func (p *GoPrinter) VisitEmpty(empty *tree.Empty, param any) tree.J {
+func (p *GoPrinter) VisitEmpty(empty *java.Empty, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(empty.Prefix, empty.Markers, out)
+	if java.FindMarker[golang.Semicolon](empty.Markers) != nil {
+		out.Append(";")
+	}
 	p.afterSyntax(empty.Markers, out)
 	return empty
 }
@@ -957,114 +1470,129 @@ func (p *GoPrinter) VisitEmpty(empty *tree.Empty, param any) tree.J {
 // visitSpace emits whitespace and comments to the output.
 // Convention: Whitespace (before comments) is emitted first, then each comment
 // with its suffix. This matches Java OpenRewrite's Space model.
-func (p *GoPrinter) visitSpace(space tree.Space, out *PrintOutputCapture) {
-	out.Append(space.Whitespace)
-	for _, comment := range space.Comments {
-		out.Append(comment.Text)
+func (p *GoPrinter) visitSpace(space java.Space, out *PrintOutputCapture) {
+	printSpace(space, out)
+}
+
+func printSpace(space java.Space, out *PrintOutputCapture) {
+	out.Append(space.Whitespace())
+	for _, comment := range space.Comments() {
+		printComment(comment, out)
 		out.Append(comment.Suffix)
 	}
 }
 
-func binaryOperatorString(op tree.BinaryOperator) string {
+// printComment emits a comment's source, re-adding the `//` or `/* */`
+// delimiters around its delimiter-free Text. Mirrors Java's
+// TextComment.printComment, which likewise reconstructs the delimiters from
+// the comment kind rather than storing them in the text.
+func printComment(comment java.Comment, out *PrintOutputCapture) {
+	out.BeforeSyntax(comment.Markers)
+	if comment.Multiline {
+		out.Append("/*")
+		out.Append(comment.Text)
+		out.Append("*/")
+	} else {
+		out.Append("//")
+		out.Append(comment.Text)
+	}
+	out.AfterSyntax(comment.Markers)
+}
+
+func binaryOperatorString(op java.BinaryOperator) string {
 	switch op {
-	case tree.Add:
+	case java.Add:
 		return "+"
-	case tree.Subtract:
+	case java.Subtract:
 		return "-"
-	case tree.Multiply:
+	case java.Multiply:
 		return "*"
-	case tree.Divide:
+	case java.Divide:
 		return "/"
-	case tree.Modulo:
+	case java.Modulo:
 		return "%"
-	case tree.Equal:
+	case java.Equal:
 		return "=="
-	case tree.NotEqual:
+	case java.NotEqual:
 		return "!="
-	case tree.LessThan:
+	case java.LessThan:
 		return "<"
-	case tree.LessThanOrEqual:
+	case java.LessThanOrEqual:
 		return "<="
-	case tree.GreaterThan:
+	case java.GreaterThan:
 		return ">"
-	case tree.GreaterThanOrEqual:
+	case java.GreaterThanOrEqual:
 		return ">="
-	case tree.LogicalAnd:
+	case java.And, java.LogicalAnd:
+		// Go's `&&`. The wire round-trip canonicalizes to the Java enum name
+		// "And" (BinaryOperator.String()), which ParseBinaryOperator maps back
+		// to `And` rather than `LogicalAnd`; handle both so a parsed tree and a
+		// round-tripped tree print identically. Bitwise `&` is BitwiseAnd.
 		return "&&"
-	case tree.LogicalOr:
+	case java.Or, java.LogicalOr:
+		// Go's `||`; see the `&&` note above. Bitwise `|` is BitwiseOr.
 		return "||"
-	case tree.BitwiseAnd:
+	case java.BitwiseAnd:
 		return "&"
-	case tree.BitwiseOr:
+	case java.BitwiseOr:
 		return "|"
-	case tree.BitwiseXor:
+	case java.BitwiseXor:
 		return "^"
-	case tree.LeftShift:
+	case java.LeftShift:
 		return "<<"
-	case tree.RightShift:
+	case java.RightShift:
 		return ">>"
-	case tree.AndNot:
+	case java.AndNot:
 		return "&^"
 	default:
 		return "?"
 	}
 }
 
-func assignmentOperatorString(op tree.AssignmentOperator) string {
+func assignmentOperatorString(op java.AssignmentOperator) string {
 	switch op {
-	case tree.AddAssign:
+	case java.AddAssign:
 		return "+="
-	case tree.SubAssign:
+	case java.SubAssign:
 		return "-="
-	case tree.MulAssign:
+	case java.MulAssign:
 		return "*="
-	case tree.DivAssign:
+	case java.DivAssign:
 		return "/="
-	case tree.ModAssign:
+	case java.ModAssign:
 		return "%="
-	case tree.AndAssign:
+	case java.AndAssign:
 		return "&="
-	case tree.OrAssign:
+	case java.OrAssign:
 		return "|="
-	case tree.XorAssign:
+	case java.XorAssign:
 		return "^="
-	case tree.ShlAssign:
+	case java.ShlAssign:
 		return "<<="
-	case tree.ShrAssign:
+	case java.ShrAssign:
 		return ">>="
-	case tree.AndNotAssign:
+	case java.AndNotAssign:
 		return "&^="
 	default:
 		return "?="
 	}
 }
 
-func unaryOperatorString(op tree.UnaryOperator) string {
+// UnaryOperatorString returns the source text of a unary operator.
+func UnaryOperatorString(op java.UnaryOperator) string {
 	switch op {
-	case tree.Negate:
+	case java.Negate:
 		return "-"
-	case tree.Not:
+	case java.Not:
 		return "!"
-	case tree.BitwiseNot:
+	case java.BitwiseNot:
 		return "^"
-	case tree.Deref:
-		return "*"
-	case tree.AddressOf:
-		return "&"
-	case tree.Receive:
-		return "<-"
-	case tree.Positive:
+	case java.Positive:
 		return "+"
-	case tree.PostIncrement:
+	case java.PostIncrement:
 		return "++"
-	case tree.PostDecrement:
+	case java.PostDecrement:
 		return "--"
-	case tree.Spread:
-		return "..."
-	case tree.SpreadPostfix:
-		return "..."
-	case tree.Tilde:
-		return "~"
 	default:
 		return "?"
 	}

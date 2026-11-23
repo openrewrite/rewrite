@@ -1,5 +1,6 @@
 import pytest
 
+from rewrite.python.visitor import PythonVisitor
 from rewrite.test import RecipeSpec, python
 
 
@@ -96,3 +97,19 @@ def test_generator_with_multiple_ifs():
 def test_generator_without_parens_inside_call():
     # language=python
     RecipeSpec().rewrite_run(python("a = sum((2 - 1) * k for k in [1])"))
+
+
+def test_visitor_reaches_comment_before_closing_bracket():
+    comments = []
+
+    class _Collector(PythonVisitor):
+        def visit_space(self, space, p):
+            comments.extend(c.text for c in space.comments)
+            return space
+
+    # language=python
+    RecipeSpec().rewrite_run(python(
+        "a = [i for i in y  # c\n]",
+        after_recipe=lambda cu: _Collector().visit(cu, None),
+    ))
+    assert comments == [" c"]

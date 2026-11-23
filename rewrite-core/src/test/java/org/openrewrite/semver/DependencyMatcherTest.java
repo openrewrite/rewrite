@@ -25,4 +25,53 @@ class DependencyMatcherTest {
     void groupArtifact() {
         assertThat(DependencyMatcher.build("org.springframework.boot:*").isValid()).isTrue();
     }
+
+    @Test
+    void exactMatch() {
+        DependencyMatcher matcher = DependencyMatcher.build("com.google.guava:guava").getValue();
+        assertThat(matcher.matches("com.google.guava", "guava")).isTrue();
+        assertThat(matcher.matches("com.google.guava", "guava-testlib")).isFalse();
+        assertThat(matcher.matches("com.google.collect", "guava")).isFalse();
+    }
+
+    @Test
+    void exactMatchIsCaseInsensitive() {
+        // The exact fast path must preserve matchesGlob's case-insensitivity.
+        DependencyMatcher matcher = DependencyMatcher.build("com.google.guava:guava").getValue();
+        assertThat(matcher.matches("Com.Google.Guava", "Guava")).isTrue();
+    }
+
+    @Test
+    void globMatch() {
+        DependencyMatcher matcher = DependencyMatcher.build("com.google.*:gua?a").getValue();
+        assertThat(matcher.matches("com.google.guava", "guava")).isTrue();
+        assertThat(matcher.matches("com.google.collect", "guava")).isTrue();
+        assertThat(matcher.matches("com.amazonaws", "guava")).isFalse();
+        assertThat(matcher.matches("com.google.guava", "guava-testlib")).isFalse();
+    }
+
+    @Test
+    void matchAll() {
+        DependencyMatcher matcher = DependencyMatcher.build("*:*").getValue();
+        assertThat(matcher.matches("com.google.guava", "guava")).isTrue();
+        assertThat(matcher.matches(null, "guava")).isTrue();
+        assertThat(matcher.matches("com.google.guava", null)).isTrue();
+    }
+
+    @Test
+    void nullCoordinateAgainstExactPattern() {
+        DependencyMatcher matcher = DependencyMatcher.build("com.google.guava:guava").getValue();
+        assertThat(matcher.matches(null, "guava")).isFalse();
+        assertThat(matcher.matches("com.google.guava", null)).isFalse();
+    }
+
+    @Test
+    void withPatternRecomputesExactness() {
+        // @With must route through the canonical constructor so derived flags stay consistent.
+        DependencyMatcher matcher = DependencyMatcher.build("com.google.guava:guava").getValue()
+                .withArtifactPattern("gua?a");
+        assertThat(matcher.matches("com.google.guava", "guava")).isTrue();
+        assertThat(matcher.matches("com.google.guava", "guaba")).isTrue();
+        assertThat(matcher.matches("com.google.guava", "guava-testlib")).isFalse();
+    }
 }

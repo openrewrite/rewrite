@@ -57,9 +57,9 @@ class XmlSendReceiveTest implements RewriteTest {
         var serverFormatter = new JsonMessageFormatter(new ParameterNamesModule());
         var clientFormatter = new JsonMessageFormatter(new ParameterNamesModule());
 
-        server = new RewriteRpc(new JsonRpc(new TraceMessageHandler("server", new HeaderDelimitedMessageHandler(serverFormatter, serverIn, serverOut))), env.toMarketplace(runtimeClasspath()))
+        server = new RewriteRpc(new JsonRpc(new TraceMessageHandler("server", new HeaderDelimitedMessageHandler(serverFormatter, serverIn, serverOut)), new JsonMessageFormatter()), env.toMarketplace(runtimeClasspath()))
           .batchSize(1);
-        client = new RewriteRpc(new JsonRpc(new TraceMessageHandler("client", new HeaderDelimitedMessageHandler(clientFormatter, clientIn, clientOut))), env.toMarketplace(runtimeClasspath()))
+        client = new RewriteRpc(new JsonRpc(new TraceMessageHandler("client", new HeaderDelimitedMessageHandler(clientFormatter, clientIn, clientOut)), new JsonMessageFormatter()), env.toMarketplace(runtimeClasspath()))
           .batchSize(1);
     }
 
@@ -200,6 +200,28 @@ class XmlSendReceiveTest implements RewriteTest {
             """
               <?xml version="1.0"?>
               <?xml-stylesheet type="text/xsl" href="style.xsl"?>
+              <root/>
+              """
+          )
+        );
+    }
+
+    @Test
+    void sendReceiveProcessingInstructionWithoutData() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new TreeVisitor<>() {
+              @Override
+              @SneakyThrows
+              public @Nullable Tree preVisit(Tree tree, ExecutionContext ctx) {
+                  Tree t = server.visit((SourceFile) tree, NoOp.class.getName(), 0);
+                  stopAfterPreVisit();
+                  return t;
+              }
+          })),
+          xml(
+            """
+              <?xml version="1.0"?>
+              <?xml-stylesheet?>
               <root/>
               """
           )

@@ -81,4 +81,66 @@ class AddCommentToXmlTagTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void addCommentBeforeSelfClosingTag() {
+        rewriteRun(
+          spec -> spec.recipe(new AddCommentToXmlTag("//foo", " hello ")),
+          xml(
+            "<root><foo bar=\"baz\"/></root>",
+            "<root><!-- hello --><foo bar=\"baz\"/></root>"
+          )
+        );
+    }
+
+    @Test
+    void addCommentBeforeSelfClosingTagPreservesIndentation() {
+        rewriteRun(
+          spec -> spec.recipe(new AddCommentToXmlTag("//foo", " hello ")),
+          xml(
+            """
+              <root>
+                  <foo bar="baz"/>
+              </root>
+              """,
+            """
+              <root>
+                  <!-- hello -->
+                  <foo bar="baz"/>
+              </root>
+              """
+          )
+        );
+    }
+
+    @Test
+    void addCommentToEmptyTag() {
+        rewriteRun(
+          spec -> spec.recipe(new AddCommentToXmlTag("//foo", " hello ")),
+          xml(
+            "<root><foo></foo></root>",
+            "<root><foo><!-- hello --></foo></root>"
+          )
+        );
+    }
+
+    @Test
+    void doesNotDuplicateCommentBeforeSelfClosingTag() {
+        rewriteRun(
+          spec -> spec.recipe(new AddCommentToXmlTag("//foo", " hello ")),
+          xml(
+            "<root><!-- hello --><foo bar=\"baz\"/></root>"
+          )
+        );
+    }
+
+    @Test
+    void doesNotDuplicateCommentInsideTag() {
+        rewriteRun(
+          spec -> spec.recipe(new AddCommentToXmlTag("//foo", " hello ")),
+          xml(
+            "<root><foo bar=\"baz\"><!-- hello --></foo></root>"
+          )
+        );
+    }
 }

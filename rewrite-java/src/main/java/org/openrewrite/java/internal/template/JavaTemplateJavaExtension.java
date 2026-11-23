@@ -19,15 +19,29 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.internal.LineStart;
+import org.openrewrite.java.marker.Varargs;
+import org.openrewrite.java.service.SourceFileStatementService;
+import org.openrewrite.java.trait.Scope;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.UUID;
+import java.util.function.BiPredicate;
+import java.util.function.Predicate;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
@@ -58,11 +72,32 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
     @Override
     public TreeVisitor<? extends J, Integer> getMixin() {
         return new JavaVisitor<Integer>() {
-            private boolean substituted;
-
             @Override
             public <J2 extends J> J2 autoFormat(J2 j, @Nullable J stopAfter, Integer p, Cursor parent) {
-                return autoFormat ? super.autoFormat(j, stopAfter, p, parent) : j;
+                if (!autoFormat) {
+                    return j;
+                }
+                J2 formatted = super.autoFormat(j, stopAfter, p, parent);
+                return parent.firstEnclosing(JavaSourceFile.class) instanceof J.CompilationUnit ?
+                        substitutions.restoreExpressionTrivia(formatted) : formatted;
+            }
+
+            /**
+             * Code that replaces code which started its line, or that changes part of a line that a declaration or
+             * statement starts, keeps the indentation and comments the line started with, rather than the
+             * indentation that a file formatted from scratch would give it. Blank lines above it keep their bytes, and
+             * the lines it nests are formatted as usual.
+             */
+            private <J2 extends J> J2 keepLineStart(J2 formatted, Space original) {
+                return formatted.withPrefix(LineStart.keep(formatted.getPrefix(), original, original));
+            }
+
+            /**
+             * A declaration, or code in place of one, also keeps the indentation of the line that holds its
+             * modifiers and name, below any annotations the template added or replaced.
+             */
+            private <J2 extends J> J2 keepDeclarationLines(J2 formatted, J original, Space prefix) {
+                return LineStart.keepDeclarationLine(keepLineStart(formatted, prefix), original, prefix);
             }
 
             @Override
@@ -79,6 +114,11 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                 } else if (loc == ANNOTATION_ARGUMENTS && mode == JavaCoordinates.Mode.REPLACEMENT &&
                            isScope(annotation)) {
                     List<J.Annotation> gen = unsubstitute(templateParser.parseAnnotations(getCursor(), "@Example(" + substitutedTemplate + ")"));
+                    if (gen.isEmpty()) {
+                        throw new IllegalStateException("Unable to parse annotation arguments from template: \n" +
+                                                        substitutedTemplate +
+                                                        "\nUse JavaTemplate.Builder.doBeforeParseTemplate() to see what stub is being generated and include it in any bug report.");
+                    }
                     return annotation.withArguments(gen.get(0).getArguments());
                 }
 
@@ -86,13 +126,113 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
             }
 
             @Override
+            public @Nullable J preVisit(J tree, Integer p) {
+                if (loc == STATEMENT_PREFIX && mode != JavaCoordinates.Mode.REPLACEMENT && tree instanceof JavaSourceFile) {
+                    J spliced = insertIntoSourceFile((JavaSourceFile) tree, p);
+                    if (spliced != null) {
+                        stopAfterPreVisit();
+                        return spliced;
+                    }
+                }
+                return super.preVisit(tree, p);
+            }
+
+            /**
+             * A Groovy script has no block around its top-level statements, so the list the new statement joins can
+             * only be reached on the source file itself.
+             */
+            private @Nullable J insertIntoSourceFile(JavaSourceFile cu, Integer p) {
+                SourceFileStatementService statements = cu.service(SourceFileStatementService.class);
+                List<Statement> spliced = spliceIntoStatements(statements.getStatements(cu), p);
+                return spliced == null ? null : statements.withStatements(cu, spliced);
+            }
+
+            private @Nullable List<Statement> spliceIntoStatements(List<Statement> statements, Integer p) {
+                if (statements.stream().noneMatch(this::isScope)) {
+                    return null;
+                }
+                return ListUtils.flatMap(statements, statement -> {
+                    if (!isScope(statement)) {
+                        return statement;
+                    }
+                    return spliceAround(statement, unsubstituteStatements(templateParser.parseBlockStatements(
+                            new Cursor(getCursor(), insertionPoint), Statement.class, substitutedTemplate,
+                            substitutions.getTypeVariables(), loc, mode)), p);
+                });
+            }
+
+            /**
+             * Position generated statements around the one the coordinate anchors on. An anchor that does not begin
+             * its own line leads a script: it has no line break to hand over, and the block it may nominally sit in
+             * is not an indentation level, so its neighbours are placed rather than formatted.
+             */
+            private List<Statement> spliceAround(Statement anchor, List<Statement> gen, Integer p) {
+                if (gen.isEmpty() && mode != JavaCoordinates.Mode.REPLACEMENT && !substitutedTemplate.trim().isEmpty()) {
+                    throw new IllegalArgumentException("Expected a template that would generate at least one " +
+                                                       "statement to insert " + (mode == JavaCoordinates.Mode.BEFORE ? "before" : "after") + " a statement, but generated none. " +
+                                                       "Template:\n" + substitutedTemplate + "\nSubstitutions:\n" + substitutions +
+                                                       "\nStatement:\n" + anchor);
+                }
+                boolean anchorBeginsLine = anchor.getPrefix().getWhitespace().contains("\n");
+                Cursor parent = getCursor();
+                for (int i = 0; i < gen.size(); i++) {
+                    Statement s = gen.get(i);
+                    if (anchorBeginsLine && i == 0 && mode == JavaCoordinates.Mode.REPLACEMENT) {
+                        Space prefix = firstPrefix(anchor);
+                        gen.set(i, keepDeclarationLines(autoFormat(s.withPrefix(prefix), p, parent), anchor, prefix));
+                    } else if (anchorBeginsLine) {
+                        gen.set(i, autoFormat(i == 0 ? s.withPrefix(firstPrefix(anchor)) : s, p, parent));
+                    } else {
+                        gen.set(i, autoFormat(s, p, parent).withPrefix(leadingPrefix(anchor, i)));
+                    }
+                }
+                switch (mode) {
+                    case BEFORE:
+                        return ListUtils.concat(gen, anchorBeginsLine ? anchor :
+                                (Statement) anchor.withPrefix(Space.format("\n")));
+                    case AFTER:
+                        return ListUtils.concat(anchor, gen);
+                    default:
+                        return gen;
+                }
+            }
+
+            /**
+             * The prefix for the first generated statement. When the anchor stays in the tree (BEFORE, AFTER) any
+             * blank-line separator above it belongs to the anchor and the new statement joins on a single break at
+             * the same indent. When the anchor is removed (REPLACEMENT) the new statement takes its position, so
+             * it also takes its whitespace — comments are dropped since replacement removes what they annotated,
+             * unless the anchor is passed back in as a parameter.
+             */
+            private Space firstPrefix(Statement anchor) {
+                if (mode == JavaCoordinates.Mode.REPLACEMENT) {
+                    return replacedPrefix(anchor);
+                }
+                String whitespace = anchor.getPrefix().getWhitespace();
+                return Space.format("\n" + whitespace.substring(whitespace.lastIndexOf('\n') + 1));
+            }
+
+            private Space leadingPrefix(Statement anchor, int i) {
+                if (i > 0 || mode == JavaCoordinates.Mode.AFTER) {
+                    return Space.format("\n");
+                }
+                // Displacing the leading statement takes over its comments too, so a license header stays on top
+                return mode == JavaCoordinates.Mode.BEFORE ? anchor.getPrefix() : replacedPrefix(anchor);
+            }
+
+            private Space replacedPrefix(Statement anchor) {
+                return substitutions.isParameter(anchor) ? anchor.getPrefix() :
+                        anchor.getPrefix().withComments(emptyList());
+            }
+
+            @Override
             public J visitBlock(J.Block block, Integer p) {
                 switch (loc) {
                     case BLOCK_END: {
                         if (isScope(block)) {
-                            List<Statement> gen = unsubstitute(templateParser.parseBlockStatements(
-                                    new Cursor(getCursor(), insertionPoint), Statement.class, substitutedTemplate,
-                                    substitutions.getTypeVariables(), loc, mode));
+                            List<Statement> gen = unsubstituteStatements(templateParser.parseBlockStatements(
+                                    new Cursor(getCursor().getParentOrThrow(), insertionPoint), Statement.class,
+                                    substitutedTemplate, substitutions.getTypeVariables(), loc, mode));
 
                             if (coordinates.getComparator() != null) {
                                 J.Block b = block;
@@ -118,30 +258,11 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                         break;
                     }
                     case STATEMENT_PREFIX: {
-                        return block.withStatements(ListUtils.flatMap(block.getStatements(), statement -> {
-                            if (isScope(statement)) {
-                                List<Statement> gen = unsubstitute(templateParser.parseBlockStatements(
-                                        new Cursor(getCursor(), insertionPoint), Statement.class, substitutedTemplate,
-                                        substitutions.getTypeVariables(), loc, mode));
-
-                                Cursor parent = getCursor();
-                                for (int i = 0; i < gen.size(); i++) {
-                                    Statement s = gen.get(i);
-                                    Statement formattedS = autoFormat(i == 0 ? s.withPrefix(statement.getPrefix().withComments(emptyList())) : s, p, parent);
-                                    gen.set(i, formattedS);
-                                }
-
-                                switch (mode) {
-                                    case REPLACEMENT:
-                                        return gen;
-                                    case BEFORE:
-                                        return ListUtils.concat(gen, statement);
-                                    case AFTER:
-                                        return ListUtils.concat(statement, gen);
-                                }
-                            }
-                            return statement;
-                        }));
+                        List<Statement> spliced = spliceIntoStatements(block.getStatements(), p);
+                        if (spliced != null) {
+                            return block.withStatements(spliced);
+                        }
+                        break;
                     }
                 }
                 return super.visitBlock(block, p);
@@ -167,7 +288,8 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                                             getComparatorOrThrow()));
                                 }
                             }
-                            return autoFormat(c, c.getName(), p, getCursor().getParentOrThrow());
+                            c = autoFormat(c, c.getName(), p, getCursor().getParentOrThrow());
+                            return keepDeclarationLines(c, classDecl, classDecl.getPrefix());
                         }
                         case EXTENDS: {
                             TypeTree anExtends = unsubstitute(templateParser.parseExtends(getCursor(), substitutedTemplate));
@@ -192,17 +314,45 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                             } else {
                                 c = c.withImplements(ListUtils.concatAll(c.getImplements(), implementings));
                             }
-                            if (c.getType() != null) {
-                                c = c.withType(((JavaType.Class) c.getType()).withInterfaces(ListUtils.concatAll(c.getType().getInterfaces(), implementsTypes)));
+                            JavaType.Parameterized parameterized = TypeUtils.asParameterized(c.getType());
+                            JavaType.Class classType = TypeUtils.asClass(parameterized == null ? c.getType() : parameterized.getType());
+                            if (classType != null) {
+                                classType = classType.withInterfaces(ListUtils.concatAll(classType.getInterfaces(), implementsTypes));
+                                c = c.withType(parameterized == null ? classType : parameterized.withType(classType));
                             }
 
                             //noinspection ConstantConditions
-                            return autoFormat(c, c.getImplements().get(c.getImplements().size() - 1), p,
-                                    getCursor().getParentOrThrow());
+                            return keepLineStart(autoFormat(c, c.getImplements().get(c.getImplements().size() - 1), p,
+                                    getCursor().getParentOrThrow()), classDecl.getPrefix());
                         }
                         case TYPE_PARAMETERS: {
                             List<J.TypeParameter> typeParameters = unsubstitute(templateParser.parseTypeParameters(getCursor(), substitutedTemplate));
-                            return classDecl.withTypeParameters(typeParameters);
+                            J.ClassDeclaration c = classDecl.withTypeParameters(typeParameters);
+                            JavaType.Parameterized parameterized = TypeUtils.asParameterized(c.getType());
+                            JavaType.Class classType = TypeUtils.asClass(parameterized == null ? c.getType() : parameterized.getType());
+                            // A type parameter's name is untyped, so its variable is built from its bounds, without
+                            // an Object bound as the parser leaves that out
+                            List<JavaType> typeVariables = typeParameters.stream()
+                                    .filter(tp -> tp.getName() instanceof J.Identifier)
+                                    .map(tp -> {
+                                        List<JavaType> bounds = tp.getBounds() == null ? emptyList() :
+                                                tp.getBounds().stream().map(TypedTree::getType)
+                                                        .filter(b -> b != null && !TypeUtils.isObject(b))
+                                                        .collect(toList());
+                                        return new JavaType.GenericTypeVariable(null,
+                                                ((J.Identifier) tp.getName()).getSimpleName(), bounds.isEmpty() ?
+                                                JavaType.GenericTypeVariable.Variance.INVARIANT :
+                                                JavaType.GenericTypeVariable.Variance.COVARIANT, bounds);
+                                    })
+                                    .collect(toList());
+                            if (classType != null && typeVariables.size() == typeParameters.size()) {
+                                // a generic class is typed with its type variables as its own type arguments
+                                classType = classType.withTypeParameters(typeVariables);
+                                JavaType.FullyQualified type = typeVariables.isEmpty() ? classType :
+                                        new JavaType.Parameterized(null, classType, typeVariables);
+                                c = c.withType(type).withName(c.getName().withType(type));
+                            }
+                            return c;
                         }
                     }
                 }
@@ -214,12 +364,12 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                 if ((loc == EXPRESSION_PREFIX ||
                      loc == STATEMENT_PREFIX && expression instanceof Statement) &&
                     isScope(expression)) {
-                    return autoFormat(unsubstitute(templateParser.parseExpression(
+                    return keepLineStart(autoFormat(unsubstitute(templateParser.parseExpression(
                                     getCursor(),
                                     substitutedTemplate,
                                     substitutions.getTypeVariables(),
                                     loc))
-                            .withPrefix(expression.getPrefix()), p);
+                            .withPrefix(expression.getPrefix()), p), expression.getPrefix());
                 }
                 return expression;
             }
@@ -227,34 +377,64 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
             @Override
             public J visitFieldAccess(J.FieldAccess fa, Integer p) {
                 if (loc == FIELD_ACCESS_PREFIX && isScope(fa)) {
-                    return autoFormat(unsubstitute(templateParser.parseExpression(
+                    return keepLineStart(autoFormat(unsubstitute(templateParser.parseExpression(
                                     getCursor(),
                                     substitutedTemplate,
                                     substitutions.getTypeVariables(),
                                     loc))
-                            .withPrefix(fa.getPrefix()), p);
+                            .withPrefix(fa.getPrefix()), p), fa.getPrefix());
                 } else if (loc == STATEMENT_PREFIX && isScope(fa)) {
                     // NOTE: while `J.FieldAccess` inherits from `Statement` they can only ever be used as expressions
-                    return autoFormat(unsubstitute(templateParser.parseExpression(
+                    return keepLineStart(autoFormat(unsubstitute(templateParser.parseExpression(
                                     getCursor(),
                                     substitutedTemplate,
                                     substitutions.getTypeVariables(),
                                     loc))
-                            .withPrefix(fa.getPrefix()), p);
+                            .withPrefix(fa.getPrefix()), p), fa.getPrefix());
                 }
                 return super.visitFieldAccess(fa, p);
+            }
+
+            @Override
+            public J visitIf(J.If iff, Integer p) {
+                if (loc == ELSE_PREFIX && isScope(iff)) {
+                    List<Statement> gen = unsubstituteStatements(templateParser.parseBlockStatements(
+                            new Cursor(getCursor().getParentOrThrow(), insertionPoint), Statement.class,
+                            substitutedTemplate, substitutions.getTypeVariables(), loc, mode));
+                    if (gen.size() != 1) {
+                        throw new IllegalArgumentException("Expected a template that would generate exactly one " +
+                                                           "statement to become an else branch, but generated " + gen.size() +
+                                                           ". Template:\n" + substitutedTemplate);
+                    }
+                    Statement branch = gen.get(0);
+                    J.If.Else existing = iff.getElsePart();
+                    if (existing != null) {
+                        // Keep the chain: what this `if` used to fall through to now hangs off the new branch
+                        if (!(branch instanceof J.If)) {
+                            throw new IllegalArgumentException("Adding an else branch to an `if` that already has " +
+                                                               "one requires a template that produces an `if`, so that " +
+                                                               "the existing branch has somewhere to hang. Template:\n" + substitutedTemplate);
+                        }
+                        branch = ((J.If) branch).withElsePart(existing);
+                    }
+                    J.If.Else elsePart = new J.If.Else(randomId(), Space.SINGLE_SPACE, Markers.EMPTY,
+                            JRightPadded.build(branch.withPrefix(Space.SINGLE_SPACE)));
+                    return keepLineStart(autoFormat(iff.withElsePart(elsePart), p, getCursor().getParentOrThrow()),
+                            iff.getPrefix());
+                }
+                return super.visitIf(iff, p);
             }
 
             @Override
             public J visitIdentifier(J.Identifier ident, Integer p) {
                 // ONLY for backwards compatibility, otherwise the same as expression replacement
                 if (loc == IDENTIFIER_PREFIX && isScope(ident)) {
-                    return autoFormat(unsubstitute(templateParser.parseExpression(
+                    return keepLineStart(autoFormat(unsubstitute(templateParser.parseExpression(
                                     getCursor(),
                                     substitutedTemplate,
                                     substitutions.getTypeVariables(),
                                     loc))
-                            .withPrefix(ident.getPrefix()), p);
+                            .withPrefix(ident.getPrefix()), p), ident.getPrefix());
                 }
                 return super.visitIdentifier(ident, p);
             }
@@ -264,7 +444,14 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                 if (loc == LAMBDA_PARAMETERS_PREFIX && isScope(lambda.getParameters())) {
                     return lambda.withParameters(unsubstitute(templateParser.parseLambdaParameters(getCursor(), substitutedTemplate)));
                 }
-                return maybeReplaceStatement(lambda, J.class, 0);
+                if (loc == STATEMENT_PREFIX && isScope(lambda)) {
+                    return maybeReplaceStatement(lambda, J.class, 0);
+                }
+                // Recurse into the lambda's body so that templates targeting an expression or
+                // statement inside the body (e.g. `lambda.getBody().getCoordinates().replace()`)
+                // can find their scope. Without this, the visitor stops at the lambda and the
+                // apply call silently returns the input unchanged.
+                return super.visitLambda(lambda, p);
             }
 
             @Override
@@ -290,11 +477,11 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                                             getComparatorOrThrow()));
                                 }
                             }
-                            return autoFormat(m, m.getName(), p,
-                                    getCursor().getParentOrThrow());
+                            m = autoFormat(m, m.getName(), p, getCursor().getParentOrThrow());
+                            return keepDeclarationLines(m, method, method.getPrefix());
                         }
                         case BLOCK_PREFIX: {
-                            List<Statement> gen = unsubstitute(templateParser.parseBlockStatements(getCursor(), Statement.class,
+                            List<Statement> gen = unsubstituteStatements(templateParser.parseBlockStatements(getCursor(), Statement.class,
                                     substitutedTemplate, substitutions.getTypeVariables(), loc, mode));
                             J.Block body = method.getBody();
                             if (body == null) {
@@ -356,10 +543,29 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                                     }
                                 }
 
-                                type = type.withParameterNames(paramNames).withParameterTypes(paramTypes);
+                                Statement last = parameters.isEmpty() ? null : parameters.get(parameters.size() - 1);
+                                Set<Flag> flags = EnumSet.noneOf(Flag.class);
+                                flags.addAll(type.getFlags());
+                                if (last instanceof J.VariableDeclarations && isVarargs((J.VariableDeclarations) last)) {
+                                    flags.add(Flag.Varargs);
+                                } else {
+                                    flags.remove(Flag.Varargs);
+                                }
+                                type = type.withParameterNames(paramNames).withParameterTypes(paramTypes).withFlags(flags);
+                                // the template's stub method owns the parsed parameters until they are given this one
+                                JavaType.Method owner = type;
+                                parameters = ListUtils.map(parameters, parameter -> {
+                                    J.VariableDeclarations decl = (J.VariableDeclarations) parameter;
+                                    return decl.withVariables(ListUtils.map(decl.getVariables(), v -> {
+                                        JavaType.Variable owned = v.getVariableType() == null ? null : v.getVariableType().withOwner(owner);
+                                        return owned == null ? v : v.withVariableType(owned).withName(v.getName().withFieldType(owned));
+                                    }));
+                                });
                             }
 
-                            return method.withParameters(parameters).withMethodType(type).withName(method.getName().withType(type));
+                            J.MethodDeclaration m = method.withParameters(parameters).withMethodType(type).withName(method.getName().withType(type));
+                            // without a method type the parameters still belong to the template's stub
+                            return type == null ? m : retypeParameterReads(m, new Cursor(getCursor().getParentOrThrow(), m));
                         }
                         case THROWS: {
                             J.MethodDeclaration m = method.withThrows(unsubstitute(templateParser.parseThrows(getCursor(), substitutedTemplate)));
@@ -386,8 +592,8 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                             if (m.getName().getType() != null) {
                                 m = m.withName(method.getName().withType(m.getMethodType()));
                             }
-                            return autoFormat(m, typeParameters.get(typeParameters.size() - 1), p,
-                                    getCursor().getParentOrThrow());
+                            return keepLineStart(autoFormat(m, typeParameters.get(typeParameters.size() - 1), p,
+                                    getCursor().getParentOrThrow()), method.getPrefix());
                         }
                     }
                 }
@@ -398,6 +604,10 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
             public J visitMethodInvocation(J.MethodInvocation method, Integer integer) {
                 if (getCursor().firstEnclosing(Javadoc.DocComment.class) != null) {
                     // We don't have support for changing method references in Javadoc comments (yet), so it's safer not to attempt any changes
+                    if (isScope(method)) {
+                        // Record the deliberate skip, so it isn't reported as a scope that could never be matched
+                        substituted = true;
+                    }
                     return method;
                 }
                 if ((loc == METHOD_INVOCATION_ARGUMENTS || loc == METHOD_INVOCATION_NAME) && isScope(method)) {
@@ -415,8 +625,15 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                     // This will only happen if the template encountered non-fatal errors during parsing
                     // Make a best-effort attempt to recover by patching together a new Method type from the old one
                     // There are many ways this type could be not quite right, but leaving the type alone is likely to cause MethodMatcher false-positives
+                    // The call takes a listed overload of the template's name instead, if one takes the new arguments
                     JavaType.Method mt = method.getMethodType();
+                    JavaType.Method overload = null;
                     if (m.getMethodType() == null && mt != null) {
+                        overload = overloadTaking(mt, m.getSimpleName(), m.getArguments());
+                    }
+                    if (overload != null) {
+                        m = m.withMethodType(overload);
+                    } else if (m.getMethodType() == null && mt != null) {
                         List<JavaType> argTypes = m.getArguments().stream()
                                 .map(Expression::getType)
                                 .map(it -> {
@@ -428,6 +645,12 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                                 })
                                 .collect(toList());
                         mt = mt.withParameterTypes(argTypes);
+                        if (mt.hasFlags(Flag.Varargs)) {
+                            // the patched method takes a parameter per argument
+                            Set<Flag> flags = EnumSet.copyOf(mt.getFlags());
+                            flags.remove(Flag.Varargs);
+                            mt = mt.withFlags(flags);
+                        }
                         m = m.withMethodType(mt);
                     }
                     if (m.getName().getType() != null) {
@@ -443,14 +666,18 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                      parentValue instanceof J.TypeCast)) {
                     // Method invocation is used as an expression (e.g., inside return, assignment, type cast),
                     // not as a standalone statement in a block. Parse as expression replacement.
-                    return autoFormat(unsubstitute(templateParser.parseExpression(
+                    return keepLineStart(autoFormat(unsubstitute(templateParser.parseExpression(
                                     getCursor(),
                                     substitutedTemplate,
                                     substitutions.getTypeVariables(),
                                     loc))
-                            .withPrefix(method.getPrefix()), integer);
+                            .withPrefix(method.getPrefix()), integer), method.getPrefix());
                 }
-                return maybeReplaceStatement(method, J.class, 0);
+                if (isScope(method)) {
+                    return maybeReplaceStatement(method, J.class, 0);
+                }
+                // Descend, so that a coordinate on something nested in the arguments is still reachable
+                return super.visitMethodInvocation(method, integer);
             }
 
             @Override
@@ -462,12 +689,12 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                          parentValue instanceof J.Assignment ||
                          parentValue instanceof J.AssignmentOperation ||
                          parentValue instanceof J.TypeCast)) {
-                        return autoFormat(unsubstitute(templateParser.parseExpression(
+                        return keepLineStart(autoFormat(unsubstitute(templateParser.parseExpression(
                                         getCursor(),
                                         substitutedTemplate,
                                         substitutions.getTypeVariables(),
                                         loc))
-                                .withPrefix(newClass.getPrefix()), p);
+                                .withPrefix(newClass.getPrefix()), p), newClass.getPrefix());
                     }
                     // allow a `J.NewClass` to also be replaced by an expression
                     return maybeReplaceStatement(newClass, J.class, p);
@@ -493,25 +720,28 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                     if (mode == JavaCoordinates.Mode.REPLACEMENT) {
                         List<J3> gen = unsubstitute(templateParser.parseBlockStatements(getCursor(),
                                 expected, substitutedTemplate, substitutions.getTypeVariables(), loc, mode));
-                        if (gen.size() != 1) {
+                        J3 replacement;
+                        if (gen.size() == 1) {
+                            replacement = gen.get(0);
+                        } else if (gen.size() == 2 && gen.get(0) instanceof J.Empty) {
                             // for some languages with optional semicolons, templates may generate a statement
                             // and an empty, e.g. for a statement replacement in Groovy for the last statement
                             // of a method that has an implicit return
-                            if (gen.size() == 2) {
-                                if (gen.get(0) instanceof J.Empty) {
-                                    return autoFormat(gen.get(1).withPrefix(statement.getPrefix()), p);
-                                }
-                                if (gen.get(1) instanceof J.Empty) {
-                                    return autoFormat(gen.get(0).withPrefix(statement.getPrefix()), p);
-                                }
-                            }
+                            replacement = gen.get(1);
+                        } else if (gen.size() == 2 && gen.get(1) instanceof J.Empty) {
+                            replacement = gen.get(0);
+                        } else {
                             throw new IllegalArgumentException("Expected a template that would generate exactly one " +
                                                                "statement to replace one statement, but generated " + gen.size() +
                                                                ". Template:\n" + substitutedTemplate + "\nSubstitutions:\n" + substitutions +
                                                                "\nStatement:\n" + statement);
                         }
-
-                        return autoFormat(gen.get(0).withPrefix(statement.getPrefix()), p);
+                        if (getCursor().getParentTreeCursor().getValue() instanceof J.Block) {
+                            //noinspection unchecked
+                            replacement = (J3) substitutions.toStatement(replacement);
+                        }
+                        return keepDeclarationLines(autoFormat(replacement.withPrefix(statement.getPrefix()), p),
+                                statement, statement.getPrefix());
                     }
                     throw new IllegalArgumentException("Cannot insert a new statement before an existing statement and return both to a visit method that returns one statement.");
                 }
@@ -537,8 +767,8 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                                         getComparatorOrThrow()));
                             }
                         }
-                        return autoFormat(v, v.getTypeExpression(), p,
-                                getCursor().getParentOrThrow());
+                        v = autoFormat(v, v.getTypeExpression(), p, getCursor().getParentOrThrow());
+                        return keepDeclarationLines(v, multiVariable, multiVariable.getPrefix());
                     }
                 }
                 return super.visitVariableDeclarations(multiVariable, p);
@@ -550,11 +780,15 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
 
             private <J2 extends J> @Nullable J2 unsubstitute(J2 j) {
                 try {
-                    J2 result = substitutions.unsubstitute(j);
-                    if (!substitutions.getTypeVariables().isEmpty()) {
-                        result = substitutions.resolveTypeVariables(result);
-                    }
-                    return result;
+                    return substitutions.unsubstitute(substitutions.resolveTypeVariables(j));
+                } finally {
+                    substituted = true;
+                }
+            }
+
+            private <J2 extends J> List<J2> unsubstituteStatements(List<J2> js) {
+                try {
+                    return substitutions.unsubstituteStatements(substitutions.resolveTypeVariables(js));
                 } finally {
                     substituted = true;
                 }
@@ -562,16 +796,196 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
 
             private <J2 extends J> List<J2> unsubstitute(List<J2> js) {
                 try {
-                    List<J2> result = substitutions.unsubstitute(js);
-                    if (!substitutions.getTypeVariables().isEmpty()) {
-                        result = ListUtils.map(result, substitutions::resolveTypeVariables);
-                    }
-                    return result;
+                    return substitutions.unsubstitute(substitutions.resolveTypeVariables(js));
                 } finally {
                     substituted = true;
                 }
             }
         };
+    }
+
+    private static boolean varargsTakes(JavaType.Method method, List<@Nullable JavaType> argumentTypes) {
+        List<JavaType> parameters = method.getParameterTypes();
+        JavaType.Array varargs = parameters.isEmpty() ? null : TypeUtils.asArray(parameters.get(parameters.size() - 1));
+        if (!method.hasFlags(Flag.Varargs) || varargs == null || argumentTypes.size() < parameters.size() - 1) {
+            return false;
+        }
+        for (int i = 0; i < argumentTypes.size(); i++) {
+            JavaType parameter = i < parameters.size() - 1 ? parameters.get(i) : varargs.getElemType();
+            if (!TypeUtils.isAssignableTo(parameter, argumentTypes.get(i))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * The method of {@code name} that {@code method}'s declaring type lists and that takes the arguments, or
+     * {@code method} itself when it has that name. As in javac, one that takes them by fixed arity without boxing
+     * comes first, then one that boxes or unboxes them, then one that takes varargs.
+     * A listed overload lacks what javac substitutes for a type variable. So when the declaring type or an overload
+     * names one, the result is null unless {@code method} has the name and takes the arguments by varargs, as in
+     * #9825.
+     */
+    private static JavaType.@Nullable Method overloadTaking(JavaType.Method method, String name,
+                                                            List<Expression> arguments) {
+        List<@Nullable JavaType> argumentTypes = new ArrayList<>(arguments.size());
+        for (Expression argument : arguments) {
+            if (!(argument instanceof J.Empty)) {
+                argumentTypes.add(argument.getType());
+            }
+        }
+        boolean ownVarargs = name.equals(method.getName()) && varargsTakes(method, argumentTypes);
+        JavaType.FullyQualified declaringType = method.getDeclaringType();
+        boolean generic = !declaringType.getTypeParameters().isEmpty() ||
+                          declaringType.getMethods().stream().anyMatch(candidate ->
+                                  candidate.getName().equals(name) && namesTypeVariable(candidate));
+        if (generic && !ownVarargs) {
+            return null;
+        }
+        BiPredicate<JavaType.Method, JavaType.Method> byParameters =
+                (candidate, other) -> takes(other.getParameterTypes(), candidate.getParameterTypes(), false);
+        JavaType.Method overload = mostSpecific(declaringType, name,
+                c -> takes(c.getParameterTypes(), argumentTypes, false), byParameters);
+        if (overload == null) {
+            overload = mostSpecific(declaringType, name,
+                    c -> takes(c.getParameterTypes(), argumentTypes, true), byParameters);
+        }
+        if (overload == null && !ownVarargs) {
+            // As in JLS 15.12.2.5, varargs methods compare by their parameter types expanded to the arguments
+            int arity = argumentTypes.size();
+            overload = mostSpecific(declaringType, name, c -> varargsTakes(c, argumentTypes), (candidate, other) -> {
+                int length = other.getParameterTypes().size() == arity + 1 ? arity + 1 : arity;
+                return takes(expanded(other, length), expanded(candidate, length), false);
+            });
+        }
+        if (overload == null && ownVarargs) {
+            overload = method;
+        }
+        if (overload == null || overload == method) {
+            return overload;
+        }
+        // A listed overload lacks the generic declaring type that the parser gives the call, and the receiver's
+        // type arguments that a generic declaring type substitutes in the return type
+        overload = overload.withDeclaringType(declaringType);
+        return generic ? overload.withReturnType(method.getReturnType()) : overload;
+    }
+
+    private static JavaType.@Nullable Method mostSpecific(JavaType.FullyQualified declaringType, String name,
+                                                         Predicate<JavaType.Method> takesArguments,
+                                                         BiPredicate<JavaType.Method, JavaType.Method> moreSpecific) {
+        JavaType.Method overload = null;
+        for (JavaType.Method candidate : declaringType.getMethods()) {
+            if (candidate.getName().equals(name) && takesArguments.test(candidate) &&
+                (overload == null || moreSpecific.test(candidate, overload))) {
+                overload = candidate;
+            }
+        }
+        return overload;
+    }
+
+    private static List<JavaType> expanded(JavaType.Method varargs, int length) {
+        List<JavaType> parameters = varargs.getParameterTypes();
+        JavaType last = parameters.get(parameters.size() - 1);
+        JavaType.Array array = TypeUtils.asArray(last);
+        List<JavaType> types = new ArrayList<>(parameters.subList(0, Math.min(length, parameters.size() - 1)));
+        while (types.size() < length) {
+            types.add(array == null ? last : array.getElemType());
+        }
+        return types;
+    }
+
+    private static boolean takes(List<JavaType> parameters, List<? extends @Nullable JavaType> types, boolean boxing) {
+        if (parameters.size() != types.size()) {
+            return false;
+        }
+        for (int i = 0; i < parameters.size(); i++) {
+            if (!boxing && isPrimitive(parameters.get(i)) != isPrimitive(types.get(i)) ||
+                !TypeUtils.isAssignableTo(parameters.get(i), types.get(i))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean isVarargs(J.VariableDeclarations parameter) {
+        if (parameter.getVarargs() != null) {
+            return true;
+        }
+        TypeTree typeTree = parameter.getTypeExpression();
+        while (typeTree instanceof J.AnnotatedType || typeTree instanceof J.ArrayType) {
+            if (typeTree instanceof J.AnnotatedType) {
+                typeTree = ((J.AnnotatedType) typeTree).getTypeExpression();
+            } else if (typeTree.getMarkers().findFirst(Varargs.class).isPresent()) {
+                return true;
+            } else {
+                typeTree = ((J.ArrayType) typeTree).getElementType();
+            }
+        }
+        return false;
+    }
+
+    private static boolean isPrimitive(@Nullable JavaType type) {
+        return type instanceof JavaType.Primitive &&
+               type != JavaType.Primitive.String && type != JavaType.Primitive.Null;
+    }
+
+    private static boolean namesTypeVariable(JavaType.Method method) {
+        Set<JavaType> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+        return namesTypeVariable(method.getReturnType(), visited) ||
+               method.getParameterTypes().stream().anyMatch(type -> namesTypeVariable(type, visited)) ||
+               method.getThrownExceptions().stream().anyMatch(type -> namesTypeVariable(type, visited));
+    }
+
+    private static boolean namesTypeVariable(@Nullable JavaType type, Set<JavaType> visited) {
+        if (type == null || !visited.add(type)) {
+            return false;
+        }
+        if (type instanceof JavaType.GenericTypeVariable) {
+            JavaType.GenericTypeVariable variable = (JavaType.GenericTypeVariable) type;
+            return !"?".equals(variable.getName()) ||
+                   variable.getBounds().stream().anyMatch(bound -> namesTypeVariable(bound, visited));
+        }
+        if (type instanceof JavaType.Parameterized) {
+            return ((JavaType.Parameterized) type).getTypeParameters().stream()
+                    .anyMatch(parameter -> namesTypeVariable(parameter, visited));
+        }
+        return type instanceof JavaType.Array && namesTypeVariable(((JavaType.Array) type).getElemType(), visited);
+    }
+
+    /**
+     * Gives the body's reads of each new parameter that parameter's types. A parameter that keeps the name of one it
+     * replaces keeps that one's readers, which still carry the replaced parameter's types.
+     */
+    private static J.MethodDeclaration retypeParameterReads(J.MethodDeclaration method, Cursor methodCursor) {
+        if (method.getBody() == null) {
+            return method;
+        }
+        Map<UUID, J.VariableDeclarations.NamedVariable> readers = new HashMap<>();
+        for (Statement parameter : method.getParameters()) {
+            if (parameter instanceof J.VariableDeclarations) {
+                for (J.VariableDeclarations.NamedVariable variable : ((J.VariableDeclarations) parameter).getVariables()) {
+                    if (variable.getVariableType() == null || !TypeUtils.isWellFormedType(variable.getType())) {
+                        // an unattributed parameter, such as one typed by a type variable or by a type missing from the
+                        // template's classpath, leaves its readers as they are
+                        continue;
+                    }
+                    Scope.bindingOf(methodCursor, variable).ifPresent(binding -> binding.references()
+                            .forEach(reference -> readers.put(reference.<J>getValue().getId(), variable)));
+                }
+            }
+        }
+        if (readers.isEmpty()) {
+            return method;
+        }
+        return method.withBody((J.Block) new JavaIsoVisitor<Integer>() {
+            @Override
+            public J.Identifier visitIdentifier(J.Identifier identifier, Integer p) {
+                J.VariableDeclarations.NamedVariable variable = readers.get(identifier.getId());
+                return variable == null ? identifier :
+                        identifier.withType(variable.getType()).withFieldType(variable.getVariableType());
+            }
+        }.visitNonNull(method.getBody(), 0));
     }
 
     private <J2 extends J> Comparator<J2> getComparatorOrThrow() {

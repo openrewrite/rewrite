@@ -43,9 +43,7 @@ type Greeter struct {
 	Prefix string
 }
 
-// Greet returns a greeting for the given name.
 func (g *Greeter) Greet(name string) string {
-	// Trim whitespace from the name
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return g.Prefix + "World"
@@ -67,8 +65,6 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Parse error: %v\n", err)
 		os.Exit(1)
 	}
-
-	// --- Section 1: AST dump with positions ---
 	fmt.Println("=== AST Nodes ===")
 	fmt.Println()
 	depth := 0
@@ -89,8 +85,6 @@ func main() {
 		depth++
 		return true
 	})
-
-	// --- Section 2: Type checking ---
 	fmt.Println()
 	fmt.Println("=== Type Information ===")
 	fmt.Println()
@@ -102,7 +96,6 @@ func main() {
 		Uses:  make(map[*ast.Ident]types.Object),
 	}
 
-	// Type-check (will have errors due to nil importer, but populates info for local types)
 	_, _ = conf.Check("main", fset, []*ast.File{file}, info)
 
 	fmt.Println("-- Definitions --")
@@ -125,8 +118,6 @@ func main() {
 			obj.Type(), fset.Position(obj.Pos()),
 		)
 	}
-
-	// --- Section 3: Comment associations ---
 	fmt.Println()
 	fmt.Println("=== Comment Map ===")
 	fmt.Println()
@@ -143,8 +134,6 @@ func main() {
 			}
 		}
 	}
-
-	// --- Section 4: Whitespace reconstruction ---
 	fmt.Println()
 	fmt.Println("=== Whitespace Between Tokens ===")
 	fmt.Println()
@@ -155,7 +144,6 @@ func main() {
 	src := []byte(sampleSource)
 	tokenFile := fset.File(file.Pos())
 
-	// Collect all positions in order by walking the AST
 	var positions []struct {
 		pos  token.Pos
 		name string
@@ -173,7 +161,6 @@ func main() {
 		return true
 	})
 
-	// Show whitespace gaps between consecutive node start positions
 	fmt.Println("First 10 whitespace gaps between nodes:")
 	shown := 0
 	for i := 1; i < len(positions) && shown < 10; i++ {
@@ -181,7 +168,6 @@ func main() {
 		endOffset := tokenFile.Offset(positions[i].pos)
 		if endOffset > startOffset {
 			between := string(src[startOffset:endOffset])
-			// Only show gaps that contain whitespace beyond the node's own text
 			if strings.ContainsAny(between, " \t\n") {
 				fmt.Printf("  Between %s and %s:\n", positions[i-1].name, positions[i].name)
 				fmt.Printf("    raw: %q\n", between)

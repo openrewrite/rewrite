@@ -1,4 +1,20 @@
+import ast
+
+from rewrite import Markers, random_id
+from rewrite.python._parser_visitor import ParserVisitor
+from rewrite.python.markers import SuppressNewline
+from rewrite.python.printer import PythonPrinter
 from rewrite.test import RecipeSpec, python
+
+
+def test_suppressed_newline():
+    source = "x = 1\n"
+    cu = ParserVisitor(source, None, None).visit_Module(ast.parse(source))
+    cu = cu.replace(markers=Markers(random_id(), [SuppressNewline(random_id())]))
+
+    assert PythonPrinter().print(cu) == "x = 1"
+    # the source file prints itself into a capture of another class than the printer's own
+    assert cu.print_all() == "x = 1"
 
 
 def test_trailing_newline():

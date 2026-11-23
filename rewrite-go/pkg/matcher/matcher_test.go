@@ -19,24 +19,26 @@ package matcher
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
+	"github.com/stretchr/testify/require"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
-
-// --- TypeUtils tests ---
 
 func TestGetFullyQualifiedName(t *testing.T) {
 	tests := []struct {
 		name string
-		typ  tree.JavaType
+		typ  java.JavaType
 		want string
 	}{
 		{"nil", nil, ""},
-		{"class", &tree.JavaTypeClass{FullyQualifiedName: "fmt.Stringer"}, "fmt.Stringer"},
-		{"primitive", &tree.JavaTypePrimitive{Keyword: "int"}, "int"},
-		{"parameterized", &tree.JavaTypeParameterized{Type: &tree.JavaTypeClass{FullyQualifiedName: "map"}}, "map"},
-		{"unknown", &tree.JavaTypeUnknown{}, ""},
+		{"class", &java.JavaTypeClass{FullyQualifiedName: "fmt.Stringer"}, "fmt.Stringer"},
+		{"primitive", &java.JavaTypePrimitive{Keyword: "int"}, "int"},
+		{"parameterized", &java.JavaTypeParameterized{Type: &java.JavaTypeClass{FullyQualifiedName: "map"}}, "map"},
+		{"unknown", &java.JavaTypeUnknown{}, ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -48,67 +50,154 @@ func TestGetFullyQualifiedName(t *testing.T) {
 }
 
 func TestIsOfClassType(t *testing.T) {
-	cls := &tree.JavaTypeClass{FullyQualifiedName: "time.Time"}
-	if !IsOfClassType(cls, "time.Time") {
-		t.Error("expected true for exact match")
-	}
-	if IsOfClassType(cls, "time.Duration") {
-		t.Error("expected false for different type")
-	}
+	cls := &java.JavaTypeClass{FullyQualifiedName: "time.Time"}
+	assert.True(t, IsOfClassType(cls, "time.Time"), "expected true for exact match")
+	assert.False(t, IsOfClassType(cls, "time.Duration"), "expected false for different type")
 }
 
 func TestIsAssignableTo(t *testing.T) {
-	stringer := &tree.JavaTypeClass{FullyQualifiedName: "fmt.Stringer"}
-	myType := &tree.JavaTypeClass{
+	stringer := &java.JavaTypeClass{FullyQualifiedName: "fmt.Stringer"}
+	myType := &java.JavaTypeClass{
 		FullyQualifiedName: "main.MyType",
-		Interfaces:         []*tree.JavaTypeClass{stringer},
+		Interfaces:         []java.FullyQualified{stringer},
 	}
 
-	if !IsAssignableTo(myType, "main.MyType") {
-		t.Error("type should be assignable to itself")
-	}
-	if !IsAssignableTo(myType, "fmt.Stringer") {
-		t.Error("type should be assignable to its interface")
-	}
-	if IsAssignableTo(myType, "io.Reader") {
-		t.Error("type should not be assignable to unrelated interface")
-	}
+	assert.True(t, IsAssignableTo(myType, "main.MyType"), "type should be assignable to itself")
+	assert.True(t, IsAssignableTo(myType, "fmt.Stringer"), "type should be assignable to its interface")
+	assert.False(t, IsAssignableTo(myType, "io.Reader"), "type should not be assignable to unrelated interface")
 }
 
 func TestIsError(t *testing.T) {
-	errType := &tree.JavaTypeClass{FullyQualifiedName: "error"}
-	if !IsError(errType) {
-		t.Error("expected true for error type")
+	errType := &java.JavaTypeClass{FullyQualifiedName: "error"}
+	assert.True(t, IsError(errType), "expected true for error type")
+	assert.False(t, IsError(&java.JavaTypeClass{FullyQualifiedName: "string"}), "expected false for non-error type")
+}
+
+// goType names a Go basic type the way the type mapper attributes it.
+func goType(name string) java.JavaType {
+	return &java.JavaTypeClass{FullyQualifiedName: name, Kind: "Class"}
+}
+
+func litType(keyword string) java.JavaType {
+	return &java.JavaTypePrimitive{Keyword: keyword}
+}
+
+func TestClassifiesALiteralsPrimitiveKeyword(t *testing.T) {
+	assert.True(t, IsString(litType("String")), "a string literal is a string")
+	assert.True(t, IsBool(litType("boolean")), "a bool literal is a bool")
+	for _, kw := range []string{"byte", "short", "int", "long", "char"} {
+		assert.Truef(t, IsInt(litType(kw)), "IsInt(%q) = false, want true", kw)
+		assert.Truef(t, IsNumeric(litType(kw)), "IsNumeric(%q) = false, want true", kw)
 	}
-	if IsError(&tree.JavaTypeClass{FullyQualifiedName: "string"}) {
-		t.Error("expected false for non-error type")
+	for _, kw := range []string{"float", "double"} {
+		assert.Truef(t, IsNumeric(litType(kw)), "IsNumeric(%q) = false, want true", kw)
+		assert.Falsef(t, IsInt(litType(kw)), "IsInt(%q) = true, want false", kw)
+	}
+	assert.False(t, IsNumeric(litType("String")), "a string literal is not numeric")
+	assert.False(t, IsInt(litType("boolean")), "a bool literal is not an integer")
+}
+
+func TestALiteralsKeywordEstablishesNoIdentity(t *testing.T) {
+	assert.False(t, IsSameGoType(litType("int"), goType("int")))
+	assert.False(t, IsSameGoType(litType("int"), litType("int")))
+}
+
+func TestMatchesALiteralArgumentAgainstItsGoTypeName(t *testing.T) {
+	for _, tc := range []struct{ pattern, keyword string }{
+		{"string", "String"},
+		{"bool", "boolean"},
+		{"int", "int"},
+		{"int32", "int"},
+		{"int64", "long"},
+		{"int8", "byte"},
+		{"byte", "byte"},
+		{"rune", "char"},
+		{"float32", "float"},
+		{"float64", "double"},
+	} {
+		m := &typeArgMatcher{pattern: globToRegexp(canonicalGoType(tc.pattern)), raw: tc.pattern}
+		assert.Truef(t, m.matches(litType(tc.keyword)),
+			"pattern %q does not match a literal typed %q", tc.pattern, tc.keyword)
+	}
+}
+
+func TestDoesNotMatchALiteralOfAnotherType(t *testing.T) {
+	for _, tc := range []struct{ pattern, keyword string }{
+		{"string", "int"},
+		{"int", "long"},
+		{"int64", "int"},
+		{"float64", "float"},
+		{"rune", "byte"},
+	} {
+		m := &typeArgMatcher{pattern: globToRegexp(canonicalGoType(tc.pattern)), raw: tc.pattern}
+		assert.Falsef(t, m.matches(litType(tc.keyword)),
+			"pattern %q matches a literal typed %q", tc.pattern, tc.keyword)
 	}
 }
 
 func TestIsString(t *testing.T) {
-	if !IsString(&tree.JavaTypePrimitive{Keyword: "String"}) {
-		t.Error("expected true for String primitive")
+	assert.True(t, IsString(goType("string")), "expected true for string")
+	assert.True(t, IsString(goType("untyped string")), "expected true for an untyped string constant")
+	assert.False(t, IsString(goType("int")), "expected false for int")
+	assert.False(t, IsString(nil), "expected false for an unattributed type")
+}
+
+func TestIsInt(t *testing.T) {
+	for _, name := range []string{
+		"int", "int8", "int16", "int32", "int64",
+		"uint", "uint8", "uint16", "uint32", "uint64", "uintptr",
+		"byte", "rune", "untyped int", "untyped rune",
+	} {
+		assert.Truef(t, IsInt(goType(name)), "IsInt(%q) = false, want true", name)
 	}
-	if IsString(&tree.JavaTypePrimitive{Keyword: "int"}) {
-		t.Error("expected false for int")
+	for _, name := range []string{"float64", "complex128", "string", "bool", "untyped nil", "main.Point"} {
+		assert.Falsef(t, IsInt(goType(name)), "IsInt(%q) = true, want false", name)
 	}
+	assert.False(t, IsInt(nil), "IsInt(nil) = true, want false")
+}
+
+func TestIsNumeric(t *testing.T) {
+	for _, name := range []string{
+		"int", "int64", "uint64", "byte", "rune",
+		"float32", "float64", "complex64", "complex128",
+		"untyped int", "untyped float", "untyped complex",
+	} {
+		assert.Truef(t, IsNumeric(goType(name)), "IsNumeric(%q) = false, want true", name)
+	}
+	for _, name := range []string{"string", "bool", "untyped nil", "main.Point"} {
+		assert.Falsef(t, IsNumeric(goType(name)), "IsNumeric(%q) = true, want false", name)
+	}
+	assert.False(t, IsNumeric(nil), "IsNumeric(nil) = true, want false")
+}
+
+func TestIsBool(t *testing.T) {
+	assert.True(t, IsBool(goType("bool")), "expected true for bool")
+	assert.True(t, IsBool(goType("untyped bool")), "expected true for an untyped bool constant")
+	assert.False(t, IsBool(goType("int")), "expected false for int")
+	assert.False(t, IsBool(nil), "expected false for an unattributed type")
+}
+
+func TestIsSameGoType(t *testing.T) {
+	assert.True(t, IsSameGoType(goType("byte"), goType("uint8")), "byte and uint8 are one type")
+	assert.True(t, IsSameGoType(goType("rune"), goType("int32")), "rune and int32 are one type")
+	assert.True(t, IsSameGoType(goType("int"), goType("int")))
+	assert.False(t, IsSameGoType(goType("int"), goType("int32")), "int is its own type, distinct from int32")
+	assert.False(t, IsSameGoType(goType("byte"), goType("int8")), "byte is unsigned, int8 signed")
+	assert.False(t, IsSameGoType(goType("int"), goType("untyped int")), "an untyped constant is not yet an int")
+	assert.False(t, IsSameGoType(goType("int"), nil), "an unattributed type is not known to match")
 }
 
 func TestAsClass(t *testing.T) {
-	cls := &tree.JavaTypeClass{FullyQualifiedName: "foo.Bar"}
+	cls := &java.JavaTypeClass{FullyQualifiedName: "foo.Bar"}
 	if AsClass(cls) != cls {
 		t.Error("AsClass should return the class directly")
 	}
-	param := &tree.JavaTypeParameterized{Type: cls}
+	param := &java.JavaTypeParameterized{Type: cls}
 	if AsClass(param) != cls {
 		t.Error("AsClass should unwrap parameterized types")
 	}
-	if AsClass(&tree.JavaTypePrimitive{Keyword: "int"}) != nil {
-		t.Error("AsClass should return nil for non-class types")
-	}
+	assert.Nil(t, AsClass(&java.JavaTypePrimitive{Keyword: "int"}), "AsClass should return nil for non-class types")
 }
-
-// --- MethodMatcher tests ---
 
 func TestGlobToRegexp(t *testing.T) {
 	tests := []struct {
@@ -133,109 +222,97 @@ func TestGlobToRegexp(t *testing.T) {
 	for _, tt := range tests {
 		re := globToRegexp(tt.pattern)
 		got := re.MatchString(tt.input)
-		if got != tt.want {
-			t.Errorf("globToRegexp(%q).MatchString(%q) = %v, want %v", tt.pattern, tt.input, got, tt.want)
-		}
+		assert.Equalf(t, tt.want, got, "globToRegexp(%q).MatchString", tt.pattern)
 	}
 }
 
 func TestMethodMatcherParsing(t *testing.T) {
 	mm := NewMethodMatcher("fmt Sprintf(string, ..)")
-	if mm.declaringTypePattern == nil {
-		t.Fatal("expected declaringTypePattern")
-	}
-	if mm.methodNamePattern == nil {
-		t.Fatal("expected methodNamePattern")
-	}
-	if !mm.matchesAnyArgs {
-		t.Error("expected matchesAnyArgs for .. pattern")
-	}
+	require.NotNil(t, mm.declaringTypePattern, "expected declaringTypePattern")
+	require.NotNil(t, mm.methodNamePattern, "expected methodNamePattern")
+	assert.True(t, mm.matchesAnyArgs, "expected matchesAnyArgs for .. pattern")
 }
 
 func TestMethodMatcherMatchesAnyArgs(t *testing.T) {
 	mm := NewMethodMatcher("fmt Println(..)")
-	mi := &tree.MethodInvocation{
-		Select: &tree.RightPadded[tree.Expression]{
-			Element: &tree.Identifier{Name: "fmt"},
+	mi := &java.MethodInvocation{
+		Select: &java.RightPadded[java.Expression]{
+			Element: &java.Identifier{Name: "fmt", Type: &java.JavaTypeClass{FullyQualifiedName: "fmt"}},
 		},
-		Name: &tree.Identifier{Name: "Println"},
+		Name: &java.Identifier{Name: "Println"},
 	}
-	if !mm.Matches(mi) {
-		t.Error("expected match for fmt.Println with any args")
-	}
+	assert.True(t, mm.Matches(mi), "expected match for fmt.Println with any args")
 }
 
 func TestMethodMatcherNoMatchWrongName(t *testing.T) {
 	mm := NewMethodMatcher("fmt Println(..)")
-	mi := &tree.MethodInvocation{
-		Select: &tree.RightPadded[tree.Expression]{
-			Element: &tree.Identifier{Name: "fmt"},
+	mi := &java.MethodInvocation{
+		Select: &java.RightPadded[java.Expression]{
+			Element: &java.Identifier{Name: "fmt"},
 		},
-		Name: &tree.Identifier{Name: "Sprintf"},
+		Name: &java.Identifier{Name: "Sprintf"},
 	}
-	if mm.Matches(mi) {
-		t.Error("expected no match for wrong method name")
-	}
+	assert.False(t, mm.Matches(mi), "expected no match for wrong method name")
 }
 
 func TestMethodMatcherNoMatchWrongPackage(t *testing.T) {
 	mm := NewMethodMatcher("fmt Println(..)")
-	mi := &tree.MethodInvocation{
-		Select: &tree.RightPadded[tree.Expression]{
-			Element: &tree.Identifier{Name: "log"},
+	mi := &java.MethodInvocation{
+		Select: &java.RightPadded[java.Expression]{
+			Element: &java.Identifier{Name: "log"},
 		},
-		Name: &tree.Identifier{Name: "Println"},
+		Name: &java.Identifier{Name: "Println"},
 	}
-	if mm.Matches(mi) {
-		t.Error("expected no match for wrong package")
-	}
+	assert.False(t, mm.Matches(mi), "expected no match for wrong package")
 }
 
 func TestMethodMatcherWildcardType(t *testing.T) {
-	mm := NewMethodMatcher("* Sub(..)")
-	mi := &tree.MethodInvocation{
-		Select: &tree.RightPadded[tree.Expression]{
-			Element: &tree.Identifier{Name: "t"},
+	// "*" stops at a dot, so a package-qualified FQN needs "*..*".
+	mm := NewMethodMatcher("*..* Sub(..)")
+	mi := &java.MethodInvocation{
+		Select: &java.RightPadded[java.Expression]{
+			Element: &java.Identifier{Name: "t", Type: &java.JavaTypeClass{FullyQualifiedName: "time.Time"}},
 		},
-		Name: &tree.Identifier{Name: "Sub"},
+		Name: &java.Identifier{Name: "Sub"},
 	}
-	// With just an identifier "t" as select, DeclaringTypeFQN returns "t"
-	// which matches "*" pattern
-	if !mm.Matches(mi) {
-		t.Error("expected match for wildcard declaring type")
+	assert.True(t, mm.Matches(mi), "expected match for wildcard declaring type")
+}
+
+func TestMethodMatcherNoMatchUntypedReceiver(t *testing.T) {
+	mm := NewMethodMatcher("*..* Sub(..)")
+	mi := &java.MethodInvocation{
+		Select: &java.RightPadded[java.Expression]{
+			Element: &java.Identifier{Name: "t"},
+		},
+		Name: &java.Identifier{Name: "Sub"},
 	}
+	assert.False(t, mm.Matches(mi), "an untyped receiver has no declaring type, not even for a wildcard")
 }
 
 func TestMethodMatcherWithTypeInfo(t *testing.T) {
 	mm := NewMethodMatcher("fmt Sprintf(..)")
-	fmtType := &tree.JavaTypeClass{FullyQualifiedName: "fmt"}
-	mi := &tree.MethodInvocation{
-		Select: &tree.RightPadded[tree.Expression]{
-			Element: &tree.Identifier{Name: "fmt"},
+	fmtType := &java.JavaTypeClass{FullyQualifiedName: "fmt"}
+	mi := &java.MethodInvocation{
+		Select: &java.RightPadded[java.Expression]{
+			Element: &java.Identifier{Name: "fmt"},
 		},
-		Name: &tree.Identifier{Name: "Sprintf"},
-		MethodType: &tree.JavaTypeMethod{
+		Name: &java.Identifier{Name: "Sprintf"},
+		MethodType: &java.JavaTypeMethod{
 			DeclaringType: fmtType,
 			Name:          "Sprintf",
 		},
 	}
-	if !mm.Matches(mi) {
-		t.Error("expected match with type info")
-	}
+	assert.True(t, mm.Matches(mi), "expected match with type info")
 }
 
 func TestMethodMatcherMatchesMethod(t *testing.T) {
 	mm := NewMethodMatcher("time.Time Sub(..)")
-	mt := &tree.JavaTypeMethod{
-		DeclaringType: &tree.JavaTypeClass{FullyQualifiedName: "time.Time"},
+	mt := &java.JavaTypeMethod{
+		DeclaringType: &java.JavaTypeClass{FullyQualifiedName: "time.Time"},
 		Name:          "Sub",
 	}
-	if !mm.MatchesMethod(mt) {
-		t.Error("expected match for time.Time Sub(..)")
-	}
+	assert.True(t, mm.MatchesMethod(mt), "expected match for time.Time Sub(..)")
 }
-
-// --- Integration test: MethodMatcher against parsed Go code ---
 
 func TestMethodMatcherOnParsedCode(t *testing.T) {
 	p := parser.NewGoParser()
@@ -248,9 +325,7 @@ func main() {
 	fmt.Sprintf("%d", 42)
 }
 `)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	printlnMatcher := NewMethodMatcher("fmt Println(..)")
 	sprintfMatcher := NewMethodMatcher("fmt Sprintf(..)")
@@ -268,12 +343,8 @@ func main() {
 	})
 	v.Visit(cu, nil)
 
-	if printlnCount != 1 {
-		t.Errorf("expected 1 Println match, got %d", printlnCount)
-	}
-	if sprintfCount != 1 {
-		t.Errorf("expected 1 Sprintf match, got %d", sprintfCount)
-	}
+	assert.Equal(t, 1, printlnCount, "expected 1 Println match")
+	assert.Equal(t, 1, sprintfCount, "expected 1 Sprintf match")
 }
 
 func TestMethodMatcherNoMatchOnParsedCode(t *testing.T) {
@@ -286,9 +357,7 @@ func main() {
 	log.Println("hello")
 }
 `)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	fmtPrintln := NewMethodMatcher("fmt Println(..)")
 
@@ -299,9 +368,7 @@ func main() {
 	})
 	v.Visit(cu, nil)
 
-	if count != 0 {
-		t.Errorf("expected 0 matches for fmt.Println in log code, got %d", count)
-	}
+	assert.Equal(t, 0, count, "expected 0 matches for fmt.Println in log code")
 }
 
 // Test helper visitor that counts method matcher hits.
@@ -311,12 +378,71 @@ type methodMatcherVisitor struct {
 	counts   map[string]*int
 }
 
-func (v *methodMatcherVisitor) VisitMethodInvocation(mi *tree.MethodInvocation, p any) tree.J {
-	mi = v.GoVisitor.VisitMethodInvocation(mi, p).(*tree.MethodInvocation)
+func (v *methodMatcherVisitor) VisitMethodInvocation(mi *java.MethodInvocation, p any) java.J {
+	mi = v.GoVisitor.VisitMethodInvocation(mi, p).(*java.MethodInvocation)
 	for name, matcher := range v.matchers {
 		if matcher.Matches(mi) {
 			*v.counts[name]++
 		}
 	}
 	return mi
+}
+
+// TypeOfExpression for Parentheses and TypeCast must DERIVE the type from the
+// inner expression (mirroring Java's J.Parentheses.getType / J.TypeCast.getType),
+// since neither struct stores a Type field.
+func TestTypeOfExpressionDerivesThroughWrappers(t *testing.T) {
+	// given
+	strType := &java.JavaTypeClass{FullyQualifiedName: "string"}
+	inner := &java.Identifier{Name: "s", Type: strType}
+
+	parens := &java.Parentheses{
+		Tree: java.RightPadded[java.Expression]{Element: inner},
+	}
+	cast := &java.TypeCast{
+		Clazz: &java.ControlParentheses{
+			Tree: java.RightPadded[java.Expression]{Element: inner},
+		},
+		Expr: &java.Identifier{Name: "x"},
+	}
+
+	// when
+	parensType := TypeOfExpression(parens)
+	castType := TypeOfExpression(cast)
+
+	// then
+	if parensType != strType {
+		t.Errorf("Parentheses: got %v, want derived inner type %v", parensType, strType)
+	}
+	if castType != strType {
+		t.Errorf("TypeCast: got %v, want derived Clazz type %v", castType, strType)
+	}
+}
+
+// A declaring type of Unknown carries no name, so the call reads as unresolved
+// and its receiver's own type supplies the name.
+func unknownDeclaringTypeInvocation() *java.MethodInvocation {
+	return &java.MethodInvocation{
+		Select: &java.RightPadded[java.Expression]{
+			Element: &java.Identifier{
+				Name: "fmt",
+				Type: &java.JavaTypeClass{FullyQualifiedName: "fmt"},
+			},
+		},
+		Name:       &java.Identifier{Name: "Println"},
+		MethodType: &java.JavaTypeMethod{Name: "Println", DeclaringType: java.UnknownType},
+	}
+}
+
+func TestMethodMatcherUnattributedDeclaringType(t *testing.T) {
+	mm := NewMethodMatcher("fmt Println(..)")
+	assert.True(t, mm.Matches(unknownDeclaringTypeInvocation()))
+}
+
+func TestDeclaringTypeFQNUnattributedDeclaringType(t *testing.T) {
+	assert.Equal(t, "fmt", DeclaringTypeFQN(unknownDeclaringTypeInvocation()))
+}
+
+func TestIsResolvedUnattributedDeclaringType(t *testing.T) {
+	assert.False(t, IsResolved(unknownDeclaringTypeInvocation()))
 }

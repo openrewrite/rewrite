@@ -112,7 +112,7 @@ public static class PreprocessorSourceTransformer
                 stack.Push((groupActive, branchActive, branchActive));
                 result[i] = GhostForDirective(i, directiveLineToIndex);
             }
-            else if (afterHash.StartsWith("elif ") || afterHash.StartsWith("elif("))
+            else if (stack.Count > 0 && (afterHash.StartsWith("elif ") || afterHash.StartsWith("elif(")))
             {
                 var condition = afterHash.StartsWith("elif(") ? afterHash[4..] : afterHash[5..];
                 condition = StripLineComment(condition);
@@ -121,14 +121,14 @@ public static class PreprocessorSourceTransformer
                 stack.Push((groupActive, branchActive, anyTaken || branchActive));
                 result[i] = GhostForDirective(i, directiveLineToIndex);
             }
-            else if (afterHash.StartsWith("else") && !IsLongerDirectiveKeyword(afterHash, "else"))
+            else if (stack.Count > 0 && afterHash.StartsWith("else") && !IsLongerDirectiveKeyword(afterHash, "else"))
             {
                 var (groupActive, _, anyTaken) = stack.Pop();
                 bool branchActive = groupActive && !anyTaken;
                 stack.Push((groupActive, branchActive, true));
                 result[i] = GhostForDirective(i, directiveLineToIndex);
             }
-            else if (afterHash.StartsWith("endif"))
+            else if (stack.Count > 0 && afterHash.StartsWith("endif"))
             {
                 stack.Pop();
                 result[i] = GhostForDirective(i, directiveLineToIndex);
@@ -203,10 +203,13 @@ public static class PreprocessorSourceTransformer
                 groupStack.Push(groupId);
                 directives.Add(new DirectiveLine(i, lines[i], PreprocessorDirectiveKind.If, groupId, -1));
             }
+            else if (groupStack.Count == 0)
+            {
+                continue;
+            }
             else if (afterHash.StartsWith("elif ") || afterHash.StartsWith("elif("))
             {
-                int groupId = groupStack.Count > 0 ? groupStack.Peek() : -1;
-                directives.Add(new DirectiveLine(i, lines[i], PreprocessorDirectiveKind.Elif, groupId, -1));
+                directives.Add(new DirectiveLine(i, lines[i], PreprocessorDirectiveKind.Elif, groupStack.Peek(), -1));
             }
             else if (afterHash.StartsWith("else") && !afterHash.StartsWith("elseif"))
             {
@@ -214,14 +217,12 @@ public static class PreprocessorSourceTransformer
                 var rest = afterHash[4..];
                 if (rest.Length == 0 || !char.IsLetterOrDigit(rest[0]))
                 {
-                    int groupId = groupStack.Count > 0 ? groupStack.Peek() : -1;
-                    directives.Add(new DirectiveLine(i, lines[i], PreprocessorDirectiveKind.Else, groupId, -1));
+                    directives.Add(new DirectiveLine(i, lines[i], PreprocessorDirectiveKind.Else, groupStack.Peek(), -1));
                 }
             }
             else if (afterHash.StartsWith("endif"))
             {
-                int groupId = groupStack.Count > 0 ? groupStack.Pop() : -1;
-                directives.Add(new DirectiveLine(i, lines[i], PreprocessorDirectiveKind.Endif, groupId, -1));
+                directives.Add(new DirectiveLine(i, lines[i], PreprocessorDirectiveKind.Endif, groupStack.Pop(), -1));
             }
         }
 

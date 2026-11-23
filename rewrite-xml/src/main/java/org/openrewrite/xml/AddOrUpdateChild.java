@@ -17,6 +17,7 @@ package org.openrewrite.xml;
 
 import lombok.AllArgsConstructor;
 import org.openrewrite.Cursor;
+import org.openrewrite.xml.internal.LineStart;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Optional;
@@ -42,7 +43,10 @@ public class AddOrUpdateChild<P> extends XmlVisitor<P> {
                 }
                 t = mapChildren(t, it -> {
                     if (it == maybeChild.get()) {
-                        return autoFormat(child.withPrefix(maybeChild.get().getPrefix()), p, getCursor());
+                        // the replacement keeps the indentation of the line the replaced child started
+                        String prefix = maybeChild.get().getPrefix();
+                        Xml.Tag formatted = autoFormat(child.withPrefix(prefix), p, getCursor());
+                        return formatted.withPrefix(LineStart.keep(formatted.getPrefix(), prefix, prefix));
                     }
                     return it;
                 });

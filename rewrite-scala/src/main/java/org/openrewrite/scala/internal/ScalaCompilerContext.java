@@ -20,26 +20,48 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.ParseWarning;
 import org.openrewrite.Parser;
 import org.openrewrite.Tree;
+import org.openrewrite.scala.ScalaParser;
 import org.openrewrite.scheduling.WorkingDirectoryExecutionContextView;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Collectors;
+
+import java.util.List;
 
 /**
  * Manages the Scala 3 compiler context and provides methods to parse Scala source files.
  * This class delegates to the Scala bridge for compiler interaction.
  */
 public class ScalaCompilerContext {
+    private static final Logger logger = LoggerFactory.getLogger(ScalaParser.class);
+
     private final ScalaCompilerBridge bridge;
     private final ExecutionContext executionContext;
+    private final boolean logCompilationWarningsAndErrors;
     private final List<String> classpathStrings;
 
     public ScalaCompilerContext(@Nullable Collection<Path> classpath,
                                 boolean logCompilationWarningsAndErrors,
                                 ExecutionContext executionContext) {
+        this(classpath, logCompilationWarningsAndErrors, executionContext, null);
+    }
+
+    /**
+     * @param compilers where {@link #compileAll} takes its compiler from and {@link #release} returns it to,
+     *                  or null to compile with a new compiler
+     */
+    public ScalaCompilerContext(@Nullable Collection<Path> classpath,
+                                boolean logCompilationWarningsAndErrors,
+                                ExecutionContext executionContext,
+                                @Nullable ScalaCompilerCache compilers) {
         this.executionContext = executionContext;
-        this.bridge = new ScalaCompilerBridge();
+        this.logCompilationWarningsAndErrors = logCompilationWarningsAndErrors;
+        this.bridge = new ScalaCompilerBridge(compilers);
 
         // Convert classpath paths to strings for the Scala bridge
         if (classpath != null && !classpath.isEmpty()) {
@@ -63,8 +85,11 @@ public class ScalaCompilerContext {
         List<ParseWarning> warnings = new ArrayList<>();
         for (int i = 0; i < result.warnings().size(); i++) {
             ScalaWarning w = result.warnings().get(i);
-            warnings.add(new ParseWarning(Tree.randomId(),
-                    input.getPath().toString() + " at line " + w.line() + ":" + w.column() + " " + w.message()));
+            String formatted = input.getPath() + " at line " + w.line() + ":" + w.column() + " " + w.message();
+            warnings.add(new ParseWarning(Tree.randomId(), formatted));
+            if (logCompilationWarningsAndErrors) {
+                logger.warn(formatted);
+            }
         }
 
         return new ParseResult(result, warnings);
@@ -87,43 +112,72 @@ public class ScalaCompilerContext {
         }
 
         // Convert to Java lists for the bridge
-        java.util.List<SourceEntry> sourceList = new ArrayList<>(entries);
-        java.util.List<String> cpList = new ArrayList<>(classpathStrings);
+        List<SourceEntry> sourceList = new ArrayList<>(entries);
+        List<String> cpList = new ArrayList<>(classpathStrings);
 
-        // Get a working directory for compiler output (.class files)
+        // Get a working directory for compiler output (.class/.tasty files).
         String outputDir;
+        Path ownedTempDir = null;
         try {
             Path root = executionContext.getMessage(WorkingDirectoryExecutionContextView.WORKING_DIRECTORY_ROOT);
             if (root == null) {
-                root = java.nio.file.Files.createTempDirectory("rewrite-scala");
+                root = ownedTempDir = Files.createTempDirectory("rewrite-scala");
             }
-            outputDir = java.nio.file.Files.createDirectories(root.resolve("scala-compiler")).toString();
-        } catch (java.io.IOException e) {
+            outputDir = Files.createDirectories(root.resolve("scala-compiler")).toString();
+        } catch (IOException e) {
             outputDir = System.getProperty("java.io.tmpdir");
         }
 
-        // Batch compile
-        Map<String, ScalaParseResult> compiled = bridge.compileAll(sourceList, cpList, outputDir);
+        try {
+            // Batch compile
+            Map<String, ScalaParseResult> compiled = bridge.compileAll(sourceList, cpList, outputDir);
 
-        // Convert to ParseResult map
-        Map<String, ParseResult> results = new LinkedHashMap<>();
-        for (Map.Entry<String, ScalaParseResult> entry : compiled.entrySet()) {
-            String path = entry.getKey();
-            ScalaParseResult result = entry.getValue();
+            // Convert to ParseResult map
+            Map<String, ParseResult> results = new LinkedHashMap<>();
+            for (Map.Entry<String, ScalaParseResult> entry : compiled.entrySet()) {
+                String path = entry.getKey();
+                ScalaParseResult result = entry.getValue();
 
-            List<ParseWarning> warnings = new ArrayList<>();
-            for (int i = 0; i < result.warnings().size(); i++) {
-                ScalaWarning w = result.warnings().get(i);
-                Parser.Input input = inputsByPath.get(path);
-                String location = (input != null ? input.getPath().toString() : path);
-                warnings.add(new ParseWarning(Tree.randomId(),
-                        location + " at line " + w.line() + ":" + w.column() + " " + w.message()));
+                List<ParseWarning> warnings = new ArrayList<>();
+                for (int i = 0; i < result.warnings().size(); i++) {
+                    ScalaWarning w = result.warnings().get(i);
+                    Parser.Input input = inputsByPath.get(path);
+                    String location = (input != null ? input.getPath().toString() : path);
+                    String formatted = location + " at line " + w.line() + ":" + w.column() + " " + w.message();
+                    warnings.add(new ParseWarning(Tree.randomId(), formatted));
+                    if (logCompilationWarningsAndErrors) {
+                        logger.warn(formatted);
+                    }
+                }
+
+                results.put(path, new ParseResult(result, warnings));
             }
 
-            results.put(path, new ParseResult(result, warnings));
+            return results;
+        } finally {
+            if (ownedTempDir != null) {
+                deleteRecursively(ownedTempDir);
+            }
         }
+    }
 
-        return results;
+    /**
+     * Returns the compiler of {@link #compileAll} for reuse, once no result of it is used any more.
+     */
+    public void release() {
+        bridge.release();
+    }
+
+    private static void deleteRecursively(Path path) {
+        try {
+            if (Files.isDirectory(path)) {
+                try (java.util.stream.Stream<Path> children = Files.list(path)) {
+                    children.forEach(ScalaCompilerContext::deleteRecursively);
+                }
+            }
+            Files.delete(path);
+        } catch (IOException ignore) {
+        }
     }
 
     /**

@@ -69,3 +69,22 @@ func TestParseForRangeWithKeyValue(t *testing.T) {
 			}
 		`))
 }
+
+func TestParseForCondWithSemicolonRuneLiteral(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			func f(tok rune) {
+				for tok != ';' {
+					if true {
+						continue
+					}
+					_ = ';'
+					if true {
+					} else {
+					}
+				}
+			}
+		`))
+}

@@ -21,8 +21,12 @@ import org.openrewrite.maven.table.MavenRepositoryOrder;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.*;
+import static org.openrewrite.gradle.search.EffectiveRepositoryAssertions.expectedWithUrls;
+import static org.openrewrite.gradle.search.EffectiveRepositoryAssertions.mavenCentral;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 
 class FindRepositoryOrderTest implements RewriteTest {
@@ -47,15 +51,15 @@ class FindRepositoryOrderTest implements RewriteTest {
                   maven { url 'https://repo.spring.io/milestone' }
               }
               """,
-            """
-              /*~~(https://repo.spring.io/milestone)~~>*/plugins {
+            spec -> spec.after(actual -> expectedWithUrls(actual, List.of("https://repo.spring.io/milestone"), """
+              plugins {
                   id 'java'
               }
 
               repositories {
                   maven { url 'https://repo.spring.io/milestone' }
               }
-              """
+              """))
           )
         );
     }
@@ -87,9 +91,9 @@ class FindRepositoryOrderTest implements RewriteTest {
                   mavenCentral()
               }
               """,
-            """
-              /*~~(https://repo.spring.io/milestone
-              https://repo.maven.apache.org/maven2/)~~>*/plugins {
+            spec -> spec.after(actual -> expectedWithUrls(actual,
+              List.of("https://repo.spring.io/milestone", mavenCentral()), """
+              plugins {
                   id 'java'
               }
 
@@ -97,7 +101,7 @@ class FindRepositoryOrderTest implements RewriteTest {
                   maven { url 'https://repo.spring.io/milestone' }
                   mavenCentral()
               }
-              """
+              """))
           )
         );
     }
@@ -115,15 +119,15 @@ class FindRepositoryOrderTest implements RewriteTest {
                   maven { url = uri("https://repo.spring.io/milestone") }
               }
               """,
-            """
-              /*~~(https://repo.spring.io/milestone)~~>*/plugins {
+            spec -> spec.after(actual -> expectedWithUrls(actual, List.of("https://repo.spring.io/milestone"), """
+              plugins {
                   id("java")
               }
 
               repositories {
                   maven { url = uri("https://repo.spring.io/milestone") }
               }
-              """
+              """))
           )
         );
     }
@@ -146,11 +150,11 @@ class FindRepositoryOrderTest implements RewriteTest {
                   id 'java'
               }
               """,
-            """
-              /*~~(https://repo.spring.io/milestone)~~>*/plugins {
+            spec -> spec.after(actual -> expectedWithUrls(actual, List.of("https://repo.spring.io/milestone"), """
+              plugins {
                   id 'java'
               }
-              """
+              """))
           )
         );
     }
@@ -160,11 +164,16 @@ class FindRepositoryOrderTest implements RewriteTest {
         rewriteRun(
           spec -> spec
             .dataTable(MavenRepositoryOrder.Row.class, rows -> {
-                assertThat(rows).hasSize(2);
-                assertThat(rows.get(0).getUri()).isEqualTo("https://repo.spring.io/milestone");
-                assertThat(rows.get(0).getRank()).isEqualTo(0);
-                assertThat(rows.get(1).getUri()).isEqualTo("https://repo.maven.apache.org/maven2/");
-                assertThat(rows.get(1).getRank()).isEqualTo(1);
+                int springIdx = indexOfUri(rows, "https://repo.spring.io/milestone");
+                int centralIdx = indexOfUri(rows, mavenCentral());
+                assertThat(springIdx).as("spring milestone repo present").isNotNegative();
+                assertThat(centralIdx).as("maven central repo present").isNotNegative();
+                assertThat(springIdx)
+                  .as("spring milestone declared before maven central")
+                  .isLessThan(centralIdx);
+                assertThat(rows.get(springIdx).getRank())
+                  .as("spring milestone rank precedes maven central rank")
+                  .isLessThan(rows.get(centralIdx).getRank());
             }),
           buildGradle(
             """
@@ -177,9 +186,9 @@ class FindRepositoryOrderTest implements RewriteTest {
                   mavenCentral()
               }
               """,
-            """
-              /*~~(https://repo.spring.io/milestone
-              https://repo.maven.apache.org/maven2/)~~>*/plugins {
+            spec -> spec.after(actual -> expectedWithUrls(actual,
+              List.of("https://repo.spring.io/milestone", mavenCentral()), """
+              plugins {
                   id 'java'
               }
 
@@ -187,8 +196,17 @@ class FindRepositoryOrderTest implements RewriteTest {
                   maven { url 'https://repo.spring.io/milestone' }
                   mavenCentral()
               }
-              """
+              """))
           )
         );
+    }
+
+    private static int indexOfUri(List<MavenRepositoryOrder.Row> rows, String uri) {
+        for (int i = 0; i < rows.size(); i++) {
+            if (uri.equals(rows.get(i).getUri())) {
+                return i;
+            }
+        }
+        return -1;
     }
 }

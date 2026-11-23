@@ -17,26 +17,60 @@
 from __future__ import annotations
 
 import ast
+import io
 import os
 import textwrap
+import tokenize
 from collections import OrderedDict
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple, Union, TYPE_CHECKING
+from typing import Dict, List, Optional, Set, Tuple, Union, TYPE_CHECKING
+from uuid import UUID
 
 from rewrite import random_id
 from rewrite.java import J, Expression, Statement
 from rewrite.java import tree as j
+from rewrite.java.markers import TrailingComma
+from rewrite.java.support_types import Space
+from rewrite.markers import Marker
+from rewrite.python.visitor import PythonVisitor
+from rewrite.utils import list_map
 
 if TYPE_CHECKING:
     from rewrite.python.tree import CompilationUnit
     from rewrite.visitor import Cursor
 
 from .capture import Capture
-from .placeholder import substitute_placeholders
+from .placeholder import substitute_placeholders, to_placeholder
 from .coordinates import PythonCoordinates, CoordinateMode
+from .replacement import substitution_marker
 
 # Wrapper function name used to make template code parseable
 WRAPPER_FUNCTION_NAME = "__WRAPPER__"
+_WRAPPER_INDENT = "    "
+
+
+_stdlib_venv: Optional[str] = None
+
+
+def _stdlib_only_venv() -> str:
+    """An empty venv of the running interpreter, for templates that declare no dependencies.
+
+    Given no venv, ty resolves against an inherited ``VIRTUAL_ENV``, the parser's own venv or the
+    ``python3`` on ``PATH``, whose packages vary with where the recipe runs. ty fails to start on
+    a venv without its ``pyvenv.cfg``, which a temp cleaner can remove while the process runs.
+    """
+    global _stdlib_venv
+    if _stdlib_venv is None or not os.path.isfile(os.path.join(_stdlib_venv, "pyvenv.cfg")):
+        import atexit
+        import shutil
+        import tempfile
+        import venv
+
+        path = tempfile.mkdtemp(prefix="openrewrite-template-stdlib-")
+        atexit.register(shutil.rmtree, path, ignore_errors=True)
+        venv.EnvBuilder(with_pip=False, symlinks=os.name != "nt").create(path)
+        _stdlib_venv = path
+    return _stdlib_venv
 
 
 @dataclass(frozen=True)
@@ -53,7 +87,9 @@ class TemplateOptions:
         dependencies: PyPI ``(package, version)`` pairs (use explicit
             operators like ``">=2.31.0"``; bare versions default to ``>=``).  When set, the
             template is parsed inside a cached virtualenv that has these
-            packages installed, enabling type attribution.
+            packages installed, enabling type attribution. Without them only
+            the standard library resolves, whatever the running interpreter
+            has installed.
         context_sensitive: Whether the template requires cursor context
             for correct parsing.
     """
@@ -61,6 +97,38 @@ class TemplateOptions:
     context: Tuple[str, ...] = ()
     dependencies: Tuple[Tuple[str, str], ...] = ()
     context_sensitive: bool = False
+
+
+def _indented_outside_strings(code: str) -> str:
+    """``code`` indented to be the wrapper's body, but for the lines a string runs on to, whose leading
+    whitespace is the string's own text."""
+    from rewrite.python._parser_visitor import FSTRING_MIDDLE, TSTRING_MIDDLE
+    continued: Set[int] = set()
+    try:
+        for token in tokenize.generate_tokens(io.StringIO(code).readline):
+            if token.type in (tokenize.STRING, FSTRING_MIDDLE, TSTRING_MIDDLE):
+                continued.update(range(token.start[0] + 1, token.end[0] + 1))
+    except (tokenize.TokenError, SyntaxError):
+        # The parser tokenizes the wrapper around this code too, so code that does not tokenize fails to parse there,
+        # and the parse says what is wrong with it.
+        pass
+    return '\n'.join(line if row in continued else _WRAPPER_INDENT + line
+                     for row, line in enumerate(code.split('\n'), 1))
+
+
+def _in_statement_slot(coordinates: PythonCoordinates, cursor: Optional['Cursor']) -> bool:
+    """Whether the result goes where the tree declares a `Statement`."""
+    from rewrite.python import tree as py
+    target = coordinates.tree
+    if not isinstance(target, Statement):
+        return False
+    ambiguous = isinstance(target, Expression) and not isinstance(target, py.ExpressionStatement)
+    if not ambiguous or coordinates.mode != CoordinateMode.REPLACEMENT \
+            or cursor is None or getattr(cursor.value, 'id', None) != target.id:
+        return True
+    # A node that is both, like a call, is a statement only where a statement list holds it.
+    from .precedence import enclosing_tree
+    return isinstance(enclosing_tree(cursor.parent), (j.Block, py.CompilationUnit))
 
 
 class TemplateEngine:
@@ -75,8 +143,8 @@ class TemplateEngine:
     - LRU caching for parsed templates
     """
 
-    # Global template cache (code -> parsed tree), LRU eviction
-    _cache: OrderedDict[str, J] = OrderedDict()
+    # Global template cache (code -> parsed tree and the context parsed ahead of it), LRU eviction
+    _cache: OrderedDict[str, Tuple[J, Tuple[Statement, ...]]] = OrderedDict()
     _cache_max_size: int = 100
 
     @classmethod
@@ -101,6 +169,25 @@ class TemplateEngine:
             SyntaxError: If the template code is invalid Python.
             ValueError: If placeholder validation fails.
         """
+        return cls._parse(code, captures, options)[0]
+
+    @classmethod
+    def get_context_statements(
+        cls,
+        code: str,
+        captures: Dict[str, Capture],
+        options: Optional[TemplateOptions] = None
+    ) -> Tuple[Statement, ...]:
+        """The statements parsed ahead of the template, which are what its context binds."""
+        return cls._parse(code, captures, options)[1]
+
+    @classmethod
+    def _parse(
+        cls,
+        code: str,
+        captures: Dict[str, Capture],
+        options: Optional[TemplateOptions] = None
+    ) -> Tuple[J, Tuple[Statement, ...]]:
         options = options or TemplateOptions()
 
         # Create cache key
@@ -119,18 +206,25 @@ class TemplateEngine:
         is_expression = cls._is_expression(dedented)
 
         # Generate wrapper and parse
-        wrapper_code = cls._generate_wrapper(substituted_code, options)
+        wrapper_code = cls._generate_wrapper(substituted_code, options, captures)
         compilation_unit = cls._parse_code(wrapper_code, options)
 
         # Extract template content from wrapper
         extracted = cls._extract_from_wrapper(compilation_unit, is_expression)
+        if not is_expression:
+            out_of_wrapper = _OutOfWrapper().visit(extracted, None)
+            assert out_of_wrapper is not None
+            extracted = out_of_wrapper
+
+        # The template's own code is the last statement, so everything ahead of it is context.
+        parsed = (extracted, tuple(compilation_unit.statements[:-1]))
 
         # Cache with LRU eviction
-        cls._cache[cache_key] = extracted
+        cls._cache[cache_key] = parsed
         if len(cls._cache) > cls._cache_max_size:
             cls._cache.popitem(last=False)
 
-        return extracted
+        return parsed
 
     @classmethod
     def apply_substitutions(
@@ -156,6 +250,22 @@ class TemplateEngine:
         return visitor.visit(template_tree, None)
 
     @classmethod
+    def retain_ids(cls, result: J, replaced: Optional[J]) -> J:
+        """Copy of ``result`` in which an id survives only at the first node carrying it, and only
+        if that id names a node of ``replaced``, the subtree the result takes the place of. Every
+        other node is minted a fresh id. The parsed template is shared by every application, and a
+        value spliced into two slots, or from somewhere that stays in the file, would otherwise put
+        one id in two places."""
+        retainable: Set[UUID] = set()
+        if replaced is not None:
+            collector = _TreeIds()
+            collector.visit(replaced, None)
+            retainable = collector.ids
+        retained = _RetainIds(retainable).visit(result, None)
+        assert retained is not None
+        return retained
+
+    @classmethod
     def _make_cache_key(
         cls,
         code: str,
@@ -163,7 +273,8 @@ class TemplateEngine:
         options: TemplateOptions
     ) -> str:
         """Generate a cache key from template components."""
-        capture_names = ",".join(sorted(captures.keys()))
+        capture_names = ",".join(
+            f"{name}:{cap.type_hint}" for name, cap in sorted(captures.items()))
         imports_key = ",".join(sorted(options.imports))
         context_key = ",".join(options.context)  # preserve order: context is order-dependent
         deps_key = ",".join(
@@ -172,13 +283,19 @@ class TemplateEngine:
         return f"{code}::{capture_names}::{imports_key}::{context_key}::{deps_key}"
 
     @classmethod
-    def _generate_wrapper(cls, code: str, options: TemplateOptions) -> str:
+    def _generate_wrapper(
+        cls,
+        code: str,
+        options: TemplateOptions,
+        captures: Dict[str, Capture],
+    ) -> str:
         """
         Generate a parseable Python wrapper for the template code.
 
         Args:
             code: Template code (with placeholders already substituted).
             options: Template options including imports.
+            captures: Captures whose ``type_hint`` declares their placeholder's type.
 
         Returns:
             Complete Python source that can be parsed.
@@ -193,6 +310,9 @@ class TemplateEngine:
         for ctx in options.context:
             lines.append(ctx)
 
+        # After the context, so that a hint can name what the context imports.
+        lines.extend(cls._capture_preamble(captures))
+
         # Dedent the code to handle indented template strings
         dedented = textwrap.dedent(code).strip()
 
@@ -204,15 +324,19 @@ class TemplateEngine:
         if is_expression:
             # Expression: wrap with return
             lines.append(f"def {WRAPPER_FUNCTION_NAME}():")
-            lines.append(f"    return {dedented}")
+            lines.append(f"{_WRAPPER_INDENT}return {dedented}")
         else:
-            # Statement(s): wrap directly
+            # In a function, a name the context or a typed capture declares has its declared type, where at the
+            # module's level ty would take it as unbound or narrow it to the value assigned.
             lines.append(f"def {WRAPPER_FUNCTION_NAME}():")
-            # Indent each line of the template
-            for line in dedented.split('\n'):
-                lines.append(f"    {line}")
+            lines.append(_indented_outside_strings(dedented))
 
         return '\n'.join(lines)
+
+    @classmethod
+    def _capture_preamble(cls, captures: Dict[str, Capture]) -> List[str]:
+        return [f"{to_placeholder(name)}: {cap.type_hint}"
+                for name, cap in captures.items() if cap.is_typed]
 
     @classmethod
     def _is_expression(cls, code: str) -> bool:
@@ -228,10 +352,8 @@ class TemplateEngine:
         """
         Parse Python code into an LST CompilationUnit.
 
-        Always attempts type attribution via ``TyTypesClient``.  When
-        *options* specifies dependencies, a cached virtualenv workspace is
-        used; otherwise a temporary directory suffices (enough for stdlib
-        and already-installed packages).
+        Always attempts type attribution via ``TyTypesClient``, in the
+        environment ``TemplateOptions.dependencies`` describes.
 
         Args:
             code: Python source code.
@@ -253,14 +375,16 @@ class TemplateEngine:
                 import tempfile as _tmpmod
                 from rewrite.python.ty_client import TyTypesClient
 
+                virtual_env = None
                 if options and options.dependencies:
                     from .dependency_workspace import DependencyWorkspace
                     workspace = DependencyWorkspace.get_or_create(options.dependencies)
                 else:
                     workspace = _tmpmod.mkdtemp()
                     owns_workspace = True
+                    virtual_env = _stdlib_only_venv()
 
-                ty_client = TyTypesClient()
+                ty_client = TyTypesClient(virtual_env=virtual_env)
                 ty_client.initialize(workspace)
 
                 # ty needs a real file path for type resolution
@@ -358,7 +482,8 @@ class TemplateEngine:
         cls,
         result: J,
         cursor: 'Cursor',
-        coordinates: PythonCoordinates
+        coordinates: PythonCoordinates,
+        format: bool = True,
     ) -> J:
         """
         Apply coordinate-based adjustments to the result.
@@ -370,6 +495,7 @@ class TemplateEngine:
             result: The template result.
             cursor: Current cursor position.
             coordinates: Insertion coordinates.
+            format: As `Template.apply`.
 
         Returns:
             The adjusted result.
@@ -383,15 +509,23 @@ class TemplateEngine:
                 # Replace the prefix to match original
                 result = result.replace(prefix=original.prefix)
 
-        # Check if we need to wrap expression in statement
-        # This happens when inserting an expression where a statement is expected
-        target = coordinates.tree
-        if isinstance(result, Expression) and isinstance(target, Statement):
-            # Wrap expression in ExpressionStatement
+        # As the parser does, wrap only an expression that is not itself a Statement.
+        if (isinstance(result, Expression) and not isinstance(result, Statement)
+                and _in_statement_slot(coordinates, cursor)):
             result = py.ExpressionStatement(
                 random_id(),
                 result,
             )
+
+        if not format:
+            return cls.unmark_substituted(result)
+
+        unformatted = _SubstitutedValues()
+        unformatted.visit(result, None)
+
+        # A replacement keeps the blank lines before the code it replaces and the indentation of the line
+        # that code starts, which may align to a bracket that formatting the result alone can't see.
+        keep_indent = coordinates.mode == CoordinateMode.REPLACEMENT
 
         # Auto-format the result
         try:
@@ -399,15 +533,102 @@ class TemplateEngine:
             original = coordinates.tree
             result = maybe_auto_format(
                 original, result, None, None,
-                cursor.parent if cursor.parent is not None else None
+                cursor.parent if cursor.parent is not None else None,
+                keep_indent=keep_indent
             )
         except (ValueError, AttributeError):
             # No CompilationUnit in cursor ancestry — skip formatting
             pass
 
+        if unformatted.values:
+            result = _SubstitutedLayout(unformatted.values).visit(result, None)
+            from ..format import minimally_format
+            result = minimally_format(result, None, cursor.parent if cursor is not None else None,
+                                      keep_indent=keep_indent)
         return result
+
+    @classmethod
+    def unmark_substituted(cls, result: J) -> J:
+        unmarked = _SubstitutedLayout({}).visit(result, None)
+        assert unmarked is not None
+        return unmarked
 
     @classmethod
     def clear_cache(cls) -> None:
         """Clear the template cache."""
         cls._cache.clear()
+
+
+class _TreeIds(PythonVisitor[None]):
+    def __init__(self):
+        super().__init__()
+        self.ids: Set[UUID] = set()
+
+    def post_visit(self, tree: J, p: None) -> J:
+        self.ids.add(tree.id)
+        return tree
+
+
+class _RetainIds(PythonVisitor[None]):
+    def __init__(self, retainable: Set[UUID]):
+        super().__init__()
+        self._retainable = retainable
+        self._seen: Set[UUID] = set()
+
+    def post_visit(self, tree: J, p: None) -> J:
+        if tree.id in self._retainable and tree.id not in self._seen:
+            self._seen.add(tree.id)
+            return tree
+        return tree.replace(_id=random_id())
+
+
+class _SubstitutedValues(PythonVisitor[None]):
+    """Collects each substituted value by the id of the `SubstitutedValue` marking it."""
+
+    def __init__(self):
+        super().__init__()
+        self.values: Dict[UUID, J] = {}
+
+    def pre_visit(self, tree: J, p: None) -> J:
+        marker = substitution_marker(tree)
+        if marker is not None:
+            self.values[marker.id] = tree
+            self.stop_after_pre_visit()
+        return tree
+
+
+class _SubstitutedLayout(PythonVisitor[None]):
+    """Puts each substituted value back as `unformatted` holds it, under the prefix the formatter gave
+    it, and drops its `SubstitutedValue` marker."""
+
+    def __init__(self, unformatted: Dict[UUID, J]):
+        super().__init__()
+        self._unformatted = unformatted
+
+    def pre_visit(self, tree: J, p: None) -> J:
+        marker = substitution_marker(tree)
+        if marker is None:
+            return tree
+        self.stop_after_pre_visit()
+        before = self._unformatted.get(marker.id)
+        if before is not None:
+            tree = before.replace(prefix=tree.prefix)
+        return tree.replace(markers=tree.markers.replace(
+            markers=[m for m in tree.markers.markers if m != marker]))
+
+
+class _OutOfWrapper(PythonVisitor[None]):
+    """Takes the indentation `_indented_outside_strings` gave a statement off each of its lines, so that the
+    template's tree is laid out as its code is, whether or not it is formatted where it lands."""
+
+    def visit_space(self, space: Optional[Space], p: None) -> Space:
+        space = super().visit_space(space, p)
+        return space.replace(
+            whitespace=space.whitespace.replace('\n' + _WRAPPER_INDENT, '\n'),
+            comments=list_map(lambda c: c.replace(suffix=c.suffix.replace('\n' + _WRAPPER_INDENT, '\n')),
+                              space.comments))
+
+    def visit_marker(self, marker: Marker, p: None) -> Marker:
+        if isinstance(marker, TrailingComma):
+            return marker.replace(suffix=self.visit_space(marker.suffix, p))
+        return marker

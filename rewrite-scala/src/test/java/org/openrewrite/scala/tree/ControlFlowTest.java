@@ -65,8 +65,25 @@ class ControlFlowTest implements RewriteTest {
             )
         );
     }
-    
-    @Test 
+
+    @Test
+    void doWhileLoop() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  var i = 0
+                  do {
+                    println(i)
+                    i += 1
+                  } while (i < 10)
+                }
+                """
+            )
+        );
+    }
+
+    @Test
     void ifWithBlock() {
         rewriteRun(
             scala(
@@ -81,7 +98,7 @@ class ControlFlowTest implements RewriteTest {
             )
         );
     }
-    
+
     @Test
     void nestedIf() {
         rewriteRun(
@@ -98,7 +115,7 @@ class ControlFlowTest implements RewriteTest {
             )
         );
     }
-    
+
     @Test
     void ifElseExpressionLiteralOperands() {
         rewriteRun(
@@ -250,7 +267,7 @@ class ControlFlowTest implements RewriteTest {
             )
         );
     }
-    
+
     @Test
     void forLoopWithTo() {
         rewriteRun(
@@ -265,7 +282,7 @@ class ControlFlowTest implements RewriteTest {
             )
         );
     }
-    
+
     @Test
     void forLoopWithUntil() {
         rewriteRun(
@@ -280,7 +297,7 @@ class ControlFlowTest implements RewriteTest {
             )
         );
     }
-    
+
     @Test
     void forLoopWithToVariable() {
         rewriteRun(
@@ -296,7 +313,7 @@ class ControlFlowTest implements RewriteTest {
             )
         );
     }
-    
+
     @Test
     void forLoopWithUntilVariable() {
         rewriteRun(
@@ -312,7 +329,7 @@ class ControlFlowTest implements RewriteTest {
             )
         );
     }
-    
+
     @Test
     void forLoopWithToExpression() {
         rewriteRun(
@@ -328,7 +345,7 @@ class ControlFlowTest implements RewriteTest {
             )
         );
     }
-    
+
     @Test
     void forLoopWithUntilExpression() {
         rewriteRun(
@@ -344,7 +361,7 @@ class ControlFlowTest implements RewriteTest {
             )
         );
     }
-    
+
     @Test
     void forLoopWithCollection() {
         rewriteRun(
@@ -360,7 +377,7 @@ class ControlFlowTest implements RewriteTest {
             )
         );
     }
-    
+
     @Test
     void simpleAssignment() {
         rewriteRun(
@@ -374,7 +391,7 @@ class ControlFlowTest implements RewriteTest {
             )
         );
     }
-    
+
     @Test
     void compoundAssignment() {
         rewriteRun(

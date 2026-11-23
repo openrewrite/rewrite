@@ -53,10 +53,71 @@ public sealed class Validations
     /// </summary>
     public bool FormattingReconciliation { get; init; } = true;
 
+    /// <summary>
+    /// Whether the recipe is validated to add only markers that report, such as search results and markup:
+    /// any other marker must be one its input sources or a fresh parse of its output also carry. Default: enabled.
+    /// </summary>
+    public bool ReportingMarkersOnly { get; init; } = true;
+
+    /// <summary>
+    /// Whether the recipe is validated to leave the execution context, which every recipe and source file in a run
+    /// shares, unchanged. Default: enabled.
+    /// </summary>
+    public bool ExecutionContextUnchanged { get; init; } = true;
+
+    /// <summary>
+    /// Whether a ScanningRecipe's scanner is validated to make no edits, which the scanning phase discards.
+    /// Default: enabled.
+    /// </summary>
+    public bool NoEditsInScanningPhase { get; init; } = true;
+
+    /// <summary>
+    /// Whether a ScanningRecipe's accumulator is validated to keep values, such as paths, names and ids, and no
+    /// <see cref="OpenRewrite.Core.IHeavyweight"/> objects, such as trees, cursors and visitors, which would stay in
+    /// memory all cycle. Default: enabled.
+    /// </summary>
+    public bool LightweightAccumulators { get; init; } = true;
+
+    /// <summary>
+    /// Whether the recipe is validated to produce the tree that the parser makes of the text the recipe's output
+    /// prints, such as a Primitive and not an Identifier for <c>int</c>. Default: enabled.
+    /// </summary>
+    public bool ParserShapedTrees { get; init; } = true;
+
+    /// <summary>
+    /// Whether the recipe is validated to format only what it changed, not a whole source file, namespace or class
+    /// that existed before the run. Default: enabled.
+    /// </summary>
+    public bool MinimalFormatting { get; init; } = true;
+
+    /// <summary>
+    /// Whether the recipe is validated to give the nodes it makes the types the compiler resolves for the text they
+    /// print, such as a <c>MethodType</c> on a call it adds, where a fresh parse of its output has them. Nodes it kept
+    /// from input that lacked them may lack them still. Default: disabled, since <c>CSharpTemplate</c> doesn't yet
+    /// type all it makes, such as binary expressions and constructor calls.
+    /// </summary>
+    public bool TypesAttributed { get; init; }
+
+    /// <summary>
+    /// Whether the recipe is validated to leave each node in a source file with an id of its own, which a recipe that
+    /// puts one node in two places doesn't. Default: enabled.
+    /// </summary>
+    public bool UniqueIds { get; init; } = true;
+
+    /// <summary>
+    /// Whether the recipe is validated to edit each source file it changes rather than make another one of it: one with
+    /// the same id, path, charset and byte order mark, and the very <see cref="OpenRewrite.Core.Markers"/> it had.
+    /// Default: disabled, since a recipe may move a file or mark it with a search result.
+    /// </summary>
+    public bool SourceFileIdentity { get; init; }
+
     /// <summary>All validations enabled with default settings.</summary>
     public static Validations All { get; } = new();
 
-    /// <summary>All validations disabled.</summary>
+    /// <summary>
+    /// The parse, print and formatting reconciliation checks disabled, and the checks of what the recipe does, such
+    /// as <see cref="ReportingMarkersOnly"/>, left on.
+    /// </summary>
     public static Validations None { get; } = new()
     {
         WhitespaceInSpaces = false,

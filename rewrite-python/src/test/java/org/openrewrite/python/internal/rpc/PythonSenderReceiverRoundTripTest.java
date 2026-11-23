@@ -19,6 +19,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Tree;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JContainer;
+import org.openrewrite.java.tree.JLeftPadded;
+import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Markers;
@@ -30,13 +33,13 @@ import org.openrewrite.rpc.RpcSendQueue;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.UUID;
 
+import static java.util.Collections.emptyList;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class PythonSenderReceiverRoundTripTest {
@@ -106,13 +109,44 @@ class PythonSenderReceiverRoundTripTest {
         assertThat(received.getExpression()).isInstanceOf(Py.Await.class);
     }
 
+    @Test
+    void typeAliasTypeParametersRoundTrip() {
+        // PEP 695 `type X[T] = int` — all four codecs previously dropped TypeAlias.typeParameters.
+        J.TypeParameter typeParam = new J.TypeParameter(
+                Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+                emptyList(), emptyList(), ident("T"), null);
+        Py.TypeAlias after = new Py.TypeAlias(
+                Tree.randomId(), Space.EMPTY, Markers.EMPTY, ident("X"),
+                JContainer.build(Space.EMPTY, List.of(JRightPadded.build(typeParam)), Markers.EMPTY),
+                JLeftPadded.build((J) ident("int")).withBefore(Space.SINGLE_SPACE),
+                null);
+
+        sq.send(after, null, null);
+        sq.flush();
+
+        Py.TypeAlias received = rq.receive(null);
+
+        assertThat(received).isNotNull();
+        assertThat(received.getTypeParameters())
+                .as("PEP 695 type parameters must survive the RPC round trip")
+                .isNotNull()
+                .hasSize(1);
+        assertThat(((J.Identifier) received.getTypeParameters().get(0).getName()).getSimpleName())
+                .isEqualTo("T");
+    }
+
+    private static J.Identifier ident(String name) {
+        return new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+                emptyList(), name, null, null);
+    }
+
     private static Py.ExpressionStatement expressionStatementOfAwait(String name, Space awaitPrefix) {
         UUID esId = Tree.randomId();
         UUID awaitId = Tree.randomId();
         UUID identId = Tree.randomId();
         J.Identifier identifier = new J.Identifier(
                 identId, Space.EMPTY, Markers.EMPTY,
-                Collections.emptyList(), name, null, null
+                emptyList(), name, null, null
         );
         Py.Await await = new Py.Await(awaitId, awaitPrefix, Markers.EMPTY, identifier, (JavaType) null);
         return new Py.ExpressionStatement(esId, await);

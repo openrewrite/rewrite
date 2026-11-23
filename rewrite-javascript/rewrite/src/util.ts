@@ -51,15 +51,151 @@ export function trimIndent(str: string | null | undefined): string {
 }
 
 /**
+ * Removes common leading whitespace from each line, optimized for template strings.
+ *
+ * Behavior:
+ * - Removes ONE leading newline if present (for template string ergonomics)
+ * - Preserves trailing newlines (important for testing formatters like Prettier)
+ * - For lines with content: removes common indentation
+ * - For lines with only whitespace: removes common indentation, preserving remaining spaces
+ *
+ * Examples:
+ * - `\n  code` → `code` (single leading newline removed)
+ * - `\n\n  code` → `\ncode` (first newline removed, second preserved)
+ * - `  code\n` → `code\n` (trailing newline preserved)
+ * - `  code\n\n` → `code\n\n` (trailing newlines preserved)
+ */
+export function dedent(s: string): string {
+    if (!s) return s;
+
+    // Remove single leading newline for ergonomics
+    const start = s.charCodeAt(0) === 10 ? 1 : 0;  // 10 = '\n'
+
+    if (start >= s.length) return '';
+
+    const str = start > 0 ? s.slice(start) : s;
+    const lines = str.split('\n');
+
+    // Always consider all lines for minIndent calculation
+    // If first line has content at column 0, minIndent will be 0 and no dedenting happens
+    const startLine = 0;
+
+    // Find minimum indentation
+    let minIndent = Infinity;
+    for (let i = startLine; i < lines.length; i++) {
+        const line = lines[i];
+        let indent = 0;
+        for (let j = 0; j < line.length; j++) {
+            const ch = line.charCodeAt(j);
+            if (ch === 32 || ch === 9) {  // ' ' or '\t'
+                indent++;
+            } else {
+                // Found non-whitespace, update minIndent
+                if (indent < minIndent) minIndent = indent;
+                break;
+            }
+        }
+    }
+
+    // If all lines are empty or no indentation
+    if (minIndent === Infinity || minIndent === 0) {
+        return lines.join('\n');
+    }
+
+    // Remove common indentation from all lines
+    return lines.map(line =>
+        line.length >= minIndent ? line.slice(minIndent) : ''
+    ).join('\n');
+}
+
+/**
+ * A compiled `(original, updates) => merged` builder that names every resulting property in an
+ * object literal. V8 sizes a literal's in-object storage to the properties it names, so the merged
+ * node keeps its fields inline; the `{...original, ...updates}` spread of a shared, megamorphic
+ * function instead lands in an out-of-object `system / PropertyArray` (millions of them across an
+ * RPC-received LST forest). Builders are cached in a trie over the two property-name lists, so a
+ * given shape compiles once.
+ */
+type MergeBuilder = (original: any, updates: any) => any;
+
+interface ShapeNode {
+    children: Map<string, ShapeNode>;
+    // Where the update keys start, so original keys [a] + updates [b, c] and [a, b] + [c] stay apart
+    updates?: ShapeNode;
+    builder?: MergeBuilder;
+}
+
+const mergeBuilders: ShapeNode = {children: new Map()};
+
+function shapeChild(node: ShapeNode, key: string): ShapeNode {
+    let child = node.children.get(key);
+    if (child === undefined) {
+        child = {children: new Map()};
+        node.children.set(key, child);
+    }
+    return child;
+}
+
+function mergeBuilderFor(originalKeys: string[], updateKeys: string[]): MergeBuilder {
+    let node = mergeBuilders;
+    for (const key of originalKeys) {
+        node = shapeChild(node, key);
+    }
+    node = node.updates ??= {children: new Map()};
+    for (const key of updateKeys) {
+        node = shapeChild(node, key);
+    }
+    return node.builder ??= compileMergeBuilder(originalKeys, updateKeys);
+}
+
+function compileMergeBuilder(originalKeys: string[], updateKeys: string[]): MergeBuilder {
+    const fromUpdates = new Set(updateKeys);
+    const names = originalKeys.slice();
+    for (const key of updateKeys) {
+        if (!names.includes(key)) {
+            names.push(key);
+        }
+    }
+    const body = "return {" + names
+        .map(name => `${JSON.stringify(name)}:(${fromUpdates.has(name) ? "u" : "o"})[${JSON.stringify(name)}]`)
+        .join(",") + "};";
+    try {
+        return new Function("o", "u", body) as MergeBuilder;
+    } catch {
+        return (o, u) => ({...o, ...u});
+    }
+}
+
+/**
  * Helper function to create a new object only if any properties have changed.
  * Compares each property in updates with the original object.
  * Returns the original object if nothing changed, or a new object with updates applied.
  */
 export function updateIfChanged<O extends object>(original: O, updates: Partial<O>): O {
+    let changed = false;
     for (const key in updates) {
         if (updates[key] !== original[key]) {
-            return { ...original, ...updates };
+            changed = true;
+            break;
         }
     }
-    return original;
+    if (!changed) {
+        return original;
+    }
+    // A merged node built through a shared spread overflows into a PropertyArray; a compiled
+    // literal builder keeps its fields inline. Originals with an enumerable symbol key fall back
+    // to the spread, since only string keys survive the JSON-serialized builder body.
+    if (typeof original === "object" && !hasEnumerableSymbol(original)) {
+        return mergeBuilderFor(Object.keys(original), Object.keys(updates as object))(original, updates);
+    }
+    return {...original, ...updates};
+}
+
+function hasEnumerableSymbol(o: object): boolean {
+    for (const s of Object.getOwnPropertySymbols(o)) {
+        if (Object.prototype.propertyIsEnumerable.call(o, s)) {
+            return true;
+        }
+    }
+    return false;
 }

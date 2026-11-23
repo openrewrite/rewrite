@@ -83,3 +83,58 @@ case class Curried(id: UUID) extends Marker {
   override def getId(): UUID = id
   override def withId[M <: Marker](newId: UUID): M = copy(id = newId).asInstanceOf[M]
 }
+
+/**
+ * Carries the source text between the last annotation/modifier and the
+ * `val`/`var`/`given` keyword for Scala variable declarations.
+ */
+case class ValVarKeyword(id: UUID, beforeKeyword: String) extends Marker {
+  override def getId(): UUID = id
+  override def withId[M <: Marker](newId: UUID): M = copy(id = newId).asInstanceOf[M]
+}
+
+/**
+ * Marks a package declaration followed by an explicit semicolon:
+ * `package foo;class Bar`.
+ */
+case class PackageSemicolon(id: UUID) extends Marker {
+  override def getId(): UUID = id
+  override def withId[M <: Marker](newId: UUID): M = copy(id = newId).asInstanceOf[M]
+}
+
+/**
+ * Marks a Scala 3 `given` declaration. Applied to:
+ * - `J.VariableDeclarations` for named given aliases (`given x: Int = 42`).
+ * - `J.MethodDeclaration` for method-shaped given aliases
+ *   (`given listOrd[T](using Ord[T]): Ord[List[T]] = ...`).
+ * - `J.ClassDeclaration` for givens that define what they implement
+ *   (`given intOrd: Ord[Int] with { ... }`, `given Foo(1)`).
+ *
+ * The printer uses this to emit `given` in place of `val`/`def`/`object`/`class`.
+ */
+case class Given(id: UUID) extends Marker {
+  override def getId(): UUID = id
+  override def withId[M <: Marker](newId: UUID): M = copy(id = newId).asInstanceOf[M]
+}
+
+/**
+ * Marks a `J.VariableDeclarations.NamedVariable` whose name is synthesized by the
+ * Scala compiler and does not appear in source. The printer omits the name.
+ * Used for anonymous `using` parameters (`def f(using Ord[T])`).
+ */
+case class OmitName(id: UUID) extends Marker {
+  override def getId(): UUID = id
+  override def withId[M <: Marker](newId: UUID): M = copy(id = newId).asInstanceOf[M]
+}
+
+/**
+ * The verbatim source of the argument lists after the first in a curried
+ * `new Foo(1)(2) { ... }`, parens included, which the printer re-emits after
+ * the first `)`. A class declaration's later parameter clauses are parameters
+ * marked with `ParameterClause`. LSTs written before that carry this marker on
+ * the primary constructor instead, and it still prints there.
+ */
+case class ExtraConstructorParamLists(id: UUID, text: String) extends Marker {
+  override def getId(): UUID = id
+  override def withId[M <: Marker](newId: UUID): M = copy(id = newId).asInstanceOf[M]
+}

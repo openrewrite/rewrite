@@ -21,6 +21,7 @@ import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
 
 class RemoveDuplicateDependenciesTest implements RewriteTest {
@@ -236,7 +237,7 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
     }
 
     @Test
-    void removeDependencyWithDifferentVersion() {
+    void keepLastDeclarationWhenVersionsDiffer() {
         rewriteRun(
           pomXml(
             """
@@ -273,7 +274,57 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
                   <dependency>
                     <groupId>com.google.inject</groupId>
                     <artifactId>guice</artifactId>
-                    <version>4.2.1</version>
+                    <version>4.2.2</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepLastDeclarationWhenValuesCarryComments() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <dependencies>
+                  <dependency>
+                    <groupId>com.google.inject</groupId>
+                    <artifactId>guice</artifactId>
+                    <version>4.2.2</version>
+                    <optional>false<!-- for now --></optional>
+                  </dependency>
+                  <dependency>
+                    <groupId>com.google.inject</groupId>
+                    <artifactId>guice</artifactId>
+                    <version>4.2.2</version>
+                    <optional>true<!-- not needed at runtime --></optional>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <dependencies>
+                  <dependency>
+                    <groupId>com.google.inject</groupId>
+                    <artifactId>guice</artifactId>
+                    <version>4.2.2</version>
+                    <optional>true<!-- not needed at runtime --></optional>
                   </dependency>
                 </dependencies>
               </project>
@@ -378,7 +429,7 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
     }
 
     @Test
-    void keepDependencyWithDifferentScope() {
+    void removeDuplicateWithDifferentScope() {
         rewriteRun(
           pomXml(
             """
@@ -397,10 +448,992 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
                     <scope>compile</scope>
                   </dependency>
                   <dependency>
+                    <groupId>junit</groupId>
+                    <artifactId>junit</artifactId>
+                    <version>4.13.2</version>
+                    <scope>test</scope>
+                  </dependency>
+                  <dependency>
                     <groupId>com.google.guava</groupId>
                     <artifactId>guava</artifactId>
                     <version>29.0-jre</version>
                     <scope>test</scope>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <dependencies>
+                  <dependency>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava</artifactId>
+                    <version>29.0-jre</version>
+                    <scope>test</scope>
+                  </dependency>
+                  <dependency>
+                    <groupId>junit</groupId>
+                    <artifactId>junit</artifactId>
+                    <version>4.13.2</version>
+                    <scope>test</scope>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepExclusionsOfLastDeclaration() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <dependencies>
+                  <dependency>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava</artifactId>
+                    <version>29.0-jre</version>
+                  </dependency>
+                  <dependency>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava</artifactId>
+                    <version>29.0-jre</version>
+                    <exclusions>
+                      <exclusion>
+                        <groupId>com.google.code.findbugs</groupId>
+                        <artifactId>jsr305</artifactId>
+                      </exclusion>
+                    </exclusions>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <dependencies>
+                  <dependency>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava</artifactId>
+                    <version>29.0-jre</version>
+                    <exclusions>
+                      <exclusion>
+                        <groupId>com.google.code.findbugs</groupId>
+                        <artifactId>jsr305</artifactId>
+                      </exclusion>
+                    </exclusions>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepFirstManagedDeclarationWhenVersionsDiffer() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <packaging>pom</packaging>
+
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>com.google.guava</groupId>
+                      <artifactId>guava</artifactId>
+                      <version>29.0-jre</version>
+                    </dependency>
+                    <dependency>
+                      <groupId>com.google.guava</groupId>
+                      <artifactId>guava</artifactId>
+                      <version>30.1-jre</version>
+                      <scope>test</scope>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <packaging>pom</packaging>
+
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>com.google.guava</groupId>
+                      <artifactId>guava</artifactId>
+                      <version>29.0-jre</version>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void mergeManagedDuplicatesFieldByField() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>junit</groupId>
+                      <artifactId>junit</artifactId>
+                      <version>4.13.1</version>
+                    </dependency>
+                    <dependency>
+                      <groupId>junit</groupId>
+                      <artifactId>junit</artifactId>
+                      <version>4.13.2</version>
+                      <scope>test</scope>
+                      <exclusions>
+                        <exclusion>
+                          <groupId>org.hamcrest</groupId>
+                          <artifactId>hamcrest-core</artifactId>
+                        </exclusion>
+                      </exclusions>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>junit</groupId>
+                      <artifactId>junit</artifactId>
+                      <version>4.13.1</version>
+                      <scope>test</scope>
+                      <exclusions>
+                        <exclusion>
+                          <groupId>org.hamcrest</groupId>
+                          <artifactId>hamcrest-core</artifactId>
+                        </exclusion>
+                      </exclusions>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void combineExclusionsOfManagedDuplicates() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>junit</groupId>
+                      <artifactId>junit</artifactId>
+                      <version>4.13.2</version>
+                      <exclusions>
+                        <exclusion>
+                          <groupId>org.foo</groupId>
+                          <artifactId>bar</artifactId>
+                        </exclusion>
+                      </exclusions>
+                    </dependency>
+                    <dependency>
+                      <groupId>junit</groupId>
+                      <artifactId>junit</artifactId>
+                      <version>4.13.2</version>
+                      <exclusions>
+                        <exclusion>
+                          <groupId>org.hamcrest</groupId>
+                          <artifactId>hamcrest-core</artifactId>
+                        </exclusion>
+                      </exclusions>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>junit</groupId>
+                      <artifactId>junit</artifactId>
+                      <version>4.13.2</version>
+                      <exclusions>
+                        <exclusion>
+                          <groupId>org.foo</groupId>
+                          <artifactId>bar</artifactId>
+                        </exclusion>
+                        <exclusion>
+                          <groupId>org.hamcrest</groupId>
+                          <artifactId>hamcrest-core</artifactId>
+                        </exclusion>
+                      </exclusions>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepLastManagedDeclarationWhenParentManagesDependencies() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>parent</artifactId>
+                <version>1</version>
+                <packaging>pom</packaging>
+
+                <modules>
+                  <module>my-app</module>
+                </modules>
+
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.hamcrest</groupId>
+                      <artifactId>hamcrest-core</artifactId>
+                      <version>1.3</version>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+              </project>
+              """
+          ),
+          mavenProject("my-app",
+            pomXml(
+              """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+
+                  <parent>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                  </parent>
+                  <artifactId>my-app</artifactId>
+
+                  <dependencyManagement>
+                    <dependencies>
+                      <dependency>
+                        <groupId>junit</groupId>
+                        <artifactId>junit</artifactId>
+                        <version>4.13.1</version>
+                      </dependency>
+                      <dependency>
+                        <groupId>junit</groupId>
+                        <artifactId>junit</artifactId>
+                        <version>4.13.2</version>
+                        <scope>test</scope>
+                      </dependency>
+                    </dependencies>
+                  </dependencyManagement>
+                </project>
+                """,
+              """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+
+                  <parent>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                  </parent>
+                  <artifactId>my-app</artifactId>
+
+                  <dependencyManagement>
+                    <dependencies>
+                      <dependency>
+                        <groupId>junit</groupId>
+                        <artifactId>junit</artifactId>
+                        <version>4.13.2</version>
+                        <scope>test</scope>
+                      </dependency>
+                    </dependencies>
+                  </dependencyManagement>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void keepLastManagedDeclarationWhenImportingBom() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>junit</groupId>
+                      <artifactId>junit</artifactId>
+                      <version>4.13.1</version>
+                    </dependency>
+                    <dependency>
+                      <groupId>junit</groupId>
+                      <artifactId>junit</artifactId>
+                      <version>4.13.2</version>
+                      <scope>test</scope>
+                    </dependency>
+                    <dependency>
+                      <groupId>org.junit</groupId>
+                      <artifactId>junit-bom</artifactId>
+                      <version>5.10.2</version>
+                      <type>pom</type>
+                      <scope>import</scope>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>junit</groupId>
+                      <artifactId>junit</artifactId>
+                      <version>4.13.2</version>
+                      <scope>test</scope>
+                    </dependency>
+                    <dependency>
+                      <groupId>org.junit</groupId>
+                      <artifactId>junit-bom</artifactId>
+                      <version>5.10.2</version>
+                      <type>pom</type>
+                      <scope>import</scope>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepLastManagedDeclarationWhenImportedBomManagesNothing() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>junit</groupId>
+                      <artifactId>junit</artifactId>
+                      <version>4.13.1</version>
+                    </dependency>
+                    <dependency>
+                      <groupId>junit</groupId>
+                      <artifactId>junit</artifactId>
+                      <version>4.13.2</version>
+                      <scope>test</scope>
+                    </dependency>
+                    <dependency>
+                      <groupId>org.sonatype.oss</groupId>
+                      <artifactId>oss-parent</artifactId>
+                      <version>7</version>
+                      <type>pom</type>
+                      <scope>import</scope>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>junit</groupId>
+                      <artifactId>junit</artifactId>
+                      <version>4.13.2</version>
+                      <scope>test</scope>
+                    </dependency>
+                    <dependency>
+                      <groupId>org.sonatype.oss</groupId>
+                      <artifactId>oss-parent</artifactId>
+                      <version>7</version>
+                      <type>pom</type>
+                      <scope>import</scope>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepFirstOfDuplicateBomImports() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.junit</groupId>
+                      <artifactId>junit-bom</artifactId>
+                      <version>5.10.2</version>
+                      <type>pom</type>
+                      <scope>import</scope>
+                    </dependency>
+                    <dependency>
+                      <groupId>org.junit</groupId>
+                      <artifactId>junit-bom</artifactId>
+                      <version>5.10.3</version>
+                      <type>pom</type>
+                      <scope>import</scope>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.junit</groupId>
+                      <artifactId>junit-bom</artifactId>
+                      <version>5.10.2</version>
+                      <type>pom</type>
+                      <scope>import</scope>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepLastOfDuplicateBomImportsWhenParentImportsTheSameBom() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>parent</artifactId>
+                <version>1</version>
+                <packaging>pom</packaging>
+
+                <modules>
+                  <module>my-app</module>
+                </modules>
+
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.junit</groupId>
+                      <artifactId>junit-bom</artifactId>
+                      <version>5.10.2</version>
+                      <type>pom</type>
+                      <scope>import</scope>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+              </project>
+              """
+          ),
+          mavenProject("my-app",
+            pomXml(
+              """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+
+                  <parent>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                  </parent>
+                  <artifactId>my-app</artifactId>
+
+                  <dependencyManagement>
+                    <dependencies>
+                      <dependency>
+                        <groupId>org.junit</groupId>
+                        <artifactId>junit-bom</artifactId>
+                        <version>5.10.2</version>
+                        <type>pom</type>
+                        <scope>import</scope>
+                      </dependency>
+                      <dependency>
+                        <groupId>org.junit</groupId>
+                        <artifactId>junit-bom</artifactId>
+                        <version>5.10.3</version>
+                        <type>pom</type>
+                        <scope>import</scope>
+                      </dependency>
+                    </dependencies>
+                  </dependencyManagement>
+                </project>
+                """,
+              """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+
+                  <parent>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                  </parent>
+                  <artifactId>my-app</artifactId>
+
+                  <dependencyManagement>
+                    <dependencies>
+                      <dependency>
+                        <groupId>org.junit</groupId>
+                        <artifactId>junit-bom</artifactId>
+                        <version>5.10.3</version>
+                        <type>pom</type>
+                        <scope>import</scope>
+                      </dependency>
+                    </dependencies>
+                  </dependencyManagement>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void removeManagedDuplicateWithDifferentVersionProperties() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <properties>
+                  <guava.version>29.0-jre</guava.version>
+                  <google.version>29.0-jre</google.version>
+                </properties>
+
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>com.google.guava</groupId>
+                      <artifactId>guava</artifactId>
+                      <version>${guava.version}</version>
+                    </dependency>
+                    <dependency>
+                      <groupId>com.google.guava</groupId>
+                      <artifactId>guava</artifactId>
+                      <version>${google.version}</version>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <properties>
+                  <guava.version>29.0-jre</guava.version>
+                  <google.version>29.0-jre</google.version>
+                </properties>
+
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>com.google.guava</groupId>
+                      <artifactId>guava</artifactId>
+                      <version>${guava.version}</version>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepDeclarationWhosePropertyResolvesToADuplicate() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <properties>
+                  <extra.artifact>guava</extra.artifact>
+                </properties>
+
+                <profiles>
+                  <profile>
+                    <id>collections</id>
+                    <properties>
+                      <extra.artifact>guava-testlib</extra.artifact>
+                    </properties>
+                  </profile>
+                </profiles>
+
+                <dependencies>
+                  <dependency>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>${extra.artifact}</artifactId>
+                    <version>29.0-jre</version>
+                  </dependency>
+                  <dependency>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava</artifactId>
+                    <version>29.0-jre</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeDuplicatesInProfile() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <profiles>
+                  <profile>
+                    <id>extra</id>
+                    <dependencies>
+                      <dependency>
+                        <groupId>com.google.guava</groupId>
+                        <artifactId>guava</artifactId>
+                        <version>29.0-jre</version>
+                      </dependency>
+                      <dependency>
+                        <groupId>com.google.guava</groupId>
+                        <artifactId>guava</artifactId>
+                        <version>30.1-jre</version>
+                      </dependency>
+                    </dependencies>
+                  </profile>
+                </profiles>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <profiles>
+                  <profile>
+                    <id>extra</id>
+                    <dependencies>
+                      <dependency>
+                        <groupId>com.google.guava</groupId>
+                        <artifactId>guava</artifactId>
+                        <version>30.1-jre</version>
+                      </dependency>
+                    </dependencies>
+                  </profile>
+                </profiles>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeManagedDuplicatesInProfile() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <profiles>
+                  <profile>
+                    <id>extra</id>
+                    <dependencyManagement>
+                      <dependencies>
+                        <dependency>
+                          <groupId>com.google.guava</groupId>
+                          <artifactId>guava</artifactId>
+                          <version>29.0-jre</version>
+                        </dependency>
+                        <dependency>
+                          <groupId>com.google.guava</groupId>
+                          <artifactId>guava</artifactId>
+                          <version>30.1-jre</version>
+                        </dependency>
+                      </dependencies>
+                    </dependencyManagement>
+                  </profile>
+                </profiles>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <profiles>
+                  <profile>
+                    <id>extra</id>
+                    <dependencyManagement>
+                      <dependencies>
+                        <dependency>
+                          <groupId>com.google.guava</groupId>
+                          <artifactId>guava</artifactId>
+                          <version>30.1-jre</version>
+                        </dependency>
+                      </dependencies>
+                    </dependencyManagement>
+                  </profile>
+                </profiles>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepDependencyRedeclaredInProfile() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <dependencies>
+                  <dependency>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava</artifactId>
+                    <version>29.0-jre</version>
+                  </dependency>
+                </dependencies>
+
+                <profiles>
+                  <profile>
+                    <id>extra</id>
+                    <dependencies>
+                      <dependency>
+                        <groupId>com.google.guava</groupId>
+                        <artifactId>guava</artifactId>
+                        <version>30.1-jre</version>
+                      </dependency>
+                    </dependencies>
+                  </profile>
+                </profiles>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepDuplicateDependenciesOfPlugin() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-dependency-plugin</artifactId>
+                      <version>3.8.1</version>
+                      <dependencies>
+                        <dependency>
+                          <groupId>com.google.guava</groupId>
+                          <artifactId>guava</artifactId>
+                          <version>29.0-jre</version>
+                        </dependency>
+                        <dependency>
+                          <groupId>com.google.guava</groupId>
+                          <artifactId>guava</artifactId>
+                          <version>30.1-jre</version>
+                        </dependency>
+                      </dependencies>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepDependencyWithEmptyClassifier() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <dependencies>
+                  <dependency>
+                    <groupId>junit</groupId>
+                    <artifactId>junit</artifactId>
+                    <version>4.13.2</version>
+                  </dependency>
+                  <dependency>
+                    <groupId>junit</groupId>
+                    <artifactId>junit</artifactId>
+                    <version>4.12</version>
+                    <classifier></classifier>
                   </dependency>
                 </dependencies>
               </project>

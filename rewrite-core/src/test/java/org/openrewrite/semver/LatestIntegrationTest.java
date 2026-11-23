@@ -21,7 +21,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-public class LatestIntegrationTest {
+class LatestIntegrationTest {
     private final LatestIntegration latestIntegration = new LatestIntegration(null);
 
     @Test

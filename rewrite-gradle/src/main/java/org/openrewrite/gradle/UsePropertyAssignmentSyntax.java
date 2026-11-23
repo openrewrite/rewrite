@@ -18,9 +18,12 @@ package org.openrewrite.gradle;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
-import org.openrewrite.groovy.GroovyTemplate;
 import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JLeftPadded;
+import org.openrewrite.java.tree.Space;
+import org.openrewrite.marker.Markers;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -58,9 +61,22 @@ public class UsePropertyAssignmentSyntax extends Recipe {
                     return method;
                 }
 
+                // Version catalog builders expose methods that look like property setters, e.g.
+                // `version("junit", "6.1.2")` and `library(...).version("1.0")`, but assigning to
+                // them is invalid DSL. Nothing inside the block is a Gradle project/task property.
+                if ("versionCatalogs".equals(method.getSimpleName())) {
+                    return method;
+                }
+
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
 
                 if (m.getArguments().size() != 1 || m.getArguments().get(0) instanceof J.Empty) {
+                    return m;
+                }
+
+                // Don't convert when the argument is a closure (e.g., version { strictly("1.0") })
+                // as that's a method call to configure a spec, not a simple property setter
+                if (m.getArguments().get(0) instanceof J.Lambda) {
                     return m;
                 }
 
@@ -68,14 +84,43 @@ public class UsePropertyAssignmentSyntax extends Recipe {
                     return m;
                 }
 
-                if (m.getSelect() != null) {
-                    return GroovyTemplate.apply("#{any()}." + propertyName + " = #{any()}",
-                            getCursor(), m.getCoordinates().replace(),
-                            m.getSelect(), m.getArguments().get(0));
+                if (m.getSelect() instanceof J.MethodInvocation) {
+                    return m;
                 }
-                return GroovyTemplate.apply(propertyName + " = #{any()}",
-                        getCursor(), m.getCoordinates().replace(),
-                        m.getArguments().get(0));
+
+                // The deprecated syntax relies on Groovy's property-setter fallback, so it never resolves to a
+                // declared method. A call that does, e.g. `matcher.group(1)`, is a regular method call.
+                if (m.getMethodType() != null) {
+                    return m;
+                }
+
+                // The transformation is purely structural (`name arg` -> `name = arg`, or
+                // `select.name arg` -> `select.name = arg`), so synthesize the assignment
+                // directly rather than going through a parser round-trip. This avoids the
+                // template-stub pipeline entirely, preserving the original argument LST (types,
+                // markers, formatting) and sidestepping classpath-sensitive parse failures.
+                Expression rhs = m.getArguments().get(0).withPrefix(Space.SINGLE_SPACE);
+
+                Expression lhs;
+                if (m.getSelect() != null) {
+                    lhs = new J.FieldAccess(
+                            Tree.randomId(),
+                            Space.EMPTY,
+                            Markers.EMPTY,
+                            m.getSelect(),
+                            new JLeftPadded<>(Space.EMPTY, m.getName().withPrefix(Space.EMPTY), Markers.EMPTY),
+                            m.getName().getType());
+                } else {
+                    lhs = m.getName().withPrefix(Space.EMPTY);
+                }
+
+                return new J.Assignment(
+                        Tree.randomId(),
+                        m.getPrefix(),
+                        m.getMarkers(),
+                        lhs,
+                        new JLeftPadded<>(Space.SINGLE_SPACE, rhs, Markers.EMPTY),
+                        rhs.getType());
             }
         });
     }

@@ -16,7 +16,11 @@
 package org.openrewrite.yaml;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.SourceFile;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.tree.ParseError;
 import org.openrewrite.yaml.tree.Yaml;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -529,6 +533,444 @@ class HelmTemplateParsingTest implements RewriteTest {
                 var docEnd = docs.getDocuments().getFirst().getEnd();
                 assertThat(docEnd.getPrefix()).contains("{{ end }}");
             })
+          )
+        );
+    }
+
+    @Test
+    void templateInsideSequenceEntryFoldedBlockScalar() {
+        // A folded block scalar that is the value of a sequence entry ("- >-") has no
+        // colon, so it was not recognized as a block scalar. Template lines inside it
+        // that reduce to a standalone placeholder were wrongly commented out.
+        rewriteRun(
+          yaml(
+            """
+              sboms:
+                - artifacts: binary
+                  documents:
+                    - >-
+                      {{ .ProjectName }}_
+                      {{- .Version }}_
+                      {{- if eq .Os "darwin" }}mac{{ else }}{{ .Os }}{{ end }}_
+                      {{- .Arch }}
+                      {{- with .Arm }}v{{ . }}{{ end }}.sbom
+                  cmd: syft
+              """
+          )
+        );
+    }
+
+    @Test
+    void templateWrappedInAsterisksInsideLiteralBlockScalar() {
+        // A "${{ ... }}" expression wrapped in markdown bold ("**...**") inside a
+        // literal block scalar is matched by both the Helm and the asterisk-placeholder
+        // patterns, nesting one UUID inside another. Restoration must resolve both.
+        rewriteRun(
+          yaml(
+            """
+              jobs:
+                summary:
+                  steps:
+                    - name: Summary
+                      run: |
+                        echo "Version: **${{ steps.inputs.outputs.version }}**" >> $GITHUB_STEP_SUMMARY
+                        echo "Commit: **${{ steps.inputs.outputs.commit_hash }}**" >> $GITHUB_STEP_SUMMARY
+                        echo "Status: ${{ steps.setup.outputs.behind_info }}" >> $GITHUB_STEP_SUMMARY
+              """
+          )
+        );
+    }
+
+    @Test
+    void hashDirectlyPrecedingTemplate() {
+        rewriteRun(
+          yaml(
+            """
+              #{{ template "chart.name" . }}
+              prompt: |
+                Answer the question: #{{ question }}
+              """
+          )
+        );
+    }
+
+    @Test
+    void multilineHelmCommentAtFileStart() {
+        rewriteRun(
+          yaml(
+            """
+              {{- /*
+              Blah text here
+              Another line here
+              */}}
+              apiVersion: v1
+              kind: Service
+              """
+          )
+        );
+    }
+
+    @Test
+    void multilineHelmCommentsInsideMapping() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue("$.metadata.name", "renamed", null)),
+          yaml(
+            """
+              metadata:
+                {{- /*
+                A comment with {{ braces }} and a key: value
+                */ -}}
+                name: original
+                {{/* a second
+                comment */}}
+                labels:
+                  app: test
+              """,
+            """
+              metadata:
+                {{- /*
+                A comment with {{ braces }} and a key: value
+                */ -}}
+                name: renamed
+                {{/* a second
+                comment */}}
+                labels:
+                  app: test
+              """
+          )
+        );
+    }
+
+    @Test
+    void multilineHelmAction() {
+        rewriteRun(
+          yaml(
+            """
+              spec:
+                {{- include "mychart.labels" (dict
+                  "context" .
+                  "extra" .Values.extra) | nindent 2 }}
+                replicas: 1
+              """
+          )
+        );
+    }
+
+    @Test
+    void multilineHelmActionWithBracesInStrings() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue("$.spec.replicas", "2", null)),
+          yaml(
+            """
+              spec:
+                {{- include "mychart.labels" (dict
+                  "open" "{"
+                  "close" "}}") | nindent 2 }}
+                replicas: 1
+              """,
+            """
+              spec:
+                {{- include "mychart.labels" (dict
+                  "open" "{"
+                  "close" "}}") | nindent 2 }}
+                replicas: 2
+              """
+          )
+        );
+    }
+
+    @Test
+    void multilineHelmActionSharingALineWithYaml() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue("$.metadata.namespace", "prod", null)),
+          yaml(
+            """
+              metadata:
+                name: {{ include "mychart.fullname"
+                         . }}-config
+                namespace: default
+              """,
+            """
+              metadata:
+                name: {{ include "mychart.fullname"
+                         . }}-config
+                namespace: prod
+              """
+          )
+        );
+    }
+
+    @Test
+    void multilineHelmActionWithRawString() {
+        rewriteRun(
+          yaml(
+            """
+              data:
+                {{- `first: line
+              }} second line` | nindent 2 }}
+                key: value
+              """
+          )
+        );
+    }
+
+    @Test
+    void multilineGitHubActionsExpression() {
+        rewriteRun(
+          yaml(
+            """
+              steps:
+                - uses: actions/setup-java@v4
+                  with:
+                    java-version: ${{ matrix.java-version }}
+                    url: ${{ format('{0}/{1}',
+                           matrix.base-url, inputs.path) }}
+              """
+          )
+        );
+    }
+
+    @Test
+    void strayOpeningDelimiterDoesNotHideYaml() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue("$.port", "8080", null)),
+          yaml(
+            """
+              note: see {{ the docs
+              name: web
+              port: 80
+              desc: done }}
+              """,
+            """
+              note: see {{ the docs
+              name: web
+              port: 8080
+              desc: done }}
+              """
+          )
+        );
+    }
+
+    @Test
+    void delimitersInsideLiteralsOnOneLine() {
+        rewriteRun(
+          yaml(
+            """
+              a: {{ "{" }}
+              b: {{ "}}" }}
+              c: {{ if eq .c '}' }}x{{ end }}
+              d: {{ "{{" }}
+              e: {{ `}}` }}
+              """,
+            spec -> spec.afterRecipe(docs -> {
+                var root = (Yaml.Mapping) docs.getDocuments().getFirst().getBlock();
+                assertThat(root.getEntries()).extracting(e -> ((Yaml.Scalar) e.getValue()).getValue())
+                  .containsExactly("{{ \"{\" }}", "{{ \"}}\" }}", "{{ if eq .c '}' }}x{{ end }}", "{{ \"{{\" }}", "{{ `}}` }}");
+            })
+          )
+        );
+    }
+
+    @Test
+    void tripleBracesStayAScalar() {
+        rewriteRun(
+          yaml(
+            """
+              k: {{{ raw }}}
+              """,
+            spec -> spec.afterRecipe(docs -> {
+                var root = (Yaml.Mapping) docs.getDocuments().getFirst().getBlock();
+                assertThat(((Yaml.Scalar) root.getEntries().getFirst().getValue()).getValue()).isEqualTo("{{{ raw }}}");
+            })
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "{{- /* a space before the delimiter */ }}",
+      "{{/* closed early */ more */}}",
+      "{{/* never closed }}"
+    })
+    void commentGoRejectsIsNotATemplate(String comment) {
+        // Helm fails to render these, so the file is not valid and does not parse
+        SourceFile sourceFile = YamlParser.builder().build().parse(comment + "\napiVersion: v1\n").findFirst().orElseThrow();
+        assertThat(sourceFile).isInstanceOf(ParseError.class);
+    }
+
+    @Test
+    void commentGoRejectsAfterAValueStaysInTheValue() {
+        rewriteRun(
+          yaml(
+            """
+              name: web {{/* the name */ }}
+              """,
+            spec -> spec.afterRecipe(docs -> {
+                var root = (Yaml.Mapping) docs.getDocuments().getFirst().getBlock();
+                assertThat(((Yaml.Scalar) root.getEntries().getFirst().getValue()).getValue())
+                  .isEqualTo("web {{/* the name */ }}");
+            })
+          )
+        );
+    }
+
+    @Test
+    void multilineHelmActionWithCrlf() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue("$.spec.replicas", "2", null)),
+          yaml(
+            "spec:\r\n  {{- include \"x\" (dict\r\n    \"a\" .) | nindent 2 }}\r\n  replicas: 1\r\n",
+            "spec:\r\n  {{- include \"x\" (dict\r\n    \"a\" .) | nindent 2 }}\r\n  replicas: 2\r\n"
+          )
+        );
+    }
+
+    @Test
+    void multilineHelmActionInBlockScalar() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue("$.next", "2", null)),
+          yaml(
+            """
+              script: |
+                {{- range $k, $v := .Values.env
+                }}
+                export {{ $k }}={{ $v }}
+                {{- end }}
+              next: 1
+              """,
+            """
+              script: |
+                {{- range $k, $v := .Values.env
+                }}
+                export {{ $k }}={{ $v }}
+                {{- end }}
+              next: 2
+              """
+          )
+        );
+    }
+
+    @Test
+    void azurePipelinesConditionalKeySpanningLines() {
+        rewriteRun(
+          yaml(
+            """
+              steps:
+              - ${{ if and(
+                  eq(parameters.a, true),
+                  ne(parameters.b, false)) }}:
+                - script: echo hi
+              """
+          )
+        );
+    }
+
+    @Test
+    void jinjaDictionaryOnOneLine() {
+        rewriteRun(
+          yaml(
+            """
+              k: {{ {'a': 1} | to_json }}
+              """
+          )
+        );
+    }
+
+    @Test
+    void mustacheTemplates() {
+        rewriteRun(
+          yaml(
+            """
+              {{! don't change }}
+              {{#items}}
+              - {{name}}
+              {{/items}}
+              """
+          )
+        );
+    }
+
+    @Test
+    void standaloneTemplateAfterBlockScalarInSequenceItem() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue("$.rules[0].record", "renamed", null)),
+          yaml(
+            """
+              rules:
+                - expr: |-
+                    sum(x)
+                  labels:
+                    quantile: '0.99'
+                  {{- with .Values.extraLabels }}
+                    {{- toYaml . | nindent 6 }}
+                  {{- end }}
+                  record: first
+              """,
+            """
+              rules:
+                - expr: |-
+                    sum(x)
+                  labels:
+                    quantile: '0.99'
+                  {{- with .Values.extraLabels }}
+                    {{- toYaml . | nindent 6 }}
+                  {{- end }}
+                  record: renamed
+              """
+          )
+        );
+    }
+
+    @Test
+    void standaloneTemplateInsideBlockScalarInSequenceItemStaysText() {
+        rewriteRun(
+          yaml(
+            """
+              - script: |
+                  {{- if .Values.debug }}
+                  set -x
+                  {{- end }}
+                next: 1
+              """,
+            spec -> spec.afterRecipe(docs -> {
+                var seq = (Yaml.Sequence) docs.getDocuments().getFirst().getBlock();
+                var item = (Yaml.Mapping) seq.getEntries().getFirst().getBlock();
+                assertThat(((Yaml.Scalar) item.getEntries().getFirst().getValue()).getValue())
+                  .contains("{{- if .Values.debug }}", "set -x", "{{- end }}");
+                assertThat(item.getEntries()).hasSize(2);
+            })
+          )
+        );
+    }
+
+    @Test
+    void lineOfOnlyTemplates() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue("$.spec.replicas", "2", null)),
+          yaml(
+            """
+              spec:
+                {{- if .Values.a }}{{- else if .Values.b }}
+                ports: []
+                {{- end }} {{- /* trailing */ -}}
+                replicas: 1
+              """,
+            """
+              spec:
+                {{- if .Values.a }}{{- else if .Values.b }}
+                ports: []
+                {{- end }} {{- /* trailing */ -}}
+                replicas: 2
+              """
+          )
+        );
+    }
+
+    @Test
+    void trailingWhitespaceAfterStandaloneTemplate() {
+        rewriteRun(
+          yaml(
+            "spec:\n  {{- if .Values.a }}  \n  replicas: 1\n  {{- end }}\t\n"
           )
         );
     }

@@ -22,14 +22,18 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.quark.Quark;
 
+import javax.annotation.CheckReturnValue;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 
 @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, property = "@c", include = JsonTypeInfo.As.PROPERTY)
-public interface Tree {
+public interface Tree extends Heavyweight {
 
     static UUID randomId() {
-        //noinspection ConstantConditions
-        return UUID.randomUUID();
+        ThreadLocalRandom r = ThreadLocalRandom.current();
+        long msb = (r.nextLong() & 0xffffffffffff0fffL) | 0x0000000000004000L; // version 4
+        long lsb = (r.nextLong() & 0x3fffffffffffffffL) | 0x8000000000000000L; // variant IETF
+        return new UUID(msb, lsb);
     }
 
     /**
@@ -41,8 +45,10 @@ public interface Tree {
 
     Markers getMarkers();
 
+    @CheckReturnValue
     <T extends Tree> T withMarkers(Markers markers);
 
+    @CheckReturnValue
     <T extends Tree> T withId(UUID id);
 
     /**

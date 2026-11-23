@@ -18,7 +18,9 @@ import {Recipe, ScanningRecipe} from "../../recipe";
 import {Cursor, rootCursor, SourceFile, Tree} from "../../tree";
 import {TreeVisitor} from "../../visitor";
 import {ExecutionContext} from "../../execution";
+import {DATA_TABLE_STORE, DataTableStore} from "../../data-table";
 import {withMetrics, extractSourcePath} from "./metrics";
+import {lookupVisitor} from "./visitor-registry";
 
 export interface VisitResponse {
     modified: boolean
@@ -42,7 +44,9 @@ export class Visit {
                   preparedRecipes: Map<String, Recipe>,
                   recipeCursors: WeakMap<Recipe, Cursor>,
                   getObject: (id: string, sourceFileType?: string) => any,
+                  captureRefCheckpoint: (treeId: string) => void,
                   getCursor: (cursorIds: string[] | undefined, sourceFileType?: string) => Promise<Cursor>,
+                  dataTableStore: () => DataTableStore | undefined,
                   metricsCsv?: string): void {
         connection.onRequest(
             new rpc.RequestType<Visit, VisitResponse, Error>("Visit"),
@@ -51,6 +55,11 @@ export class Visit {
                 metricsCsv,
                 (context) => async (request) => {
                     const p = await getObject(request.p, undefined);
+                    const store = dataTableStore();
+                    if (store && p instanceof ExecutionContext) {
+                        p.messages[DATA_TABLE_STORE] = store;
+                    }
+                    captureRefCheckpoint(request.treeId);
                     const before: Tree = await getObject(request.treeId, request.sourceFileType);
                     const cursor = await getCursor(request.cursor, request.sourceFileType);
                     context.target = extractSourcePath(before, cursor);
@@ -129,9 +138,12 @@ export class Visit {
             }
             return await recipe.editor();
         } else {
+            const ctor = lookupVisitor(visitorName) ?? (globalThis as any)[visitorName];
+            if (!ctor) {
+                throw new Error(`Unknown visitor: ${visitorName}`);
+            }
             return Reflect.construct(
-                // "as any" bypasses strict type checking
-                (globalThis as any)[visitorName],
+                ctor,
                 request.visitorOptions ? Array.from(request.visitorOptions.values()) : [])
         }
     }

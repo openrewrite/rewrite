@@ -17,6 +17,13 @@ package org.openrewrite.scala;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.SourceFile;
+import org.openrewrite.Tree;
+import org.openrewrite.java.marker.OmitParentheses;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JContainer;
+import org.openrewrite.java.tree.Statement;
+import org.openrewrite.scala.marker.OmitBraces;
+import org.openrewrite.scala.marker.ProcedureSyntax;
 import org.openrewrite.scala.tree.S;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.tree.ParseError;
@@ -60,6 +67,127 @@ class Scala2CompatTest implements RewriteTest {
                 object Test {
                   def greet(name: String) {
                     println(name)
+                  }
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void procedureSyntaxWithoutParameterList() {
+        rewriteRun(
+            scala(
+                """
+                object T {
+                  def d { println("z") }
+                }
+                """,
+                spec -> spec.afterRecipe(cu -> {
+                    J.ClassDeclaration t = (J.ClassDeclaration) cu.getStatements().get(0);
+                    J.MethodDeclaration d = (J.MethodDeclaration) t.getBody().getStatements().get(0);
+                    assertThat(d.getMarkers().findFirst(ProcedureSyntax.class)).isPresent();
+                    assertThat(d.getPadding().getParameters().getMarkers().findFirst(OmitParentheses.class)).isPresent();
+                    assertThat(d.getParameters()).isEmpty();
+                    assertThat(d.getBody()).isNotNull();
+                    assertThat(d.getBody().getStatements()).singleElement().isInstanceOf(J.Return.class);
+                })
+            )
+        );
+    }
+
+    @Test
+    void emptyParameterListAfterComment() {
+        rewriteRun(
+            scala(
+                """
+                object T {
+                  def d /* c */ () = 1
+                }
+                """,
+                spec -> spec.afterRecipe(cu -> {
+                    J.ClassDeclaration t = (J.ClassDeclaration) cu.getStatements().get(0);
+                    J.MethodDeclaration d = (J.MethodDeclaration) t.getBody().getStatements().get(0);
+                    assertThat(d.getPadding().getParameters().getMarkers().findFirst(OmitParentheses.class)).isEmpty();
+                })
+            )
+        );
+    }
+
+    @Test
+    void procedureSyntaxDeclarationWithoutParameterList() {
+        rewriteRun(
+            scala(
+                """
+                trait T {
+                  def h
+                  def g: Int
+                }
+                """,
+                spec -> spec.afterRecipe(cu -> {
+                    J.ClassDeclaration t = (J.ClassDeclaration) cu.getStatements().get(0);
+                    J.MethodDeclaration h = (J.MethodDeclaration) t.getBody().getStatements().get(0);
+                    assertThat(h.getMarkers().findFirst(ProcedureSyntax.class)).isPresent();
+                    assertThat(h.getPadding().getParameters().getMarkers().findFirst(OmitParentheses.class)).isPresent();
+                    assertThat(h.getReturnTypeExpression()).isNull();
+                    assertThat(h.getBody()).isNull();
+
+                    J.MethodDeclaration g = (J.MethodDeclaration) t.getBody().getStatements().get(1);
+                    assertThat(g.getMarkers().findFirst(ProcedureSyntax.class)).isEmpty();
+                })
+            )
+        );
+    }
+
+    @Test
+    void printsProcedureSyntaxMarkedByEarlierParserVersions() {
+        String source = """
+          object T {
+            def d { println("z") }
+          }
+          """;
+        SourceFile cu = ScalaParser.builder().build().parse(source).findFirst().orElseThrow();
+        SourceFile withOldMarkers = (SourceFile) new ScalaIsoVisitor<Integer>() {
+            @Override
+            public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, Integer p) {
+                J.MethodDeclaration m = super.visitMethodDeclaration(method, p);
+                m = m.withMarkers(m.getMarkers().removeByType(ProcedureSyntax.class).add(new OmitBraces(Tree.randomId())));
+                JContainer<Statement> params = m.getPadding().getParameters();
+                return m.getPadding().withParameters(params.withMarkers(
+                  params.getMarkers().removeByType(OmitParentheses.class).add(new OmitBraces(Tree.randomId()))));
+            }
+        }.visitNonNull(cu, 0);
+        assertThat(withOldMarkers.printAll()).isEqualTo(source);
+    }
+
+    @Test
+    void procedureSyntaxWithDefaultParam() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def greet(name: String = "world") {
+                    println(name)
+                  }
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void statementAfterProcedureSyntaxMethod() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def outer(): Unit = {
+                    def inner() {
+                      println(1)
+                    }
+
+                    // call it
+                    inner()
                   }
                 }
                 """
@@ -888,6 +1016,145 @@ class Scala2CompatTest implements RewriteTest {
     }
 
     @Test
+    void parameterizedAnonymousGiven() {
+        rewriteRun(
+            scala(
+                """
+                trait Ord[T]
+                object Test {
+                  given [T](using Ord[T]): Ord[List[T]] = new Ord[List[T]] {}
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void classConstructorWithUsingClause() {
+        rewriteRun(
+            scala(
+                """
+                trait Executor
+                class C(val coll: String, helper: Int)(using Executor):
+                  def foo = 1
+                """
+            )
+        );
+    }
+
+    @Test
+    void anonymousGivenWithModifier() {
+        rewriteRun(
+            scala(
+                """
+                trait BSONHandler[T]
+                object Test {
+                  private given BSONHandler[Int] = new BSONHandler[Int] {}
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void namedGivenWithBodyAndScopedModifier() {
+        rewriteRun(
+            scala(
+                """
+                trait BSONHandler[T]
+                object Test {
+                  private[Test] given intHandler: BSONHandler[Int] with {
+                    def write(i: Int) = ???
+                  }
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void givenImportBare() {
+        rewriteRun(
+            scala(
+                """
+                trait Foo
+                object Givens {
+                  given Foo = new Foo {}
+                }
+                object Use {
+                  import Givens.given
+                  val x: Foo = summon[Foo]
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void givenImportSelector() {
+        rewriteRun(
+            scala(
+                """
+                trait Foo
+                object Givens {
+                  given Foo = new Foo {}
+                }
+                object Use {
+                  import Givens.{given Foo}
+                  val x: Foo = summon[Foo]
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void givenMethodShapeNoValueParams() {
+        rewriteRun(
+            scala(
+                """
+                trait BSONHandler[T]
+                object Test {
+                  given mapHandler[V: BSONHandler]: BSONHandler[V] = new BSONHandler[V] {}
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void givenAnonymousTypeParamsOnly() {
+        rewriteRun(
+            scala(
+                """
+                trait BSONHandler[T]
+                object Test {
+                  given [T: BSONHandler]: BSONHandler[List[T]] = new BSONHandler[List[T]] {}
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void givenAliasMethodShape() {
+        rewriteRun(
+            scala(
+                """
+                trait Ord[T] {
+                  def compare(a: T, b: T): Int
+                }
+                object Test {
+                  given listOrd[T](using ord: Ord[T]): Ord[List[T]] = new Ord[List[T]] {
+                    def compare(a: List[T], b: List[T]): Int = 0
+                  }
+                }
+                """
+            )
+        );
+    }
+
+    @Test
     void specializedAnnotationOnTypeParam() {
         rewriteRun(
             scala(
@@ -1135,5 +1402,179 @@ class Scala2CompatTest implements RewriteTest {
                 System.out.println("FILE: " + name + " OK");
             }
         }
+    }
+
+    @Test
+    void minimalLambdaTupleTypeAscription() {
+        rewriteRun(
+            scala(
+                """
+                val f = (t: (Int, String)) => t
+                """
+            )
+        );
+    }
+
+    @Test
+    void valTupleAndFunctionTypeAscription() {
+        rewriteRun(
+            scala(
+                """
+                val x: (Int, String) = (1, "a")
+                val f: Int => String = _.toString
+                """
+            )
+        );
+    }
+
+    @Test
+    void expressionTupleTypeAscription() {
+        rewriteRun(
+            scala(
+                """
+                val y = (1, "a"): (Int, String)
+                """
+            )
+        );
+    }
+
+    @Test
+    void contextFunctionTypeAscription() {
+        rewriteRun(
+            scala(
+                """
+                val f: Int ?=> String = _.toString
+                """
+            )
+        );
+    }
+
+    @Test
+    void preservesWhitespaceBeforeFirstElementInDelimitedList() {
+        rewriteRun(
+            scala(
+                """
+                class Foo[
+                  A,
+                  B
+                ](
+                  a: A,
+                  b: B
+                )
+
+                object Test {
+                  val x: Map[
+                    String,
+                    Int
+                  ] = ???
+
+                  val xs = List.empty[
+                    String
+                  ]
+
+                  def f[A, B](a: A, b: B) = (a, b)
+
+                  val y = f[
+                    Int,
+                    String
+                  ](
+                    1,
+                    "x"
+                  )
+
+                  val t = (
+                    1,
+                    2,
+                    3
+                  )
+
+                  val g = (
+                    a: Int,
+                    b: Int
+                  ) => a + b
+
+                  def make() =
+                    new Foo(
+                      a,
+                      b
+                    ) {
+                      override def x() = 1
+                    }
+
+                  def matchIt(z: Any) = z match {
+                    case Foo(
+                      a,
+                      b
+                    ) => a
+                  }
+
+                  def cast(w: Any) = w.isInstanceOf[
+                    String]
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void trailingPostfixAfterInfixChain() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def foo(xs: List[Int]) =
+                    xs filter (_ > 0) sortBy (_.toString) list
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void forComprehensionWithBlockBody() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  for {
+                    _ <- Some(1)
+                    field <- Some(2)
+                  } {
+                    println(field)
+                  }
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void enumAsIdentifier() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def qualifyEnum(enum: Enum[_]): String =
+                    enum.getClass.getCanonicalName + "." + enum.name()
+
+                  def compareEnum(term: String, enum: Enum[_]): Boolean = term == qualifyEnum(enum)
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void givenAsIdentifier() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  val given = 42
+                  def use(given: Int): Int = given + 1
+                }
+                """
+            )
+        );
     }
 }

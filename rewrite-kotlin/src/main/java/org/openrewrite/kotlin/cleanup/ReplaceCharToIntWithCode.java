@@ -18,9 +18,11 @@ package org.openrewrite.kotlin.cleanup;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.kotlin.KotlinTemplate;
 import org.openrewrite.kotlin.KotlinVisitor;
@@ -39,7 +41,7 @@ public class ReplaceCharToIntWithCode extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new KotlinVisitor<ExecutionContext>() {
+        return Preconditions.check(new UsesMethod<>(CHAR_TO_INT_METHOD_MATCHER), new KotlinVisitor<ExecutionContext>() {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 if (CHAR_TO_INT_METHOD_MATCHER.matches(method) && method.getSelect() != null) {
@@ -52,7 +54,7 @@ public class ReplaceCharToIntWithCode extends Recipe {
                 }
                 return super.visitMethodInvocation(method, ctx);
             }
-        };
+        });
     }
 
 }

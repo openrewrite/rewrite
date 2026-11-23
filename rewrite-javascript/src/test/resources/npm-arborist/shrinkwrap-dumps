@@ -1,0 +1,367 @@
+{
+ "construct": {
+  "flags": {
+   "/srv/user/projects/root": "00000",
+   "/srv/user/projects/root/node_modules/peer": "00010",
+   "/srv/user/projects/root/node_modules/peer/node_modules/peerdep": "00010",
+   "/srv/user/projects/root/node_modules/e": "10000",
+   "/srv/user/projects/root/node_modules/tgz": "10000",
+   "/srv/user/projects/root/node_modules/tgz-pkg-resolved": "10000",
+   "/srv/user/projects/root/target": "00000",
+   "/srv/user/projects/root/node_modules/link": "00000",
+   "/srv/user/projects/root/realPkg": "00000",
+   "/srv/user/projects/root/node_modules/link3": "00000",
+   "/srv/user/projects/root/node_modules/a": "00000",
+   "/srv/user/projects/root/node_modules/optin": "01000",
+   "/srv/user/projects/root/node_modules/devit": "10000",
+   "/srv/user/projects/root/node_modules/devo": "00100",
+   "/srv/user/projects/root/node_modules/d": "10000",
+   "/srv/user/projects/root/node_modules/d/node_modules/bundled": "10000",
+   "/srv/user/projects/root/node_modules/d/node_modules/git-dep": "10000",
+   "/srv/user/projects/root/node_modules/nopkg": "11111"
+  },
+  "gets": [
+   [
+    "root metadata, no package version",
+    "",
+    "{\"dependencies\":{\"a\":\"\",\"link\":\"\",\"link2\":\"\",\"link3\":\"\"},\"devDependencies\":{\"d\":\"\",\"devit\":\"\",\"e\":\"https://foo.com/e.tgz\"},\"hasInstallScript\":true,\"name\":\"root\",\"optionalDependencies\":{\"optin\":\"\"},\"peerDependencies\":{\"peer\":\"\"}}"
+   ],
+   [
+    "root metadata, with package version",
+    "",
+    "{\"dependencies\":{\"a\":\"\",\"link\":\"\",\"link2\":\"\",\"link3\":\"\"},\"devDependencies\":{\"d\":\"\",\"devit\":\"\",\"e\":\"https://foo.com/e.tgz\"},\"hasInstallScript\":true,\"name\":\"root\",\"optionalDependencies\":{\"optin\":\"\"},\"peerDependencies\":{\"peer\":\"\"},\"version\":\"1.2.3\"}"
+   ],
+   [
+    "meta for optional dep",
+    "node_modules/optin",
+    "{\"dependencies\":{\"devo\":\"\"},\"optional\":true,\"version\":\"1.2.3\"}"
+   ],
+   [
+    "meta for dev dep",
+    "node_modules/devit",
+    "{\"dependencies\":{\"devo\":\"\"},\"dev\":true,\"version\":\"1.2.3\"}"
+   ],
+   [
+    "meta for devOptional dep",
+    "node_modules/devo",
+    "{\"devOptional\":true,\"version\":\"1.2.3\"}"
+   ],
+   [
+    "metadata for tarball file pkg",
+    "node_modules/tgz",
+    "{\"cpu\":[\"x64\"],\"dev\":true,\"engines\":{\"node\":\">=10\"},\"funding\":{\"url\":\"https://example.com/\"},\"libc\":[\"glibc\"],\"os\":[\"any\",\"!win32\"],\"resolved\":\"file:archives/tarball.tgz\",\"version\":\"1.2.3\"}"
+   ],
+   [
+    "metadata for tarball file pkg with _resolved value",
+    "node_modules/tgz-pkg-resolved",
+    "{\"dev\":true,\"funding\":{\"url\":\"https://example.com/\"},\"integrity\":\"sha512-tarball/package/resolved/integrity\",\"resolved\":\"file:archives/tarball-pkg-resolved.tgz\",\"version\":\"1.2.3\"}"
+   ],
+   [
+    "link metadata",
+    "/srv/user/projects/root/node_modules/link",
+    "{\"link\":true,\"resolved\":\"target\"}"
+   ],
+   [
+    "link target metadata",
+    "/srv/user/projects/root/target",
+    "{\"funding\":{\"url\":\"https://example.com/payme\"},\"name\":\"link\",\"resolved\":\"git+ssh://git@github.com/isaacs/foobarbaz.git#aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"version\":\"1.2.3\"}"
+   ],
+   [
+    "link metadata with same pkg name as link target",
+    "/srv/user/projects/root/node_modules/link3",
+    "{\"link\":true,\"resolved\":\"realPkg\"}"
+   ],
+   [
+    "link target metadata with same pkg name as link target",
+    "/srv/user/projects/root/realPkg",
+    "{\"funding\":{\"url\":\"https://example.com/payme\"},\"name\":\"link3\",\"resolved\":\"git+ssh://git@github.com/isaacs/foobarbaz.git#aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"version\":\"1.2.3\"}"
+   ],
+   [
+    "dep a metadata",
+    "node_modules/a",
+    "{\"integrity\":\"sha512-helloyesthisisdog\",\"resolved\":\"https://example.com/a.tgz\",\"version\":\"1.2.3\"}"
+   ],
+   [
+    "dep d metadata",
+    "node_modules/d",
+    "{\"bundleDependencies\":[\"bundled\"],\"dependencies\":{\"bundled\":\"npm:not-bundled-tho@*\",\"e\":\"1.2.3\",\"git-dep\":\"github:foo/bar\"},\"dev\":true,\"version\":\"1.2.3\"}"
+   ],
+   [
+    "dep e metadata",
+    "node_modules/e",
+    "{\"dependencies\":{\"tgz\":\"\",\"tgz-pkg-resolved\":\"\"},\"dev\":true,\"license\":\"blurb\",\"resolved\":\"https://foo.com/e.tgz\",\"version\":\"1.2.3\"}"
+   ],
+   [
+    "bundled pkg metadata",
+    "node_modules/d/node_modules/bundled",
+    "{\"dev\":true,\"inBundle\":true,\"name\":\"not-bundled-tho\",\"version\":\"1.2.3\"}"
+   ],
+   [
+    "git dep metadata",
+    "node_modules/d/node_modules/git-dep",
+    "{\"dev\":true,\"resolved\":\"git+ssh://git@github.com/foo/bar.git#0000000000000000000000000000000000000000\",\"version\":\"1.2.3\"}"
+   ],
+   [
+    "node without a package",
+    "node_modules/nopkg",
+    "{\"extraneous\":true}"
+   ],
+   [
+    "a peer dep",
+    "node_modules/peer",
+    "{\"dependencies\":{\"peerdep\":\"\"},\"integrity\":\"sha512-peerpeerpeer\",\"peer\":true,\"resolved\":\"https://peer.com/peer.tgz\",\"version\":\"1.2.3\"}"
+   ],
+   [
+    "a peer meta-dep",
+    "node_modules/peer/node_modules/peerdep",
+    "{\"integrity\":\"sha512-peerdeppeerdep\",\"peer\":true,\"resolved\":\"https://peer.com/peerdep.tgz\",\"version\":\"1.2.3\"}"
+   ]
+  ]
+ },
+ "yarn": [
+  {
+   "name": "a yarn.lock entry with version mismatch",
+   "yarn": "\n# THIS IS AN AUTOGENERATED FILE. DO NOT EDIT THIS FILE DIRECTLY.\n# yarn lockfile v1\n\nmkdirp@^1.0.2:\n  version \"1.0.2\"\n  resolved \"https://registry.yarnpkg.com/mkdirp/-/mkdirp-1.0.2.tgz#5ccd93437619ca7050b538573fc918327eba98fb\"\n  integrity sha512-N2REVrJ/X/jGPfit2d7zea2J1pf7EAR5chIUcfHffAZ7gmlam5U65sAm76+o4ntQbSRdTjYf7qZz3chuHlwXEA==\n",
+   "spec": "^1.0.2",
+   "pkg": {
+    "name": "mkdirp",
+    "version": "1.0.4",
+    "_resolved": "https://registry.npmjs.org/mkdirp/-/mkdirp-1.0.4.tgz"
+   },
+   "link": false,
+   "nodes": [
+    [
+     "",
+     null,
+     null
+    ],
+    [
+     "node_modules/mkdirp",
+     "https://registry.npmjs.org/mkdirp/-/mkdirp-1.0.4.tgz",
+     null
+    ]
+   ],
+   "gets": [
+    [
+     "",
+     "{\"dependencies\":{\"mkdirp\":\"^1.0.2\"},\"extraneous\":true,\"name\":\"root\",\"version\":\"1.0.0\"}"
+    ],
+    [
+     "node_modules/mkdirp",
+     "{\"extraneous\":true,\"resolved\":\"https://registry.npmjs.org/mkdirp/-/mkdirp-1.0.4.tgz\",\"version\":\"1.0.4\"}"
+    ]
+   ],
+   "rewritten": "# THIS IS AN AUTOGENERATED FILE. DO NOT EDIT THIS FILE DIRECTLY.\n# yarn lockfile v1\n\n\nmkdirp@^1.0.2:\n  version \"1.0.4\"\n  resolved \"https://registry.npmjs.org/mkdirp/-/mkdirp-1.0.4.tgz\"\n"
+  },
+  {
+   "name": "a yarn.lock entry with integrity mismatch",
+   "yarn": "\n# THIS IS AN AUTOGENERATED FILE. DO NOT EDIT THIS FILE DIRECTLY.\n# yarn lockfile v1\n\nmkdirp@^1.0.2:\n  version \"1.0.2\"\n  resolved \"https://registry.yarnpkg.com/mkdirp/-/mkdirp-1.0.2.tgz#5ccd93437619ca7050b538573fc918327eba98fb\"\n  integrity \"sha512-N2REVrJ/X/jGPfit2d7zea2J1pf7EAR5chIUcfHffAZ7gmlam5U65sAm76+o4ntQbSRdTjYf7qZz3chuHlwXEA==\"\n",
+   "spec": "^1.0.2",
+   "pkg": {
+    "name": "mkdirp",
+    "version": "1.0.2",
+    "_resolved": "https://registry.npmjs.org/mkdirp/-/mkdirp-1.0.2.tgz",
+    "_integrity": "um, nope, not even close buddy"
+   },
+   "link": false,
+   "nodes": [
+    [
+     "",
+     null,
+     null
+    ],
+    [
+     "node_modules/mkdirp",
+     "https://registry.npmjs.org/mkdirp/-/mkdirp-1.0.2.tgz",
+     "um, nope, not even close buddy"
+    ]
+   ],
+   "gets": [
+    [
+     "",
+     "{\"dependencies\":{\"mkdirp\":\"^1.0.2\"},\"extraneous\":true,\"name\":\"root\",\"version\":\"1.0.0\"}"
+    ],
+    [
+     "node_modules/mkdirp",
+     "{\"extraneous\":true,\"integrity\":\"um, nope, not even close buddy\",\"resolved\":\"https://registry.npmjs.org/mkdirp/-/mkdirp-1.0.2.tgz\",\"version\":\"1.0.2\"}"
+    ]
+   ],
+   "rewritten": "# THIS IS AN AUTOGENERATED FILE. DO NOT EDIT THIS FILE DIRECTLY.\n# yarn lockfile v1\n\n\nmkdirp@^1.0.2:\n  version \"1.0.2\"\n  resolved \"https://registry.npmjs.org/mkdirp/-/mkdirp-1.0.2.tgz\"\n  integrity um, nope, not even close buddy\n"
+  },
+  {
+   "name": "a yarn.lock entry with no resolved",
+   "yarn": "\n# THIS IS AN AUTOGENERATED FILE. DO NOT EDIT THIS FILE DIRECTLY.\n# yarn lockfile v1\n\nmkdirp@^1.0.2:\n  version \"1.0.2\"\n  integrity \"sha512-N2REVrJ/X/jGPfit2d7zea2J1pf7EAR5chIUcfHffAZ7gmlam5U65sAm76+o4ntQbSRdTjYf7qZz3chuHlwXEA==\"\n",
+   "spec": "^1.0.2",
+   "pkg": {
+    "name": "mkdirp",
+    "version": "1.0.2"
+   },
+   "link": false,
+   "nodes": [
+    [
+     "",
+     null,
+     null
+    ],
+    [
+     "node_modules/mkdirp",
+     null,
+     "sha512-N2REVrJ/X/jGPfit2d7zea2J1pf7EAR5chIUcfHffAZ7gmlam5U65sAm76+o4ntQbSRdTjYf7qZz3chuHlwXEA=="
+    ]
+   ],
+   "gets": [
+    [
+     "",
+     "{\"dependencies\":{\"mkdirp\":\"^1.0.2\"},\"extraneous\":true,\"name\":\"root\",\"version\":\"1.0.0\"}"
+    ],
+    [
+     "node_modules/mkdirp",
+     "{\"extraneous\":true,\"integrity\":\"sha512-N2REVrJ/X/jGPfit2d7zea2J1pf7EAR5chIUcfHffAZ7gmlam5U65sAm76+o4ntQbSRdTjYf7qZz3chuHlwXEA==\",\"version\":\"1.0.2\"}"
+    ]
+   ],
+   "rewritten": "# THIS IS AN AUTOGENERATED FILE. DO NOT EDIT THIS FILE DIRECTLY.\n# yarn lockfile v1\n\n\nmkdirp@^1.0.2:\n  version \"1.0.2\"\n  integrity sha512-N2REVrJ/X/jGPfit2d7zea2J1pf7EAR5chIUcfHffAZ7gmlam5U65sAm76+o4ntQbSRdTjYf7qZz3chuHlwXEA==\n"
+  },
+  {
+   "name": "a yarn.lock entry with file: resolved",
+   "yarn": "\n# THIS IS AN AUTOGENERATED FILE. DO NOT EDIT THIS FILE DIRECTLY.\n# yarn lockfile v1\n\nmkdirp@file:mkdirp:\n  version \"1.0.2\"\n  integrity \"sha512-N2REVrJ/X/jGPfit2d7zea2J1pf7EAR5chIUcfHffAZ7gmlam5U65sAm76+o4ntQbSRdTjYf7qZz3chuHlwXEA==\"\n",
+   "spec": "file:mkdirp",
+   "pkg": {
+    "name": "mkdirp",
+    "version": "1.0.2"
+   },
+   "link": true,
+   "nodes": [
+    [
+     "",
+     null,
+     null
+    ],
+    [
+     "mkdirp",
+     null,
+     null
+    ],
+    [
+     "node_modules/mkdirp",
+     "file:../mkdirp",
+     "sha512-N2REVrJ/X/jGPfit2d7zea2J1pf7EAR5chIUcfHffAZ7gmlam5U65sAm76+o4ntQbSRdTjYf7qZz3chuHlwXEA=="
+    ]
+   ],
+   "gets": [
+    [
+     "",
+     "{\"dependencies\":{\"mkdirp\":\"file:mkdirp\"},\"extraneous\":true,\"name\":\"root\",\"version\":\"1.0.0\"}"
+    ],
+    [
+     "mkdirp",
+     "{\"extraneous\":true,\"version\":\"1.0.2\"}"
+    ],
+    [
+     "node_modules/mkdirp",
+     "{\"link\":true,\"resolved\":\"mkdirp\"}"
+    ]
+   ],
+   "rewritten": "# THIS IS AN AUTOGENERATED FILE. DO NOT EDIT THIS FILE DIRECTLY.\n# yarn lockfile v1\n\n\n\"mkdirp@file:mkdirp\":\n  version \"1.0.2\"\n  resolved \"file:mkdirp\"\n  integrity sha512-N2REVrJ/X/jGPfit2d7zea2J1pf7EAR5chIUcfHffAZ7gmlam5U65sAm76+o4ntQbSRdTjYf7qZz3chuHlwXEA==\n"
+  },
+  {
+   "name": "a yarn.lock entry with no integrity",
+   "yarn": "\n# THIS IS AN AUTOGENERATED FILE. DO NOT EDIT THIS FILE DIRECTLY.\n# yarn lockfile v1\n\nmkdirp@^1.0.2:\n  version \"1.0.2\"\n  resolved \"https://registry.yarnpkg.com/mkdirp/-/mkdirp-1.0.2.tgz#5ccd93437619ca7050b538573fc918327eba98fb\"\n",
+   "spec": "^1.0.2",
+   "pkg": {
+    "name": "mkdirp",
+    "version": "1.0.2"
+   },
+   "link": false,
+   "nodes": [
+    [
+     "",
+     null,
+     null
+    ],
+    [
+     "node_modules/mkdirp",
+     "https://registry.npmjs.org/mkdirp/-/mkdirp-1.0.2.tgz",
+     null
+    ]
+   ],
+   "gets": [
+    [
+     "",
+     "{\"dependencies\":{\"mkdirp\":\"^1.0.2\"},\"extraneous\":true,\"name\":\"root\",\"version\":\"1.0.0\"}"
+    ],
+    [
+     "node_modules/mkdirp",
+     "{\"extraneous\":true,\"resolved\":\"https://registry.npmjs.org/mkdirp/-/mkdirp-1.0.2.tgz\",\"version\":\"1.0.2\"}"
+    ]
+   ],
+   "rewritten": "# THIS IS AN AUTOGENERATED FILE. DO NOT EDIT THIS FILE DIRECTLY.\n# yarn lockfile v1\n\n\nmkdirp@^1.0.2:\n  version \"1.0.2\"\n  resolved \"https://registry.npmjs.org/mkdirp/-/mkdirp-1.0.2.tgz\"\n"
+  },
+  {
+   "name": "a yarn.lock with no entries",
+   "yarn": "\n# THIS IS AN AUTOGENERATED FILE. DO NOT EDIT THIS FILE DIRECTLY.\n# yarn lockfile v1\n",
+   "spec": "^1.0.2",
+   "pkg": {
+    "name": "mkdirp",
+    "version": "1.0.4",
+    "_resolved": "https://registry.npmjs.org/mkdirp/-/mkdirp-1.0.4.tgz"
+   },
+   "link": false,
+   "nodes": [
+    [
+     "",
+     null,
+     null
+    ],
+    [
+     "node_modules/mkdirp",
+     "https://registry.npmjs.org/mkdirp/-/mkdirp-1.0.4.tgz",
+     null
+    ]
+   ],
+   "gets": [
+    [
+     "",
+     "{\"dependencies\":{\"mkdirp\":\"^1.0.2\"},\"extraneous\":true,\"name\":\"root\",\"version\":\"1.0.0\"}"
+    ],
+    [
+     "node_modules/mkdirp",
+     "{\"extraneous\":true,\"resolved\":\"https://registry.npmjs.org/mkdirp/-/mkdirp-1.0.4.tgz\",\"version\":\"1.0.4\"}"
+    ]
+   ],
+   "rewritten": "# THIS IS AN AUTOGENERATED FILE. DO NOT EDIT THIS FILE DIRECTLY.\n# yarn lockfile v1\n\n\nmkdirp@^1.0.2:\n  version \"1.0.4\"\n  resolved \"https://registry.npmjs.org/mkdirp/-/mkdirp-1.0.4.tgz\"\n"
+  },
+  {
+   "name": "a yarn.lock entry that matches",
+   "yarn": "\n# THIS IS AN AUTOGENERATED FILE. DO NOT EDIT THIS FILE DIRECTLY.\n# yarn lockfile v1\n\nmkdirp@^1.0.2:\n  version \"1.0.2\"\n  resolved \"https://registry.yarnpkg.com/mkdirp/-/mkdirp-1.0.2.tgz#5ccd93437619ca7050b538573fc918327eba98fb\"\n  integrity sha512-N2REVrJ/X/jGPfit2d7zea2J1pf7EAR5chIUcfHffAZ7gmlam5U65sAm76+o4ntQbSRdTjYf7qZz3chuHlwXEA==\n",
+   "spec": "^1.0.2",
+   "pkg": {
+    "name": "mkdirp",
+    "version": "1.0.2"
+   },
+   "link": false,
+   "nodes": [
+    [
+     "",
+     null,
+     null
+    ],
+    [
+     "node_modules/mkdirp",
+     "https://registry.npmjs.org/mkdirp/-/mkdirp-1.0.2.tgz",
+     "sha512-N2REVrJ/X/jGPfit2d7zea2J1pf7EAR5chIUcfHffAZ7gmlam5U65sAm76+o4ntQbSRdTjYf7qZz3chuHlwXEA=="
+    ]
+   ],
+   "gets": [
+    [
+     "",
+     "{\"dependencies\":{\"mkdirp\":\"^1.0.2\"},\"extraneous\":true,\"name\":\"root\",\"version\":\"1.0.0\"}"
+    ],
+    [
+     "node_modules/mkdirp",
+     "{\"extraneous\":true,\"integrity\":\"sha512-N2REVrJ/X/jGPfit2d7zea2J1pf7EAR5chIUcfHffAZ7gmlam5U65sAm76+o4ntQbSRdTjYf7qZz3chuHlwXEA==\",\"resolved\":\"https://registry.npmjs.org/mkdirp/-/mkdirp-1.0.2.tgz\",\"version\":\"1.0.2\"}"
+    ]
+   ],
+   "rewritten": "# THIS IS AN AUTOGENERATED FILE. DO NOT EDIT THIS FILE DIRECTLY.\n# yarn lockfile v1\n\n\nmkdirp@^1.0.2:\n  version \"1.0.2\"\n  resolved \"https://registry.npmjs.org/mkdirp/-/mkdirp-1.0.2.tgz\"\n  integrity sha512-N2REVrJ/X/jGPfit2d7zea2J1pf7EAR5chIUcfHffAZ7gmlam5U65sAm76+o4ntQbSRdTjYf7qZz3chuHlwXEA==\n"
+  }
+ ]
+}

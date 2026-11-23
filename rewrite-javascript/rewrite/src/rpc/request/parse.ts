@@ -20,10 +20,16 @@ import {randomId, UUID} from "../../uuid";
 import {SourceFile} from "../../tree";
 import {withMetrics} from "./metrics";
 import * as path from "path";
+import {XmlParser} from "../../xml/parser";
 
 export class Parse {
     constructor(private readonly inputs: ParserInput[],
-                private readonly relativeTo?: string) {
+                private readonly relativeTo?: string,
+                /**
+                 * Parser options from the peer. Keys this handler does not recognize are ignored, and a
+                 * peer that sends none gets the parser's own defaults.
+                 */
+                private readonly options?: { [key: string]: string }) {
     }
 
     /**
@@ -34,6 +40,8 @@ export class Parse {
         const fileName = path.basename(filePath);
         if (fileName === 'package.json') {
             return "packageJson";
+        } else if (XmlParser.accept(filePath)) {
+            return "xml";
         }
         return "javascript";
     }
@@ -58,11 +66,14 @@ export class Parse {
                         : "javascript";
 
                     const parser = Parsers.createParser(parserType, {
-                        ctx: new ExecutionContext(),
+                        ctx: new ExecutionContext({...request.options}),
                         relativeTo: request.relativeTo
                     })!;
 
-                    const generator = parser.parse(...request.inputs);
+                    // an input without its text names a file for the parser to read
+                    const inputs = request.inputs.map(input =>
+                        typeof input === 'object' && input.text == null ? input.sourcePath : input);
+                    const generator = parser.parse(...inputs);
                     const resultIds: UUID[] = [];
 
                     for (let i = 0; i < request.inputs.length; i++) {

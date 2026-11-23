@@ -24,8 +24,6 @@ import org.openrewrite.maven.tree.GroupArtifact;
 import java.util.HashSet;
 import java.util.Set;
 
-import static java.util.Objects.requireNonNull;
-
 @RequiredArgsConstructor
 class GradleConfigurationFilter {
     private final GradleProject gradleProject;
@@ -36,7 +34,10 @@ class GradleConfigurationFilter {
     public void removeTransitiveConfigurations() {
         Set<String> tmpConfigurations = new HashSet<>(filteredConfigurations);
         for (String tmpConfiguration : tmpConfigurations) {
-            GradleDependencyConfiguration gdc = requireNonNull(gradleProject.getConfiguration(tmpConfiguration));
+            GradleDependencyConfiguration gdc = gradleProject.getConfiguration(tmpConfiguration);
+            if (gdc == null) {
+                continue;
+            }
             for (GradleDependencyConfiguration transitive : gradleProject.configurationsExtendingFrom(gdc, true)) {
                 filteredConfigurations.remove(transitive.getName());
             }
@@ -56,7 +57,10 @@ class GradleConfigurationFilter {
     public void removeConfigurationsContainingTransitiveDependency(GroupArtifact dependency) {
         Set<String> tmpConfigurations = new HashSet<>(filteredConfigurations);
         for (String tmpConfiguration : tmpConfigurations) {
-            GradleDependencyConfiguration gdc = requireNonNull(gradleProject.getConfiguration(tmpConfiguration));
+            GradleDependencyConfiguration gdc = gradleProject.getConfiguration(tmpConfiguration);
+            if (gdc == null) {
+                continue;
+            }
             for (GradleDependencyConfiguration transitive : gradleProject.configurationsExtendingFrom(gdc, true)) {
                 if (transitive.findResolvedDependency(dependency.getGroupId(), dependency.getArtifactId()) != null) {
                     filteredConfigurations.remove(tmpConfiguration);

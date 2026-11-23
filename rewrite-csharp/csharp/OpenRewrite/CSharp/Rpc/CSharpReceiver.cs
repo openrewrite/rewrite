@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using System.Text.Json;
 using OpenRewrite.Core;
 using OpenRewrite.Core.Rpc;
 using OpenRewrite.Java;
@@ -82,6 +83,7 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
             IsPattern ip => VisitIsPattern(ip, q),
             StatementExpression se => VisitStatementExpression(se, q),
             SizeOf sof => VisitSizeOf(sof, q),
+            TypeOf tof => VisitTypeOf(tof, q),
             UnsafeStatement us => VisitUnsafeStatement(us, q),
             FixedStatement fs => VisitFixedStatement(fs, q),
             PointerType pt => VisitPointerType(pt, q),
@@ -221,10 +223,11 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     {
         var global = q.Receive(ud.Global, rp => _delegate.VisitRightPadded(rp, q));
         var @static = q.Receive(ud.Static, lp => _delegate.VisitLeftPadded(lp, q));
+        var @unsafe = q.Receive(ud.Unsafe, lp => _delegate.VisitLeftPadded(lp!, q));
         var alias = q.Receive(ud.Alias, rp => _delegate.VisitRightPadded(rp!, q));
         var namespaceOrType = q.Receive((J)ud.NamespaceOrType, el => (J)VisitNonNull(el, q));
         return ud.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers)
-            .WithGlobal(global!).WithStatic(@static!).WithAlias(alias).WithNamespaceOrType((TypeTree)namespaceOrType!);
+            .WithGlobal(global!).WithStatic(@static!).WithUnsafe(@unsafe).WithAlias(alias).WithNamespaceOrType((TypeTree)namespaceOrType!);
     }
 
     // ---- PropertyDeclaration ----
@@ -312,9 +315,16 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     // ---- SizeOf ----
     public override J VisitSizeOf(SizeOf sizeOf, RpcReceiveQueue q)
     {
-        var expression = q.Receive((J)sizeOf.Expression, el => (J)VisitNonNull(el, q));
+        var clazz = q.Receive(sizeOf.Clazz, el => (ControlParentheses<TypeTree>)VisitNonNull(el, q));
         var type = q.Receive(sizeOf.Type, t => VisitType(t, q)!);
-        return sizeOf.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithExpression((Expression)expression!).WithType(type);
+        return sizeOf.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithClazz(clazz!).WithType(type);
+    }
+
+    public override J VisitTypeOf(TypeOf typeOf, RpcReceiveQueue q)
+    {
+        var clazz = q.Receive(typeOf.Clazz, el => (ControlParentheses<TypeTree>)VisitNonNull(el, q));
+        var type = q.Receive(typeOf.Type, t => VisitType(t, q)!);
+        return typeOf.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithClazz(clazz!).WithType(type);
     }
 
     // ---- UnsafeStatement ----
@@ -412,19 +422,21 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         var expressionRp = q.Receive(
             new JRightPadded<Expression>(interp.Expression, interp.After, Markers.Empty),
             rp => _delegate.VisitRightPadded(rp, q));
+        var alignmentBefore = q.Receive(interp.Alignment?.Before ?? Space.Empty, space => VisitSpace(space, q));
         var alignmentRp = q.Receive(
             interp.Alignment != null
                 ? (JRightPadded<Expression>?)new JRightPadded<Expression>(
                     interp.Alignment.Element, Space.Empty, Markers.Empty)
                 : null,
             rp => _delegate.VisitRightPadded(rp!, q));
+        var formatBefore = q.Receive(interp.Format?.Before ?? Space.Empty, space => VisitSpace(space, q));
         var formatRp = q.Receive(
             interp.Format != null
                 ? (JRightPadded<Expression>?)new JRightPadded<Expression>(
                     interp.Format.Element, Space.Empty, Markers.Empty)
                 : null,
             rp => _delegate.VisitRightPadded(rp!, q));
-        return interp.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithExpression(expressionRp!.Element).WithAfter(expressionRp!.After).WithAlignment(alignmentRp != null ? new JLeftPadded<Expression>(Space.Empty, alignmentRp.Element) : null).WithFormat(formatRp != null ? new JLeftPadded<Identifier>(Space.Empty, (Identifier)formatRp.Element) : null);
+        return interp.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithExpression(expressionRp!.Element).WithAfter(expressionRp!.After).WithAlignment(alignmentRp != null ? new JLeftPadded<Expression>(alignmentBefore!, alignmentRp.Element) : null).WithFormat(formatRp != null ? new JLeftPadded<Identifier>(formatBefore!, (Identifier)formatRp.Element) : null);
     }
 
     // ---- AwaitExpression ----
@@ -496,27 +508,39 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     public override J VisitPragmaWarningDirective(PragmaWarningDirective pwd, RpcReceiveQueue q)
     {
         var action = q.ReceiveAndGet(pwd.Action, RpcReceiveQueue.ToEnum<PragmaWarningAction>());
+        var keywordSpacing = q.Receive(pwd.KeywordSpacing, space => VisitSpace(space, q))!;
+        var actionSpacing = q.Receive(pwd.ActionSpacing, space => VisitSpace(space, q))!;
         var warningCodes = q.ReceiveList(pwd.WarningCodes, rp => _delegate.VisitRightPadded(rp, q));
-        return pwd.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithAction(action).WithWarningCodes(warningCodes!);
+        return pwd.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithAction(action)
+            .WithWarningCodes(warningCodes!).WithKeywordSpacing(keywordSpacing).WithActionSpacing(actionSpacing);
     }
 
     // ---- NullableDirective ----
     public override J VisitNullableDirective(NullableDirective nd, RpcReceiveQueue q)
     {
         var setting = q.ReceiveAndGet(nd.Setting, RpcReceiveQueue.ToEnum<NullableSetting>());
-        // Target is a nullable enum — receive as object and convert
+        // Target is a nullable enum. NO_CHANGE echoes back the string we seed below;
+        // ADD/CHANGE arrives as a JsonElement (string- or number-encoded enum). The prior
+        // `(NullableTarget)targetObj` fallback threw InvalidCastException on the JsonElement,
+        // aborting receipt of the whole CompilationUnit for any file with a `#nullable`
+        // directive and leaving a partially-built tree (later surfacing as NPEs downstream).
         var targetObj = q.Receive<object?>(nd.Target != null ? nd.Target.Value.ToString() : null);
         NullableTarget? target = targetObj switch
         {
-            string s => Enum.Parse<NullableTarget>(s, true),
             null => null,
+            NullableTarget nt => nt,
+            string s => Enum.Parse<NullableTarget>(s, true),
+            JsonElement { ValueKind: JsonValueKind.String } je => Enum.Parse<NullableTarget>(je.GetString()!, true),
+            JsonElement { ValueKind: JsonValueKind.Number } je => (NullableTarget)je.GetInt32(),
             _ => (NullableTarget)targetObj
         };
         var hashSpacing = q.Receive(nd.HashSpacing)!;
         var trailingComment = q.Receive(nd.TrailingComment)!;
+        var keywordSpacing = q.Receive(nd.KeywordSpacing)!;
         return nd.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers)
             .WithSetting(setting).WithTarget(target)
-            .WithHashSpacing(hashSpacing).WithTrailingComment(trailingComment);
+            .WithHashSpacing(hashSpacing).WithTrailingComment(trailingComment)
+            .WithKeywordSpacing(keywordSpacing);
     }
 
     // ---- RegionDirective ----
@@ -566,8 +590,10 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     // ---- PragmaChecksumDirective ----
     public override J VisitPragmaChecksumDirective(PragmaChecksumDirective pcd, RpcReceiveQueue q)
     {
+        var keywordSpacing = q.Receive(pcd.KeywordSpacing, space => VisitSpace(space, q))!;
         var arguments = q.Receive<string>(pcd.Arguments);
-        return pcd.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithArguments(arguments!);
+        return pcd.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers)
+            .WithKeywordSpacing(keywordSpacing).WithArguments(arguments!);
     }
 
     // ---- LineDirective ----
@@ -671,9 +697,9 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
 
     public override J VisitUsingStatement(UsingStatement ust, RpcReceiveQueue q)
     {
-        var exprPadded = q.Receive(ust.ExpressionPadded, lp => _delegate.VisitLeftPadded(lp, q));
+        var expression = q.Receive(ust.Expression, el => (ControlParentheses<Expression>)VisitNonNull(el, q));
         var statement = q.Receive((J)ust.Statement, el => (J)VisitNonNull(el, q));
-        return ust.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithExpressionPadded(exprPadded!).WithStatement((Statement)statement!);
+        return ust.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithExpression(expression!).WithStatement((Statement)statement!);
     }
 
     public override J VisitAllowsConstraintClause(AllowsConstraintClause acc, RpcReceiveQueue q)
@@ -836,7 +862,8 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         var parameters = q.Receive(cod.Parameters, c => VisitContainer(c, q));
         var exprBody = q.Receive(cod.ExpressionBody, lp => _delegate.VisitLeftPadded(lp!, q));
         var body = q.Receive((J?)cod.Body, el => (J)VisitNonNull(el!, q));
-        return cod.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithModifiers(modifiers!).WithKind(kind!).WithInterfaceSpecifier(interfaceSpec).WithReturnType(returnType!).WithParameters(parameters!).WithExpressionBody(exprBody).WithBody((Block?)body);
+        var methodType = q.Receive((JavaType?)cod.MethodType, t => VisitType(t, q)!);
+        return cod.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithModifiers(modifiers!).WithKind(kind!).WithInterfaceSpecifier(interfaceSpec).WithReturnType(returnType!).WithParameters(parameters!).WithExpressionBody(exprBody).WithBody((Block?)body).WithMethodType((JavaType.Method?)methodType);
     }
 
     public override J VisitOperatorDeclaration(OperatorDeclaration opd, RpcReceiveQueue q)
@@ -1018,8 +1045,9 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     public override J VisitOrdering(Ordering ord, RpcReceiveQueue q)
     {
         var expression = q.Receive(ord.ExpressionPadded, rp => _delegate.VisitRightPadded(rp, q));
-        var direction = q.ReceiveAndGet<DirectionKind, object>(
-            ord.Direction ?? default, RpcReceiveQueue.ToEnum<DirectionKind>());
+        // nullable, so that an ordering with no direction keyword stays without one
+        var direction = q.ReceiveAndGet<DirectionKind?, object>(
+            ord.Direction, value => RpcReceiveQueue.ToEnum<DirectionKind>()(value));
         return ord.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithExpressionPadded(expression!).WithDirection(direction);
     }
 
@@ -1090,6 +1118,26 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         // Make ConsumePreVisit/PopPreVisit accessible to CSharpReceiver
         public new void ConsumePreVisit(J j, RpcReceiveQueue q) => base.ConsumePreVisit(j, q);
         public new void PopPreVisit() => base.PopPreVisit();
+
+        public override Space VisitSpace(Space space, RpcReceiveQueue q)
+        {
+            var comments = q.ReceiveList(space.Comments, c =>
+            {
+                // A structured /// XML documentation comment is decomposed as a proper tree;
+                // reconstruct it node-by-node rather than flattening it to text.
+                if (c is CsDocComment.DocComment docComment)
+                {
+                    return (Comment)new CsDocCommentReceiver(_outer).Visit(docComment, q)!;
+                }
+                var multiline = q.Receive(c.Multiline);
+                var text = q.Receive(c.Text);
+                var suffix = q.Receive(c.Suffix);
+                var markers = q.Receive((c as TextComment)?.Markers);
+                return new TextComment(text!, suffix!, multiline, markers);
+            });
+            var whitespace = q.Receive(space.Whitespace);
+            return space.WithComments(comments!).WithWhitespace(whitespace!);
+        }
 
         public override J? Visit(Tree? tree, RpcReceiveQueue q)
         {

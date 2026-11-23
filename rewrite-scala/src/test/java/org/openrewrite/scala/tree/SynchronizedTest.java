@@ -20,8 +20,8 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.scala.Assertions.scala;
 
-public class SynchronizedTest implements RewriteTest {
-    
+class SynchronizedTest implements RewriteTest {
+
     @Test
     void synchronizedBlock() {
         rewriteRun(
@@ -38,7 +38,7 @@ public class SynchronizedTest implements RewriteTest {
             )
         );
     }
-    
+
     @Test
     void synchronizedWithExplicitMonitor() {
         rewriteRun(
@@ -56,7 +56,7 @@ public class SynchronizedTest implements RewriteTest {
             )
         );
     }
-    
+
     @Test
     void synchronizedMethod() {
         rewriteRun(
@@ -71,7 +71,7 @@ public class SynchronizedTest implements RewriteTest {
             )
         );
     }
-    
+
     @Test
     void nestedSynchronized() {
         rewriteRun(
@@ -92,7 +92,7 @@ public class SynchronizedTest implements RewriteTest {
             )
         );
     }
-    
+
     @Test
     void synchronizedWithReturn() {
         rewriteRun(

@@ -16,18 +16,247 @@
 package org.openrewrite.groovy;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.Issue;
+import org.openrewrite.ParseExceptionResult;
+import org.openrewrite.SourceFile;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.tree.ParseError;
+
+import java.util.HashMap;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.groovy.Assertions.groovy;
 
 class GroovyParserTest implements RewriteTest {
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/8958")
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "a[0,1]",
+      "a[0,1][2]",
+      "a[[0,1], [2,3]]",
+      "a[(0),1]",
+      "a[*xs]",
+      "a[0]",
+      "a[[0,1]]",
+      "a[[*xs]]",
+      "a[ /* first */ 0 /* before comma */, /* second */ 1 /* end */ ]",
+      "commandLine ['cmd', '/c'] + azCmd",
+      "commandLine(['cmd', '/c'] + azCmd)"
+    })
+    void multiIndexAccess(String source) {
+        rewriteRun(
+          groovy(source)
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "def a = (println 'x')",
+      "def y = 1\ndef a = [(int) y: 1]"
+    })
+    void syntaxErrorFailsWithTheCompilersErrorRatherThanAMisprint(String source) {
+        SourceFile parsed = GroovyParser.builder().build()
+          .parse(new InMemoryExecutionContext(), source)
+          .findFirst()
+          .orElseThrow();
+        assertThat(parsed).isInstanceOf(ParseError.class);
+        assertThat(((ParseError) parsed).getErroneous()).isNull();
+        assertThat(parsed.getMarkers().findFirst(ParseExceptionResult.class).orElseThrow().getExceptionType())
+          .isEqualTo("MultipleCompilationErrorsException");
+    }
+
     @Test
     void groovyRuntimeIsVersion2() throws Exception {
         Class<?> groovySystem = Class.forName("groovy.lang.GroovySystem");
         var version = (String) groovySystem.getMethod("getVersion").invoke(null);
         assertThat(version).startsWith("2.");
+    }
+
+    @Test
+    void staticallyImportedFieldReadHasTheFieldType() {
+        rewriteRun(
+          groovy(
+            """
+              import static java.lang.System.out
+              def o = out
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Integer p) {
+                    J.Identifier read = (J.Identifier) variable.getInitializer();
+                    assertThat(read.getFieldType()).isNotNull();
+                    assertThat(TypeUtils.isOfClassType(read.getFieldType().getOwner(), "java.lang.System")).isTrue();
+                    return variable;
+                }
+            }.visit(cu, 0))
+          )
+        );
+    }
+
+    @Test
+    void staticallyImportedGetterReadAsAPropertyHasThePropertyOfAQualifiedRead() {
+        rewriteRun(
+          groovy(
+            """
+              import static java.lang.Runtime.getRuntime
+              def bare = runtime
+              def qualified = Runtime.runtime
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                Map<String, J.VariableDeclarations.NamedVariable> variables = new HashMap<>();
+                new JavaIsoVisitor<Integer>() {
+                    @Override
+                    public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Integer p) {
+                        variables.put(variable.getSimpleName(), variable);
+                        return variable;
+                    }
+                }.visit(cu, 0);
+                J.Identifier read = (J.Identifier) variables.get("bare").getInitializer();
+                J.FieldAccess qualifiedRead = (J.FieldAccess) variables.get("qualified").getInitializer();
+                assertThat(TypeUtils.isOfClassType(read.getType(), "java.lang.Runtime")).isTrue();
+                assertThat(read.getFieldType()).isNotNull().isSameAs(qualifiedRead.getName().getFieldType());
+            })
+          )
+        );
+    }
+
+    @Test
+    void staticallyImportedGetterReadFollowedByAParenthesizedStatement() {
+        rewriteRun(
+          groovy(
+            """
+              import static java.lang.Runtime.getRuntime
+              def r = runtime
+              ("a" + "b").toString()
+              """
+          )
+        );
+    }
+
+    @Test
+    void parenthesizedStaticallyImportedFieldRead() {
+        rewriteRun(
+          groovy(
+            """
+              import static java.lang.Math.PI
+              import static java.lang.Math.PI as pi
+              def x = (PI) * 2
+              def y = -(PI)
+              def z = [(PI): 1]
+              def w = (pi) * 2
+              """
+          )
+        );
+    }
+
+    @Test
+    void parenthesizedVariableAndPropertyReads() {
+        rewriteRun(
+          groovy(
+            """
+              def y = 1
+              def o = [name: 1]
+              def a = (y) * 2
+              def b = -(y)
+              def c = [(y): 1]
+              def d = ((y)) * 2
+              def e = (o.name) * 2
+              def f = -(o.name)
+              """
+          )
+        );
+    }
+
+    @Test
+    void parenthesizedCastsCallsAndIncrements() {
+        rewriteRun(
+          groovy(
+            """
+              import static java.lang.Runtime.getRuntime
+              import static java.lang.Math.abs
+              def y = 1
+              def a = (1 as String)
+              def b = ((int) y) * 2
+              def c = (int) (y + 1)
+              def d = (y++) /* ) */ * 2
+              def e = (--y)
+              def f = (y.toString()) // )
+              def g = ((y?.toString())).length()
+              def h = (y).toString().length()
+              def i = ((y)).toString()
+              def j = (abs(1)) * 2
+              def k = (runtime)
+              def l = (y > 0 ? 1 : 2) * 2
+              def m = (y > 0) ? 1 : 2
+              def n = (!y)
+              def o = (-y) * 2
+              def p = (+y)
+              def q = (~y)
+              def r = ([1, 2]) + [3]
+              def s = ([a: 1])
+              def t = (1..2)
+              def u = -(y.hashCode())
+              def v = [(y.toString()): 1]
+              def w = -(y).hashCode()
+              def x = (foo(")"))
+              def z = (foo("(${y}"))
+              def foo(x) { x }
+              """
+          )
+        );
+    }
+
+    @Test
+    void parenthesizedClosuresMethodPointersArraysAndClassLiterals() {
+        rewriteRun(
+          groovy(
+            """
+              def y = 1
+              def a = ({ it }) * 2
+              def b = (({ it }))(1)
+              def c = -({ 1 })
+              def d = (y.&toString)()
+              def e = [(y.&toString): 1]
+              def f = (new int[2]).length
+              def g = (String).name
+              def h = ((String[])).class
+              def i = (String[]) == null
+              """
+          )
+        );
+    }
+
+    @Test
+    void arrayClassLiterals() {
+        rewriteRun(
+          groovy(
+            """
+              def a = String[].class
+              def b = int[][].class
+              """
+          )
+        );
+    }
+
+    @Test
+    void parenthesizedGStringInterpolations() {
+        rewriteRun(
+          groovy(
+            """
+              def y = 1
+              def a = "a ${((y.toString()))} b"
+              def b = ("${y.toString(")")}".length())
+              """
+          )
+        );
     }
 
     @Test
@@ -95,6 +324,161 @@ class GroovyParserTest implements RewriteTest {
                         (100)
                         """
                 )
+        );
+    }
+
+    @Test
+    void closuresBlocksAndMethodPointers() {
+        rewriteRun(
+          groovy(
+            """
+              [1, 2].each { println it }
+              if (true) {
+                  def f = this.&println
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8978")
+    @Test
+    void baseScriptDeclaration() {
+        rewriteRun(
+          groovy(
+            """
+              @groovy.transform.BaseScript groovy.lang.Script base
+              println 1
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8979")
+    @Test
+    void fieldDeclarationInsideBlock() {
+        rewriteRun(
+          groovy(
+            """
+              import groovy.transform.Field
+              @Field def top = 0
+              @Deprecated @Field def second = 1
+              if (true) {
+                  @Field def list = []
+                  @Deprecated
+                  @Field @SuppressWarnings("unused") String s = "s"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void annotationsAfterModifiers() {
+        rewriteRun(
+          groovy(
+            """
+              import groovy.transform.Field
+              final @Field x = 1
+              final @Deprecated String y = "y"
+              public @SuppressWarnings("unused") final class A {
+                  private @Deprecated t
+                  public @Deprecated A() {}
+                  public @Deprecated <T> T n(final @Deprecated q) { null }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8980")
+    @Test
+    void gStringInParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              def t = 1
+              def label = ("build.${t}")
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8981")
+    @Test
+    void statementsInsideGStringInterpolation() {
+        rewriteRun(
+          groovy(
+            """
+              def x = true
+              def s = "${if (x) { return 'a' }; return ''}"
+              """
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"pi", "PIE"})
+    void aliasedStaticFieldRead(String alias) {
+        rewriteRun(
+          groovy(
+            """
+              import static java.lang.Math.PI as %1$s
+              def x = %1$s
+              """.formatted(alias),
+            spec -> spec.afterRecipe(cu -> {
+                J.VariableDeclarations x = (J.VariableDeclarations) cu.getStatements().get(1);
+                J.Identifier read = (J.Identifier) x.getVariables().get(0).getInitializer();
+                assertThat(read.getSimpleName()).isEqualTo(alias);
+                assertThat(read.getFieldType().getName()).isEqualTo("PI");
+            })
+          )
+        );
+    }
+
+    @Test
+    void staticFieldReadFollowedByGStringInterpolation() {
+        rewriteRun(
+          groovy(
+            """
+              import static java.lang.Math.PI
+              import static java.lang.Math.E as e
+              def x = 1
+              def s = "$PI$x$e$x"
+              """
+          )
+        );
+    }
+
+    @Test
+    void aliasedStaticImportCall() {
+        rewriteRun(
+          groovy(
+            """
+              import static java.util.Collections.singletonList as one
+              def o = one("a")
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                J.VariableDeclarations o = (J.VariableDeclarations) cu.getStatements().get(1);
+                J.MethodInvocation call = (J.MethodInvocation) o.getVariables().get(0).getInitializer();
+                assertThat(call.getSimpleName()).isEqualTo("one");
+                assertThat(call.getMethodType().getName()).isEqualTo("singletonList");
+            })
+          )
+        );
+    }
+
+    @Test
+    void quotedStaticMethodNameCall() {
+        rewriteRun(
+          groovy(
+            """
+              class A {
+                  static 'foo bar'(int i) { i }
+                  static m() { 'foo bar'(1) + '''foo bar'''(2) }
+              }
+              """
+          )
         );
     }
 

@@ -22,6 +22,7 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.table.CompileErrors;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.marker.SearchResult;
 
 public class FindCompileErrors extends Recipe {
@@ -39,9 +40,9 @@ public class FindCompileErrors extends Recipe {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.Erroneous visitErroneous(J.Erroneous erroneous, ExecutionContext ctx) {
-                J.CompilationUnit cu = getCursor().firstEnclosing(J.CompilationUnit.class);
+                JavaSourceFile cu = getCursor().firstEnclosing(JavaSourceFile.class);
                 String sourceFile = cu != null ? cu.getSourcePath().toString() : "Unknown source file";
-                String code = erroneous.print(getCursor());
+                String code = erroneous.print(getCursor().getParentOrThrow());
                 report.insertRow(ctx, new CompileErrors.Row(
                         sourceFile,
                         code

@@ -19,7 +19,6 @@ import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayOutputStream;
 import java.io.ObjectOutputStream;
-import java.io.Serializable;
 
 /**
  * Every model object that is transferred via the tooling API must implement {@link java.io.Serializable}, including

@@ -29,8 +29,11 @@ rewrite-java-25
 
 # Other language modules
 
+rewrite-android
+rewrite-coldfusion
 rewrite-csharp
 rewrite-docker
+rewrite-go
 rewrite-gradle
 rewrite-groovy
 rewrite-hcl
@@ -41,6 +44,8 @@ rewrite-maven
 rewrite-properties
 rewrite-protobuf
 rewrite-python
+rewrite-ruby
+rewrite-scala
 rewrite-toml
 rewrite-xml
 rewrite-yaml

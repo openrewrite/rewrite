@@ -15,7 +15,6 @@
  */
 package org.openrewrite.rpc.request;
 
-import com.fasterxml.jackson.annotation.JsonValue;
 import io.moderne.jsonrpc.JsonRpcMethod;
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
@@ -29,10 +28,11 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
+
+import static java.util.Collections.singletonList;
 
 @Value
 public class Parse implements RpcRequest {
@@ -41,6 +41,15 @@ public class Parse implements RpcRequest {
 
     @Nullable
     String relativeTo;
+
+    /**
+     * Optional, parser-specific options forwarded to the RPC server. The handler
+     * interprets keys it recognizes and silently ignores the rest. Older clients
+     * that do not send this field deserialize to {@code null}, in which case the
+     * handler falls back to its process-wide defaults.
+     */
+    @Nullable
+    Map<String, String> options;
 
     @Value
     public static class Input {
@@ -65,7 +74,7 @@ public class Parse implements RpcRequest {
                 Parser parser = findParser(input.getSourcePath());
                 Parser.Input parserInput = toParserInput(input);
                 SourceFile sourceFile = parser.parseInputs(
-                        Collections.singletonList(parserInput), relativeTo, ctx
+                        singletonList(parserInput), relativeTo, ctx
                 ).findFirst().orElseThrow(() ->
                         new IllegalStateException("Parser returned no results for " + input.getSourcePath()));
                 String id = sourceFile.getId().toString();

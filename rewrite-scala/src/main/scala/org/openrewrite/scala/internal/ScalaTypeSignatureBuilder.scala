@@ -16,6 +16,7 @@
 package org.openrewrite.scala.internal
 
 import dotty.tools.dotc.core.Contexts.*
+import dotty.tools.dotc.core.Flags
 import dotty.tools.dotc.core.Names
 import dotty.tools.dotc.core.Symbols
 import dotty.tools.dotc.core.Types.*
@@ -31,9 +32,26 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
 
   private var typeVariableNameStack: HashSet[String] = null
 
+  private var depth = 0
+
+  /** Signatures of the types described outside any type variable's bound, where they depend on the type alone. */
+  private val signatures = new java.util.IdentityHashMap[Type, String]()
+
+  private val binaryNames = new java.util.IdentityHashMap[Symbols.Symbol, String]()
+
   def signature(tpe: Type): String = {
     if (tpe == null) return "{undefined}"
+    if (typeVariableNameStack != null && !typeVariableNameStack.isEmpty) return describe(tpe)
+    var sig = signatures.get(tpe)
+    if (sig == null) {
+      sig = describe(tpe)
+      signatures.put(tpe, sig)
+    }
+    sig
+  }
 
+  private def describe(tpe: Type): String = {
+    depth += 1
     try {
       tpe.dealias match {
         case ct: ConstantType =>
@@ -42,6 +60,8 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
           typeRefSignature(tr)
         case tmr: TermRef =>
           termRefSignature(tmr)
+        case at: AppliedType if at.isRepeatedParam =>
+          signature(at.translateFromRepeated(toArray = false))
         case at: AppliedType =>
           parameterizedSignature(at)
         case tp: TypeParamRef =>
@@ -55,14 +75,28 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
         case at: AndType =>
           signature(at.tp1) + " & " + signature(at.tp2)
         case ot: OrType =>
-          signature(ot.tp1) + " | " + signature(ot.tp2)
-        case NoType =>
-          "{undefined}"
+          unionMembers(ot).map(_._1).mkString(" | ")
+        case ci: ClassInfo =>
+          classFqn(ci.cls)
+        case tt: ThisType =>
+          signature(tt.tref)
+        case et: ExprType =>
+          signature(et.resultType)
+        case lambda: HKTypeLambda => lambda.resType match {
+          case at: AppliedType if !at.tycon.isInstanceOf[TypeParamRef] => signature(at.tycon)
+          case _ => "{undefined}"
+        }
+        // What `ScalaTypeMapping.mapType` maps to `JavaType.Unknown`
         case _ =>
-          tpe.show
+          "{undefined}"
       }
     } catch {
+      // A type too deep to describe is undefined as a whole. Answering at the level that ran out
+      // of stack would let the caller go on to its next argument and descend just as deep again.
+      case e: VirtualMachineError if depth > 1 => throw e
       case _: Throwable => "{undefined}"
+    } finally {
+      depth -= 1
     }
   }
 
@@ -86,9 +120,9 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
   private def typeRefSignature(tr: TypeRef): String = {
     val sym = tr.symbol
     if (!sym.exists) return tr.show
+    if (sym.isTypeParam) return typeVariableSignature(sym.name.toString, tr.underlying)
 
-    val fqn = sym.fullName.toString
-    mapScalaFqnToJava(fqn)
+    mapScalaFqnToJava(binaryName(sym))
   }
 
   private def termRefSignature(tmr: TermRef): String = {
@@ -98,6 +132,7 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
   }
 
   def parameterizedSignature(at: AppliedType): String = {
+    if (at.tycon.typeSymbol == ctx.definitions.ArrayClass) return signature(at.args.head) + "[]"
     val base = signature(at.tycon)
     val tj = new StringJoiner(", ", "<", ">")
     at.args.foreach { arg =>
@@ -106,44 +141,52 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
     base + tj.toString
   }
 
-  private def genericSignature(tp: TypeParamRef): String = {
-    val name = tp.paramName.toString
+  private def genericSignature(tp: TypeParamRef): String =
+    typeVariableSignature(tp.paramName.toString, tp.underlying)
 
+  private def typeVariableSignature(name: String, bounds: Type): String = {
     if (typeVariableNameStack == null)
       typeVariableNameStack = new HashSet[String]()
 
+    // Already being described further out: only the frame that added the name takes it off,
+    // or a second mention of it in the same bound would describe the bound all over again.
     if (!typeVariableNameStack.add(name)) {
-      typeVariableNameStack.remove(name)
       return "Generic{" + name + "}"
     }
 
-    val sb = new StringBuilder("Generic{" + name)
+    try {
+      val sb = new StringBuilder("Generic{" + name)
 
-    tp.underlying match {
-      case tb: TypeBounds if !(tb.hi =:= ctx.definitions.AnyType) =>
-        sb.append(" extends ")
-        sb.append(signature(tb.hi))
-      case _ =>
+      bounds match {
+        case tb: TypeBounds if !isAny(upperBoundOfKind(tb.hi)) =>
+          sb.append(" extends ")
+          sb.append(signature(upperBoundOfKind(tb.hi)))
+        case _ =>
+      }
+
+      sb.append("}").toString()
+    } finally {
+      typeVariableNameStack.remove(name)
     }
-
-    typeVariableNameStack.remove(name)
-    sb.append("}").toString()
   }
 
   private def boundsSignature(tb: TypeBounds): String = {
-    if (!(tb.hi =:= ctx.definitions.AnyType)) {
+    if (!isAny(tb.hi)) {
       "? extends " + signature(tb.hi)
-    } else if (!(tb.lo =:= ctx.definitions.NothingType)) {
+    } else if (!isNothing(tb.lo)) {
       "? super " + signature(tb.lo)
     } else {
       "?"
     }
   }
 
-  def methodSignature(sym: Symbols.Symbol): String = {
-    val owner = sym.owner.fullName.toString
+  def methodSignature(sym: Symbols.Symbol): String = methodSignature(sym, sym.info)
+
+  /** The signature of the method with the given parameter and result types, as instantiated at a call. */
+  def methodSignature(sym: Symbols.Symbol, info: Type): String = {
+    val owner = classFqn(sym.owner)
     val name = if (sym.isConstructor) "<constructor>" else sym.name.toString
-    val returnType = sym.info.finalResultType match {
+    val returnType = info.finalResultType match {
       case NoType => "void"
       case rt => signature(rt)
     }
@@ -153,15 +196,9 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
     sb.append(",return=").append(returnType)
 
     val paramTypes = new StringJoiner(",", "[", "]")
-    sym.info match {
+    info.stripPoly match {
       case mt: MethodType =>
-        mt.paramInfos.foreach(pt => paramTypes.add(signature(pt)))
-      case pt: PolyType =>
-        pt.resultType match {
-          case mt: MethodType =>
-            mt.paramInfos.foreach(pt => paramTypes.add(signature(pt)))
-          case _ =>
-        }
+        mt.paramInfos.foreach(pt => paramTypes.add(signature(parameterType(sym, pt))))
       case _ =>
     }
     sb.append(",parameters=").append(paramTypes)
@@ -169,9 +206,70 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
     sb.toString()
   }
 
+  /** The type of a parameter of the method as the JVM sees it: a repeated parameter is an array of a Java method, a `Seq` otherwise. */
+  def parameterType(method: Symbols.Symbol, pt: Type): Type =
+    if (!pt.isRepeatedParam) pt
+    else if (method.is(Flags.JavaDefined)) pt.translateParameterized(ctx.definitions.RepeatedParamClass, ctx.definitions.ArrayClass)
+    else pt.translateFromRepeated(toArray = false)
+
+  // Sorted so that `A | B` and `B | A` share one cache key.
+  def unionMembers(ot: OrType): List[(String, Type)] =
+    unionAlternatives(ot).map(t => signature(t) -> t).distinctBy(_._1).sortBy(_._1)
+
+  private def unionAlternatives(tpe: Type): List[Type] = tpe.dealias match {
+    case ot: OrType => unionAlternatives(ot.tp1) ++ unionAlternatives(ot.tp2)
+    case nothing if nothing.isExactlyNothing => Nil
+    case other => List(other)
+  }
+
+  /** Most bounds are `Any` or `Nothing` themselves, which needs no subtype check. */
+  def isAny(tp: Type): Boolean = tp match {
+    case tr: TypeRef if tr.symbol eq ctx.definitions.AnyClass => true
+    case _ => tp =:= ctx.definitions.AnyType
+  }
+
+  def isNothing(tp: Type): Boolean = tp match {
+    case tr: TypeRef if tr.symbol eq ctx.definitions.NothingClass => true
+    case _ => tp =:= ctx.definitions.NothingType
+  }
+
+  /** The upper bound of a type constructor `CC[X] <: Iterable[X]` is that of its applications, `Iterable[X]`. */
+  def upperBoundOfKind(hi: Type): Type = hi match {
+    case lambda: HKTypeLambda => lambda.resType
+    case other => other
+  }
+
+  /**
+   * The FQN of a class by its JVM binary name (`Outer$Inner`, `object A` as `A$`), with `scala.Any`/`scala.AnyRef`
+   * as `java.lang.Object`. Java statics live on a module class `X$` and are keyed under `X` like the Java parser does.
+   */
+  def classFqn(sym: Symbols.Symbol): String = methodOwnerFqn(sym) match {
+    case "scala.Any" | "scala.AnyRef" => "java.lang.Object"
+    case other => other
+  }
+
+  /** The owner of a method in its signature: its class by binary name, with Java statics under the Java class. */
+  def methodOwnerFqn(owner: Symbols.Symbol): String = {
+    val fqn = binaryName(owner)
+    if (owner.is(Flags.JavaDefined) && owner.is(Flags.ModuleClass)) fqn.stripSuffix("$") else fqn
+  }
+
   def variableSignature(sym: Symbols.Symbol): String = {
-    val owner = sym.owner.fullName.toString
-    owner + "{name=" + sym.name.toString + "}"
+    val name = "{name=" + sym.name.toString
+    if (sym.owner.isClass) return binaryName(sym.owner) + name + "}"
+    val owner = if (sym.owner.is(Flags.Method)) methodSignature(sym.owner) else sym.owner.fullName.toString
+    owner + name + (if (sym.span.exists) ",pos=" + sym.span.start else "") + "}"
+  }
+
+  /** `flatName` leaves out the package, and joins a nested class to a module class owner without a doubled `$`. */
+  private def binaryName(sym: Symbols.Symbol): String = {
+    var name = binaryNames.get(sym)
+    if (name == null) {
+      val pkg = sym.enclosingPackageClass
+      name = if (pkg.isEffectiveRoot) sym.flatName.toString else pkg.fullName.toString + "." + sym.flatName
+      binaryNames.put(sym, name)
+    }
+    name
   }
 
   def variableSignature(name: String): String = {
@@ -193,6 +291,7 @@ class ScalaTypeSignatureBuilder(using ctx: Context) {
     case "scala.Unit" => "void"
     case "scala.Any" => "java.lang.Object"
     case "scala.AnyRef" => "java.lang.Object"
+    case "scala.Matchable" => "java.lang.Object"
     case "scala.Nothing" => "scala.Nothing"
     case "scala.Null" => "null"
     case other => other

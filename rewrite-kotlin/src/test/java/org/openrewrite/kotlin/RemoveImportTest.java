@@ -18,6 +18,7 @@ package org.openrewrite.kotlin;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Issue;
 import org.openrewrite.Recipe;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.test.RewriteTest;
@@ -46,6 +47,84 @@ class RemoveImportTest implements RewriteTest {
                 return cu;
             }
         });
+    }
+
+    @Test
+    void commentInTypeImport() {
+        rewriteRun(
+          spec -> spec.recipe(removeTypeImportRecipe("java.util.ArrayList")),
+          kotlin(
+            """
+              import java.util./*type*/ArrayList
+
+              class A
+              """,
+            """
+              class A
+              """
+          )
+        );
+    }
+
+    @Test
+    void commentInFunctionImport() {
+        rewriteRun(
+          spec -> spec.recipe(removeMemberImportRecipe("kotlin.collections", "emptyList")),
+          kotlin(
+            """
+              import kotlin.collections./*extension*/emptyList
+
+              class A
+              """,
+            """
+              class A
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/2437")
+    @Test
+    void preservesKtlintSuppressionCommentOnLineBeforeRemovedImport() {
+        rewriteRun(
+          spec -> spec.recipe(removeTypeImportRecipe("java.util.List")),
+          kotlin(
+            """
+              import java.util.Date // ktlint-disable no-wildcard-imports
+              import java.util.List
+              import java.util.UUID
+
+              class A
+              """,
+            """
+              import java.util.Date // ktlint-disable no-wildcard-imports
+              import java.util.UUID
+
+              class A
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/2437")
+    @Test
+    void preservesPreviousLineCommentWhenLastImportRemoved() {
+        rewriteRun(
+          spec -> spec.recipe(removeTypeImportRecipe("java.util.List")),
+          kotlin(
+            """
+              import java.util.Date // ktlint-disable no-wildcard-imports
+              import java.util.List
+
+              class A
+              """,
+            """
+              import java.util.Date // ktlint-disable no-wildcard-imports
+
+              class A
+              """
+          )
+        );
     }
 
     @DocumentExample
@@ -162,7 +241,7 @@ class RemoveImportTest implements RewriteTest {
     @Test
     void keepImportAlias() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none())
+          spec -> spec.typeValidationOptions(TypeValidation.all().identifiers(false))
             .recipe(removeMemberImportRecipe("java.util.regex.Pattern", "COMMENTS")),
           kotlin(
             """
@@ -181,8 +260,8 @@ class RemoveImportTest implements RewriteTest {
     void removeImportAlias() {
         // TODO check if this is really what we want to happen
         rewriteRun(
-          // Type validation is disabled until https://github.com/openrewrite/rewrite-kotlin/issues/545 is implemented.
-          spec -> spec.typeValidationOptions(TypeValidation.none())
+          // Identifiers are not validated until https://github.com/openrewrite/rewrite-kotlin/issues/545 is implemented.
+          spec -> spec.typeValidationOptions(TypeValidation.all().identifiers(false))
             .recipe(removeMemberImportRecipe("java.util.regex.Pattern", "COMMENTS")),
           kotlin(
             """
@@ -199,6 +278,42 @@ class RemoveImportTest implements RewriteTest {
               class A {
                   val f = arrayOf(i)
               }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepTypeImportAlias() {
+        rewriteRun(
+          spec -> spec.recipe(removeTypeImportRecipe("java.util.ArrayList")),
+          kotlin(
+            """
+              import java.util.ArrayList as AL
+
+              class A {
+                  val list = AL<String>()
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepImportOfConstructorReference() {
+        rewriteRun(
+          spec -> spec.recipe(removeTypeImportRecipe("a.b.Original")),
+          kotlin(
+            """
+              package a.b
+              class Original
+              """
+          ),
+          kotlin(
+            """
+              import a.b.Original
+
+              val f = ::Original
               """
           )
         );

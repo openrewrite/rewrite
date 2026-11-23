@@ -1,0 +1,1767 @@
+/*
+ * Copyright 2025 the original author or authors.
+ *
+ * Licensed under the Moderne Source Available License (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://docs.moderne.io/licensing/moderne-source-available-license
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package java
+
+import (
+	"strconv"
+	"strings"
+
+	"github.com/google/uuid"
+)
+
+type Identifier struct {
+	ID          uuid.UUID
+	Prefix      Space
+	Markers     Markers
+	Annotations []Tree // Java annotations on this identifier (empty in Go, received from Java)
+	Name        string
+	Type        JavaType          // the type of this identifier (nullable)
+	FieldType   *JavaTypeVariable // the variable type when this identifier refers to a field (nullable)
+}
+
+func (*Identifier) IsTree()       {}
+func (*Identifier) IsJ()          {}
+func (*Identifier) IsExpression() {}
+
+func (n *Identifier) WithPrefix(prefix Space) *Identifier {
+	if SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *Identifier) WithMarkers(markers Markers) *Identifier {
+	if MarkersEqual(n.Markers, markers) {
+		return n
+	}
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+func (n *Identifier) WithName(name string) *Identifier {
+	if n.Name == name {
+		return n
+	}
+	c := *n
+	c.Name = name
+	return &c
+}
+
+func (n *Identifier) WithType(t JavaType) *Identifier {
+	if n.Type == t {
+		return n
+	}
+	c := *n
+	c.Type = t
+	return &c
+}
+
+func (n *Identifier) WithFieldType(ft *JavaTypeVariable) *Identifier {
+	if n.FieldType == ft {
+		return n
+	}
+	c := *n
+	c.FieldType = ft
+	return &c
+}
+
+type Literal struct {
+	ID             uuid.UUID
+	Prefix         Space
+	Markers        Markers
+	Value          any
+	Source         string          // the original source text of the literal
+	UnicodeEscapes []UnicodeEscape // mirrors J.Literal.unicodeEscapes; typically empty for Go
+	Type           JavaType        // the type of this literal (nullable)
+}
+
+// UnicodeEscape mirrors J.Literal.UnicodeEscape: an escaped code point and
+// the index into the value source where it occurs. Go does not currently
+// produce these, but the field exists to keep Literal symmetric with the
+// Java model for RPC round-tripping.
+type UnicodeEscape struct {
+	ValueSourceIndex int
+	CodePoint        string
+}
+
+func (*Literal) IsTree()       {}
+func (*Literal) IsJ()          {}
+func (*Literal) IsExpression() {}
+
+func (n *Literal) WithPrefix(prefix Space) *Literal {
+	if SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *Literal) WithMarkers(markers Markers) *Literal {
+	if MarkersEqual(n.Markers, markers) {
+		return n
+	}
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+func (n *Literal) WithValue(value any) *Literal {
+	if n.Value == value {
+		return n
+	}
+	c := *n
+	c.Value = value
+	return &c
+}
+
+func (n *Literal) WithSource(source string) *Literal {
+	if n.Source == source {
+		return n
+	}
+	c := *n
+	c.Source = source
+	return &c
+}
+
+type BinaryOperator int
+
+const (
+	Add BinaryOperator = iota + 1
+	Subtract
+	Multiply
+	Divide
+	Modulo
+	And
+	Or
+	BitwiseAnd
+	BitwiseOr
+	BitwiseXor
+	LeftShift
+	RightShift
+	Equal
+	NotEqual
+	LessThan
+	LessThanOrEqual
+	GreaterThan
+	GreaterThanOrEqual
+	LogicalAnd
+	LogicalOr
+	AndNot // Go-specific: &^
+)
+
+func (op BinaryOperator) String() string {
+	switch op {
+	case Add:
+		return "Addition"
+	case Subtract:
+		return "Subtraction"
+	case Multiply:
+		return "Multiplication"
+	case Divide:
+		return "Division"
+	case Modulo:
+		return "Modulo"
+	case And, LogicalAnd:
+		return "And"
+	case Or, LogicalOr:
+		return "Or"
+	case BitwiseAnd:
+		return "BitAnd"
+	case BitwiseOr:
+		return "BitOr"
+	case BitwiseXor:
+		return "BitXor"
+	case LeftShift:
+		return "LeftShift"
+	case RightShift:
+		return "RightShift"
+	case Equal:
+		return "Equal"
+	case NotEqual:
+		return "NotEqual"
+	case LessThan:
+		return "LessThan"
+	case LessThanOrEqual:
+		return "LessThanOrEqual"
+	case GreaterThan:
+		return "GreaterThan"
+	case GreaterThanOrEqual:
+		return "GreaterThanOrEqual"
+	case AndNot:
+		return "BitAnd" // Go-specific &^ mapped to BitAnd with marker
+	default:
+		return "Addition"
+	}
+}
+
+func ParseBinaryOperator(s string) BinaryOperator {
+	switch s {
+	case "Addition":
+		return Add
+	case "Subtraction":
+		return Subtract
+	case "Multiplication":
+		return Multiply
+	case "Division":
+		return Divide
+	case "Modulo":
+		return Modulo
+	case "And":
+		return And
+	case "Or":
+		return Or
+	case "BitAnd":
+		return BitwiseAnd
+	case "BitOr":
+		return BitwiseOr
+	case "BitXor":
+		return BitwiseXor
+	case "LeftShift":
+		return LeftShift
+	case "RightShift":
+		return RightShift
+	case "Equal":
+		return Equal
+	case "NotEqual":
+		return NotEqual
+	case "LessThan":
+		return LessThan
+	case "LessThanOrEqual":
+		return LessThanOrEqual
+	case "GreaterThan":
+		return GreaterThan
+	case "GreaterThanOrEqual":
+		return GreaterThanOrEqual
+	default:
+		return 0 // Unknown
+	}
+}
+
+type Binary struct {
+	ID       uuid.UUID
+	Prefix   Space
+	Markers  Markers
+	Left     Expression
+	Operator LeftPadded[BinaryOperator]
+	Right    Expression
+	Type     JavaType // the result type (nullable)
+}
+
+func (*Binary) IsTree()       {}
+func (*Binary) IsJ()          {}
+func (*Binary) IsExpression() {}
+
+func (n *Binary) WithPrefix(prefix Space) *Binary {
+	if SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *Binary) WithMarkers(markers Markers) *Binary {
+	if MarkersEqual(n.Markers, markers) {
+		return n
+	}
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+func (n *Binary) WithLeft(left Expression) *Binary {
+	if n.Left == left {
+		return n
+	}
+	c := *n
+	c.Left = left
+	return &c
+}
+
+func (n *Binary) WithRight(right Expression) *Binary {
+	if n.Right == right {
+		return n
+	}
+	c := *n
+	c.Right = right
+	return &c
+}
+
+type Block struct {
+	ID         uuid.UUID
+	Prefix     Space
+	Markers    Markers
+	Statements []RightPadded[Statement]
+	End        Space // whitespace before the closing brace
+}
+
+func (*Block) IsTree()      {}
+func (*Block) IsJ()         {}
+func (*Block) IsStatement() {}
+
+func (n *Block) WithPrefix(prefix Space) *Block {
+	if SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *Block) WithMarkers(markers Markers) *Block {
+	if MarkersEqual(n.Markers, markers) {
+		return n
+	}
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+func (n *Block) WithStatements(statements []RightPadded[Statement]) *Block {
+	if SameSlice(n.Statements, statements) {
+		return n
+	}
+	c := *n
+	c.Statements = statements
+	return &c
+}
+
+func (n *Block) WithEnd(end Space) *Block {
+	if SpaceEqual(n.End, end) {
+		return n
+	}
+	c := *n
+	c.End = end
+	return &c
+}
+
+// Return represents a return statement. Mirrors Java's J.Return: a single,
+// nullable returned expression. Go return statements with more than one value
+// map to golang.Return instead.
+type Return struct {
+	ID         uuid.UUID
+	Prefix     Space
+	Markers    Markers
+	Expression Expression // nil for a naked `return`
+}
+
+func (*Return) IsTree()      {}
+func (*Return) IsJ()         {}
+func (*Return) IsStatement() {}
+
+func (n *Return) WithPrefix(prefix Space) *Return {
+	if SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *Return) WithMarkers(markers Markers) *Return {
+	if MarkersEqual(n.Markers, markers) {
+		return n
+	}
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+// If represents an if statement. The condition is a ControlParentheses whose
+// inner element is the bare Go condition. Go has no parens, so the wrapper
+// carries no whitespace of its own and the printer emits only the inner
+// element. Go's optional init clause (`if x := f(); cond {}`) has no slot here;
+// it lives on a wrapping golang.StatementWithInit instead.
+type If struct {
+	ID        uuid.UUID
+	Prefix    Space
+	Markers   Markers
+	Condition *ControlParentheses
+	ThenPart  RightPadded[Statement]
+	ElsePart  *Else // nil if no else clause
+}
+
+func (*If) IsTree()      {}
+func (*If) IsJ()         {}
+func (*If) IsStatement() {}
+
+func (n *If) WithPrefix(prefix Space) *If {
+	if SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *If) WithMarkers(markers Markers) *If {
+	if MarkersEqual(n.Markers, markers) {
+		return n
+	}
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+func (n *If) WithCondition(condition *ControlParentheses) *If {
+	if n.Condition == condition {
+		return n
+	}
+	c := *n
+	c.Condition = condition
+	return &c
+}
+
+func (n *If) WithThenPart(thenPart RightPadded[Statement]) *If {
+	if RightPaddedEqual(n.ThenPart, thenPart) {
+		return n
+	}
+	c := *n
+	c.ThenPart = thenPart
+	return &c
+}
+
+func (n *If) WithElsePart(elsePart *Else) *If {
+	if n.ElsePart == elsePart {
+		return n
+	}
+	c := *n
+	c.ElsePart = elsePart
+	return &c
+}
+
+type Else struct {
+	ID      uuid.UUID
+	Prefix  Space
+	Markers Markers
+	Body    RightPadded[Statement]
+}
+
+func (*Else) IsTree() {}
+func (*Else) IsJ()    {}
+
+func (n *Else) WithPrefix(prefix Space) *Else {
+	if SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *Else) WithMarkers(markers Markers) *Else {
+	if MarkersEqual(n.Markers, markers) {
+		return n
+	}
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+type Assignment struct {
+	ID       uuid.UUID
+	Prefix   Space
+	Markers  Markers
+	Variable Expression
+	Value    LeftPadded[Expression]
+	Type     JavaType // the result type (nullable)
+}
+
+func (*Assignment) IsTree()       {}
+func (*Assignment) IsJ()          {}
+func (*Assignment) IsStatement()  {}
+func (*Assignment) IsExpression() {}
+
+func (n *Assignment) WithPrefix(prefix Space) *Assignment {
+	if SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *Assignment) WithMarkers(markers Markers) *Assignment {
+	if MarkersEqual(n.Markers, markers) {
+		return n
+	}
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+func (n *Assignment) WithVariable(variable Expression) *Assignment {
+	if n.Variable == variable {
+		return n
+	}
+	c := *n
+	c.Variable = variable
+	return &c
+}
+
+type AssignmentOperation struct {
+	ID         uuid.UUID
+	Prefix     Space
+	Markers    Markers
+	Variable   Expression
+	Operator   LeftPadded[AssignmentOperator]
+	Assignment Expression
+	Type       JavaType // the result type (nullable)
+}
+
+type AssignmentOperator int
+
+const (
+	AddAssign    AssignmentOperator = iota + 1 // +=
+	SubAssign                                  // -=
+	MulAssign                                  // *=
+	DivAssign                                  // /=
+	ModAssign                                  // %=
+	AndAssign                                  // &=
+	OrAssign                                   // |=
+	XorAssign                                  // ^=
+	ShlAssign                                  // <<=
+	ShrAssign                                  // >>=
+	AndNotAssign                               // &^= (Go-specific)
+)
+
+func (op AssignmentOperator) String() string {
+	switch op {
+	case AddAssign:
+		return "Addition"
+	case SubAssign:
+		return "Subtraction"
+	case MulAssign:
+		return "Multiplication"
+	case DivAssign:
+		return "Division"
+	case ModAssign:
+		return "Modulo"
+	case AndAssign:
+		return "BitAnd"
+	case OrAssign:
+		return "BitOr"
+	case XorAssign:
+		return "BitXor"
+	case ShlAssign:
+		return "LeftShift"
+	case ShrAssign:
+		return "RightShift"
+	case AndNotAssign:
+		return "BitAnd" // Go-specific &^= mapped to BitAnd with marker
+	default:
+		return "Addition"
+	}
+}
+
+func ParseAssignmentOperator(s string) AssignmentOperator {
+	switch s {
+	case "Addition":
+		return AddAssign
+	case "Subtraction":
+		return SubAssign
+	case "Multiplication":
+		return MulAssign
+	case "Division":
+		return DivAssign
+	case "Modulo":
+		return ModAssign
+	case "BitAnd":
+		return AndAssign
+	case "BitOr":
+		return OrAssign
+	case "BitXor":
+		return XorAssign
+	case "LeftShift":
+		return ShlAssign
+	case "RightShift":
+		return ShrAssign
+	default:
+		return 0 // Unknown
+	}
+}
+
+func (*AssignmentOperation) IsTree()       {}
+func (*AssignmentOperation) IsJ()          {}
+func (*AssignmentOperation) IsStatement()  {}
+func (*AssignmentOperation) IsExpression() {}
+
+func (n *AssignmentOperation) WithPrefix(prefix Space) *AssignmentOperation {
+	if SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *AssignmentOperation) WithMarkers(markers Markers) *AssignmentOperation {
+	if MarkersEqual(n.Markers, markers) {
+		return n
+	}
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+func (n *AssignmentOperation) WithVariable(variable Expression) *AssignmentOperation {
+	if n.Variable == variable {
+		return n
+	}
+	c := *n
+	c.Variable = variable
+	return &c
+}
+
+type MethodDeclaration struct {
+	ID                 uuid.UUID
+	Prefix             Space
+	Markers            Markers
+	LeadingAnnotations []*Annotation // `//go:noinline` / `//go:nosplit` etc. on funcs
+	Name               *Identifier
+	TypeParameters     *TypeParameters      // nil for non-generic functions; `[T any]` declaration-site type params
+	Parameters         Container[Statement] // parameter list in parentheses
+	ReturnType         Expression           // nil for void functions; single type or *TypeList for multiple
+	Body               *Block               // nil for forward declarations
+	MethodType         *JavaTypeMethod      // the method type signature (nullable)
+}
+
+func (*MethodDeclaration) IsTree()      {}
+func (*MethodDeclaration) IsJ()         {}
+func (*MethodDeclaration) IsStatement() {}
+
+func (n *MethodDeclaration) WithPrefix(prefix Space) *MethodDeclaration {
+	if SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *MethodDeclaration) WithMarkers(markers Markers) *MethodDeclaration {
+	if MarkersEqual(n.Markers, markers) {
+		return n
+	}
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+func (n *MethodDeclaration) WithLeadingAnnotations(anns []*Annotation) *MethodDeclaration {
+	if SameSlice(n.LeadingAnnotations, anns) {
+		return n
+	}
+	c := *n
+	c.LeadingAnnotations = anns
+	return &c
+}
+
+func (n *MethodDeclaration) WithName(name *Identifier) *MethodDeclaration {
+	if n.Name == name {
+		return n
+	}
+	c := *n
+	c.Name = name
+	return &c
+}
+
+func (n *MethodDeclaration) WithBody(body *Block) *MethodDeclaration {
+	if n.Body == body {
+		return n
+	}
+	c := *n
+	c.Body = body
+	return &c
+}
+
+func (n *MethodDeclaration) WithTypeParameters(tps *TypeParameters) *MethodDeclaration {
+	if n.TypeParameters == tps {
+		return n
+	}
+	c := *n
+	c.TypeParameters = tps
+	return &c
+}
+
+// TypeParameters represents a declaration-site type parameter list, e.g. Go
+// `[T any, U comparable]` (Java `<T, U>`). Maps to
+// org.openrewrite.java.tree.J$TypeParameters.
+type TypeParameters struct {
+	ID          uuid.UUID
+	Prefix      Space
+	Markers     Markers
+	Annotations []*Annotation
+	// Elements are *TypeParameter. Typed as RightPadded[J] so the RPC padding
+	// machinery (which reconstructs J-only nodes as RightPadded[J]) round-trips
+	// them without bespoke type-switch cases.
+	TypeParameters []RightPadded[J]
+}
+
+func (*TypeParameters) IsTree() {}
+func (*TypeParameters) IsJ()    {}
+
+func (n *TypeParameters) WithPrefix(prefix Space) *TypeParameters {
+	if SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *TypeParameters) WithMarkers(markers Markers) *TypeParameters {
+	if MarkersEqual(n.Markers, markers) {
+		return n
+	}
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+// TypeParameter represents a single declaration-site type parameter, e.g. Go
+// `T any` (Java `T extends Foo`). The constraint (Go) / bound (Java) lives in
+// Bounds as a single-element container; it is nil when the parameter shares a
+// later sibling's constraint, as in `[T, U any]`. Maps to
+// org.openrewrite.java.tree.J$TypeParameter.
+type TypeParameter struct {
+	ID          uuid.UUID
+	Prefix      Space
+	Markers     Markers
+	Annotations []*Annotation
+	Name        Expression
+	Bounds      *Container[Expression]
+}
+
+func (*TypeParameter) IsTree() {}
+func (*TypeParameter) IsJ()    {}
+
+func (n *TypeParameter) WithPrefix(prefix Space) *TypeParameter {
+	if SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *TypeParameter) WithMarkers(markers Markers) *TypeParameter {
+	if MarkersEqual(n.Markers, markers) {
+		return n
+	}
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+// ForLoop represents a classic for loop: `for init; cond; update { body }`
+// Also covers condition-only `for cond {}` and infinite `for {}`.
+type ForLoop struct {
+	ID      uuid.UUID
+	Prefix  Space
+	Markers Markers
+	Control ForControl
+	Body    RightPadded[Statement] // the block and the space after it
+}
+
+func (*ForLoop) IsTree()      {}
+func (*ForLoop) IsJ()         {}
+func (*ForLoop) IsStatement() {}
+
+func (n *ForLoop) WithPrefix(prefix Space) *ForLoop {
+	if SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *ForLoop) WithMarkers(markers Markers) *ForLoop {
+	if MarkersEqual(n.Markers, markers) {
+		return n
+	}
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+func (n *ForLoop) WithBody(body RightPadded[Statement]) *ForLoop {
+	if RightPaddedEqual(n.Body, body) {
+		return n
+	}
+	c := *n
+	c.Body = body
+	return &c
+}
+
+// When Init is non-nil, this is a 3-clause loop with semicolons;
+// Init.After and Condition.After capture whitespace around semicolons.
+// When Init is nil and Condition is non-nil, it's a condition-only loop (no semicolons).
+// When both are nil, it's an infinite loop.
+type ForControl struct {
+	ID        uuid.UUID
+	Prefix    Space
+	Markers   Markers
+	Init      *RightPadded[Statement]  // nil for condition-only or infinite loops
+	Condition *RightPadded[Expression] // nil for infinite loops
+	Update    *RightPadded[Statement]  // nil when no update clause
+}
+
+func (*ForControl) IsTree() {}
+func (*ForControl) IsJ()    {}
+
+func (n *ForControl) WithPrefix(prefix Space) *ForControl {
+	if SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *ForControl) WithMarkers(markers Markers) *ForControl {
+	if MarkersEqual(n.Markers, markers) {
+		return n
+	}
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+type ForEachLoop struct {
+	ID      uuid.UUID
+	Prefix  Space
+	Markers Markers
+	Control ForEachControl
+	Body    RightPadded[Statement] // the block and the space after it
+}
+
+func (*ForEachLoop) IsTree()      {}
+func (*ForEachLoop) IsJ()         {}
+func (*ForEachLoop) IsStatement() {}
+
+func (n *ForEachLoop) WithPrefix(prefix Space) *ForEachLoop {
+	if SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *ForEachLoop) WithMarkers(markers Markers) *ForEachLoop {
+	if MarkersEqual(n.Markers, markers) {
+		return n
+	}
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+func (n *ForEachLoop) WithBody(body RightPadded[Statement]) *ForEachLoop {
+	if RightPaddedEqual(n.Body, body) {
+		return n
+	}
+	c := *n
+	c.Body = body
+	return &c
+}
+
+// ForEachControl is a faithful mirror of Java's J.ForEachLoop.Control: it has
+// exactly the same two slots, Variable and Iterable. The "range" keyword (the
+// Go analog of Java's `:` separator) is implicit and always present.
+//
+// Structure: `for` [variable] `range` iterable
+//   - Variable holds the loop target(s). Keyless `for range expr {}` uses a
+//     J.Empty here. One or more targets — together with the `:=`/`=` operator —
+//     are carried by a golang.MultiAssignment (its ShortVarDecl marker encodes
+//     `:=` vs `=`); this keeps all Go-specific structure out of this mirror.
+//   - Variable.After = space before "range".
+type ForEachControl struct {
+	ID       uuid.UUID
+	Prefix   Space
+	Markers  Markers
+	Variable RightPadded[Statement]  // loop target(s); J.Empty when keyless
+	Iterable RightPadded[Expression] // expression after "range" keyword
+}
+
+func (*ForEachControl) IsTree() {}
+func (*ForEachControl) IsJ()    {}
+
+func (n *ForEachControl) WithPrefix(prefix Space) *ForEachControl {
+	if SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *ForEachControl) WithMarkers(markers Markers) *ForEachControl {
+	if MarkersEqual(n.Markers, markers) {
+		return n
+	}
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+// Switch represents a switch statement. Mirrors Java's J.Switch: a selector tag
+// and the case block. Go's optional init clause (`switch x := f(); x {}`) has no
+// slot here — it lives on a wrapping golang.StatementWithInit instead.
+type Switch struct {
+	ID       uuid.UUID
+	Prefix   Space
+	Markers  Markers
+	Selector *ControlParentheses // selector expression (matching J.Switch); Go has no parens, so the wrapper carries no whitespace and the inner element holds the tag. Tree.Element is an Empty for a tagless `switch {}`. Tree.After = space before {
+	Body     *Block              // contains Case statements
+}
+
+func (*Switch) IsTree()      {}
+func (*Switch) IsJ()         {}
+func (*Switch) IsStatement() {}
+
+func (n *Switch) WithPrefix(prefix Space) *Switch {
+	if SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *Switch) WithMarkers(markers Markers) *Switch {
+	if MarkersEqual(n.Markers, markers) {
+		return n
+	}
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+func (n *Switch) WithBody(body *Block) *Switch {
+	if n.Body == body {
+		return n
+	}
+	c := *n
+	c.Body = body
+	return &c
+}
+
+type Case struct {
+	ID          uuid.UUID
+	Prefix      Space
+	Markers     Markers
+	Expressions Container[Expression] // empty for default case
+	Body        Container[Statement]  // Before = space before the colon; the statements after it
+}
+
+func (*Case) IsTree()      {}
+func (*Case) IsJ()         {}
+func (*Case) IsStatement() {}
+
+func (n *Case) WithPrefix(prefix Space) *Case {
+	if SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *Case) WithMarkers(markers Markers) *Case {
+	if MarkersEqual(n.Markers, markers) {
+		return n
+	}
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+type Break struct {
+	ID      uuid.UUID
+	Prefix  Space
+	Markers Markers
+	Label   *Identifier // nil if no label
+}
+
+func (*Break) IsTree()      {}
+func (*Break) IsJ()         {}
+func (*Break) IsStatement() {}
+
+func (n *Break) WithPrefix(prefix Space) *Break {
+	if SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *Break) WithMarkers(markers Markers) *Break {
+	if MarkersEqual(n.Markers, markers) {
+		return n
+	}
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+type Continue struct {
+	ID      uuid.UUID
+	Prefix  Space
+	Markers Markers
+	Label   *Identifier // nil if no label
+}
+
+func (*Continue) IsTree()      {}
+func (*Continue) IsJ()         {}
+func (*Continue) IsStatement() {}
+
+func (n *Continue) WithPrefix(prefix Space) *Continue {
+	if SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *Continue) WithMarkers(markers Markers) *Continue {
+	if MarkersEqual(n.Markers, markers) {
+		return n
+	}
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+type Label struct {
+	ID        uuid.UUID
+	Prefix    Space
+	Markers   Markers
+	Name      RightPadded[*Identifier] // After = space before ':'
+	Statement Statement
+}
+
+func (*Label) IsTree()      {}
+func (*Label) IsJ()         {}
+func (*Label) IsStatement() {}
+
+func (n *Label) WithPrefix(prefix Space) *Label {
+	if SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *Label) WithMarkers(markers Markers) *Label {
+	if MarkersEqual(n.Markers, markers) {
+		return n
+	}
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+// Mirrors org.openrewrite.java.tree.J.Annotation.
+//
+// Java has first-class `@Annotation(args)` syntax. Go has no `@`, but
+// has two analogous concepts that this type models uniformly:
+//
+//  1. Struct field tags. Each `key:"value"` pair in a struct field
+//     tag becomes one Annotation on the field's VariableDeclarations:
+//     AnnotationType = Identifier{Name: key},
+//     Arguments      = [Literal{Value: value}].
+//     The printer renders the run of struct-tag annotations on a
+//     VariableDeclarations whose parent is a StructType as a single
+//     backtick-wrapped tag.
+//
+//  2. Source directives like `//go:noinline`, `//go:generate`,
+//     `//lint:ignore`. Each directive becomes one Annotation on the
+//     enclosing MethodDeclaration / TypeDecl / VariableDeclarations:
+//     AnnotationType = Identifier{Name: "go:noinline"},
+//     Arguments      = [Literal(args)] when the directive carries
+//     text after the keyword, else nil.
+//
+// In both cases, AnnotationType is an Expression (typically Identifier;
+// FieldAccess for qualified directives like `lint:ignore`).
+//
+// Recipes use AnnotationService to inspect / match / mutate, mirroring
+// Java's AnnotationService surface.
+type Annotation struct {
+	ID             uuid.UUID
+	Prefix         Space
+	Markers        Markers
+	AnnotationType Expression             // NameTree — Identifier or FieldAccess
+	Arguments      *Container[Expression] // nullable; tags always have one Literal
+}
+
+func (*Annotation) IsTree()       {}
+func (*Annotation) IsJ()          {}
+func (*Annotation) IsExpression() {}
+
+func (n *Annotation) WithPrefix(prefix Space) *Annotation {
+	if SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *Annotation) WithMarkers(markers Markers) *Annotation {
+	if MarkersEqual(n.Markers, markers) {
+		return n
+	}
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+func (n *Annotation) WithAnnotationType(annotationType Expression) *Annotation {
+	if n.AnnotationType == annotationType {
+		return n
+	}
+	c := *n
+	c.AnnotationType = annotationType
+	return &c
+}
+
+func (n *Annotation) WithArguments(arguments *Container[Expression]) *Annotation {
+	if n.Arguments == arguments {
+		return n
+	}
+	c := *n
+	c.Arguments = arguments
+	return &c
+}
+
+type Empty struct {
+	ID      uuid.UUID
+	Prefix  Space
+	Markers Markers
+}
+
+func (*Empty) IsTree()       {}
+func (*Empty) IsJ()          {}
+func (*Empty) IsStatement()  {}
+func (*Empty) IsExpression() {}
+
+func (n *Empty) WithPrefix(prefix Space) *Empty {
+	if SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *Empty) WithMarkers(markers Markers) *Empty {
+	if MarkersEqual(n.Markers, markers) {
+		return n
+	}
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+type Unary struct {
+	ID       uuid.UUID
+	Prefix   Space
+	Markers  Markers
+	Operator LeftPadded[UnaryOperator]
+	Operand  Expression
+	Type     JavaType // the result type (nullable)
+}
+
+type UnaryOperator int
+
+const (
+	Negate        UnaryOperator = iota + 1 // -
+	Not                                    // !
+	BitwiseNot                             // ^
+	Positive                               // +
+	PostIncrement                          // ++ (postfix)
+	PostDecrement                          // -- (postfix)
+)
+
+func (op UnaryOperator) String() string {
+	switch op {
+	case Negate:
+		return "Negative"
+	case Not:
+		return "Not"
+	case BitwiseNot:
+		return "Complement"
+	case Positive:
+		return "Positive"
+	case PostIncrement:
+		return "PostIncrement"
+	case PostDecrement:
+		return "PostDecrement"
+	default:
+		return "Negative"
+	}
+}
+
+func ParseUnaryOperator(s string) UnaryOperator {
+	switch s {
+	case "PreIncrement":
+		return Positive // Go doesn't have pre-increment
+	case "PreDecrement":
+		return Negate // Go doesn't have pre-decrement
+	case "PostIncrement":
+		return PostIncrement
+	case "PostDecrement":
+		return PostDecrement
+	case "Positive":
+		return Positive
+	case "Negative":
+		return Negate
+	case "Complement":
+		return BitwiseNot
+	case "Not":
+		return Not
+	case "BitwiseNot":
+		return BitwiseNot
+	case "LogicalNot":
+		return Not
+	default:
+		return 0 // Unknown operator
+	}
+}
+
+func (*Unary) IsTree()       {}
+func (*Unary) IsJ()          {}
+func (*Unary) IsExpression() {}
+func (*Unary) IsStatement()  {}
+
+func (n *Unary) WithPrefix(prefix Space) *Unary {
+	if SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *Unary) WithMarkers(markers Markers) *Unary {
+	if MarkersEqual(n.Markers, markers) {
+		return n
+	}
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+func (n *Unary) WithOperand(operand Expression) *Unary {
+	if n.Operand == operand {
+		return n
+	}
+	c := *n
+	c.Operand = operand
+	return &c
+}
+
+type FieldAccess struct {
+	ID      uuid.UUID
+	Prefix  Space
+	Markers Markers
+	Target  Expression
+	Name    LeftPadded[*Identifier]
+	Type    JavaType // the result type (nullable)
+}
+
+func (*FieldAccess) IsTree()       {}
+func (*FieldAccess) IsJ()          {}
+func (*FieldAccess) IsExpression() {}
+func (*FieldAccess) IsStatement()  {}
+
+func (n *FieldAccess) WithPrefix(prefix Space) *FieldAccess {
+	if SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *FieldAccess) WithMarkers(markers Markers) *FieldAccess {
+	if MarkersEqual(n.Markers, markers) {
+		return n
+	}
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+func (n *FieldAccess) WithTarget(target Expression) *FieldAccess {
+	if n.Target == target {
+		return n
+	}
+	c := *n
+	c.Target = target
+	return &c
+}
+
+type MethodInvocation struct {
+	ID             uuid.UUID
+	Prefix         Space
+	Markers        Markers
+	Select         *RightPadded[Expression] // nil for free functions
+	TypeParameters *Container[Expression]   // explicit call-site type arguments, e.g. `[int]` in `Map[int](42)`; nil otherwise
+	Name           *Identifier
+	Arguments      Container[Expression]
+	MethodType     *JavaTypeMethod // the method type being invoked (nullable)
+}
+
+func (*MethodInvocation) IsTree()       {}
+func (*MethodInvocation) IsJ()          {}
+func (*MethodInvocation) IsExpression() {}
+func (*MethodInvocation) IsStatement()  {}
+
+func (n *MethodInvocation) WithPrefix(prefix Space) *MethodInvocation {
+	if SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *MethodInvocation) WithMarkers(markers Markers) *MethodInvocation {
+	if MarkersEqual(n.Markers, markers) {
+		return n
+	}
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+func (n *MethodInvocation) WithName(name *Identifier) *MethodInvocation {
+	if n.Name == name {
+		return n
+	}
+	c := *n
+	c.Name = name
+	return &c
+}
+
+func (n *MethodInvocation) WithTypeParameters(typeParameters *Container[Expression]) *MethodInvocation {
+	if n.TypeParameters == typeParameters {
+		return n
+	}
+	c := *n
+	c.TypeParameters = typeParameters
+	return &c
+}
+
+// Grouped declarations `var ( ... )` / `const ( ... )` are modeled by
+// golang.DeclarationBlock, whose elements are single VariableDeclarations.
+type VariableDeclarations struct {
+	ID                 uuid.UUID
+	Prefix             Space
+	Markers            Markers
+	LeadingAnnotations []*Annotation                      // struct field tags (one per `key:"value"` pair) or `//go:` directives
+	TypeExpr           Expression                         // the declared type (nil if inferred)
+	Varargs            *Space                             // non-nil for variadic params (`...T`); holds prefix of `...`
+	Variables          []RightPadded[*VariableDeclarator] // the declared variables
+}
+
+func (*VariableDeclarations) IsTree()      {}
+func (*VariableDeclarations) IsJ()         {}
+func (*VariableDeclarations) IsStatement() {}
+
+func (n *VariableDeclarations) WithPrefix(prefix Space) *VariableDeclarations {
+	if SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *VariableDeclarations) WithMarkers(markers Markers) *VariableDeclarations {
+	if MarkersEqual(n.Markers, markers) {
+		return n
+	}
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+func (n *VariableDeclarations) WithLeadingAnnotations(anns []*Annotation) *VariableDeclarations {
+	if SameSlice(n.LeadingAnnotations, anns) {
+		return n
+	}
+	c := *n
+	c.LeadingAnnotations = anns
+	return &c
+}
+
+type VariableDeclarator struct {
+	ID          uuid.UUID
+	Prefix      Space
+	Markers     Markers
+	Name        *Identifier
+	Initializer *LeftPadded[Expression] // nil if no initializer
+}
+
+func (*VariableDeclarator) IsTree() {}
+func (*VariableDeclarator) IsJ()    {}
+
+func (n *VariableDeclarator) WithPrefix(prefix Space) *VariableDeclarator {
+	if SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *VariableDeclarator) WithMarkers(markers Markers) *VariableDeclarator {
+	if MarkersEqual(n.Markers, markers) {
+		return n
+	}
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+func (n *VariableDeclarator) WithName(name *Identifier) *VariableDeclarator {
+	if n.Name == name {
+		return n
+	}
+	c := *n
+	c.Name = name
+	return &c
+}
+
+// Mirrors Java's J.ArrayType, which has no length slot. Go's fixed-size arrays
+// `[N]T` carry an inline length expression and map to golang.ArrayType instead.
+type ArrayType struct {
+	ID          uuid.UUID
+	Prefix      Space
+	Markers     Markers
+	Dimension   LeftPadded[Space] // Before = space before `[`, Element = space inside brackets before `]`
+	ElementType Expression        // the element type
+	Type        JavaType          // the array type (nullable)
+}
+
+func (*ArrayType) IsTree()       {}
+func (*ArrayType) IsJ()          {}
+func (*ArrayType) IsExpression() {}
+
+func (n *ArrayType) WithPrefix(prefix Space) *ArrayType {
+	if SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *ArrayType) WithMarkers(markers Markers) *ArrayType {
+	if MarkersEqual(n.Markers, markers) {
+		return n
+	}
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+type Parentheses struct {
+	ID      uuid.UUID
+	Prefix  Space
+	Markers Markers
+	Tree    RightPadded[Expression] // Element = inner expr, After = space before `)`
+}
+
+func (*Parentheses) IsTree()       {}
+func (*Parentheses) IsJ()          {}
+func (*Parentheses) IsExpression() {}
+
+func (n *Parentheses) WithPrefix(prefix Space) *Parentheses {
+	if SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *Parentheses) WithMarkers(markers Markers) *Parentheses {
+	if MarkersEqual(n.Markers, markers) {
+		return n
+	}
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+// ParenthesizedTypeTree is a type written in parentheses, such as the `(*T)` of
+// `(*T)(nil)`. Go spells a parenthesized type and a parenthesized expression
+// alike, so only the position tells them apart; the separate node is what keeps
+// a type a TypeTree in slots such as TypeCast.Clazz, which Java bounds to one.
+type ParenthesizedTypeTree struct {
+	ID          uuid.UUID
+	Prefix      Space
+	Markers     Markers
+	Annotations []*Annotation
+	Type        *Parentheses // the parentheses, and the type they enclose
+}
+
+func (*ParenthesizedTypeTree) IsTree()       {}
+func (*ParenthesizedTypeTree) IsJ()          {}
+func (*ParenthesizedTypeTree) IsExpression() {}
+
+func (n *ParenthesizedTypeTree) WithPrefix(prefix Space) *ParenthesizedTypeTree {
+	if SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *ParenthesizedTypeTree) WithMarkers(markers Markers) *ParenthesizedTypeTree {
+	if MarkersEqual(n.Markers, markers) {
+		return n
+	}
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+// TypeCast is Go's conversion `T(x)`. J's own cast is the mirror image — Java
+// parenthesizes the type ahead of the operand — so Clazz holds the type, where
+// J.TypeCast.getType reads it, and the parentheses it carries stand after that
+// type: its Prefix leads the `(`, its After the `)`.
+type TypeCast struct {
+	ID      uuid.UUID
+	Prefix  Space
+	Markers Markers
+	Clazz   *ControlParentheses // the type, and the parentheses following it
+	Expr    Expression          // the operand being converted
+}
+
+func (*TypeCast) IsTree()       {}
+func (*TypeCast) IsJ()          {}
+func (*TypeCast) IsExpression() {}
+
+func (n *TypeCast) WithPrefix(prefix Space) *TypeCast {
+	if SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *TypeCast) WithMarkers(markers Markers) *TypeCast {
+	if MarkersEqual(n.Markers, markers) {
+		return n
+	}
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+type ControlParentheses struct {
+	ID      uuid.UUID
+	Prefix  Space
+	Markers Markers
+	Tree    RightPadded[Expression] // Element = inner, After = space before `)`
+}
+
+func (*ControlParentheses) IsTree()       {}
+func (*ControlParentheses) IsJ()          {}
+func (*ControlParentheses) IsExpression() {}
+
+func (n *ControlParentheses) WithPrefix(prefix Space) *ControlParentheses {
+	if SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *ControlParentheses) WithMarkers(markers Markers) *ControlParentheses {
+	if MarkersEqual(n.Markers, markers) {
+		return n
+	}
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+type ArrayAccess struct {
+	ID        uuid.UUID
+	Prefix    Space
+	Markers   Markers
+	Indexed   Expression
+	Dimension *ArrayDimension
+	Type      JavaType // the result type (nullable)
+}
+
+type ArrayDimension struct {
+	ID      uuid.UUID
+	Prefix  Space
+	Markers Markers
+	Index   RightPadded[Expression] // Element = index expr, After = space before `]`
+}
+
+func (*ArrayAccess) IsTree()       {}
+func (*ArrayAccess) IsJ()          {}
+func (*ArrayAccess) IsExpression() {}
+
+func (n *ArrayAccess) WithPrefix(prefix Space) *ArrayAccess {
+	if SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *ArrayAccess) WithMarkers(markers Markers) *ArrayAccess {
+	if MarkersEqual(n.Markers, markers) {
+		return n
+	}
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+func (*ArrayDimension) IsTree() {}
+func (*ArrayDimension) IsJ()    {}
+
+func (n *ArrayDimension) WithPrefix(prefix Space) *ArrayDimension {
+	if SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *ArrayDimension) WithMarkers(markers Markers) *ArrayDimension {
+	if MarkersEqual(n.Markers, markers) {
+		return n
+	}
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+type ParameterizedType struct {
+	ID             uuid.UUID
+	Prefix         Space
+	Markers        Markers
+	Clazz          Expression             // the base type being parameterized
+	TypeParameters *Container[Expression] // the type arguments (nullable)
+	Type           JavaType               // resolved type (nullable)
+}
+
+func (*ParameterizedType) IsTree()       {}
+func (*ParameterizedType) IsJ()          {}
+func (*ParameterizedType) IsExpression() {}
+
+func (n *ParameterizedType) WithPrefix(prefix Space) *ParameterizedType {
+	if SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *ParameterizedType) WithMarkers(markers Markers) *ParameterizedType {
+	if MarkersEqual(n.Markers, markers) {
+		return n
+	}
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+type Import struct {
+	ID      uuid.UUID
+	Prefix  Space
+	Markers Markers
+	Alias   *LeftPadded[*Identifier] // nil if no alias
+	// Qualid mirrors J.Import.qualid: its Target is an Empty and its Name the
+	// path as written, without the quotes of an interpreted string.
+	Qualid *FieldAccess
+}
+
+func (*Import) IsTree()      {}
+func (*Import) IsJ()         {}
+func (*Import) IsStatement() {}
+
+// Path returns the import path that Qualid's name spells.
+func (n *Import) Path() string {
+	if n == nil || n.Qualid == nil || n.Qualid.Name.Element == nil {
+		return ""
+	}
+	name := n.Qualid.Name.Element.Name
+	if strings.HasPrefix(name, "`") {
+		return strings.Trim(name, "`")
+	}
+	if strings.ContainsRune(name, '\\') {
+		if path, err := strconv.Unquote(`"` + name + `"`); err == nil {
+			return path
+		}
+	}
+	return name
+}
+
+// ImportPathSource is the string literal an import path is written as: a raw
+// string is held with its backticks, an interpreted one without its quotes.
+func ImportPathSource(name string) string {
+	if name == "" || strings.HasPrefix(name, "`") {
+		return name
+	}
+	return `"` + name + `"`
+}
+
+func (n *Import) WithPrefix(prefix Space) *Import {
+	if SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *Import) WithMarkers(markers Markers) *Import {
+	if MarkersEqual(n.Markers, markers) {
+		return n
+	}
+	c := *n
+	c.Markers = markers
+	return &c
+}

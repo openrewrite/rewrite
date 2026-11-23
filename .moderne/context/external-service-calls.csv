@@ -1,0 +1,7 @@
+Entity ID,Source path,Client class,Target service,Client type,Protocol,Base URL
+external:org.openrewrite.maven.MavenParserTest,rewrite-maven/src/test/java/org/openrewrite/maven/MavenParserTest.java,org.openrewrite.maven.MavenParserTest,Maven Parser Test Service,OkHttp,,
+external:org.openrewrite.maven.http.OkHttpSender,rewrite-maven/src/test/java/org/openrewrite/maven/http/OkHttpSender.java,org.openrewrite.maven.http.OkHttpSender,Ok Http Sender Service,OkHttp,,
+external:org.openrewrite.maven.http.OkHttpSender,rewrite-maven/src/test/java/org/openrewrite/maven/http/OkHttpSender.java,org.openrewrite.maven.http.OkHttpSender,Ok Http Sender Service,OkHttp,,
+external:org.openrewrite.maven.http.OkHttpSender,rewrite-maven/src/test/java/org/openrewrite/maven/http/OkHttpSender.java,org.openrewrite.maven.http.OkHttpSender,Ok Http Sender Service,OkHttp,,
+external:org.openrewrite.maven.internal.MavenPomDownloaderTest$WithOkHttpClientAndSelfSignedTLS,rewrite-maven/src/test/java/org/openrewrite/maven/internal/MavenPomDownloaderTest.java,org.openrewrite.maven.internal.MavenPomDownloaderTest$WithOkHttpClientAndSelfSignedTLS,Maven Pom Downloader Test$ With Ok Http Client And Self Signed T L S Service,OkHttp,,
+external:org.openrewrite.docker.internal.EolImageDataGenerator,rewrite-docker/src/test/java/org/openrewrite/docker/internal/EolImageDataGenerator.java,org.openrewrite.docker.internal.EolImageDataGenerator,Eol Image Data Generator Service,Java HttpClient,,

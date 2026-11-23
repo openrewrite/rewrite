@@ -23,6 +23,9 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.maven.tree.MavenResolutionResult;
+import org.openrewrite.maven.tree.ResolvedPom;
+import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.List;
@@ -31,9 +34,6 @@ import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
-
-import org.openrewrite.maven.tree.MavenResolutionResult;
-import org.openrewrite.maven.tree.ResolvedPom;
 
 class ChangeParentPomTest implements RewriteTest {
 
@@ -92,11 +92,11 @@ class ChangeParentPomTest implements RewriteTest {
     void changeParentShouldResolveDependenciesManagementWithMavenProperties() {
         rewriteRun(
           spec -> spec.recipe(new ChangeParentPom(
-            "org.jenkins-ci.plugins",
-            "org.jenkins-ci.plugins",
-            "plugin",
-            "plugin",
-            "5.3",
+            "org.apache",
+            "org.apache",
+            "apache",
+            "apache",
+            "32",
             null,
             null,
             null,
@@ -106,90 +106,68 @@ class ChangeParentPomTest implements RewriteTest {
           pomXml(
             """
               <project>
+                  <modelVersion>4.0.0</modelVersion>
                   <parent>
-                      <groupId>org.jenkins-ci.plugins</groupId>
-                      <artifactId>plugin</artifactId>
-                      <version>4.86</version>
+                      <groupId>org.apache</groupId>
+                      <artifactId>apache</artifactId>
+                      <version>31</version>
                       <relativePath/>
                   </parent>
-                  <artifactId>example-plugin</artifactId>
-                  <version>0.8-SNAPSHOT</version>
+                  <artifactId>example</artifactId>
+                  <version>1.0</version>
                   <properties>
-                      <jenkins.baseline>2.462</jenkins.baseline>
-                      <jenkins.version>${jenkins.baseline}.3</jenkins.version>
+                      <bom.suffix>bom</bom.suffix>
                   </properties>
                   <dependencyManagement>
-                     <dependencies>
-                         <dependency>
-                             <groupId>io.jenkins.tools.bom</groupId>
-                             <artifactId>bom-${jenkins.baseline}.x</artifactId>
-                             <version>3722.vcc62e7311580</version>
-                             <type>pom</type>
-                             <scope>import</scope>
-                         </dependency>
-                     </dependencies>
-                 </dependencyManagement>
-                 <dependencies>
-                     <dependency>
-                         <groupId>org.jenkins-ci.plugins</groupId>
-                         <artifactId>scm-api</artifactId>
-                     </dependency>
-                 </dependencies>
-                  <repositories>
-                      <repository>
-                        <id>central</id>
-                        <name>Central Repository</name>
-                        <url>https://repo.maven.apache.org/maven2</url>
-                      </repository>
-                      <repository>
-                          <id>repo.jenkins-ci.org</id>
-                          <url>https://repo.jenkins-ci.org/public/</url>
-                      </repository>
-                  </repositories>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.junit</groupId>
+                              <artifactId>junit-${bom.suffix}</artifactId>
+                              <version>5.10.2</version>
+                              <type>pom</type>
+                              <scope>import</scope>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.junit.jupiter</groupId>
+                          <artifactId>junit-jupiter-api</artifactId>
+                      </dependency>
+                  </dependencies>
               </project>
               """,
             """
               <project>
+                  <modelVersion>4.0.0</modelVersion>
                   <parent>
-                      <groupId>org.jenkins-ci.plugins</groupId>
-                      <artifactId>plugin</artifactId>
-                      <version>5.3</version>
+                      <groupId>org.apache</groupId>
+                      <artifactId>apache</artifactId>
+                      <version>32</version>
                       <relativePath/>
                   </parent>
-                  <artifactId>example-plugin</artifactId>
-                  <version>0.8-SNAPSHOT</version>
+                  <artifactId>example</artifactId>
+                  <version>1.0</version>
                   <properties>
-                      <jenkins.baseline>2.462</jenkins.baseline>
-                      <jenkins.version>${jenkins.baseline}.3</jenkins.version>
+                      <bom.suffix>bom</bom.suffix>
                   </properties>
                   <dependencyManagement>
-                     <dependencies>
-                         <dependency>
-                             <groupId>io.jenkins.tools.bom</groupId>
-                             <artifactId>bom-${jenkins.baseline}.x</artifactId>
-                             <version>3722.vcc62e7311580</version>
-                             <type>pom</type>
-                             <scope>import</scope>
-                         </dependency>
-                     </dependencies>
-                 </dependencyManagement>
-                 <dependencies>
-                     <dependency>
-                         <groupId>org.jenkins-ci.plugins</groupId>
-                         <artifactId>scm-api</artifactId>
-                     </dependency>
-                 </dependencies>
-                  <repositories>
-                      <repository>
-                        <id>central</id>
-                        <name>Central Repository</name>
-                        <url>https://repo.maven.apache.org/maven2</url>
-                      </repository>
-                      <repository>
-                          <id>repo.jenkins-ci.org</id>
-                          <url>https://repo.jenkins-ci.org/public/</url>
-                      </repository>
-                  </repositories>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.junit</groupId>
+                              <artifactId>junit-${bom.suffix}</artifactId>
+                              <version>5.10.2</version>
+                              <type>pom</type>
+                              <scope>import</scope>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.junit.jupiter</groupId>
+                          <artifactId>junit-jupiter-api</artifactId>
+                      </dependency>
+                  </dependencies>
               </project>
               """
           )
@@ -1564,6 +1542,260 @@ class ChangeParentPomTest implements RewriteTest {
               )
             );
         }
+
+        @Issue("https://github.com/moderneinc/customer-requests/issues/2589")
+        @Test
+        void bringsDownRemovedManagedVersionDeclaredInChildModuleOfLocalParent() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeParentPom(
+                "org.springframework.boot", "org.springframework.boot",
+                "spring-boot-starter-parent", "spring-boot-starter-parent",
+                "3.2.4",
+                null, null, null, null, null)),
+              mavenProject("parent",
+                pomXml(
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <groupId>com.mycompany</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1.0.0-SNAPSHOT</version>
+                        <packaging>pom</packaging>
+                        <parent>
+                            <groupId>org.springframework.boot</groupId>
+                            <artifactId>spring-boot-starter-parent</artifactId>
+                            <version>2.7.18</version>
+                            <relativePath/>
+                        </parent>
+                        <modules>
+                            <module>child</module>
+                        </modules>
+                    </project>
+                    """,
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <groupId>com.mycompany</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1.0.0-SNAPSHOT</version>
+                        <packaging>pom</packaging>
+                        <parent>
+                            <groupId>org.springframework.boot</groupId>
+                            <artifactId>spring-boot-starter-parent</artifactId>
+                            <version>3.2.4</version>
+                            <relativePath/>
+                        </parent>
+                        <modules>
+                            <module>child</module>
+                        </modules>
+                        <dependencyManagement>
+                            <dependencies>
+                                <dependency>
+                                    <groupId>javax.servlet</groupId>
+                                    <artifactId>javax.servlet-api</artifactId>
+                                    <version>4.0.1</version>
+                                </dependency>
+                            </dependencies>
+                        </dependencyManagement>
+                    </project>
+                    """
+                ),
+                mavenProject("child",
+                  pomXml(
+                    """
+                      <project>
+                          <modelVersion>4.0.0</modelVersion>
+                          <parent>
+                              <groupId>com.mycompany</groupId>
+                              <artifactId>parent</artifactId>
+                              <version>1.0.0-SNAPSHOT</version>
+                          </parent>
+                          <artifactId>child</artifactId>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>javax.servlet</groupId>
+                                  <artifactId>javax.servlet-api</artifactId>
+                              </dependency>
+                          </dependencies>
+                      </project>
+                      """,
+                    spec -> spec.afterRecipe(doc -> {
+                        MavenResolutionResult result = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                        assertThat(result.getPom().getManagedVersion("javax.servlet", "javax.servlet-api", null, null))
+                          .describedAs("The version the parent brought down is visible to the child")
+                          .isEqualTo("4.0.1");
+                    })
+                  )
+                )
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/8595")
+        @Test
+        void chainedUpgradesRetainVersionStrippedByEarlierUpgrade() {
+            rewriteRun(
+              spec -> spec.recipes(
+                new ChangeParentPom("org.springframework.boot", null, "spring-boot-starter-parent", null, "2.7.18", null, null, null, false, null),
+                new ChangeParentPom("org.springframework.boot", null, "spring-boot-starter-parent", null, "3.0.13", null, null, null, false, null)
+              ),
+              mavenProject("parent",
+                pomXml(
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <groupId>com.mycompany</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1.0.0-SNAPSHOT</version>
+                        <packaging>pom</packaging>
+                        <parent>
+                            <groupId>org.springframework.boot</groupId>
+                            <artifactId>spring-boot-starter-parent</artifactId>
+                            <version>2.7.5</version>
+                            <relativePath/>
+                        </parent>
+                        <modules>
+                            <module>child</module>
+                        </modules>
+                    </project>
+                    """,
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <groupId>com.mycompany</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1.0.0-SNAPSHOT</version>
+                        <packaging>pom</packaging>
+                        <parent>
+                            <groupId>org.springframework.boot</groupId>
+                            <artifactId>spring-boot-starter-parent</artifactId>
+                            <version>3.0.13</version>
+                            <relativePath/>
+                        </parent>
+                        <modules>
+                            <module>child</module>
+                        </modules>
+                    </project>
+                    """
+                ),
+                mavenProject("child",
+                  pomXml(
+                    """
+                      <project>
+                          <modelVersion>4.0.0</modelVersion>
+                          <parent>
+                              <groupId>com.mycompany</groupId>
+                              <artifactId>parent</artifactId>
+                              <version>1.0.0-SNAPSHOT</version>
+                          </parent>
+                          <artifactId>child</artifactId>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>org.glassfish</groupId>
+                                  <artifactId>jakarta.el</artifactId>
+                                  <version>3.0.4</version>
+                              </dependency>
+                          </dependencies>
+                      </project>
+                      """,
+                    spec -> spec.afterRecipe(doc -> {
+                        MavenResolutionResult result = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                        assertThat(result.getDependencies().get(Scope.Compile))
+                          .describedAs("The dependency still resolves to a version")
+                          .anyMatch(dep -> "org.glassfish:jakarta.el:3.0.4".equals(dep.getGav().toString()));
+                    })
+                  )
+                )
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/8595")
+        @Test
+        void chainedUpgradesBringDownRemovedManagedVersionForChildModule() {
+            rewriteRun(
+              spec -> spec.recipes(
+                new ChangeParentPom("org.springframework.boot", null, "spring-boot-starter-parent", null, "2.7.18", null, null, null, false, null),
+                new ChangeParentPom("org.springframework.boot", null, "spring-boot-starter-parent", null, "3.0.13", null, null, null, false, null)
+              ),
+              mavenProject("parent",
+                pomXml(
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <groupId>com.mycompany</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1.0.0-SNAPSHOT</version>
+                        <packaging>pom</packaging>
+                        <parent>
+                            <groupId>org.springframework.boot</groupId>
+                            <artifactId>spring-boot-starter-parent</artifactId>
+                            <version>2.7.5</version>
+                            <relativePath/>
+                        </parent>
+                        <modules>
+                            <module>child</module>
+                        </modules>
+                    </project>
+                    """,
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <groupId>com.mycompany</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1.0.0-SNAPSHOT</version>
+                        <packaging>pom</packaging>
+                        <parent>
+                            <groupId>org.springframework.boot</groupId>
+                            <artifactId>spring-boot-starter-parent</artifactId>
+                            <version>3.0.13</version>
+                            <relativePath/>
+                        </parent>
+                        <modules>
+                            <module>child</module>
+                        </modules>
+                        <dependencyManagement>
+                            <dependencies>
+                                <dependency>
+                                    <groupId>org.glassfish</groupId>
+                                    <artifactId>jakarta.el</artifactId>
+                                    <version>3.0.4</version>
+                                </dependency>
+                            </dependencies>
+                        </dependencyManagement>
+                    </project>
+                    """
+                ),
+                mavenProject("child",
+                  pomXml(
+                    """
+                      <project>
+                          <modelVersion>4.0.0</modelVersion>
+                          <parent>
+                              <groupId>com.mycompany</groupId>
+                              <artifactId>parent</artifactId>
+                              <version>1.0.0-SNAPSHOT</version>
+                          </parent>
+                          <artifactId>child</artifactId>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>org.glassfish</groupId>
+                                  <artifactId>jakarta.el</artifactId>
+                              </dependency>
+                          </dependencies>
+                      </project>
+                      """,
+                    spec -> spec.afterRecipe(doc -> {
+                        MavenResolutionResult result = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                        assertThat(result.getPom().getManagedVersion("org.glassfish", "jakarta.el", null, null))
+                          .describedAs("The version the parent brought down is visible to the child")
+                          .isEqualTo("3.0.4");
+                    })
+                  )
+                )
+              )
+            );
+        }
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1753")
@@ -1799,117 +2031,80 @@ class ChangeParentPomTest implements RewriteTest {
     void shouldNotAddToDependencyManagement() {
         rewriteRun(
           spec -> spec.recipe(new ChangeParentPom(
-            "org.jenkins-ci.plugins",
-            "org.jenkins-ci.plugins",
-            "plugin",
-            "plugin",
-            "4.81",
+            "org.apache",
+            "org.apache",
+            "apache",
+            "apache",
+            "32",
             null,
             null,
             null,
             null,
-            null)),
-          // language=xml
+            null
+          )),
           pomXml(
             """
               <project>
-                  <artifactId>example</artifactId>
                   <modelVersion>4.0.0</modelVersion>
                   <parent>
-                      <groupId>org.jenkins-ci.plugins</groupId>
-                      <artifactId>plugin</artifactId>
-                      <version>4.75</version>
+                      <groupId>org.apache</groupId>
+                      <artifactId>apache</artifactId>
+                      <version>31</version>
                       <relativePath/>
                   </parent>
-                  <properties>
-                      <jenkins.version>2.387.3</jenkins.version>
-                  </properties>
-                  <repositories>
-                    <repository>
-                        <id>central</id>
-                        <name>Central Repository</name>
-                        <url>https://repo.maven.apache.org/maven2</url>
-                    </repository>
-                      <repository>
-                          <id>repo.jenkins-ci.org</id>
-                          <url>https://repo.jenkins-ci.org/public/</url>
-                      </repository>
-                  </repositories>
-                  <pluginRepositories>
-                      <pluginRepository>
-                          <id>repo.jenkins-ci.org</id>
-                          <url>https://repo.jenkins-ci.org/public/</url>
-                      </pluginRepository>
-                  </pluginRepositories>
+                  <artifactId>example</artifactId>
+                  <version>1.0</version>
                   <dependencyManagement>
-                    <dependencies>
-                        <dependency>
-                            <groupId>io.jenkins.tools.bom</groupId>
-                            <artifactId>bom-2.387.x</artifactId>
-                            <version>2516.v113cb_3d00317</version>
-                            <type>pom</type>
-                            <scope>import</scope>
-                        </dependency>
-                    </dependencies>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.junit</groupId>
+                              <artifactId>junit-bom</artifactId>
+                              <version>5.10.2</version>
+                              <type>pom</type>
+                              <scope>import</scope>
+                          </dependency>
+                      </dependencies>
                   </dependencyManagement>
                   <dependencies>
                       <dependency>
-                          <groupId>org.jenkins-ci.plugins</groupId>
-                          <artifactId>junit</artifactId>
+                          <groupId>org.junit.jupiter</groupId>
+                          <artifactId>junit-jupiter-api</artifactId>
                       </dependency>
                   </dependencies>
               </project>
               """,
             """
               <project>
-                  <artifactId>example</artifactId>
                   <modelVersion>4.0.0</modelVersion>
                   <parent>
-                      <groupId>org.jenkins-ci.plugins</groupId>
-                      <artifactId>plugin</artifactId>
-                      <version>4.81</version>
+                      <groupId>org.apache</groupId>
+                      <artifactId>apache</artifactId>
+                      <version>32</version>
                       <relativePath/>
                   </parent>
-                  <properties>
-                      <jenkins.version>2.387.3</jenkins.version>
-                  </properties>
-                  <repositories>
-                    <repository>
-                        <id>central</id>
-                        <name>Central Repository</name>
-                        <url>https://repo.maven.apache.org/maven2</url>
-                    </repository>
-                      <repository>
-                          <id>repo.jenkins-ci.org</id>
-                          <url>https://repo.jenkins-ci.org/public/</url>
-                      </repository>
-                  </repositories>
-                  <pluginRepositories>
-                      <pluginRepository>
-                          <id>repo.jenkins-ci.org</id>
-                          <url>https://repo.jenkins-ci.org/public/</url>
-                      </pluginRepository>
-                  </pluginRepositories>
+                  <artifactId>example</artifactId>
+                  <version>1.0</version>
                   <dependencyManagement>
-                    <dependencies>
-                        <dependency>
-                            <groupId>io.jenkins.tools.bom</groupId>
-                            <artifactId>bom-2.387.x</artifactId>
-                            <version>2516.v113cb_3d00317</version>
-                            <type>pom</type>
-                            <scope>import</scope>
-                        </dependency>
-                    </dependencies>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.junit</groupId>
+                              <artifactId>junit-bom</artifactId>
+                              <version>5.10.2</version>
+                              <type>pom</type>
+                              <scope>import</scope>
+                          </dependency>
+                      </dependencies>
                   </dependencyManagement>
                   <dependencies>
                       <dependency>
-                          <groupId>org.jenkins-ci.plugins</groupId>
-                          <artifactId>junit</artifactId>
+                          <groupId>org.junit.jupiter</groupId>
+                          <artifactId>junit-jupiter-api</artifactId>
                       </dependency>
                   </dependencies>
               </project>
               """
-          ));
+          )
+        );
     }
 
     @Test

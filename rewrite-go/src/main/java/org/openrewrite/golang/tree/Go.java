@@ -20,12 +20,11 @@ import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.golang.GolangPrinter;
 import org.openrewrite.golang.GolangVisitor;
-import org.openrewrite.golang.rpc.GoRewriteRpc;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.rpc.request.Print;
 
 import java.lang.ref.SoftReference;
 import java.lang.ref.WeakReference;
@@ -34,9 +33,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
+import static java.util.stream.Collectors.toList;
 
 @SuppressWarnings("unused")
 public interface Go extends J {
@@ -156,7 +155,7 @@ public interface Go extends J {
 
         @Override
         public List<J.Import> getImports() {
-            return imports == null ? java.util.Collections.emptyList() : imports.getElements();
+            return imports == null ? emptyList() : imports.getElements();
         }
 
         @Override
@@ -166,11 +165,9 @@ public interface Go extends J {
             }
             if (this.imports == null) {
                 return withImportsContainer(JContainer.build(Space.EMPTY,
-                        JRightPadded.withElements(java.util.Collections.emptyList(), imports), Markers.EMPTY));
+                        JRightPadded.withElements(emptyList(), imports), Markers.EMPTY));
             }
-            return withImportsContainer(JContainer.build(this.imports.getBefore(),
-                    JRightPadded.withElements(this.imports.getPadding().getElements(), imports),
-                    this.imports.getMarkers()));
+            return withImportsContainer(JContainer.withElements(this.imports, imports));
         }
 
         List<JRightPadded<Statement>> statements;
@@ -203,7 +200,7 @@ public interface Go extends J {
                     .map(JRightPadded::getElement)
                     .filter(J.ClassDeclaration.class::isInstance)
                     .map(J.ClassDeclaration.class::cast)
-                    .collect(Collectors.toList());
+                    .collect(toList());
         }
 
         @Override
@@ -250,16 +247,7 @@ public interface Go extends J {
 
         @Override
         public <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
-            return new TreeVisitor<Tree, PrintOutputCapture<P>>() {
-                @Override
-                public @Nullable Tree preVisit(Tree tree, PrintOutputCapture<P> p) {
-                    GoRewriteRpc rpc = GoRewriteRpc.getOrStart();
-                    Print.MarkerPrinter mappedMarkerPrinter = Print.MarkerPrinter.from(p.getMarkerPrinter());
-                    p.append(rpc.print(tree, cursor, mappedMarkerPrinter));
-                    stopAfterPreVisit();
-                    return tree;
-                }
-            };
+            return new GolangPrinter<>();
         }
 
         public Padding getPadding() {
@@ -559,7 +547,7 @@ public interface Go extends J {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class Composite implements Go, Expression {
+    final class Composite implements Go, Expression, TypedTree {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -592,16 +580,10 @@ public interface Go extends J {
             return getPadding().withElements(JContainer.withElements(this.elements, elements));
         }
 
-        @Override
-        public @Nullable JavaType getType() {
-            return null;
-        }
-
-        @Override
-        public <T extends J> T withType(@Nullable JavaType type) {
-            //noinspection unchecked
-            return (T) this;
-        }
+        @With
+        @Getter
+        @Nullable
+        JavaType type;
 
         @Override
         public <P> @Nullable J acceptGolang(GolangVisitor<P> v, P p) {
@@ -637,7 +619,7 @@ public interface Go extends J {
             }
 
             public Go.Composite withElements(JContainer<Expression> elements) {
-                return t.elements == elements ? t : new Go.Composite(t.padding, t.id, t.prefix, t.markers, t.typeExpr, elements);
+                return t.elements == elements ? t : new Go.Composite(t.padding, t.id, t.prefix, t.markers, t.typeExpr, elements, t.type);
             }
         }
     }
@@ -683,16 +665,10 @@ public interface Go extends J {
             return getPadding().withValue(this.value.withElement(value));
         }
 
-        @Override
-        public @Nullable JavaType getType() {
-            return null;
-        }
-
-        @Override
-        public <T extends J> T withType(@Nullable JavaType type) {
-            //noinspection unchecked
-            return (T) this;
-        }
+        @With
+        @Getter
+        @Nullable
+        JavaType type;
 
         @Override
         public <P> @Nullable J acceptGolang(GolangVisitor<P> v, P p) {
@@ -728,7 +704,7 @@ public interface Go extends J {
             }
 
             public Go.KeyValue withValue(JLeftPadded<Expression> value) {
-                return t.value == value ? t : new Go.KeyValue(t.padding, t.id, t.prefix, t.markers, t.keyExpr, value);
+                return t.value == value ? t : new Go.KeyValue(t.padding, t.id, t.prefix, t.markers, t.keyExpr, value, t.type);
             }
         }
     }
@@ -797,16 +773,10 @@ public interface Go extends J {
         @Getter
         Space closeBracket;
 
-        @Override
-        public @Nullable JavaType getType() {
-            return null;
-        }
-
-        @Override
-        public <T extends J> T withType(@Nullable JavaType type) {
-            //noinspection unchecked
-            return (T) this;
-        }
+        @With
+        @Getter
+        @Nullable
+        JavaType type;
 
         @Override
         public <P> @Nullable J acceptGolang(GolangVisitor<P> v, P p) {
@@ -842,7 +812,7 @@ public interface Go extends J {
             }
 
             public Go.SliceExpr withLow(JRightPadded<Expression> low) {
-                return t.low == low ? t : new Go.SliceExpr(t.padding, t.id, t.prefix, t.markers, t.indexed, t.openBracket, low, t.high, t.max, t.closeBracket);
+                return t.low == low ? t : new Go.SliceExpr(t.padding, t.id, t.prefix, t.markers, t.indexed, t.openBracket, low, t.high, t.max, t.closeBracket, t.type);
             }
 
             public JRightPadded<Expression> getHigh() {
@@ -850,7 +820,98 @@ public interface Go extends J {
             }
 
             public Go.SliceExpr withHigh(JRightPadded<Expression> high) {
-                return t.high == high ? t : new Go.SliceExpr(t.padding, t.id, t.prefix, t.markers, t.indexed, t.openBracket, t.low, high, t.max, t.closeBracket);
+                return t.high == high ? t : new Go.SliceExpr(t.padding, t.id, t.prefix, t.markers, t.indexed, t.openBracket, t.low, high, t.max, t.closeBracket, t.type);
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------
+    // ArrayType ([N]T) — fixed-size array with an inline length expression
+    // ---------------------------------------------------------------
+
+    /**
+     * A fixed-size array type {@code [N]T} (e.g. {@code [5]int}, {@code [...]int{...}}).
+     * The length {@code N} is an inline constant expression that {@link J.ArrayType}
+     * (mirroring Java, which has no length in array types) cannot hold. Slices
+     * {@code []T} have no length and keep using {@link J.ArrayType}.
+     */
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class ArrayType implements Go, Expression, TypeTree {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @EqualsAndHashCode.Include
+        @With
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        JRightPadded<Expression> length;
+
+        public Expression getLength() {
+            return length.getElement();
+        }
+
+        public Go.ArrayType withLength(Expression length) {
+            return getPadding().withLength(this.length.withElement(length));
+        }
+
+        @With
+        @Getter
+        Expression elementType;
+
+        @With
+        @Getter
+        @Nullable
+        JavaType type;
+
+        @Override
+        public <P> @Nullable J acceptGolang(GolangVisitor<P> v, P p) {
+            return v.visitGoArrayType(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Go.ArrayType t;
+
+            public JRightPadded<Expression> getLength() {
+                return t.length;
+            }
+
+            public Go.ArrayType withLength(JRightPadded<Expression> length) {
+                return t.length == length ? t : new Go.ArrayType(t.padding, t.id, t.prefix, t.markers, length, t.elementType, t.type);
             }
         }
     }
@@ -900,16 +961,10 @@ public interface Go extends J {
         @Getter
         Expression value;
 
-        @Override
-        public @Nullable JavaType getType() {
-            return null;
-        }
-
-        @Override
-        public <T extends J> T withType(@Nullable JavaType type) {
-            //noinspection unchecked
-            return (T) this;
-        }
+        @With
+        @Getter
+        @Nullable
+        JavaType type;
 
         @Override
         public <P> @Nullable J acceptGolang(GolangVisitor<P> v, P p) {
@@ -945,7 +1000,7 @@ public interface Go extends J {
             }
 
             public Go.MapType withKey(JRightPadded<Expression> key) {
-                return t.key == key ? t : new Go.MapType(t.padding, t.id, t.prefix, t.markers, t.openBracket, key, t.value);
+                return t.key == key ? t : new Go.MapType(t.padding, t.id, t.prefix, t.markers, t.openBracket, key, t.value, t.type);
             }
         }
     }
@@ -958,6 +1013,11 @@ public interface Go extends J {
         BIDI,       // chan T
         SEND_ONLY,  // chan<- T
         RECV_ONLY   // <-chan T
+    }
+
+    enum DeclKind {
+        VAR,    // var ( ... )
+        CONST   // const ( ... )
     }
 
     // ---------------------------------------------------------------
@@ -986,16 +1046,10 @@ public interface Go extends J {
         @Getter
         Expression elem;
 
-        @Override
-        public @Nullable JavaType getType() {
-            return null;
-        }
-
-        @Override
-        public <T extends J> T withType(@Nullable JavaType type) {
-            //noinspection unchecked
-            return (T) this;
-        }
+        @With
+        @Getter
+        @Nullable
+        JavaType type;
 
         @Override
         public <P> @Nullable J acceptGolang(GolangVisitor<P> v, P p) {
@@ -1005,6 +1059,138 @@ public interface Go extends J {
         @Override
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
+        }
+    }
+
+    // ---------------------------------------------------------------
+    // TypeAssertion (x.(T))
+    // ---------------------------------------------------------------
+
+    /**
+     * Go's postfix {@code x.(T)}, which reads an interface's dynamic type where
+     * {@link J.TypeCast} converts. The left expression is right-padded, so its
+     * padding holds what stands before the dot — a space, or a comment.
+     */
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class TypeAssertion implements Go, Expression, TypedTree {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @EqualsAndHashCode.Include
+        @With
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        JRightPadded<Expression> left;
+
+        public Expression getLeft() {
+            return left.getElement();
+        }
+
+        public Go.TypeAssertion withLeft(Expression left) {
+            return getPadding().withLeft(this.left.withElement(left));
+        }
+
+        @With
+        @Getter
+        J.ControlParentheses<Expression> assertedType;
+
+        @With
+        @Getter
+        @Nullable
+        JavaType type;
+
+        @Override
+        public <P> @Nullable J acceptGolang(GolangVisitor<P> v, P p) {
+            return v.visitTypeAssertion(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Go.TypeAssertion t;
+
+            public JRightPadded<Expression> getLeft() {
+                return t.left;
+            }
+
+            public Go.TypeAssertion withLeft(JRightPadded<Expression> left) {
+                return t.left == left ? t : new Go.TypeAssertion(t.padding, t.id, t.prefix, t.markers, left, t.assertedType, t.type);
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------
+    // ExpressionStatement — wraps an Expression in statement position
+    // ---------------------------------------------------------------
+
+    /**
+     * Wraps an {@link Expression} so it can appear in statement position.
+     * Go allows a parenthesized call to stand alone as a statement,
+     * {@code (h())}, which {@link J.Parentheses} alone cannot represent.
+     */
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    final class ExpressionStatement implements Go, Statement {
+        @EqualsAndHashCode.Include
+        @With
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        @With
+        @Getter
+        Expression expression;
+
+        @Override
+        public <P> @Nullable J acceptGolang(GolangVisitor<P> v, P p) {
+            return v.visitExpressionStatement(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
         }
     }
 
@@ -1087,16 +1273,10 @@ public interface Go extends J {
         @Getter
         Expression value;
 
-        @Override
-        public @Nullable JavaType getType() {
-            return null;
-        }
-
-        @Override
-        public <T extends J> T withType(@Nullable JavaType type) {
-            //noinspection unchecked
-            return (T) this;
-        }
+        @With
+        @Getter
+        @Nullable
+        JavaType type;
 
         @Override
         public <P> @Nullable J acceptGolang(GolangVisitor<P> v, P p) {
@@ -1151,16 +1331,10 @@ public interface Go extends J {
         @Nullable
         Expression returnType;
 
-        @Override
-        public @Nullable JavaType getType() {
-            return null;
-        }
-
-        @Override
-        public <T extends J> T withType(@Nullable JavaType type) {
-            //noinspection unchecked
-            return (T) this;
-        }
+        @With
+        @Getter
+        @Nullable
+        JavaType type;
 
         @Override
         public <P> @Nullable J acceptGolang(GolangVisitor<P> v, P p) {
@@ -1196,7 +1370,7 @@ public interface Go extends J {
             }
 
             public Go.FuncType withParameters(JContainer<Statement> parameters) {
-                return t.parameters == parameters ? t : new Go.FuncType(t.padding, t.id, t.prefix, t.markers, parameters, t.returnType);
+                return t.parameters == parameters ? t : new Go.FuncType(t.padding, t.id, t.prefix, t.markers, parameters, t.returnType, t.type);
             }
         }
     }
@@ -1227,16 +1401,10 @@ public interface Go extends J {
         @Getter
         J.Block body;
 
-        @Override
-        public @Nullable JavaType getType() {
-            return null;
-        }
-
-        @Override
-        public <T extends J> T withType(@Nullable JavaType type) {
-            //noinspection unchecked
-            return (T) this;
-        }
+        @With
+        @Getter
+        @Nullable
+        JavaType type;
 
         @Override
         public <P> @Nullable J acceptGolang(GolangVisitor<P> v, P p) {
@@ -1275,16 +1443,10 @@ public interface Go extends J {
         @Getter
         J.Block body;
 
-        @Override
-        public @Nullable JavaType getType() {
-            return null;
-        }
-
-        @Override
-        public <T extends J> T withType(@Nullable JavaType type) {
-            //noinspection unchecked
-            return (T) this;
-        }
+        @With
+        @Getter
+        @Nullable
+        JavaType type;
 
         @Override
         public <P> @Nullable J acceptGolang(GolangVisitor<P> v, P p) {
@@ -1334,16 +1496,10 @@ public interface Go extends J {
             return getPadding().withTypes(JContainer.withElements(this.types, types));
         }
 
-        @Override
-        public @Nullable JavaType getType() {
-            return null;
-        }
-
-        @Override
-        public <T extends J> T withType(@Nullable JavaType type) {
-            //noinspection unchecked
-            return (T) this;
-        }
+        @With
+        @Getter
+        @Nullable
+        JavaType type;
 
         @Override
         public <P> @Nullable J acceptGolang(GolangVisitor<P> v, P p) {
@@ -1379,8 +1535,137 @@ public interface Go extends J {
             }
 
             public Go.TypeList withTypes(JContainer<Statement> types) {
-                return t.types == types ? t : new Go.TypeList(t.padding, t.id, t.prefix, t.markers, types);
+                return t.types == types ? t : new Go.TypeList(t.padding, t.id, t.prefix, t.markers, types, t.type);
             }
+        }
+    }
+
+    // ---------------------------------------------------------------
+    // Union (~int | ~int8 type-set constraint)
+    // ---------------------------------------------------------------
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class Union implements Go, Expression, TypeTree {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @EqualsAndHashCode.Include
+        @With
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        List<JRightPadded<Expression>> types;
+
+        public List<Expression> getTypes() {
+            return JRightPadded.getElements(types);
+        }
+
+        public Go.Union withTypes(List<Expression> types) {
+            return getPadding().withTypes(JRightPadded.withElements(this.types, types));
+        }
+
+        @With
+        @Getter
+        @Nullable
+        JavaType type;
+
+        @Override
+        public <P> @Nullable J acceptGolang(GolangVisitor<P> v, P p) {
+            return v.visitUnion(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Go.Union t;
+
+            public List<JRightPadded<Expression>> getTypes() {
+                return t.types;
+            }
+
+            public Go.Union withTypes(List<JRightPadded<Expression>> types) {
+                return t.types == types ? t : new Go.Union(t.padding, t.id, t.prefix, t.markers, types, t.type);
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------
+    // UnderlyingType (~T approximation element)
+    // ---------------------------------------------------------------
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    final class UnderlyingType implements Go, Expression, TypeTree {
+        @EqualsAndHashCode.Include
+        @With
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        @With
+        @Getter
+        Expression element;
+
+        @Override
+        public @Nullable JavaType getType() {
+            return element == null ? null : element.getType();
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public UnderlyingType withType(@Nullable JavaType type) {
+            return element == null ? this : withElement(element.withType(type));
+        }
+
+        @Override
+        public <P> @Nullable J acceptGolang(GolangVisitor<P> v, P p) {
+            return v.visitUnderlyingType(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
         }
     }
 
@@ -1413,7 +1698,16 @@ public interface Go extends J {
 
         @With
         @Getter
-        J.Identifier name;
+        List<J.Annotation> leadingAnnotations;
+
+        /** Absent on the outer node of a grouped {@code type ( … )}, whose names live on its specs. */
+        @With
+        @Getter
+        J.@Nullable Identifier name;
+
+        @With
+        @Getter
+        J.@Nullable TypeParameters typeParameters;
 
         @Nullable
         JLeftPadded<Space> assign;
@@ -1468,7 +1762,7 @@ public interface Go extends J {
             }
 
             public Go.TypeDecl withAssign(@Nullable JLeftPadded<Space> assign) {
-                return t.assign == assign ? t : new Go.TypeDecl(t.padding, t.id, t.prefix, t.markers, t.name, assign, t.definition, t.specs);
+                return t.assign == assign ? t : new Go.TypeDecl(t.padding, t.id, t.prefix, t.markers, t.leadingAnnotations, t.name, t.typeParameters, assign, t.definition, t.specs);
             }
 
             public @Nullable JContainer<Statement> getSpecs() {
@@ -1476,7 +1770,87 @@ public interface Go extends J {
             }
 
             public Go.TypeDecl withSpecs(@Nullable JContainer<Statement> specs) {
-                return t.specs == specs ? t : new Go.TypeDecl(t.padding, t.id, t.prefix, t.markers, t.name, t.assign, t.definition, specs);
+                return t.specs == specs ? t : new Go.TypeDecl(t.padding, t.id, t.prefix, t.markers, t.leadingAnnotations, t.name, t.typeParameters, t.assign, t.definition, specs);
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------
+    // DeclarationBlock (var ( ... ) / const ( ... ))
+    // ---------------------------------------------------------------
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class DeclarationBlock implements Go, Statement {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @EqualsAndHashCode.Include
+        @With
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        @With
+        @Getter
+        List<J.Annotation> leadingAnnotations;
+
+        @With
+        @Getter
+        DeclKind kind;
+
+        JContainer<Statement> specs;
+
+        public List<Statement> getSpecs() {
+            return specs.getElements();
+        }
+
+        @Override
+        public <P> @Nullable J acceptGolang(GolangVisitor<P> v, P p) {
+            return v.visitDeclarationBlock(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Go.DeclarationBlock t;
+
+            public JContainer<Statement> getSpecs() {
+                return t.specs;
+            }
+
+            public Go.DeclarationBlock withSpecs(JContainer<Statement> specs) {
+                return t.specs == specs ? t : new Go.DeclarationBlock(t.padding, t.id, t.prefix, t.markers, t.leadingAnnotations, t.kind, specs);
             }
         }
     }
@@ -1590,6 +1964,242 @@ public interface Go extends J {
     }
 
     // ---------------------------------------------------------------
+    // Return (return a, b) — multi-value return
+    // ---------------------------------------------------------------
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class Return implements Go, Statement {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @EqualsAndHashCode.Include
+        @With
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        List<JRightPadded<Expression>> expressions;
+
+        public List<Expression> getExpressions() {
+            return JRightPadded.getElements(expressions);
+        }
+
+        public Go.Return withExpressions(List<Expression> expressions) {
+            return getPadding().withExpressions(JRightPadded.withElements(this.expressions, expressions));
+        }
+
+        @Override
+        public <P> @Nullable J acceptGolang(GolangVisitor<P> v, P p) {
+            return v.visitGoReturn(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Go.Return t;
+
+            public List<JRightPadded<Expression>> getExpressions() {
+                return t.expressions;
+            }
+
+            public Go.Return withExpressions(List<JRightPadded<Expression>> expressions) {
+                return t.expressions == expressions ? t : new Go.Return(t.padding, t.id, t.prefix, t.markers, expressions);
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------
+    // MethodDeclaration (func (s *Service) Run() {}) — method with receiver
+    // ---------------------------------------------------------------
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class MethodDeclaration implements Go, Statement {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @EqualsAndHashCode.Include
+        @With
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        JContainer<Statement> receiver;
+
+        public List<Statement> getReceiver() {
+            return receiver.getElements();
+        }
+
+        public Go.MethodDeclaration withReceiver(List<Statement> receiver) {
+            return getPadding().withReceiver(JContainer.withElements(this.receiver, receiver));
+        }
+
+        @With
+        @Getter
+        J.MethodDeclaration declaration;
+
+        @Override
+        public <P> @Nullable J acceptGolang(GolangVisitor<P> v, P p) {
+            return v.visitGoMethodDeclaration(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Go.MethodDeclaration t;
+
+            public JContainer<Statement> getReceiver() {
+                return t.receiver;
+            }
+
+            public Go.MethodDeclaration withReceiver(JContainer<Statement> receiver) {
+                return t.receiver == receiver ? t : new Go.MethodDeclaration(t.padding, t.id, t.prefix, t.markers, receiver, t.declaration);
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------
+    // StatementWithInit (if/switch x := f(); ...) — init clause carrier
+    // ---------------------------------------------------------------
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class StatementWithInit implements Go, Statement {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @EqualsAndHashCode.Include
+        @With
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        JRightPadded<Statement> init;
+
+        public Statement getInit() {
+            return init.getElement();
+        }
+
+        public Go.StatementWithInit withInit(Statement init) {
+            return getPadding().withInit(this.init.withElement(init));
+        }
+
+        @With
+        @Getter
+        Statement statement;
+
+        @Override
+        public <P> @Nullable J acceptGolang(GolangVisitor<P> v, P p) {
+            return v.visitStatementWithInit(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Go.StatementWithInit t;
+
+            public JRightPadded<Statement> getInit() {
+                return t.init;
+            }
+
+            public Go.StatementWithInit withInit(JRightPadded<Statement> init) {
+                return t.init == init ? t : new Go.StatementWithInit(t.padding, t.id, t.prefix, t.markers, init, t.statement);
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------
     // CommClause (case <-ch: ... in select)
     // ---------------------------------------------------------------
 
@@ -1675,6 +2285,43 @@ public interface Go extends J {
     }
 
     // ---------------------------------------------------------------
+    // Select (select { case <-ch: ... })
+    // ---------------------------------------------------------------
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    final class Select implements Go, Statement {
+        @EqualsAndHashCode.Include
+        @With
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        @With
+        @Getter
+        J.Block body;
+
+        @Override
+        public <P> @Nullable J acceptGolang(GolangVisitor<P> v, P p) {
+            return v.visitSelect(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+    }
+
+    // ---------------------------------------------------------------
     // IndexList (Map[int, string] - multi-type-param generics)
     // ---------------------------------------------------------------
 
@@ -1715,16 +2362,10 @@ public interface Go extends J {
             return getPadding().withIndices(JContainer.withElements(this.indices, indices));
         }
 
-        @Override
-        public @Nullable JavaType getType() {
-            return null;
-        }
-
-        @Override
-        public <T extends J> T withType(@Nullable JavaType type) {
-            //noinspection unchecked
-            return (T) this;
-        }
+        @With
+        @Getter
+        @Nullable
+        JavaType type;
 
         @Override
         public <P> @Nullable J acceptGolang(GolangVisitor<P> v, P p) {
@@ -1760,8 +2401,358 @@ public interface Go extends J {
             }
 
             public Go.IndexList withIndices(JContainer<Expression> indices) {
-                return t.indices == indices ? t : new Go.IndexList(t.padding, t.id, t.prefix, t.markers, t.target, indices);
+                return t.indices == indices ? t : new Go.IndexList(t.padding, t.id, t.prefix, t.markers, t.target, indices, t.type);
             }
+        }
+    }
+
+    // ---------------------------------------------------------------
+    // Unary (Go-specific prefix unary operators: &x, *p, <-ch)
+    // ---------------------------------------------------------------
+
+    /**
+     * A Go-specific prefix unary expression whose operator has no equivalent in
+     * {@link J.Unary.Type}: address-of ({@code &}), pointer indirection
+     * ({@code *}) and channel receive ({@code <-}). Operators that <em>do</em>
+     * map to {@link J.Unary.Type} (e.g. {@code !}, {@code -}, {@code ^}) stay as
+     * {@link J.Unary} so recipes can treat them uniformly with other languages.
+     */
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class Unary implements Go, Statement, Expression, TypedTree {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @EqualsAndHashCode.Include
+        @With
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        JLeftPadded<Type> operator;
+
+        @With
+        @Getter
+        Expression expression;
+
+        public Type getOperator() {
+            return operator.getElement();
+        }
+
+        public Go.Unary withOperator(Type operator) {
+            return getPadding().withOperator(this.operator.withElement(operator));
+        }
+
+        @With
+        @Getter
+        @Nullable
+        JavaType type;
+
+        @Override
+        public <P> @Nullable J acceptGolang(GolangVisitor<P> v, P p) {
+            return v.visitGoUnary(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+
+        public enum Type {
+            AddressOf,
+            Indirection,
+            Receive
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Go.Unary t;
+
+            public JLeftPadded<Type> getOperator() {
+                return t.operator;
+            }
+
+            public Go.Unary withOperator(JLeftPadded<Type> operator) {
+                return t.operator == operator ? t : new Go.Unary(t.padding, t.id, t.prefix, t.markers, operator, t.expression, t.type);
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------
+    // Binary (Go-specific binary operators: a &^ b)
+    // ---------------------------------------------------------------
+
+    /**
+     * A Go-specific binary expression whose operator has no equivalent in
+     * {@link J.Binary.Type}: bit-clear ({@code &^}). All other Go binary
+     * operators map to {@link J.Binary}.
+     */
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class Binary implements Go, Expression {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @EqualsAndHashCode.Include
+        @With
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        @With
+        @Getter
+        Expression left;
+
+        JLeftPadded<Type> operator;
+
+        @With
+        @Getter
+        Expression right;
+
+        public Type getOperator() {
+            return operator.getElement();
+        }
+
+        public Go.Binary withOperator(Type operator) {
+            return getPadding().withOperator(this.operator.withElement(operator));
+        }
+
+        @With
+        @Getter
+        @Nullable
+        JavaType type;
+
+        @Override
+        public <P> @Nullable J acceptGolang(GolangVisitor<P> v, P p) {
+            return v.visitGoBinary(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+
+        public enum Type {
+            AndNot
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Go.Binary t;
+
+            public JLeftPadded<Type> getOperator() {
+                return t.operator;
+            }
+
+            public Go.Binary withOperator(JLeftPadded<Type> operator) {
+                return t.operator == operator ? t : new Go.Binary(t.padding, t.id, t.prefix, t.markers, t.left, operator, t.right, t.type);
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------
+    // AssignmentOperation (Go-specific compound assignment: a &^= b)
+    // ---------------------------------------------------------------
+
+    /**
+     * A Go-specific compound assignment whose operator has no equivalent in
+     * {@link J.AssignmentOperation.Type}: bit-clear assign ({@code &^=}). All
+     * other Go compound assignments map to {@link J.AssignmentOperation}.
+     */
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class AssignmentOperation implements Go, Statement, Expression {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @EqualsAndHashCode.Include
+        @With
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        @With
+        @Getter
+        Expression variable;
+
+        JLeftPadded<Type> operator;
+
+        @With
+        @Getter
+        Expression assignment;
+
+        public Type getOperator() {
+            return operator.getElement();
+        }
+
+        public Go.AssignmentOperation withOperator(Type operator) {
+            return getPadding().withOperator(this.operator.withElement(operator));
+        }
+
+        @With
+        @Getter
+        @Nullable
+        JavaType type;
+
+        @Override
+        public <P> @Nullable J acceptGolang(GolangVisitor<P> v, P p) {
+            return v.visitGoAssignmentOperation(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+
+        public enum Type {
+            AndNot
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Go.AssignmentOperation t;
+
+            public JLeftPadded<Type> getOperator() {
+                return t.operator;
+            }
+
+            public Go.AssignmentOperation withOperator(JLeftPadded<Type> operator) {
+                return t.operator == operator ? t : new Go.AssignmentOperation(t.padding, t.id, t.prefix, t.markers, t.variable, operator, t.assignment, t.type);
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------
+    // Variadic (Go-specific ellipsis: [...]T elided length, args... call spread)
+    // ---------------------------------------------------------------
+
+    /**
+     * Go's {@code ...} ellipsis where it stands for something other than a parameter type: an array's elided
+     * length in {@code [...]T{...}} ({@code postfix == false}) and the call-site spread {@code args...}
+     * ({@code postfix == true}). {@code dots} is the whitespace before the {@code ...} in the postfix form.
+     * A parameter's {@code ...T} is a {@link J.VariableDeclarations} whose {@code varargs} slot holds the dots.
+     */
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @AllArgsConstructor
+    final class Variadic implements Go, Expression, TypeTree {
+        @EqualsAndHashCode.Include
+        @With
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        @With
+        @Getter
+        Expression element;
+
+        @With
+        @Getter
+        Space dots;
+
+        @With
+        @Getter
+        boolean postfix;
+
+        @With
+        @Getter
+        @Nullable
+        JavaType type;
+
+        @Override
+        public <P> @Nullable J acceptGolang(GolangVisitor<P> v, P p) {
+            return v.visitGoVariadic(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
         }
     }
 }

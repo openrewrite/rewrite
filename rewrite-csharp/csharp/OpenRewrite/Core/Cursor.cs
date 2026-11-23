@@ -21,7 +21,7 @@ namespace OpenRewrite.Core;
 /// Tracks the path from root to the current node during tree traversal.
 /// Enables visitors to access parent context when making decisions.
 /// </summary>
-public class Cursor
+public class Cursor : IHeavyweight
 {
     public const string ROOT_VALUE = "root";
 

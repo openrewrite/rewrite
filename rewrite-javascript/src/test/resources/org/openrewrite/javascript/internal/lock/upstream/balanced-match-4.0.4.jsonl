@@ -1,0 +1,20 @@
+{"header":"balanced-match 4.0.4: every call its own tests (test/test.ts) make, with its answer; generate/upstream-calls.js generate/upstream/balanced-match.js <checkout> 4.0.4"}
+{"test":"test/test.ts","fn":"balanced","args":["{","}","pre{in{nest}}post"],"out":{"start":3,"end":12,"pre":"pre","body":"in{nest}","post":"post"}}
+{"test":"test/test.ts","fn":"balanced","args":["{","}","{{{{{{{{{in}post"],"out":{"start":8,"end":11,"pre":"{{{{{{{{","body":"in","post":"post"}}
+{"test":"test/test.ts","fn":"balanced","args":["{","}","pre{body{in}post"],"out":{"start":8,"end":11,"pre":"pre{body","body":"in","post":"post"}}
+{"test":"test/test.ts","fn":"balanced","args":["{","}","pre{in}po}st"],"out":{"start":3,"end":6,"pre":"pre","body":"in","post":"po}st"}}
+{"test":"test/test.ts","fn":"balanced","args":["{","}","pre}{in{nest}}post"],"out":{"start":4,"end":13,"pre":"pre}","body":"in{nest}","post":"post"}}
+{"test":"test/test.ts","fn":"balanced","args":["{","}","pre{body}between{body2}post"],"out":{"start":3,"end":8,"pre":"pre","body":"body","post":"between{body2}post"}}
+{"test":"test/test.ts","fn":"balanced","args":["<b>","</b>","pre<b>in<b>nest</b></b>post"],"out":{"start":3,"end":19,"pre":"pre","body":"in<b>nest</b>","post":"post"}}
+{"test":"test/test.ts","fn":"balanced","args":["<b>","</b>","pre</b><b>in<b>nest</b></b>post"],"out":{"start":7,"end":23,"pre":"pre</b>","body":"in<b>nest</b>","post":"post"}}
+{"test":"test/test.ts","fn":"balanced","args":["{{","}}","pre{{{in}}}post"],"out":{"start":3,"end":9,"pre":"pre","body":"{in}","post":"post"}}
+{"test":"test/test.ts","fn":"balanced","args":["{{{","}}","pre{{{in}}}post"],"out":{"start":3,"end":8,"pre":"pre","body":"in","post":"}post"}}
+{"test":"test/test.ts","fn":"balanced","args":["{","}","pre{{first}in{second}post"],"out":{"start":4,"end":10,"pre":"pre{","body":"first","post":"in{second}post"}}
+{"test":"test/test.ts","fn":"balanced","args":["<?","?>","pre<?>post"],"out":{"start":3,"end":4,"pre":"pre","body":"","post":"post"}}
+{"test":"test/test.ts","fn":"balanced","args":["___","___","PRE ___BODY___ POST"],"out":{"start":4,"end":11,"pre":"PRE ","body":"BODY","post":" POST"}}
+{"test":"test/test.ts","fn":"balanced","args":[null,null,"nope"],"out":false}
+{"test":"test/test.ts","fn":"balanced","args":["{","}","nope"],"out":{"$":"undefined"}}
+{"test":"test/test.ts","fn":"balanced","args":["{","}","{nope"],"out":{"$":"undefined"}}
+{"test":"test/test.ts","fn":"balanced","args":["{","}","nope}"],"out":{"$":"undefined"}}
+{"test":"test/test.ts","fn":"balanced","args":[{"$":"regexp","source":"\\{","flags":""},{"$":"regexp","source":"\\}","flags":""},"nope"],"out":false}
+{"test":"test/test.ts","fn":"balanced","args":[{"$":"regexp","source":"\\s+\\{\\s+","flags":""},{"$":"regexp","source":"\\s+\\}\\s+","flags":""},"pre  {   in{nest}   }  post"],"out":{"start":3,"end":17,"pre":"pre","body":"in{nest}","post":"post"}}

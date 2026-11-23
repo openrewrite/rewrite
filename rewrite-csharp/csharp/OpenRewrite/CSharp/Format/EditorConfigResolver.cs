@@ -13,6 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using OpenRewrite.Core;
+
 namespace OpenRewrite.CSharp.Format;
 
 /// <summary>
@@ -24,7 +26,14 @@ namespace OpenRewrite.CSharp.Format;
 public class EditorConfigResolver
 {
     private readonly string _projectRoot;
-    private readonly Dictionary<string, CSharpFormatStyle> _cache = new();
+    private readonly Dictionary<string, Resolved> _cache = new();
+    private readonly Dictionary<(string Dir, bool UseTabs, int IndentSize, int TabSize), CSharpFormatStyle> _detected =
+        new();
+
+    /// <summary>
+    /// A directory's style, and whether its .editorconfig files set <c>indent_style</c> and <c>indent_size</c>.
+    /// </summary>
+    private sealed record Resolved(CSharpFormatStyle Style, bool SetsIndentStyle, bool SetsIndentSize);
 
     public EditorConfigResolver(string projectRoot)
     {
@@ -36,19 +45,35 @@ public class EditorConfigResolver
     /// by collecting .editorconfig files from the file's directory up to the project root.
     /// Results are cached per directory.
     /// </summary>
-    public CSharpFormatStyle Resolve(string absoluteFilePath)
+    public CSharpFormatStyle Resolve(string absoluteFilePath) => Resolve(absoluteFilePath, null);
+
+    /// <summary>
+    /// Resolves the style of <paramref name="absoluteFilePath"/>, indenting as <paramref name="cu"/> already does
+    /// where its .editorconfig files set no <c>indent_style</c> or <c>indent_size</c>, as Java's Autodetect does.
+    /// </summary>
+    public CSharpFormatStyle Resolve(string absoluteFilePath, CompilationUnit? cu)
     {
         var dir = Path.GetDirectoryName(Path.GetFullPath(absoluteFilePath))!;
 
-        if (_cache.TryGetValue(dir, out var cached))
-            return cached;
+        if (!_cache.TryGetValue(dir, out var resolved))
+        {
+            resolved = ResolveForDirectory(dir);
+            _cache[dir] = resolved;
+        }
 
-        var style = ResolveForDirectory(dir);
-        _cache[dir] = style;
-        return style;
+        if (cu == null || resolved is { SetsIndentStyle: true, SetsIndentSize: true })
+            return resolved.Style;
+
+        var style = IndentationDetector.Apply(resolved.Style, cu, resolved.SetsIndentStyle, resolved.SetsIndentSize);
+        if (ReferenceEquals(style, resolved.Style))
+            return style;
+        var key = (dir, style.UseTabs, style.IndentSize, style.TabSize);
+        if (!_detected.TryGetValue(key, out var shared))
+            _detected[key] = shared = style;
+        return shared;
     }
 
-    private CSharpFormatStyle ResolveForDirectory(string dir)
+    private Resolved ResolveForDirectory(string dir)
     {
         // Collect .editorconfig files from dir up to project root
         var configs = CollectEditorConfigs(dir);
@@ -63,7 +88,7 @@ public class EditorConfigResolver
             }
         }
 
-        return BuildStyle(merged);
+        return new Resolved(BuildStyle(merged), merged.ContainsKey("indent_style"), merged.ContainsKey("indent_size"));
     }
 
     /// <summary>
@@ -311,7 +336,7 @@ public class EditorConfigResolver
         var wrappingKeepStatementsOnSingleLine = GetBoolSetting(settings, "csharp_preserve_single_line_statements", "true", true);
 
         return new CSharpFormatStyle(
-            Guid.NewGuid(), useTabs, indentSize, tabSize, newLine,
+            Tree.RandomId(), useTabs, indentSize, tabSize, newLine,
             // Indentation
             indentBlock, indentBraces, indentSwitchCaseSection,
             indentSwitchCaseSectionWhenBlock, indentSwitchSection, labelPositioning,

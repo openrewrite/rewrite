@@ -18,6 +18,8 @@ package org.openrewrite.groovy.format;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.groovy.marker.AsStyleTypeCast;
+import org.openrewrite.groovy.marker.LambdaStyle;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.ToBeRemoved;
 import org.openrewrite.java.style.*;
 import org.openrewrite.java.tree.J;
@@ -25,7 +27,6 @@ import org.openrewrite.java.tree.JLeftPadded;
 import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.style.NamedStyles;
-import org.openrewrite.style.Style;
 import org.openrewrite.style.StyleHelper;
 
 import java.util.List;
@@ -33,7 +34,7 @@ import java.util.function.Supplier;
 
 public class SpacesVisitor<P> extends org.openrewrite.java.format.SpacesVisitor<P> {
     public SpacesVisitor(List<NamedStyles> styles, @Nullable Tree stopAfter) {
-        this(getStyle(SpacesStyle.class, styles, IntelliJ::spaces), getStyle(EmptyForInitializerPadStyle.class, styles), getStyle(EmptyForIteratorPadStyle.class, styles), getStyle(WrappingAndBracesStyle.class, styles, IntelliJ::wrappingAndBraces), stopAfter);
+        this(StyleHelper.getStyle(SpacesStyle.class, styles, (Supplier<SpacesStyle>) IntelliJ::spaces), StyleHelper.getStyle(EmptyForInitializerPadStyle.class, styles), StyleHelper.getStyle(EmptyForIteratorPadStyle.class, styles), StyleHelper.getStyle(WrappingAndBracesStyle.class, styles, (Supplier<WrappingAndBracesStyle>) IntelliJ::wrappingAndBraces), stopAfter);
     }
 
     public SpacesVisitor(SpacesStyle spacesStyle, @Nullable EmptyForInitializerPadStyle emptyForInitializerPadStyle, @Nullable EmptyForIteratorPadStyle emptyForIteratorPadStyle, WrappingAndBracesStyle wrappingAndBracesStyle, @Nullable Tree stopAfter) {
@@ -51,6 +52,20 @@ public class SpacesVisitor<P> extends org.openrewrite.java.format.SpacesVisitor<
             return typeCast;
         }
         return super.visitTypeCast(typeCast, p);
+    }
+
+    @Override
+    public J.Lambda visitLambda(J.Lambda lambda, P p) {
+        J.Lambda l = super.visitLambda(lambda, p);
+        List<J> parameters = lambda.getParameters().getParameters();
+        if (parameters.isEmpty() || lambda.getParameters().isParenthesized() ||
+            lambda.getMarkers().findFirst(LambdaStyle.class).map(LambdaStyle::isJavaStyle).orElse(false)) {
+            return l;
+        }
+        // A closure's parameters follow `{`, so Java's rule of no padding after `(` must not eat the space there
+        Space beforeFirst = parameters.get(0).getPrefix();
+        return l.withParameters(l.getParameters().withParameters(ListUtils.mapFirst(l.getParameters().getParameters(),
+                param -> param.withPrefix(beforeFirst))));
     }
 
     @Override
@@ -84,23 +99,5 @@ public class SpacesVisitor<P> extends org.openrewrite.java.format.SpacesVisitor<
                 break;
         }
         return super.visitSpace(space, loc, ctx);
-    }
-
-    @ToBeRemoved(after = "2026-03-01", reason = "Replace me with org.openrewrite.style.StyleHelper.getStyle now available in parent runtime")
-    private static <S extends Style> @Nullable S getStyle(Class<S> styleClass, List<NamedStyles> styles) {
-        S style = NamedStyles.merge(styleClass, styles);
-        if (style != null) {
-            return (S) style.applyDefaults();
-        }
-        return null;
-    }
-
-    @ToBeRemoved(after = "2026-03-01", reason = "Replace me with org.openrewrite.style.StyleHelper.getStyle now available in parent runtime")
-    private static <S extends Style> S getStyle(Class<S> styleClass, List<NamedStyles> styles, Supplier<S> defaultStyle) {
-        S style = NamedStyles.merge(styleClass, styles);
-        if (style != null) {
-            return StyleHelper.merge(defaultStyle.get(), style);
-        }
-        return defaultStyle.get();
     }
 }

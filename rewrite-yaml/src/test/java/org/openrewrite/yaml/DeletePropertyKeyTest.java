@@ -203,6 +203,46 @@ class DeletePropertyKeyTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/9511")
+    @Test
+    void aliasOfBlockMappingAnchor() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("job.b", null, null, null)),
+          yaml(
+            """
+              base: &base
+                a: 1
+              job:
+                <<: *base
+                b: 2
+              """
+          )
+        );
+    }
+
+    @SuppressWarnings("YAMLUnusedAnchor")
+    @Test
+    void anchorWithoutAlias() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("job.b", null, null, null)),
+          yaml(
+            """
+              base: &base
+                a: 1
+              job:
+                b: 2
+                c: 3
+              """,
+            """
+              base: &base
+                a: 1
+              job:
+                c: 3
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1168")
     @ParameterizedTest
     @ValueSource(strings = {
@@ -663,6 +703,92 @@ class DeletePropertyKeyTest implements RewriteTest {
               root:
                 keep: yes # inline comment
               """
+          )
+        );
+    }
+
+    @Test
+    void deleteEntryAfterFoldedBlockScalar() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("doomed", null, null, null)),
+          yaml(
+            """
+              keep: >-
+                line one
+                line two
+              doomed: value
+              after: tail
+              """,
+            """
+              keep: >-
+                line one
+                line two
+              after: tail
+              """
+          )
+        );
+    }
+
+    @Test
+    void deleteEntryAfterLiteralKeepBlockScalar() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("doomed", null, null, null)),
+          yaml(
+            """
+              keep: |+
+                line one
+                line two
+
+              doomed: value
+              after: tail
+              """,
+            """
+              keep: |+
+                line one
+                line two
+
+              after: tail
+              """
+          )
+        );
+    }
+
+    @Test
+    void deleteEntryBeforeBlockScalarIsUnchanged() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("doomed", null, null, null)),
+          yaml(
+            """
+              doomed: value
+              keep: >-
+                line one
+                line two
+              after: tail
+              """,
+            """
+              keep: >-
+                line one
+                line two
+              after: tail
+              """
+          )
+        );
+    }
+
+    @Test
+    void deleteEntryAfterCrlfBlockScalar() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("doomed", null, null, null)),
+          yaml(
+            "keep: >-\r\n" +
+            "  line one\r\n" +
+            "  line two\r\n" +
+            "doomed: value\r\n" +
+            "after: tail\r\n",
+            "keep: >-\r\n" +
+            "  line one\r\n" +
+            "  line two\r\n" +
+            "after: tail\r\n"
           )
         );
     }

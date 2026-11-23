@@ -1,0 +1,38 @@
+plain	ok {"name":"a","version":"1.0.0","dependencies":{"b":"^1.0.0"}}
+other-top-directory	ok {"name":"a","version":"1.0.0","dependencies":{"b":"^1.0.0"}}
+dot-slash-prefix	ok {"name":"fallback","version":"9.9.9"}
+no-manifest	ok {"name":"fallback","version":"9.9.9"}
+empty	ok {"name":"fallback","version":"9.9.9"}
+yarn-json	ok {"name":"a","version":"1.0.0","dependencies":{"b":"^1.0.0"}}
+package-and-yarn-json	ok {"name":"a","version":"1.0.0","dependencies":{"b":"^1.0.0"}}
+metadata-manifest	ok {"name":"m","version":"3.0.0","dependencies":{"c":"1"}}
+metadata-without-manifest	ok {"name":"a","version":"1.0.0","dependencies":{"b":"^1.0.0"}}
+metadata-manifest-null	ok {"name":"fallback","version":"9.9.9"}
+metadata-bin-number	TypeError The "paths[1]" argument must be of type string. Received type number (5)
+later-entry-wins	ok {"name":"a","version":"1.0.0","dependencies":{"b":"^1.0.0"}}
+pax-path	ok {"name":"a","version":"1.0.0","dependencies":{"b":"^1.0.0"}}
+gnu-long-name	ok {"name":"a","version":"1.0.0","dependencies":{"b":"^1.0.0"}}
+ustar-prefix	ok {"name":"a","version":"1.0.0","dependencies":{"b":"^1.0.0"}}
+symlink	ok {"name":"a","version":"1.0.0","dependencies":{"b":"^1.0.0"}}
+symlink-absolute	ok {"name":"fallback","version":"9.9.9"}
+symlink-dangling	ok {"name":"fallback","version":"9.9.9"}
+hard-link	ok {"name":"a","version":"1.0.0","dependencies":{"b":"^1.0.0"}}
+hard-link-below	MessageError <url>: Extracting tar content of undefined failed, the file appears to be corrupt: "ENOENT: no such file or directory, link 'lib/lib/real.json' -> 'lib/x.json'"
+manifest-directory	Error EISDIR: illegal operation on a directory, read
+path-through-file	MessageError <url>: Extracting tar content of undefined failed, the file appears to be corrupt: "lib is not a valid path"
+unsupported-type	MessageError <url>: Extracting tar content of undefined failed, the file appears to be corrupt: "unsupported type for fifo (fifo)"
+bad-checksum	MessageError <url>: Extracting tar content of undefined failed, the file appears to be corrupt: "Invalid tar header. Maybe the tar is corrupted or it needs to be gunzipped?"
+truncated	MessageError <url>: Extracting tar content of undefined failed, the file appears to be corrupt: "Unexpected end of data"
+invalid-json	SyntaxError package.json: Unexpected end of JSON input
+number-json	TypeError Cannot create property '_registry' on number '5'
+version-cleaned	ok {"name":"a","version":"1.0.0"}
+bom	ok {"name":"a","version":"1.0.0","dependencies":{"b":"^1.0.0"}}
+optional-dependencies	ok {"name":"a","version":"1.0.0","dependencies":{},"optionalDependencies":{"c":"1"}}
+ungzipped	ok {"name":"a","version":"1.0.0","dependencies":{"b":"^1.0.0"}}
+gzip-twice	ok {"name":"a","version":"1.0.0","dependencies":{"b":"^1.0.0"}}
+deflate	ok {"name":"a","version":"1.0.0","dependencies":{"b":"^1.0.0"}}
+gzip-five-times	ok {"name":"a","version":"1.0.0","dependencies":{"b":"^1.0.0"}}
+not-gzip	Error <url>: unexpected end of file
+upstream-broken-tar-data	MessageError <url>: Extracting tar content of undefined failed, the file appears to be corrupt: "Unexpected end of data"
+upstream-broken-tar-header	MessageError <url>: Extracting tar content of undefined failed, the file appears to be corrupt: "Unexpected end of data"
+upstream-ungzipped	ok {"name":"beeper","version":"1.1.0"}

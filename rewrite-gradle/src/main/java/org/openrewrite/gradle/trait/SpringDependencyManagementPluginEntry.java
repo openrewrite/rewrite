@@ -59,7 +59,7 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
 
     String group;
     Set<String> artifacts; //As dependencySet can have multiple Entry invocations
-    String version;
+    @Nullable String version;
 
     public SpringDependencyManagementPluginEntry withGroupArtifactVersion(DependencyMatcher matcher, @Nullable String newGroup, @Nullable String newArtifact, @Nullable String newVersion, @Nullable String versionPattern, MavenMetadataFailures metadataFailures, ExecutionContext ctx) {
         GradleProject gradleProject = getGradleProject();
@@ -273,9 +273,7 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
         }
 
         private List<GroupArtifactVersion> parseDependencySet(J.MethodInvocation methodInvocation) {
-            List<String> entries = new ArrayList<>();
-
-            new JavaIsoVisitor<List<String>>() {
+            List<String> entries = new JavaIsoVisitor<List<String>>() {
                 @Override
                 public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, List<String> entries) {
                     if ("entry".equals(method.getSimpleName()) && method.getArguments().size() == 1) {
@@ -289,7 +287,7 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
                     }
                     return super.visitMethodInvocation(method, entries);
                 }
-            }.visit(methodInvocation, entries);
+            }.reduce(methodInvocation, new ArrayList<>());
 
             List<GroupArtifactVersion> dependencies = new ArrayList<>();
             List<Expression> arguments = methodInvocation.getArguments();

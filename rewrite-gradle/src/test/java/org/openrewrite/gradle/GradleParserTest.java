@@ -17,16 +17,29 @@ package org.openrewrite.gradle;
 
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
+import org.openrewrite.groovy.GroovyParser;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.internal.JavaTypeCache;
+import org.openrewrite.java.search.FindMethods;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.kotlin.KotlinParser;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.tree.ParseError;
 
+import java.lang.reflect.Field;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -126,6 +139,209 @@ class GradleParserTest implements RewriteTest {
             })
           )
         );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5270")
+    @Test
+    void develocityExtensionIsTypeAttributed() {
+        rewriteRun(
+          settingsGradle(
+            """
+              plugins {
+                  id 'com.gradle.develocity' version '3.19.2'
+              }
+              develocity {
+                  server = 'https://dev.example.com/'
+                  buildScan {
+                      publishing.onlyIf { false }
+                  }
+                  buildCache {
+                      remote(develocity.buildCache) {
+                          enabled = true
+                      }
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                var declaringTypes = new ArrayList<String>();
+                new JavaIsoVisitor<Integer>() {
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                        JavaType.Method type = method.getMethodType();
+                        declaringTypes.add(method.getSimpleName() + ": " +
+                                           (type == null ? null : type.getDeclaringType().getFullyQualifiedName()));
+                        return super.visitMethodInvocation(method, p);
+                    }
+                }.visit(cu, 0);
+                assertThat(declaringTypes).contains(
+                  "develocity: RewriteSettings",
+                  "buildScan: DevelocitySpec",
+                  "onlyIf: com.gradle.develocity.agent.gradle.scan.BuildScanPublishingConfiguration",
+                  "buildCache: org.gradle.api.initialization.Settings"
+                );
+                assertThat(FindMethods.find(cu, "org.gradle.api.initialization.Settings plugins(..)", true)).isNotEmpty();
+            })
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "tasks.register('report')",
+      "tasks.named('report')",
+      "tasks.create('report')",
+      "task('report')",
+      "task(name: 'report')"
+    })
+    void taskConfigurationBlockIsTypeAttributed(String declaration) {
+        rewriteRun(
+          buildGradle(
+            """
+              %s {
+                  dependsOn 'check'
+                  doLast {
+                      println 'done'
+                  }
+              }
+              """.formatted(declaration),
+            spec -> spec.afterRecipe(cu -> {
+                assertThat(FindMethods.find(cu, "org.gradle.api.Task dependsOn(..)", true)).isNotEmpty();
+                assertThat(FindMethods.find(cu, "org.gradle.api.Task doLast(..)", true)).isNotEmpty();
+            })
+          )
+        );
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(delimiter = '|', textBlock = """
+      tasks.register('copyDocs', Copy) { from 'docs' }               | org.gradle.api.tasks.AbstractCopyTask from(..)
+      tasks.withType(Copy).configureEach { from 'docs' }             | org.gradle.api.tasks.AbstractCopyTask from(..)
+      tasks.named('jar', Jar) { manifest { attributes('a': 'b') } }  | org.gradle.api.java.archives.Manifest attributes(..)
+      task copyDocs(type: Copy) { from 'docs' }                      | org.gradle.api.tasks.AbstractCopyTask from(..)
+      task report { dependsOn 'check' }                              | org.gradle.api.Task dependsOn(..)
+      java { toolchain { } }                                         | org.gradle.api.plugins.JavaPluginExtension toolchain(..)
+      sourceSets { main { java { srcDirs 'src' } } }                 | org.gradle.api.file.SourceDirectorySet srcDirs(..)
+      publishing { publications { maven(MavenPublication) { pom { } } } } | org.gradle.api.publish.maven.MavenPublication pom(..)
+      dependencies { errorProne('a:b:1') { exclude group: 'c' } }    | org.gradle.api.artifacts.ModuleDependency exclude(..)
+      """)
+    void closureDelegatesToTheObjectGradleConfiguresWithIt(String script, String method) {
+        rewriteRun(
+          buildGradle(script, spec -> spec.afterRecipe(cu ->
+            assertThat(FindMethods.find(cu, method)).isNotEmpty()))
+        );
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(delimiter = '|', textBlock = """
+      plugins { id("org.example") }                                     | org.gradle.plugin.use.PluginDependenciesSpec id(..)
+      dependencies { implementation("g:a:1") }                          | DependencyHandlerSpec implementation(..)
+      dependencies { implementation("g:a:1") { exclude(group = "c") } } | org.gradle.kotlin.dsl.DependencyHandlerExtensionsKt exclude(..)
+      tasks.register("report") { doLast { } }                           | org.gradle.api.Task doLast(..)
+      tasks.test { useJUnitPlatform() }                                 | org.gradle.api.tasks.testing.Test useJUnitPlatform(..)
+      java { toolchain { } }                                            | org.gradle.api.plugins.JavaPluginExtension toolchain(..)
+      """)
+    void kotlinDslIsTypeAttributed(String script, String method) {
+        rewriteRun(
+          buildGradleKts(script, spec -> spec.afterRecipe(cu ->
+            assertThat(FindMethods.find(cu, method)).isNotEmpty()))
+        );
+    }
+
+    @Test
+    void kotlinDslAccessorsOfAnOlderGradle() {
+        rewriteRun(
+          spec -> spec.parser(GradleParser.builder().gradleVersion("6.9")),
+          buildGradleKts(
+            """
+              dependencies { implementation("g:a:1") }
+              tasks.withType<Test> { useJUnitPlatform() }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                assertThat(FindMethods.find(cu, "DependencyHandlerSpec implementation(..)")).isNotEmpty();
+                assertThat(FindMethods.find(cu, "org.gradle.api.tasks.testing.Test useJUnitPlatform(..)")).isNotEmpty();
+            })
+          )
+        );
+    }
+
+    @Test
+    void configurationNotDeclaredByTheStubsIsADependencyDeclaration() {
+        rewriteRun(
+          buildGradle(
+            """
+              dependencies {
+                  testFixturesImplementation 'org.slf4j:slf4j-api:2.0.0'
+              }
+              """,
+            spec -> spec.afterRecipe(cu ->
+              assertThat(FindMethods.find(cu, "DependencyHandlerSpec testFixturesImplementation(..)")).isNotEmpty())
+          )
+        );
+    }
+
+    @Test
+    void dependenciesBlockOfAnUnknownPluginDeclaresNoDependencies() {
+        rewriteRun(
+          buildGradle(
+            """
+              dependencyManagement {
+                  dependencies {
+                      dependency 'org.slf4j:slf4j-api:2.0.0'
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu ->
+              assertThat(FindMethods.find(cu, "DependencyHandlerSpec dependency(..)")).isEmpty())
+          )
+        );
+    }
+
+    @Test
+    void apiOfTheSelectedGradleVersion() {
+        // Gradle 9 removed JavaPluginConvention
+        @Language("groovy") String script = """
+          JavaPluginConvention convention = null
+          convention.getSourceSets()
+          """;
+        rewriteRun(
+          buildGradle(script, spec -> spec.afterRecipe(cu ->
+            assertThat(FindMethods.find(cu, "org.gradle.api.plugins.JavaPluginConvention getSourceSets()")).isEmpty()))
+        );
+        rewriteRun(
+          spec -> spec.parser(GradleParser.builder().gradleVersion("8.5")),
+          buildGradle(script, spec -> spec.afterRecipe(cu ->
+            assertThat(FindMethods.find(cu, "org.gradle.api.plugins.JavaPluginConvention getSourceSets()")).isNotEmpty()))
+        );
+    }
+
+    @Test
+    void gradle6HasTheUtilitiesGradle7DeclaresPublic() {
+        rewriteRun(
+          spec -> spec.parser(GradleParser.builder().gradleVersion("6.9.4")),
+          buildGradle(
+            """
+              if (GradleVersion.current() >= GradleVersion.version('6.0') && VersionNumber.parse('1.2').major > 0) {
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                assertThat(FindMethods.find(cu, "org.gradle.util.GradleVersion current()")).isNotEmpty();
+                assertThat(FindMethods.find(cu, "org.gradle.util.VersionNumber parse(..)")).isNotEmpty();
+            })
+          )
+        );
+    }
+
+    @Test
+    void gradleVersionOfTheProjectWrapper(@TempDir Path project) throws Exception {
+        Path wrapper = Files.createDirectories(project.resolve("gradle/wrapper")).resolve("gradle-wrapper.properties");
+        Files.writeString(wrapper, "distributionUrl=https\\://services.gradle.org/distributions/gradle-8.5-rc-1-bin.zip\n");
+        SourceFile buildGradle = GradleParser.builder().build().parseInputs(
+            List.of(Parser.Input.fromString(project.resolve("build.gradle"), """
+              JavaPluginConvention convention = null
+              convention.getSourceSets()
+              """)), project, new InMemoryExecutionContext(Throwable::printStackTrace))
+          .findFirst().orElseThrow();
+        assertThat(FindMethods.find((J) buildGradle, "org.gradle.api.plugins.JavaPluginConvention getSourceSets()")).isNotEmpty();
     }
 
     @Test
@@ -270,6 +486,17 @@ class GradleParserTest implements RewriteTest {
               repositories {
                   mavenCentral()
               }
+              """
+          )
+        );
+    }
+
+    @Test
+    void kotlinDslWithUnresolvedCallableReference() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              kotlin { jvmToolchain { languageVersion.set(libs.versions.jdk.map(JavaLanguageVersion::of)) } }
               """
           )
         );
@@ -556,6 +783,37 @@ class GradleParserTest implements RewriteTest {
         assertThat(optionalSourceFile).isPresent();
         SourceFile sourceFile = optionalSourceFile.get();
         assertThat(sourceFile).isNotInstanceOf(ParseError.class);
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/pull/8301")
+    @Test
+    void cloneIsolatesGroovyAndKotlinTypeCaches() throws Exception {
+        GradleParser.Builder shared = GradleParser.builder()
+          .groovyParser(GroovyParser.builder())
+          .kotlinParser(KotlinParser.builder());
+
+        GradleParser.Builder cloneA = (GradleParser.Builder) shared.clone();
+        GradleParser.Builder cloneB = (GradleParser.Builder) shared.clone();
+
+        assertThat(cloneA.groovyParser)
+          .isNotSameAs(shared.groovyParser)
+          .isNotSameAs(cloneB.groovyParser);
+        assertThat(cloneA.kotlinParser)
+          .isNotSameAs(shared.kotlinParser)
+          .isNotSameAs(cloneB.kotlinParser);
+
+        assertThat(typeCacheOf(cloneA.groovyParser))
+          .isNotSameAs(typeCacheOf(shared.groovyParser))
+          .isNotSameAs(typeCacheOf(cloneB.groovyParser));
+        assertThat(typeCacheOf(cloneA.kotlinParser))
+          .isNotSameAs(typeCacheOf(shared.kotlinParser))
+          .isNotSameAs(typeCacheOf(cloneB.kotlinParser));
+    }
+
+    private static JavaTypeCache typeCacheOf(Object parserBuilder) throws Exception {
+        Field field = parserBuilder.getClass().getDeclaredField("typeCache");
+        field.setAccessible(true);
+        return (JavaTypeCache) field.get(parserBuilder);
     }
 
     @MethodSource("escapedBackslashesAndInterpolationInGStringParams")

@@ -40,7 +40,9 @@ public class LatestRelease implements VersionComparator {
         int lastDotIdx = version.lastIndexOf('.');
         for (String suffix : RELEASE_SUFFIXES) {
             if (version.regionMatches(true, lastDotIdx, suffix, 0, suffix.length())) {
-                version = version.substring(0, lastDotIdx);
+                String patchedVersion = ParsedVersion.parse(version).patchedVersion();
+                version = version.substring(0, lastDotIdx) +
+                        (patchedVersion == null ? "" : version.substring(patchedVersion.length()));
                 break;
             }
         }
@@ -48,7 +50,7 @@ public class LatestRelease implements VersionComparator {
         int versionParts = countVersionParts(version);
 
         if (versionParts <= 2) {
-            String[] versionAndMetadata = version.split("(?=[-+])");
+            String[] versionAndMetadata = version.split("(?=[-+])", 2);
             for (; versionParts <= 2; versionParts++) {
                 versionAndMetadata[0] += ".0";
             }
@@ -152,8 +154,91 @@ public class LatestRelease implements VersionComparator {
             return Integer.compare(v1Prio, v2Prio);
         }
 
-        // Both are either pre-release or release versions, do string comparison
-        return normalized1.compareTo(normalized2);
+        int identifierCompare = compareNaturally(normalized1, normalized2);
+        if (identifierCompare != 0) {
+            return identifierCompare;
+        }
+        int normalizedCompare = normalized1.compareTo(normalized2);
+        if (normalizedCompare != 0) {
+            return normalizedCompare;
+        }
+        // When the metadata-stripped versions are equal, fall back to comparing the
+        // un-normalized versions lexicographically — but only when BOTH originals match
+        // the metadata pattern, so that build-metadata-only differences within a matching
+        // family (e.g. 1.2.3+backpatch.001 vs 1.2.3+backpatch.002) are ordered
+        // deterministically while heterogeneous metadata (e.g. 29.0-jre vs 29, under
+        // pattern `-jre`) continues to compare equal as a HyphenRange would expect.
+        if (metadataPattern != null && bothMatchMetadata(nv1, nv2, metadataPattern)) {
+            return nv1.compareTo(nv2);
+        }
+        return 0;
+    }
+
+    private static int compareNaturally(String v1, String v2) {
+        int i1 = 0;
+        int i2 = 0;
+        while (i1 < v1.length() && i2 < v2.length()) {
+            int c;
+            if (isAsciiDigit(v1.charAt(i1)) && isAsciiDigit(v2.charAt(i2))) {
+                int end1 = digitRunEnd(v1, i1);
+                int end2 = digitRunEnd(v2, i2);
+                c = compareDigitRuns(v1, i1, end1, v2, i2, end2);
+                i1 = end1;
+                i2 = end2;
+            } else {
+                c = Character.compare(Character.toLowerCase(v1.charAt(i1++)), Character.toLowerCase(v2.charAt(i2++)));
+            }
+            if (c != 0) {
+                return c;
+            }
+        }
+        return Integer.compare(v1.length() - i1, v2.length() - i2);
+    }
+
+    private static int compareDigitRuns(String v1, int start1, int end1, String v2, int start2, int end2) {
+        while (start1 < end1 - 1 && v1.charAt(start1) == '0') {
+            start1++;
+        }
+        while (start2 < end2 - 1 && v2.charAt(start2) == '0') {
+            start2++;
+        }
+        if (end1 - start1 != end2 - start2) {
+            return Integer.compare(end1 - start1, end2 - start2);
+        }
+        while (start1 < end1) {
+            int c = Character.compare(v1.charAt(start1++), v2.charAt(start2++));
+            if (c != 0) {
+                return c;
+            }
+        }
+        return 0;
+    }
+
+    private static int digitRunEnd(String v, int start) {
+        int i = start;
+        while (i < v.length() && isAsciiDigit(v.charAt(i))) {
+            i++;
+        }
+        return i;
+    }
+
+    // Not Character.isDigit: it accepts non-ASCII digits, whose code points sit above the letters
+    // that compareNaturally compares them against, which would make the order intransitive.
+    private static boolean isAsciiDigit(char c) {
+        return c >= '0' && c <= '9';
+    }
+
+    private static boolean bothMatchMetadata(String nv1, String nv2, String metadataPattern) {
+        return matchesMetadata(nv1, metadataPattern) && matchesMetadata(nv2, metadataPattern);
+    }
+
+    private static boolean matchesMetadata(String version, String metadataPattern) {
+        ParsedVersion parsed = ParsedVersion.parse(version);
+        if (!parsed.matches()) {
+            return false;
+        }
+        String qualifier = parsed.qualifier();
+        return qualifier != null && qualifier.matches(metadataPattern);
     }
 
     /**

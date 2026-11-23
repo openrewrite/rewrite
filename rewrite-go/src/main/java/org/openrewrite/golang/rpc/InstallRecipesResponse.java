@@ -22,4 +22,10 @@ import org.jspecify.annotations.Nullable;
 public class InstallRecipesResponse {
     int recipesInstalled;
     @Nullable String version;
+    /**
+     * Full Go import path of the package containing {@code func Activate(*recipe.Registry)}
+     * in the just-installed module. Callers (e.g. Moderne CLI) need this to import the
+     * recipe module when generating a custom {@code rewrite-go-rpc} main.
+     */
+    @Nullable String activatePkg;
 }

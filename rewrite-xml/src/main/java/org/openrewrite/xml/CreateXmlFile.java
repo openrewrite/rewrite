@@ -92,6 +92,9 @@ public class CreateXmlFile extends ScanningRecipe<AtomicBoolean> {
                     if (StringUtils.isBlank(fileContents)) {
                         return document.withProlog(null).withRoot(null);
                     }
+                    if (document.printAll().equals(fileContents)) {
+                        return document;
+                    }
                     Optional<SourceFile> sourceFiles = XmlParser.builder().build()
                             .parse(fileContents)
                             .findFirst();
@@ -100,8 +103,10 @@ public class CreateXmlFile extends ScanningRecipe<AtomicBoolean> {
                         if (sourceFile instanceof Xml.Document) {
                             Xml.Document newXmlDocument = (Xml.Document) sourceFile;
                             return document
+                                    .withPrefix(newXmlDocument.getPrefix())
                                     .withProlog(newXmlDocument.getProlog())
-                                    .withRoot(newXmlDocument.getRoot());
+                                    .withRoot(newXmlDocument.getRoot())
+                                    .withEof(newXmlDocument.getEof());
                         }
                     }
                 }

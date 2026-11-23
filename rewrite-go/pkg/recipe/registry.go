@@ -22,21 +22,15 @@ import (
 	"sync"
 )
 
-// CategoryDescriptor describes a recipe category for hierarchical organization.
 type CategoryDescriptor struct {
 	DisplayName string
 	Description string
 }
 
-// RecipeConstructor creates a new Recipe instance, optionally configured with options.
 type RecipeConstructor func(options map[string]any) Recipe
 
-// Registration holds a recipe constructor and its category path.
 type Registration struct {
-	// Descriptor provides metadata about the recipe.
-	Descriptor RecipeDescriptor
-
-	// Constructor creates new instances of the recipe with the given options.
+	Descriptor  RecipeDescriptor
 	Constructor RecipeConstructor
 
 	// Categories is the category path from shallowest to deepest
@@ -44,14 +38,12 @@ type Registration struct {
 	Categories []CategoryDescriptor
 }
 
-// Category is a node in the recipe category tree.
 type Category struct {
 	CategoryDescriptor
 	Recipes       []Registration
 	Subcategories []*Category
 }
 
-// Registry holds all registered recipes organized by category.
 // Create one with NewRegistry and populate it via Activate:
 //
 //	registry := recipe.NewRegistry()
@@ -60,9 +52,15 @@ type Registry struct {
 	mu     sync.RWMutex
 	root   Category
 	byName map[string]*Registration
+
+	// subByName holds the children contributed by composite recipes'
+	// RecipeList(). These are resolvable by name (so the CLI can prepare a
+	// composite's children individually) but are intentionally kept out of
+	// byName / the category tree so they don't surface as standalone
+	// marketplace entries. FindRecipe falls back to this map.
+	subByName map[string]*Registration
 }
 
-// Activator is a function that registers recipes with a registry.
 // Each module provides an Activate function that the caller passes
 // to Registry.Activate:
 //
@@ -78,14 +76,13 @@ type Registry struct {
 //	registry.Activate(cleanup.Activate, security.Activate)
 type Activator func(registry *Registry)
 
-// NewRegistry creates an empty registry.
 func NewRegistry() *Registry {
 	return &Registry{
-		byName: make(map[string]*Registration),
+		byName:    make(map[string]*Registration),
+		subByName: make(map[string]*Registration),
 	}
 }
 
-// Register adds a recipe to the registry.
 // The prototype is used to extract the recipe descriptor. A constructor is
 // automatically derived via reflection: it creates a new instance of the
 // prototype's type and sets exported fields from the options map. Option
@@ -114,15 +111,38 @@ func (r *Registry) Register(prototype Recipe, categories ...CategoryDescriptor) 
 		cat = r.findOrCreateSubcategory(cat, cd)
 	}
 	cat.Recipes = append(cat.Recipes, *reg)
+
+	// Composite recipes advertise their RecipeList() children in the
+	// descriptor (see Describe), so the CLI prepares each child by name.
+	// Register those children so FindRecipe can resolve them — but only into
+	// subByName, never byName or the category tree, so they don't appear as
+	// standalone marketplace recipes.
+	r.registerSubRecipes(prototype)
 }
 
-// RegisterDescriptor registers a recipe from its descriptor (used for dynamically loaded recipes).
-// The constructor returns nil since the recipe implementation lives in the external module.
+// registerSubRecipes recursively records a recipe's RecipeList() children in
+// subByName so they are resolvable by name. The traversal is guarded against
+// cycles (and shared sub-recipes) via the subByName presence check.
+func (r *Registry) registerSubRecipes(rec Recipe) {
+	for _, sub := range rec.RecipeList() {
+		name := sub.Name()
+		if _, exists := r.subByName[name]; !exists {
+			// A child that is also registered as a top-level recipe is
+			// already resolvable via byName; FindRecipe checks byName first.
+			child := sub
+			r.subByName[name] = &Registration{
+				Descriptor:  Describe(child),
+				Constructor: func(map[string]any) Recipe { return child },
+			}
+			r.registerSubRecipes(child)
+		}
+	}
+}
+
 func (r *Registry) RegisterDescriptor(desc RecipeDescriptor) {
 	r.RegisterWithCategories(desc, nil)
 }
 
-// RegisterWithCategories registers a recipe descriptor with its category path.
 func (r *Registry) RegisterWithCategories(desc RecipeDescriptor, categories []CategoryDescriptor) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -149,15 +169,18 @@ func (r *Registry) RegisterWithCategories(desc RecipeDescriptor, categories []Ca
 	r.byName[desc.Name] = reg
 }
 
-// FindRecipe looks up a registration by fully qualified recipe name.
 func (r *Registry) FindRecipe(name string) (*Registration, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	reg, ok := r.byName[name]
+	if reg, ok := r.byName[name]; ok {
+		return reg, true
+	}
+	// Fall back to composite children (e.g. "Parent$Keep") contributed via
+	// RecipeList(), which are not standalone marketplace recipes.
+	reg, ok := r.subByName[name]
 	return reg, ok
 }
 
-// AllRecipes returns descriptors for all registered recipes.
 func (r *Registry) AllRecipes() []RecipeDescriptor {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -168,7 +191,6 @@ func (r *Registry) AllRecipes() []RecipeDescriptor {
 	return result
 }
 
-// AllRegistrations returns the full registrations (descriptor + categories) for all recipes.
 func (r *Registry) AllRegistrations() []Registration {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -179,14 +201,12 @@ func (r *Registry) AllRegistrations() []Registration {
 	return result
 }
 
-// Categories returns the top-level categories.
 func (r *Registry) Categories() []*Category {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	return r.root.Subcategories
 }
 
-// Activate runs the given activators against this registry.
 // Each activator calls Register to add its recipes. This is the
 // single entry point for populating a registry.
 //

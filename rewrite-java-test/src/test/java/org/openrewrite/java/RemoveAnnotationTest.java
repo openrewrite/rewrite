@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpecs;
 import org.openrewrite.test.TypeValidation;
 
 import static org.openrewrite.java.Assertions.java;
@@ -744,6 +745,336 @@ class RemoveAnnotationTest implements RewriteTest {
               }
               """
           )
+        );
+    }
+
+    @Test
+    void removeAllMatchingAnnotations() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveAnnotation("@org.jetbrains.annotations.*ull*")),
+          java(
+            """
+              import org.jetbrains.annotations.NotNull;
+              import org.jetbrains.annotations.Nullable;
+
+              class Foo {
+                  @NotNull
+                  @Nullable
+                  public void bar() {
+                  }
+              }
+              """,
+            """
+              class Foo {
+                  public void bar() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeAllLeadingAnnotationsWithModifiersOnSeparateLines() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveAnnotation("@org.example.Remove*")),
+          removableAnnotation("RemoveA"),
+          removableAnnotation("RemoveB"),
+          java(
+            """
+              import org.example.RemoveA;
+              import org.example.RemoveB;
+
+              @RemoveA
+              @RemoveB
+              public class Test {
+                  @RemoveA
+                  @RemoveB
+                  private final int field = 0;
+
+                  @RemoveA
+                  @RemoveB
+                  public Test() {
+                  }
+
+                  @RemoveA
+                  @RemoveB
+                  public void method() {
+                      @RemoveA
+                      @RemoveB
+                      final int local = 0;
+                  }
+              }
+              """,
+            """
+              public class Test {
+                  private final int field = 0;
+
+                  public Test() {
+                  }
+
+                  public void method() {
+                      final int local = 0;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeAllLeadingAnnotationsWithModifiersOnSameLine() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveAnnotation("@org.example.Remove*")),
+          removableAnnotation("RemoveA"),
+          removableAnnotation("RemoveB"),
+          java(
+            """
+              import org.example.RemoveA;
+              import org.example.RemoveB;
+
+              @RemoveA @RemoveB public class Test {
+                  @RemoveA @RemoveB private final int field = 0;
+
+                  @RemoveA @RemoveB public Test() {
+                  }
+
+                  @RemoveA @RemoveB public void method() {
+                      @RemoveA @RemoveB final int local = 0;
+                  }
+              }
+              """,
+            """
+              public class Test {
+                  private final int field = 0;
+
+                  public Test() {
+                  }
+
+                  public void method() {
+                      final int local = 0;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeAllLeadingAnnotationsWithoutModifiersOnSeparateLines() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveAnnotation("@org.example.Remove*")),
+          removableAnnotation("RemoveA"),
+          removableAnnotation("RemoveB"),
+          java(
+            """
+              import org.example.RemoveA;
+              import org.example.RemoveB;
+
+              @RemoveA
+              @RemoveB
+              class Test<T> {
+                  @RemoveA
+                  @RemoveB
+                  int field;
+
+                  @RemoveA
+                  @RemoveB
+                  Test() {
+                  }
+
+                  @RemoveA
+                  @RemoveB
+                  void method() {
+                      @RemoveA
+                      @RemoveB
+                      int local = 0;
+                  }
+
+                  @RemoveA
+                  @RemoveB
+                  <U> void generic() {
+                  }
+              }
+              """,
+            """
+              class Test<T> {
+                  int field;
+
+                  Test() {
+                  }
+
+                  void method() {
+                      int local = 0;
+                  }
+
+                  <U> void generic() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeAllLeadingAnnotationsWithoutModifiersOnSameLine() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveAnnotation("@org.example.Remove*")),
+          removableAnnotation("RemoveA"),
+          removableAnnotation("RemoveB"),
+          java(
+            """
+              import org.example.RemoveA;
+              import org.example.RemoveB;
+
+              @RemoveA @RemoveB class Test {
+                  @RemoveA @RemoveB int field;
+
+                  @RemoveA @RemoveB Test() {
+                  }
+
+                  @RemoveA @RemoveB void method() {
+                      @RemoveA @RemoveB int local = 0;
+                  }
+
+                  @RemoveA @RemoveB <U> void generic() {
+                  }
+              }
+              """,
+            """
+              class Test {
+                  int field;
+
+                  Test() {
+                  }
+
+                  void method() {
+                      int local = 0;
+                  }
+
+                  <U> void generic() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeFirstAndLastLeadingAnnotationOnSeparateLines() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveAnnotation("@org.example.Remove*")),
+          removableAnnotation("RemoveA"),
+          removableAnnotation("RemoveB"),
+          java(
+            """
+              import org.example.RemoveA;
+              import org.example.RemoveB;
+
+              @RemoveA
+              @Deprecated
+              @RemoveB
+              public class Test {
+                  @RemoveA
+                  @Deprecated
+                  @RemoveB
+                  private int field;
+
+                  @RemoveA
+                  @Deprecated
+                  @RemoveB
+                  void method() {
+                      @RemoveA
+                      @SuppressWarnings("unused")
+                      @RemoveB
+                      int local = 0;
+                  }
+              }
+              """,
+            """
+              @Deprecated
+              public class Test {
+                  @Deprecated
+                  private int field;
+
+                  @Deprecated
+                  void method() {
+                      @SuppressWarnings("unused")
+                      int local = 0;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeFirstAndLastLeadingAnnotationOnSameLine() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveAnnotation("@org.example.Remove*")),
+          removableAnnotation("RemoveA"),
+          removableAnnotation("RemoveB"),
+          java(
+            """
+              package org.test;
+
+              import org.example.RemoveA;
+              import org.example.RemoveB;
+
+              @RemoveA @Deprecated @RemoveB class Test {
+                  @RemoveA @Deprecated @RemoveB private int field;
+
+                  @RemoveA @Deprecated @RemoveB public void method() {
+                      @RemoveA @SuppressWarnings("unused") @RemoveB int local = 0;
+                  }
+              }
+              """,
+            """
+              package org.test;
+
+              @Deprecated class Test {
+                  @Deprecated private int field;
+
+                  @Deprecated public void method() {
+                      @SuppressWarnings("unused") int local = 0;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeOnlyAnnotationFromGenericClass() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveAnnotation("@java.lang.Deprecated")),
+          java(
+            """
+              @Deprecated
+              class OnSeparateLines<T> {
+              }
+
+              @Deprecated class OnSameLine<T> {
+              }
+              """,
+            """
+              class OnSeparateLines<T> {
+              }
+
+              class OnSameLine<T> {
+              }
+              """
+          )
+        );
+    }
+
+    private static SourceSpecs removableAnnotation(String name) {
+        return java(
+          """
+            package org.example;
+            public @interface %s {
+            }
+            """.formatted(name)
         );
     }
 }

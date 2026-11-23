@@ -20,8 +20,12 @@ import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.internal.CommentService;
+import org.openrewrite.internal.TreeShapeValidationService;
 import org.openrewrite.json.JsonVisitor;
 import org.openrewrite.json.internal.JsonPrinter;
+import org.openrewrite.json.internal.JsonTreeShapeValidationService;
+import org.openrewrite.json.service.JsonCommentService;
 import org.openrewrite.marker.Markers;
 
 import java.lang.ref.WeakReference;
@@ -36,6 +40,7 @@ public interface Json extends Tree {
     @SuppressWarnings("unchecked")
     @Override
     default <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+        //noinspection DataFlowIssue
         return (R) acceptJson(v.adapt(JsonVisitor.class), p);
     }
 
@@ -185,6 +190,17 @@ public interface Json extends Tree {
         @Override
         public <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
             return new JsonPrinter<>();
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public <S, T extends S> T service(Class<S> service) {
+            if (CommentService.class.getName().equals(service.getName())) {
+                return (T) new JsonCommentService();
+            } else if (TreeShapeValidationService.class.getName().equals(service.getName())) {
+                return (T) new JsonTreeShapeValidationService();
+            }
+            return SourceFile.super.service(service);
         }
     }
 

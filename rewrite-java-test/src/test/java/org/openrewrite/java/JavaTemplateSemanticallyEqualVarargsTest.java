@@ -74,6 +74,48 @@ class JavaTemplateSemanticallyEqualVarargsTest implements RewriteTest {
         }
 
         @Test
+        void parenthesizedVarargsElementMatchesByTheTypeOfWhatItEncloses() {
+            rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                  final JavaTemplate before = JavaTemplate
+                    .builder("String.format(#{format:any(String)}, #{args:anyArray(String)})")
+                    .build();
+                  final JavaTemplate after = JavaTemplate
+                    .builder("String.format(java.util.Locale.ROOT, #{format:any(String)}, #{args:anyArray(String)})")
+                    .build();
+
+                  @Override
+                  public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                      JavaTemplate.Matcher matcher = before.matcher(getCursor());
+                      if (matcher.find()) {
+                          return after.apply(getCursor(), method.getCoordinates().replace(), matcher.parameter(0), matcher.parameter(1));
+                      }
+                      return super.visitMethodInvocation(method, ctx);
+                  }
+              })),
+              //language=java
+              java(
+                """
+                  class Foo {
+                      void test(String b) {
+                          String strings = String.format("%s%s", "a", (b));
+                          String mixed = String.format("%s%s", "a", (1));
+                      }
+                  }
+                  """,
+                """
+                  class Foo {
+                      void test(String b) {
+                          String strings = String.format(java.util.Locale.ROOT, "%s%s", "a", (b));
+                          String mixed = String.format("%s%s", "a", (1));
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
         void matchVarargsWithZeroElements() {
             rewriteRun(
               spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
@@ -321,7 +363,6 @@ class JavaTemplateSemanticallyEqualVarargsTest implements RewriteTest {
         void extractVarargsMatchedElements() {
             rewriteRun(
               spec -> spec
-                .expectedCyclesThatMakeChanges(1).cycles(1)
                 .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
                     final JavaTemplate template = JavaTemplate
                       .builder("java.util.Arrays.asList(#{items:anyArray(Object)})")

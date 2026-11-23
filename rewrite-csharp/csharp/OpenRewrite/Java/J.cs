@@ -64,12 +64,17 @@ public sealed class NullSafe : Marker, IRpcCodec<NullSafe>, IEquatable<NullSafe>
     public NullSafe WithDotPrefix(Space dotPrefix) =>
         ReferenceEquals(dotPrefix, DotPrefix) ? this : new(Id, dotPrefix);
 
-    public static NullSafe Instance { get; } = new(Guid.Empty);
+    // Distinct fixed UUID per singleton marker. A shared Guid.Empty collides across
+    // marker types in every UUID-keyed path of the V3 marker table (intern table,
+    // findById, multi-project extern resolveById) — resolving any zero-UUID marker
+    // returns whichever type was stored first, silently swapping e.g. NullSafe for
+    // NullCoalescing and dropping `?.`/`??` from printed C# so migration patches fail.
+    public static NullSafe Instance { get; } = new(new Guid("1e5a0001-0000-4000-8000-000000000001"));
 
     public void RpcSend(NullSafe after, RpcSendQueue q)
     {
         q.GetAndSend(after, m => m.Id);
-        q.GetAndSend(after, m => m.DotPrefix, s => new Rpc.JavaSender().VisitSpace(s, q));
+        q.GetAndSend(after, m => Rpc.JavaSender.SpaceRef(m.DotPrefix), s => new Rpc.JavaSender().VisitSpace(Rewrite.Core.Rpc.Reference.GetValueNonNull<Space>(s), q));
     }
 
     public NullSafe RpcReceive(NullSafe before, RpcReceiveQueue q) =>
@@ -95,7 +100,7 @@ public sealed class OmitParentheses(
     public OmitParentheses WithId(Guid id) =>
         id == Id ? this : new(id);
 
-    public static OmitParentheses Instance { get; } = new(Guid.Empty);
+    public static OmitParentheses Instance { get; } = new(new Guid("1e5a0002-0000-4000-8000-000000000002"));
     public void RpcSend(OmitParentheses after, RpcSendQueue q) => q.GetAndSend(after, m => m.Id);
     public OmitParentheses RpcReceive(OmitParentheses before, RpcReceiveQueue q) =>
         before.WithId(q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse));
@@ -1058,6 +1063,7 @@ public sealed class MethodDeclaration(
     TypeTree? returnTypeExpression,
     Identifier name,
     JContainer<Statement> parameters,
+    IList<JLeftPadded<Space>> dimensionsAfterName,
     JContainer<NameTree>? throws,
     Block? body,
     JLeftPadded<Expression>? defaultValue,
@@ -1073,37 +1079,40 @@ public sealed class MethodDeclaration(
     public TypeTree? ReturnTypeExpression { get; } = returnTypeExpression;
     public Identifier Name { get; } = name;
     public JContainer<Statement> Parameters { get; } = parameters;
+    public IList<JLeftPadded<Space>> DimensionsAfterName { get; } = dimensionsAfterName;
     public JContainer<NameTree>? Throws { get; } = throws;
     public Block? Body { get; } = body;
     public JLeftPadded<Expression>? DefaultValue { get; } = defaultValue;
     public JavaType.Method? MethodType { get; } = methodType;
 
     public MethodDeclaration WithId(Guid id) =>
-        id == Id ? this : new(id, Prefix, Markers, LeadingAnnotations, Modifiers, TypeParameters, ReturnTypeExpression, Name, Parameters, Throws, Body, DefaultValue, MethodType);
+        id == Id ? this : new(id, Prefix, Markers, LeadingAnnotations, Modifiers, TypeParameters, ReturnTypeExpression, Name, Parameters, DimensionsAfterName, Throws, Body, DefaultValue, MethodType);
     public MethodDeclaration WithPrefix(Space prefix) =>
-        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, LeadingAnnotations, Modifiers, TypeParameters, ReturnTypeExpression, Name, Parameters, Throws, Body, DefaultValue, MethodType);
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, LeadingAnnotations, Modifiers, TypeParameters, ReturnTypeExpression, Name, Parameters, DimensionsAfterName, Throws, Body, DefaultValue, MethodType);
     public MethodDeclaration WithMarkers(Markers markers) =>
-        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, LeadingAnnotations, Modifiers, TypeParameters, ReturnTypeExpression, Name, Parameters, Throws, Body, DefaultValue, MethodType);
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, LeadingAnnotations, Modifiers, TypeParameters, ReturnTypeExpression, Name, Parameters, DimensionsAfterName, Throws, Body, DefaultValue, MethodType);
     public MethodDeclaration WithLeadingAnnotations(IList<Annotation> leadingAnnotations) =>
-        ReferenceEquals(leadingAnnotations, LeadingAnnotations) ? this : new(Id, Prefix, Markers, leadingAnnotations, Modifiers, TypeParameters, ReturnTypeExpression, Name, Parameters, Throws, Body, DefaultValue, MethodType);
+        ReferenceEquals(leadingAnnotations, LeadingAnnotations) ? this : new(Id, Prefix, Markers, leadingAnnotations, Modifiers, TypeParameters, ReturnTypeExpression, Name, Parameters, DimensionsAfterName, Throws, Body, DefaultValue, MethodType);
     public MethodDeclaration WithModifiers(IList<Modifier> modifiers) =>
-        ReferenceEquals(modifiers, Modifiers) ? this : new(Id, Prefix, Markers, LeadingAnnotations, modifiers, TypeParameters, ReturnTypeExpression, Name, Parameters, Throws, Body, DefaultValue, MethodType);
+        ReferenceEquals(modifiers, Modifiers) ? this : new(Id, Prefix, Markers, LeadingAnnotations, modifiers, TypeParameters, ReturnTypeExpression, Name, Parameters, DimensionsAfterName, Throws, Body, DefaultValue, MethodType);
     public MethodDeclaration WithTypeParameters(JContainer<TypeParameter>? typeParameters) =>
-        ReferenceEquals(typeParameters, TypeParameters) ? this : new(Id, Prefix, Markers, LeadingAnnotations, Modifiers, typeParameters, ReturnTypeExpression, Name, Parameters, Throws, Body, DefaultValue, MethodType);
+        ReferenceEquals(typeParameters, TypeParameters) ? this : new(Id, Prefix, Markers, LeadingAnnotations, Modifiers, typeParameters, ReturnTypeExpression, Name, Parameters, DimensionsAfterName, Throws, Body, DefaultValue, MethodType);
     public MethodDeclaration WithReturnTypeExpression(TypeTree? returnTypeExpression) =>
-        ReferenceEquals(returnTypeExpression, ReturnTypeExpression) ? this : new(Id, Prefix, Markers, LeadingAnnotations, Modifiers, TypeParameters, returnTypeExpression, Name, Parameters, Throws, Body, DefaultValue, MethodType);
+        ReferenceEquals(returnTypeExpression, ReturnTypeExpression) ? this : new(Id, Prefix, Markers, LeadingAnnotations, Modifiers, TypeParameters, returnTypeExpression, Name, Parameters, DimensionsAfterName, Throws, Body, DefaultValue, MethodType);
     public MethodDeclaration WithName(Identifier name) =>
-        ReferenceEquals(name, Name) ? this : new(Id, Prefix, Markers, LeadingAnnotations, Modifiers, TypeParameters, ReturnTypeExpression, name, Parameters, Throws, Body, DefaultValue, MethodType);
+        ReferenceEquals(name, Name) ? this : new(Id, Prefix, Markers, LeadingAnnotations, Modifiers, TypeParameters, ReturnTypeExpression, name, Parameters, DimensionsAfterName, Throws, Body, DefaultValue, MethodType);
     public MethodDeclaration WithParameters(JContainer<Statement> parameters) =>
-        ReferenceEquals(parameters, Parameters) ? this : new(Id, Prefix, Markers, LeadingAnnotations, Modifiers, TypeParameters, ReturnTypeExpression, Name, parameters, Throws, Body, DefaultValue, MethodType);
+        ReferenceEquals(parameters, Parameters) ? this : new(Id, Prefix, Markers, LeadingAnnotations, Modifiers, TypeParameters, ReturnTypeExpression, Name, parameters, DimensionsAfterName, Throws, Body, DefaultValue, MethodType);
+    public MethodDeclaration WithDimensionsAfterName(IList<JLeftPadded<Space>> dimensionsAfterName) =>
+        ReferenceEquals(dimensionsAfterName, DimensionsAfterName) ? this : new(Id, Prefix, Markers, LeadingAnnotations, Modifiers, TypeParameters, ReturnTypeExpression, Name, Parameters, dimensionsAfterName, Throws, Body, DefaultValue, MethodType);
     public MethodDeclaration WithThrows(JContainer<NameTree>? throws) =>
-        ReferenceEquals(throws, Throws) ? this : new(Id, Prefix, Markers, LeadingAnnotations, Modifiers, TypeParameters, ReturnTypeExpression, Name, Parameters, throws, Body, DefaultValue, MethodType);
+        ReferenceEquals(throws, Throws) ? this : new(Id, Prefix, Markers, LeadingAnnotations, Modifiers, TypeParameters, ReturnTypeExpression, Name, Parameters, DimensionsAfterName, throws, Body, DefaultValue, MethodType);
     public MethodDeclaration WithBody(Block? body) =>
-        ReferenceEquals(body, Body) ? this : new(Id, Prefix, Markers, LeadingAnnotations, Modifiers, TypeParameters, ReturnTypeExpression, Name, Parameters, Throws, body, DefaultValue, MethodType);
+        ReferenceEquals(body, Body) ? this : new(Id, Prefix, Markers, LeadingAnnotations, Modifiers, TypeParameters, ReturnTypeExpression, Name, Parameters, DimensionsAfterName, Throws, body, DefaultValue, MethodType);
     public MethodDeclaration WithDefaultValue(JLeftPadded<Expression>? defaultValue) =>
-        ReferenceEquals(defaultValue, DefaultValue) ? this : new(Id, Prefix, Markers, LeadingAnnotations, Modifiers, TypeParameters, ReturnTypeExpression, Name, Parameters, Throws, Body, defaultValue, MethodType);
+        ReferenceEquals(defaultValue, DefaultValue) ? this : new(Id, Prefix, Markers, LeadingAnnotations, Modifiers, TypeParameters, ReturnTypeExpression, Name, Parameters, DimensionsAfterName, Throws, Body, defaultValue, MethodType);
     public MethodDeclaration WithMethodType(JavaType.Method? methodType) =>
-        ReferenceEquals(methodType, MethodType) ? this : new(Id, Prefix, Markers, LeadingAnnotations, Modifiers, TypeParameters, ReturnTypeExpression, Name, Parameters, Throws, Body, DefaultValue, methodType);
+        ReferenceEquals(methodType, MethodType) ? this : new(Id, Prefix, Markers, LeadingAnnotations, Modifiers, TypeParameters, ReturnTypeExpression, Name, Parameters, DimensionsAfterName, Throws, Body, DefaultValue, methodType);
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -1192,13 +1201,13 @@ public sealed class TypeParameters(
     /// Create a TypeParameters wrapper from a JContainer (for RPC sending).
     /// </summary>
     public static TypeParameters FromContainer(JContainer<TypeParameter> container) =>
-        new(Guid.NewGuid(), container.Before, Markers.Empty, [], container.Elements);
+        new(Tree.RandomId(), container.Before, container.Markers, [], container.Elements);
 
     /// <summary>
     /// Convert back to a JContainer (for RPC receiving).
     /// </summary>
     public JContainer<TypeParameter> ToContainer() =>
-        new(Prefix, Params, Markers.Empty);
+        new(Prefix, Params, Markers);
 
     public bool Equals(TypeParameters? other) => other is not null && Id == other.Id;
     public override bool Equals(object? obj) => Equals(obj as TypeParameters);

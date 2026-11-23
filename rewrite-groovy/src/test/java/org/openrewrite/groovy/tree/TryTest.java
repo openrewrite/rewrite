@@ -167,6 +167,65 @@ class TryTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/8040")
+    @Test
+    void tryWithResourcesWithoutCatch() {
+        rewriteRun(
+          groovy(
+            """
+              try(ByteArrayInputStream a = new ByteArrayInputStream("".getBytes()); ByteArrayInputStream b = new ByteArrayInputStream("".getBytes())) {
+
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8040")
+    @Test
+    void tryWithResourcesWithoutCatchNested() {
+        rewriteRun(
+          groovy(
+            """
+              try(ByteArrayInputStream a = new ByteArrayInputStream("".getBytes()); ByteArrayInputStream b = new ByteArrayInputStream("".getBytes())) {
+                            try(ByteArrayInputStream c = new ByteArrayInputStream("".getBytes()); ByteArrayInputStream d = new ByteArrayInputStream("".getBytes())) {
+
+                             }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8040")
+    @Test
+    void tryWithResourceWithoutCatch() {
+        rewriteRun(
+          groovy(
+            """
+              try (ByteArrayInputStream a = new ByteArrayInputStream("".getBytes())) {
+                  def x = a.read()
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8040")
+    @Test
+    void tryWithResourcesWithoutCatchButFinally() {
+        rewriteRun(
+          groovy(
+            """
+              try (ByteArrayInputStream a = new ByteArrayInputStream("".getBytes()); ByteArrayInputStream b = new ByteArrayInputStream("".getBytes())) {
+              } finally {
+                  println "done"
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void whitespace() {
         rewriteRun(

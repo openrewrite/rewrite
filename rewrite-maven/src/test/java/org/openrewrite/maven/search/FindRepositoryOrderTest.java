@@ -35,7 +35,7 @@ class FindRepositoryOrderTest implements RewriteTest {
     @Test
     void findRepositoryOrder() {
         var ctx = MavenExecutionContextView.view(new InMemoryExecutionContext());
-        ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
+        MavenSettings testSettings = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
           //language=xml
           """
             <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -60,7 +60,9 @@ class FindRepositoryOrderTest implements RewriteTest {
                 </profiles>
             </settings>
             """
-        ), ctx));
+        ), ctx);
+        // Merge in user/install settings so any configured mirror (e.g. CI's moderne-cache) still applies.
+        ctx.setMavenSettings(testSettings.merge(MavenSettings.readMavenSettingsFromDisk(ctx)));
 
         rewriteRun(
           spec -> spec

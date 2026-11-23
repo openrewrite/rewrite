@@ -20,8 +20,10 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
+import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.service.ImportService;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
@@ -66,7 +68,7 @@ public class ReplaceAnnotation extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         AnnotationMatcher matcher = new AnnotationMatcher(annotationPatternToReplace);
-        return new JavaIsoVisitor<ExecutionContext>() {
+        return Preconditions.check(new UsesType<>(matcher.getAnnotationName(), true), new JavaIsoVisitor<ExecutionContext>() {
 
             @Override
             public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
@@ -141,6 +143,6 @@ public class ReplaceAnnotation extends Recipe {
                     }
                 }
             }
-        };
+        });
     }
 }

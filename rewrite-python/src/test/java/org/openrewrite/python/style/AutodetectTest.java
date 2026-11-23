@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -291,10 +292,7 @@ class AutodetectTest implements RewriteTest {
         );
     }
 
-    @CsvSource({
-      "true",
-      "false"
-    })
+    @ValueSource(booleans = {true, false})
     @ParameterizedTest(name = "Mixed Operators - with spaces={0}")
     void autodetectMixedOperatorSpacing(boolean hasSpaces) {
         rewriteRun(
@@ -314,10 +312,7 @@ class AutodetectTest implements RewriteTest {
         );
     }
 
-    @CsvSource({
-      "true",
-      "false"
-    })
+    @ValueSource(booleans = {true, false})
     @ParameterizedTest(name = "For Loop Semi-colon - with spaces={0}")
     void autodetectForLoop(boolean hasSpaces) {
         rewriteRun(

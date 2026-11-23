@@ -16,6 +16,7 @@
 package org.openrewrite.remote;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.InMemoryExecutionContext;
@@ -25,10 +26,13 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.concurrent.*;
 
 import static java.util.Objects.requireNonNull;
+import static org.openrewrite.remote.AuthenticatingHttpSender.AUTHORIZATION;
+import static org.openrewrite.remote.AuthenticatingHttpSender.authenticatorFor;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -99,6 +103,99 @@ class RemoteFileTest {
         }
 
         executorService.shutdown();
+    }
+
+    @Test
+    void retriesWithAuthenticationAfterChallenge(@TempDir Path cacheDir) {
+        // given
+        AuthenticatingHttpSender httpSender = new AuthenticatingHttpSender("content".getBytes(StandardCharsets.UTF_8));
+        ExecutionContext ctx = context(cacheDir, httpSender);
+        RemoteExecutionContextView.view(ctx).addAuthenticator(authenticatorFor("https://repo.example/maven2/"));
+
+        // when
+        String content = Remote.builder(Path.of("file.txt"))
+          .charset(StandardCharsets.UTF_8)
+          .build(URI.create("https://repo.example/maven2/file.txt"))
+          .printAll(ctx);
+
+        // then
+        assertThat(content).isEqualTo("content");
+        assertThat(httpSender.authorizations).containsExactly(null, AUTHORIZATION);
+    }
+
+    @Test
+    void withoutAuthenticatorSendsSingleAnonymousRequest(@TempDir Path cacheDir) {
+        // given
+        AuthenticatingHttpSender httpSender = new AuthenticatingHttpSender("content".getBytes(StandardCharsets.UTF_8));
+        ExecutionContext ctx = context(cacheDir, httpSender);
+        URI uri = URI.create("https://repo.example/maven2/file.txt");
+
+        // when
+        RemoteFile remoteFile = Remote.builder(Path.of("file.txt")).build(uri);
+
+        // then
+        assertThatThrownBy(() -> remoteFile.getInputStream(ctx))
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessage("Failed to download " + uri + " to artifact cache");
+        assertThat(httpSender.authorizations).containsExactly((String) null);
+    }
+
+    @Test
+    void authenticatorForAnotherUriIsNotUsed(@TempDir Path cacheDir) {
+        // given
+        AuthenticatingHttpSender httpSender = new AuthenticatingHttpSender("content".getBytes(StandardCharsets.UTF_8));
+        ExecutionContext ctx = context(cacheDir, httpSender);
+        RemoteExecutionContextView.view(ctx)
+          .addAuthenticator(authenticatorFor("https://other.example/maven2/"))
+          .addAuthenticator(authenticatorFor("https://repo.example/private/"));
+
+        // when
+        RemoteFile remoteFile = Remote.builder(Path.of("file.txt"))
+          .build(URI.create("https://repo.example/maven2/file.txt"));
+
+        // then
+        assertThatThrownBy(() -> remoteFile.getInputStream(ctx)).isInstanceOf(IllegalStateException.class);
+        assertThat(httpSender.authorizations).containsExactly((String) null);
+    }
+
+    @Test
+    void authenticatesUpFrontOnceEndpointRequiredAuthentication(@TempDir Path cacheDir) {
+        // given
+        AuthenticatingHttpSender httpSender = new AuthenticatingHttpSender("content".getBytes(StandardCharsets.UTF_8));
+        ExecutionContext ctx = context(cacheDir, httpSender);
+        RemoteExecutionContextView.view(ctx).addAuthenticator(authenticatorFor("https://repo.example/maven2/"));
+        Remote.builder(Path.of("first.txt")).build(URI.create("https://repo.example/maven2/first.txt")).printAll(ctx);
+        httpSender.authorizations.clear();
+
+        // when
+        String content = Remote.builder(Path.of("second.txt"))
+          .charset(StandardCharsets.UTF_8)
+          .build(URI.create("https://repo.example/maven2/second.txt"))
+          .printAll(ctx);
+
+        // then
+        assertThat(content).isEqualTo("content");
+        assertThat(httpSender.authorizations).containsExactly(AUTHORIZATION);
+    }
+
+    @Test
+    void addingEqualAuthenticatorTwiceIsNoOp() {
+        // given
+        ExecutionContext ctx = new InMemoryExecutionContext();
+        RemoteAuthenticator authenticator = authenticatorFor("https://repo.example/maven2/");
+
+        // when
+        RemoteExecutionContextView.view(ctx).addAuthenticator(authenticator).addAuthenticator(authenticator);
+
+        // then
+        assertThat(RemoteExecutionContextView.view(ctx).getAuthenticators()).containsExactly(authenticator);
+    }
+
+    private static ExecutionContext context(Path cacheDir, AuthenticatingHttpSender httpSender) {
+        ExecutionContext ctx = new InMemoryExecutionContext();
+        RemoteExecutionContextView.view(ctx).setArtifactCache(new LocalRemoteArtifactCache(cacheDir));
+        HttpSenderExecutionContextView.view(ctx).setLargeFileHttpSender(httpSender);
+        return ctx;
     }
 
     private Long getInputStreamSize(InputStream is) {

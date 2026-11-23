@@ -30,7 +30,6 @@ import org.openrewrite.kotlin.style.WrappingAndBracesStyle;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
-import org.openrewrite.test.TypeValidation;
 
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
@@ -208,9 +207,9 @@ class TabsAndIndentsTest implements RewriteTest {
                                                 third: String) {
                   }
                   private fun firstArgOnNewLine(
-                          first: String,
-                          second: Int,
-                          third: String) {
+                      first: String,
+                      second: Int,
+                      third: String) {
                   }
               }
               """
@@ -257,7 +256,8 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void alignMethodDeclarationParamsWhenContinuationIndentUsingTabs() {
         rewriteRun(
-          tabsAndIndents(style -> style.withUseTabCharacter(true)),
+          style(tabs -> tabs.withUseTabCharacter(true),
+            wrapping -> wrapping.withFunctionDeclarationParameters(wrapping.getFunctionDeclarationParameters().withUseContinuationIndent(true))),
           kotlin(
             """
             import java.util.*;
@@ -953,7 +953,8 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void methodDeclaration() {
         rewriteRun(
-          tabsAndIndents(style -> style.withContinuationIndent(2)),
+          style(tabs -> tabs.withContinuationIndent(2),
+            wrapping -> wrapping.withFunctionDeclarationParameters(wrapping.getFunctionDeclarationParameters().withUseContinuationIndent(true))),
           kotlin(
             """
               public class Test {
@@ -1138,7 +1139,6 @@ class TabsAndIndentsTest implements RewriteTest {
         );
     }
 
-    @Disabled("java doc is not parsed")
     @Test
     void javadoc() {
         rewriteRun(
@@ -2042,8 +2042,8 @@ class TabsAndIndentsTest implements RewriteTest {
               """,
             """
               /******** Align JavaDoc with multiple leading '*' in margin left.
-                **** Align left
-                */
+               **** Align left
+               */
               public class Test {
                   /******** Align JavaDoc with multiple leading '*' in margin right.
                    **** Align right
@@ -2056,7 +2056,6 @@ class TabsAndIndentsTest implements RewriteTest {
         );
     }
 
-    @Disabled("java doc is not parsed")
     @Issue("https://github.com/openrewrite/rewrite/pull/659")
     @Test
     void alignJavaDocs() {
@@ -2228,7 +2227,6 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void trailingLambdaCall() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none()),
           kotlin(
             """
               import kotlin.reflect.full.memberProperties

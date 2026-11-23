@@ -1,0 +1,7 @@
+module example.com/withlocal
+
+go 1.22
+
+replace github.com/x/y => ../local/y
+
+require github.com/x/y v0.0.0

@@ -18,226 +18,71 @@ package rpc
 
 import (
 	"github.com/google/uuid"
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
-// GoReceiver deserializes Go AST nodes from the receive queue.
-// Handles G (Go-specific) nodes and delegates J nodes to JavaReceiver.
+// Mirrors org.openrewrite.golang.internal.rpc.GolangReceiver, which
+// extends JavaReceiver, which extends JavaVisitor.
+//
+// GoReceiver embeds JavaReceiver to inherit J-node Visit overrides
+// and the PreVisit hook (id/prefix/markers), and adds VisitX
+// overrides for G-specific node types. Self is set by visitor.Init
+// so the framework's type-switch dispatch routes to the most-derived
+// override.
 type GoReceiver struct {
-	java JavaReceiver
+	JavaReceiver
 }
 
-// NewGoReceiver creates a GoReceiver with its JavaReceiver properly wired.
 func NewGoReceiver() *GoReceiver {
 	gr := &GoReceiver{}
-	gr.java = JavaReceiver{
-		typeReceiver: NewJavaTypeReceiver(),
-		parent:       gr,
-	}
-	return gr
+	gr.typeReceiver = NewJavaTypeReceiver()
+	return visitor.Init(gr)
 }
 
-// Visit dispatches to the appropriate receive method based on node type.
-func (r *GoReceiver) Visit(node any, q *ReceiveQueue) any {
-	if node == nil {
+// Visit overrides the framework dispatch to special-case ParseError —
+// it isn't a J node, has no Prefix/Markers, and uses its own codec.
+// All other tree types fall through to the framework's switch.
+func (r *GoReceiver) Visit(t java.Tree, p any) java.Tree {
+	if t == nil {
 		return nil
 	}
-
-	// ParseError has its own codec — handle before preVisit (no prefix field)
-	if pe, ok := node.(*tree.ParseError); ok {
+	if pe, ok := t.(*java.ParseError); ok {
 		c := *pe
-		return r.receiveParseError(&c, q)
+		return r.receiveParseError(&c, p.(*ReceiveQueue))
 	}
-
-	// preVisit: receive ID, prefix, markers
-	node = r.preVisit(node, q)
-
-	switch v := node.(type) {
-	// G nodes
-	case *tree.CompilationUnit:
-		return r.receiveCompilationUnit(v, q)
-	case *tree.GoStmt:
-		return r.receiveGoStmt(v, q)
-	case *tree.Defer:
-		return r.receiveDefer(v, q)
-	case *tree.Send:
-		return r.receiveSend(v, q)
-	case *tree.Goto:
-		return r.receiveGoto(v, q)
-	case *tree.Fallthrough:
-		return v
-	case *tree.Composite:
-		return r.receiveComposite(v, q)
-	case *tree.KeyValue:
-		return r.receiveKeyValue(v, q)
-	case *tree.Slice:
-		return r.receiveSlice(v, q)
-	case *tree.MapType:
-		return r.receiveMapType(v, q)
-	case *tree.StatementExpression:
-		return r.receiveStatementExpression(v, q)
-	case *tree.PointerType:
-		return r.receivePointerType(v, q)
-	case *tree.Channel:
-		return r.receiveChannel(v, q)
-	case *tree.FuncType:
-		return r.receiveFuncType(v, q)
-	case *tree.StructType:
-		return r.receiveStructType(v, q)
-	case *tree.InterfaceType:
-		return r.receiveInterfaceType(v, q)
-	case *tree.TypeList:
-		return r.receiveTypeList(v, q)
-	case *tree.TypeDecl:
-		return r.receiveTypeDecl(v, q)
-	case *tree.MultiAssignment:
-		return r.receiveMultiAssignment(v, q)
-	case *tree.CommClause:
-		return r.receiveCommClause(v, q)
-	case *tree.IndexList:
-		return r.receiveIndexList(v, q)
-
-	default:
-		// Delegate all J nodes to JavaReceiver
-		return r.java.visitJ(node, q)
+	// A peer that names a go.mod or go.sum node by id sends it on its own.
+	switch n := t.(type) {
+	case *golang.GoMod:
+		c := *n
+		return receiveGoMod(&c, p.(*ReceiveQueue))
+	case *golang.GoModDirective:
+		c := *n
+		return recvGoModDirective(&c, p.(*ReceiveQueue))
+	case *golang.GoModBlock:
+		c := *n
+		return recvGoModBlock(&c, p.(*ReceiveQueue))
+	case *golang.GoModValue:
+		c := *n
+		return recvGoModValue(&c, p.(*ReceiveQueue)).(*golang.GoModValue)
+	case *golang.GoSum:
+		c := *n
+		return receiveGoSum(&c, p.(*ReceiveQueue))
+	case *golang.GoSumLine:
+		c := *n
+		return recvGoSumLine(&c, p.(*ReceiveQueue)).(*golang.GoSumLine)
 	}
+	return r.GoVisitor.Visit(t, p)
 }
-
-func (r *GoReceiver) preVisit(node any, q *ReceiveQueue) any {
-	// shallow copy to avoid mutating remoteObjects baseline
-	switch n := node.(type) {
-	// G nodes
-	case *tree.CompilationUnit:
-		c := *n; node = &c
-	case *tree.GoStmt:
-		c := *n; node = &c
-	case *tree.Defer:
-		c := *n; node = &c
-	case *tree.Send:
-		c := *n; node = &c
-	case *tree.Goto:
-		c := *n; node = &c
-	case *tree.Fallthrough:
-		c := *n; node = &c
-	case *tree.Composite:
-		c := *n; node = &c
-	case *tree.KeyValue:
-		c := *n; node = &c
-	case *tree.Slice:
-		c := *n; node = &c
-	case *tree.MapType:
-		c := *n; node = &c
-	case *tree.StatementExpression:
-		c := *n; node = &c
-	case *tree.PointerType:
-		c := *n; node = &c
-	case *tree.Channel:
-		c := *n; node = &c
-	case *tree.FuncType:
-		c := *n; node = &c
-	case *tree.StructType:
-		c := *n; node = &c
-	case *tree.InterfaceType:
-		c := *n; node = &c
-	case *tree.TypeList:
-		c := *n; node = &c
-	case *tree.TypeDecl:
-		c := *n; node = &c
-	case *tree.MultiAssignment:
-		c := *n; node = &c
-	case *tree.CommClause:
-		c := *n; node = &c
-	case *tree.IndexList:
-		c := *n; node = &c
-	// J nodes
-	case *tree.Identifier:
-		c := *n; node = &c
-	case *tree.Literal:
-		c := *n; node = &c
-	case *tree.Binary:
-		c := *n; node = &c
-	case *tree.Block:
-		c := *n; node = &c
-	case *tree.Empty:
-		c := *n; node = &c
-	case *tree.Unary:
-		c := *n; node = &c
-	case *tree.FieldAccess:
-		c := *n; node = &c
-	case *tree.MethodInvocation:
-		c := *n; node = &c
-	case *tree.Assignment:
-		c := *n; node = &c
-	case *tree.AssignmentOperation:
-		c := *n; node = &c
-	case *tree.MethodDeclaration:
-		c := *n; node = &c
-	case *tree.VariableDeclarations:
-		c := *n; node = &c
-	case *tree.VariableDeclarator:
-		c := *n; node = &c
-	case *tree.Return:
-		c := *n; node = &c
-	case *tree.If:
-		c := *n; node = &c
-	case *tree.Else:
-		c := *n; node = &c
-	case *tree.ForLoop:
-		c := *n; node = &c
-	case *tree.ForControl:
-		c := *n; node = &c
-	case *tree.ForEachLoop:
-		c := *n; node = &c
-	case *tree.ForEachControl:
-		c := *n; node = &c
-	case *tree.Switch:
-		c := *n; node = &c
-	case *tree.Case:
-		c := *n; node = &c
-	case *tree.Break:
-		c := *n; node = &c
-	case *tree.Continue:
-		c := *n; node = &c
-	case *tree.Label:
-		c := *n; node = &c
-	case *tree.ArrayType:
-		c := *n; node = &c
-	case *tree.ArrayAccess:
-		c := *n; node = &c
-	case *tree.ArrayDimension:
-		c := *n; node = &c
-	case *tree.Parentheses:
-		c := *n; node = &c
-	case *tree.TypeCast:
-		c := *n; node = &c
-	case *tree.ControlParentheses:
-		c := *n; node = &c
-	case *tree.Import:
-		c := *n; node = &c
-	}
-
-	// ID
-	q.Receive(extractID(node), nil)
-	// Prefix
-	if result := q.Receive(nodePrefix(node), func(v any) any {
-		return receiveSpace(v.(tree.Space), q)
-	}); result != nil {
-		setPrefix(node, result.(tree.Space))
-	}
-	// Markers
-	if result := q.Receive(nodeMarkers(node), func(v any) any {
-		return receiveMarkersCodec(q, v.(tree.Markers))
-	}); result != nil {
-		setMarkers(node, result.(tree.Markers))
-	}
-	return node
-}
-
-// --- G nodes ---
 
 // receiveParseError deserializes a ParseError matching Java's ParseError.rpcReceive field order:
-// id, markers, sourcePath, charsetName, charsetBomMarked, checksum, fileAttributes, text
-func (r *GoReceiver) receiveParseError(pe *tree.ParseError, q *ReceiveQueue) *tree.ParseError {
+// id, markers, sourcePath, charsetName, charsetBomMarked, checksum, fileAttributes, text.
+//
+// ParseError isn't a J node — no Prefix/Markers handling via PreVisit.
+// Special-cased at the top of Visit() instead of dispatched through
+// the framework switch.
+func (r *GoReceiver) receiveParseError(pe *java.ParseError, q *ReceiveQueue) *java.ParseError {
 	idStr := receiveScalar[string](q, pe.Ident.String())
 	if idStr != "" {
 		if parsed, err := uuid.Parse(idStr); err == nil {
@@ -248,373 +93,437 @@ func (r *GoReceiver) receiveParseError(pe *tree.ParseError, q *ReceiveQueue) *tr
 	pe.SourcePath = receiveScalar[string](q, pe.SourcePath)
 	pe.CharsetName = receiveScalar[string](q, pe.CharsetName)
 	pe.CharsetBomMarked = receiveScalar[bool](q, pe.CharsetBomMarked)
-	q.Receive(nil, nil) // checksum
-	q.Receive(nil, nil) // fileAttributes
+	receiveChecksum(q)
+	receiveFileAttributes(q)
 	pe.Text = receiveScalar[string](q, pe.Text)
 	return pe
 }
 
-func (r *GoReceiver) receiveCompilationUnit(cu *tree.CompilationUnit, q *ReceiveQueue) *tree.CompilationUnit {
+func (r *GoReceiver) VisitCompilationUnit(cu *golang.CompilationUnit, p any) java.J {
+	q := p.(*ReceiveQueue)
 	c := *cu // shallow copy to avoid mutating remoteObjects baseline
 	cu = &c
 	cu.SourcePath = receiveScalar[string](q, cu.SourcePath)
 	q.Receive(nil, nil) // charset
-	q.Receive(nil, nil) // charsetBomMarked
-	// checksum — Checksum.rpcSend sends: algorithm (string), value (byte[])
-	q.Receive(nil, func(v any) any {
-		receiveScalar[string](q, "") // algorithm
-		q.Receive(nil, nil)          // value
-		return nil
-	})
-	// fileAttributes — FileAttributes.rpcSend sends 7 sub-fields
-	q.Receive(nil, func(v any) any {
-		q.Receive(nil, nil) // creationTime
-		q.Receive(nil, nil) // lastModifiedTime
-		q.Receive(nil, nil) // lastAccessTime
-		q.Receive(nil, nil) // isReadable
-		q.Receive(nil, nil) // isWritable
-		q.Receive(nil, nil) // isExecutable
-		q.Receive(nil, nil) // size
-		return nil
-	})
+	cu.CharsetBomMarked = receiveScalar[bool](q, cu.CharsetBomMarked)
+	receiveChecksum(q)
+	receiveFileAttributes(q)
 	// packageDecl
 	var beforePkgDecl any
 	if cu.PackageDecl != nil {
 		beforePkgDecl = *cu.PackageDecl
 	}
 	if result := q.Receive(beforePkgDecl, func(v any) any { return receiveRightPadded(r, q, v) }); result != nil {
-		rp := coerceRightPaddedIdent(result)
-		if rp.Element == nil {
-		}
+		rp := coerceRightPaddedTyped[*java.Identifier](result)
 		cu.PackageDecl = &rp
 	} else {
 		cu.PackageDecl = nil
 	}
 	// imports (container)
-	var beforeImports any
-	if cu.Imports != nil {
-		beforeImports = *cu.Imports
-	}
-	if result := q.Receive(beforeImports, func(v any) any { return receiveContainer(r, q, v) }); result != nil {
-		c := result.(tree.Container[*tree.Import])
-		cu.Imports = &c
-	} else {
-		cu.Imports = nil
-	}
+	cu.Imports = receivePointerContainer[*java.Import](r, q, cu.Imports)
 	// statements
-	beforeStmts := make([]any, len(cu.Statements))
-	for i, s := range cu.Statements {
-		beforeStmts[i] = s
+	if after := receiveTypedList(q, cu.Statements,
+		func(v any) any { return receiveRightPadded(r, q, v) },
+		coerceToStatementRP); after != nil {
+		cu.Statements = after
 	}
-	afterStmts := q.ReceiveList(beforeStmts, func(v any) any { return receiveRightPadded(r, q, v) })
-	if afterStmts != nil {
-		cu.Statements = make([]tree.RightPadded[tree.Statement], len(afterStmts))
-		for i, s := range afterStmts {
-			cu.Statements[i] = coerceToStatementRP(s)
-		}
-	}
-	// EOF
-	if result := q.Receive(cu.EOF, func(v any) any { return receiveSpace(v.(tree.Space), q) }); result != nil {
-		cu.EOF = result.(tree.Space)
-	}
+	cu.EOF = receiveValue(q, cu.EOF, func(e java.Space) any { return receiveSpace(e, q) })
 	return cu
 }
 
-func (r *GoReceiver) receiveGoStmt(gs *tree.GoStmt, q *ReceiveQueue) *tree.GoStmt {
+func (r *GoReceiver) VisitGoStmt(gs *golang.GoStmt, p any) java.J {
+	q := p.(*ReceiveQueue)
 	c := *gs // shallow copy to avoid mutating remoteObjects baseline
 	gs = &c
-	result := q.Receive(gs.Expr, func(v any) any { return r.Visit(v, q) })
-	if result != nil {
-		gs.Expr = result.(tree.Expression)
-	}
+	gs.Expr = receiveValue(q, gs.Expr, func(e java.Expression) any { return r.Visit(e, q) })
 	return gs
 }
 
-func (r *GoReceiver) receiveDefer(d *tree.Defer, q *ReceiveQueue) *tree.Defer {
+func (r *GoReceiver) VisitDefer(d *golang.Defer, p any) java.J {
+	q := p.(*ReceiveQueue)
 	c := *d // shallow copy to avoid mutating remoteObjects baseline
 	d = &c
-	result := q.Receive(d.Expr, func(v any) any { return r.Visit(v, q) })
-	if result != nil {
-		d.Expr = result.(tree.Expression)
-	}
+	d.Expr = receiveValue(q, d.Expr, func(e java.Expression) any { return r.Visit(e, q) })
 	return d
 }
 
-func (r *GoReceiver) receiveSend(sn *tree.Send, q *ReceiveQueue) *tree.Send {
+func (r *GoReceiver) VisitSend(sn *golang.Send, p any) java.J {
+	q := p.(*ReceiveQueue)
 	c := *sn // shallow copy to avoid mutating remoteObjects baseline
 	sn = &c
-	result := q.Receive(sn.Channel, func(v any) any { return r.Visit(v, q) })
-	if result != nil {
-		sn.Channel = result.(tree.Expression)
-	}
+	sn.Channel = receiveValue(q, sn.Channel, func(e java.Expression) any { return r.Visit(e, q) })
 	if result := q.Receive(sn.Arrow, func(v any) any { return receiveLeftPadded(r, q, v) }); result != nil {
-		sn.Arrow = result.(tree.LeftPadded[tree.Expression])
+		sn.Arrow = result.(java.LeftPadded[java.Expression])
 	}
 	return sn
 }
 
-func (r *GoReceiver) receiveGoto(g *tree.Goto, q *ReceiveQueue) *tree.Goto {
+func (r *GoReceiver) VisitGoto(g *golang.Goto, p any) java.J {
+	q := p.(*ReceiveQueue)
 	c := *g // shallow copy to avoid mutating remoteObjects baseline
 	g = &c
-	result := q.Receive(g.Label, func(v any) any { return r.Visit(v, q) })
-	if result != nil {
-		g.Label = result.(*tree.Identifier)
-	}
+	g.Label = receiveValue(q, g.Label, func(e *java.Identifier) any { return r.Visit(e, q) })
 	return g
 }
 
-func (r *GoReceiver) receiveComposite(comp *tree.Composite, q *ReceiveQueue) *tree.Composite {
+func (r *GoReceiver) VisitGoUnary(u *golang.Unary, p any) java.J {
+	q := p.(*ReceiveQueue)
+	c := *u // shallow copy to avoid mutating remoteObjects baseline
+	u = &c
+	u.Operator = receiveLeftPaddedEnum(r, q, u.Operator, golang.ParseUnaryOperator)
+	u.Expression = receiveValue(q, u.Expression, func(e java.Expression) any { return r.Visit(e, q) })
+	u.Type = r.receiveType(u.Type, q)
+	return u
+}
+
+func (r *GoReceiver) VisitGoBinary(b *golang.Binary, p any) java.J {
+	q := p.(*ReceiveQueue)
+	c := *b // shallow copy to avoid mutating remoteObjects baseline
+	b = &c
+	b.Left = receiveValue(q, b.Left, func(e java.Expression) any { return r.Visit(e, q) })
+	b.Operator = receiveLeftPaddedEnum(r, q, b.Operator, golang.ParseBinaryOperator)
+	b.Right = receiveValue(q, b.Right, func(e java.Expression) any { return r.Visit(e, q) })
+	b.Type = r.receiveType(b.Type, q)
+	return b
+}
+
+func (r *GoReceiver) VisitGoAssignmentOperation(a *golang.AssignmentOperation, p any) java.J {
+	q := p.(*ReceiveQueue)
+	c := *a // shallow copy to avoid mutating remoteObjects baseline
+	a = &c
+	a.Variable = receiveValue(q, a.Variable, func(e java.Expression) any { return r.Visit(e, q) })
+	a.Operator = receiveLeftPaddedEnum(r, q, a.Operator, golang.ParseAssignmentOperator)
+	a.Assignment = receiveValue(q, a.Assignment, func(e java.Expression) any { return r.Visit(e, q) })
+	a.Type = r.receiveType(a.Type, q)
+	return a
+}
+
+func (r *GoReceiver) VisitGoVariadic(vr *golang.Variadic, p any) java.J {
+	q := p.(*ReceiveQueue)
+	c := *vr // shallow copy to avoid mutating remoteObjects baseline
+	vr = &c
+	vr.Element = receiveValue(q, vr.Element, func(e java.Expression) any { return r.Visit(e, q) })
+	vr.Dots = receiveValue(q, vr.Dots, func(s java.Space) any { return receiveSpace(s, q) })
+	vr.Postfix = receiveScalar[bool](q, vr.Postfix)
+	vr.Type = r.receiveType(vr.Type, q)
+	return vr
+}
+
+// VisitFallthrough mirrors GolangReceiver.visitFallthrough — the node has no
+// payload beyond the framework-handled id/prefix/markers, so this override
+// is intentionally a no-op. Present for sender/receiver symmetry.
+func (r *GoReceiver) VisitFallthrough(f *golang.Fallthrough, p any) java.J {
+	return f
+}
+
+func (r *GoReceiver) VisitComposite(comp *golang.Composite, p any) java.J {
+	q := p.(*ReceiveQueue)
 	c := *comp // shallow copy to avoid mutating remoteObjects baseline
 	comp = &c
-	result := q.Receive(comp.TypeExpr, func(v any) any { return r.Visit(v, q) })
-	if result != nil {
-		comp.TypeExpr = result.(tree.Expression)
-	}
-	if result := q.Receive(comp.Elements, func(v any) any { return receiveContainer(r, q, v) }); result != nil {
-		comp.Elements = result.(tree.Container[tree.Expression])
-	}
+	comp.TypeExpr = receiveValue(q, comp.TypeExpr, func(e java.Expression) any { return r.Visit(e, q) })
+	comp.Elements = receiveContainer[java.Expression](r, q, comp.Elements)
+	comp.Type = r.receiveType(comp.Type, q)
 	return comp
 }
 
-func (r *GoReceiver) receiveKeyValue(kv *tree.KeyValue, q *ReceiveQueue) *tree.KeyValue {
+func (r *GoReceiver) VisitKeyValue(kv *golang.KeyValue, p any) java.J {
+	q := p.(*ReceiveQueue)
 	c := *kv // shallow copy to avoid mutating remoteObjects baseline
 	kv = &c
-	result := q.Receive(kv.Key, func(v any) any { return r.Visit(v, q) })
-	if result != nil {
-		kv.Key = result.(tree.Expression)
-	}
+	kv.Key = receiveValue(q, kv.Key, func(e java.Expression) any { return r.Visit(e, q) })
 	if result := q.Receive(kv.Value, func(v any) any { return receiveLeftPadded(r, q, v) }); result != nil {
-		kv.Value = result.(tree.LeftPadded[tree.Expression])
+		kv.Value = result.(java.LeftPadded[java.Expression])
 	}
+	kv.Type = r.receiveType(kv.Type, q)
 	return kv
 }
 
-func (r *GoReceiver) receiveSlice(sl *tree.Slice, q *ReceiveQueue) *tree.Slice {
+func (r *GoReceiver) VisitGoArrayType(at *golang.ArrayType, p any) java.J {
+	q := p.(*ReceiveQueue)
+	c := *at // shallow copy to avoid mutating remoteObjects baseline
+	at = &c
+	if result := q.Receive(at.Length, func(v any) any { return receiveRightPadded(r, q, v) }); result != nil {
+		at.Length = coerceToExpressionRP(result)
+	}
+	at.ElementType = receiveValue(q, at.ElementType, func(e java.Expression) any { return r.Visit(e, q) })
+	at.Type = r.receiveType(at.Type, q)
+	return at
+}
+
+func (r *GoReceiver) VisitSlice(sl *golang.Slice, p any) java.J {
+	q := p.(*ReceiveQueue)
 	c := *sl // shallow copy to avoid mutating remoteObjects baseline
 	sl = &c
-	result := q.Receive(sl.Indexed, func(v any) any { return r.Visit(v, q) })
-	if result != nil {
-		sl.Indexed = result.(tree.Expression)
-	}
-	if result := q.Receive(sl.OpenBracket, func(v any) any { return receiveSpace(v.(tree.Space), q) }); result != nil {
-		sl.OpenBracket = result.(tree.Space)
-	}
+	sl.Indexed = receiveValue(q, sl.Indexed, func(e java.Expression) any { return r.Visit(e, q) })
+	sl.OpenBracket = receiveValue(q, sl.OpenBracket, func(e java.Space) any { return receiveSpace(e, q) })
 	if result := q.Receive(sl.Low, func(v any) any { return receiveRightPadded(r, q, v) }); result != nil {
 		sl.Low = coerceToExpressionRP(result)
 	}
 	if result := q.Receive(sl.High, func(v any) any { return receiveRightPadded(r, q, v) }); result != nil {
 		sl.High = coerceToExpressionRP(result)
 	}
-	max := q.Receive(sl.Max, func(v any) any { return r.Visit(v, q) })
-	if max != nil {
-		sl.Max = max.(tree.Expression)
-	}
-	if result := q.Receive(sl.CloseBracket, func(v any) any { return receiveSpace(v.(tree.Space), q) }); result != nil {
-		sl.CloseBracket = result.(tree.Space)
-	}
+	sl.Max = receiveValue(q, sl.Max, func(e java.Expression) any { return r.Visit(e, q) })
+	sl.CloseBracket = receiveValue(q, sl.CloseBracket, func(e java.Space) any { return receiveSpace(e, q) })
+	sl.Type = r.receiveType(sl.Type, q)
 	return sl
 }
 
-func (r *GoReceiver) receiveMapType(mt *tree.MapType, q *ReceiveQueue) *tree.MapType {
+func (r *GoReceiver) VisitMapType(mt *golang.MapType, p any) java.J {
+	q := p.(*ReceiveQueue)
 	c := *mt // shallow copy to avoid mutating remoteObjects baseline
 	mt = &c
-	if result := q.Receive(mt.OpenBracket, func(v any) any { return receiveSpace(v.(tree.Space), q) }); result != nil {
-		mt.OpenBracket = result.(tree.Space)
-	}
+	mt.OpenBracket = receiveValue(q, mt.OpenBracket, func(e java.Space) any { return receiveSpace(e, q) })
 	if result := q.Receive(mt.Key, func(v any) any { return receiveRightPadded(r, q, v) }); result != nil {
 		mt.Key = coerceToExpressionRP(result)
 	}
-	result := q.Receive(mt.Value, func(v any) any { return r.Visit(v, q) })
-	if result != nil {
-		mt.Value = result.(tree.Expression)
-	}
+	mt.Value = receiveValue(q, mt.Value, func(e java.Expression) any { return r.Visit(e, q) })
+	mt.Type = r.receiveType(mt.Type, q)
 	return mt
 }
 
-func (r *GoReceiver) receiveStatementExpression(se *tree.StatementExpression, q *ReceiveQueue) *tree.StatementExpression {
+func (r *GoReceiver) VisitTypeAssertion(ta *golang.TypeAssertion, p any) java.J {
+	q := p.(*ReceiveQueue)
+	c := *ta
+	ta = &c
+	if result := q.Receive(ta.Left, func(v any) any { return receiveRightPadded(r, q, v) }); result != nil {
+		ta.Left = result.(java.RightPadded[java.Expression])
+	}
+	ta.AssertedType = receiveValue(q, ta.AssertedType, func(e *java.ControlParentheses) any { return r.Visit(e, q) })
+	ta.Type = r.receiveType(ta.Type, q)
+	return ta
+}
+
+func (r *GoReceiver) VisitExpressionStatement(es *golang.ExpressionStatement, p any) java.J {
+	q := p.(*ReceiveQueue)
+	c := *es
+	es = &c
+	es.Expression = receiveValue(q, es.Expression, func(e java.Expression) any { return r.Visit(e, q) })
+	return es
+}
+
+func (r *GoReceiver) VisitStatementExpression(se *golang.StatementExpression, p any) java.J {
+	q := p.(*ReceiveQueue)
 	c := *se
 	se = &c
-	result := q.Receive(se.Statement, func(v any) any { return r.Visit(v, q) })
-	if result != nil {
-		se.Statement = result.(tree.Statement)
-	}
+	se.Statement = receiveValue(q, se.Statement, func(e java.Statement) any { return r.Visit(e, q) })
 	return se
 }
 
-func (r *GoReceiver) receivePointerType(pt *tree.PointerType, q *ReceiveQueue) *tree.PointerType {
+func (r *GoReceiver) VisitPointerType(pt *golang.PointerType, p any) java.J {
+	q := p.(*ReceiveQueue)
 	c := *pt
 	pt = &c
-	result := q.Receive(pt.Elem, func(v any) any { return r.Visit(v, q) })
-	if result != nil {
-		pt.Elem = result.(tree.Expression)
-	}
+	pt.Elem = receiveValue(q, pt.Elem, func(e java.Expression) any { return r.Visit(e, q) })
+	pt.Type = r.receiveType(pt.Type, q)
 	return pt
 }
 
-func (r *GoReceiver) receiveChannel(ch *tree.Channel, q *ReceiveQueue) *tree.Channel {
+func (r *GoReceiver) VisitChannel(ch *golang.Channel, p any) java.J {
+	q := p.(*ReceiveQueue)
 	c := *ch // shallow copy to avoid mutating remoteObjects baseline
 	ch = &c
 	dirStr := receiveScalar[string](q, "")
 	switch dirStr {
 	case "BIDI":
-		ch.Dir = tree.ChanBidi
+		ch.Dir = golang.ChanBidi
 	case "SEND_ONLY":
-		ch.Dir = tree.ChanSendOnly
+		ch.Dir = golang.ChanSendOnly
 	case "RECV_ONLY":
-		ch.Dir = tree.ChanRecvOnly
+		ch.Dir = golang.ChanRecvOnly
 	}
-	result := q.Receive(ch.Value, func(v any) any { return r.Visit(v, q) })
-	if result != nil {
-		ch.Value = result.(tree.Expression)
-	}
+	ch.Value = receiveValue(q, ch.Value, func(e java.Expression) any { return r.Visit(e, q) })
+	ch.Type = r.receiveType(ch.Type, q)
 	return ch
 }
 
-func (r *GoReceiver) receiveFuncType(ft *tree.FuncType, q *ReceiveQueue) *tree.FuncType {
+func (r *GoReceiver) VisitFuncType(ft *golang.FuncType, p any) java.J {
+	q := p.(*ReceiveQueue)
 	c := *ft // shallow copy to avoid mutating remoteObjects baseline
 	ft = &c
-	if result := q.Receive(ft.Parameters, func(v any) any { return receiveContainerAs(r, q, v, ContainerStatement) }); result != nil {
-		ft.Parameters = result.(tree.Container[tree.Statement])
-	}
-	result := q.Receive(ft.ReturnType, func(v any) any { return r.Visit(v, q) })
-	if result != nil {
-		ft.ReturnType = result.(tree.Expression)
-	}
+	ft.Parameters = receiveContainer[java.Statement](r, q, ft.Parameters)
+	ft.ReturnType = receiveValue(q, ft.ReturnType, func(e java.Expression) any { return r.Visit(e, q) })
+	ft.Type = r.receiveType(ft.Type, q)
 	return ft
 }
 
-func (r *GoReceiver) receiveStructType(st *tree.StructType, q *ReceiveQueue) *tree.StructType {
+func (r *GoReceiver) VisitStructType(st *golang.StructType, p any) java.J {
+	q := p.(*ReceiveQueue)
 	c := *st // shallow copy to avoid mutating remoteObjects baseline
 	st = &c
-	result := q.Receive(st.Body, func(v any) any { return r.Visit(v, q) })
-	if result != nil {
-		st.Body = result.(*tree.Block)
-	}
+	st.Body = receiveValue(q, st.Body, func(e *java.Block) any { return r.Visit(e, q) })
+	st.Type = r.receiveType(st.Type, q)
 	return st
 }
 
-func (r *GoReceiver) receiveInterfaceType(it *tree.InterfaceType, q *ReceiveQueue) *tree.InterfaceType {
+func (r *GoReceiver) VisitInterfaceType(it *golang.InterfaceType, p any) java.J {
+	q := p.(*ReceiveQueue)
 	c := *it // shallow copy to avoid mutating remoteObjects baseline
 	it = &c
-	result := q.Receive(it.Body, func(v any) any { return r.Visit(v, q) })
-	if result != nil {
-		it.Body = result.(*tree.Block)
-	}
+	it.Body = receiveValue(q, it.Body, func(e *java.Block) any { return r.Visit(e, q) })
+	it.Type = r.receiveType(it.Type, q)
 	return it
 }
 
-func (r *GoReceiver) receiveTypeList(tl *tree.TypeList, q *ReceiveQueue) *tree.TypeList {
+func (r *GoReceiver) VisitTypeList(tl *golang.TypeList, p any) java.J {
+	q := p.(*ReceiveQueue)
 	c := *tl // shallow copy to avoid mutating remoteObjects baseline
 	tl = &c
-	if result := q.Receive(tl.Types, func(v any) any { return receiveContainerAs(r, q, v, ContainerStatement) }); result != nil {
-		tl.Types = result.(tree.Container[tree.Statement])
-	}
+	tl.Types = receiveContainer[java.Statement](r, q, tl.Types)
+	tl.Type = r.receiveType(tl.Type, q)
 	return tl
 }
 
-func (r *GoReceiver) receiveTypeDecl(td *tree.TypeDecl, q *ReceiveQueue) *tree.TypeDecl {
+func (r *GoReceiver) VisitUnion(u *golang.Union, p any) java.J {
+	q := p.(*ReceiveQueue)
+	c := *u // shallow copy to avoid mutating remoteObjects baseline
+	u = &c
+	if after := receiveTypedList(q, u.Types,
+		func(v any) any { return receiveRightPadded(r, q, v) },
+		coerceToExpressionRP); after != nil {
+		u.Types = after
+	}
+	u.Type = r.receiveType(u.Type, q)
+	return u
+}
+
+func (r *GoReceiver) VisitUnderlyingType(ut *golang.UnderlyingType, p any) java.J {
+	q := p.(*ReceiveQueue)
+	c := *ut // shallow copy to avoid mutating remoteObjects baseline
+	ut = &c
+	ut.Element = receiveValue(q, ut.Element, func(e java.Expression) any { return r.Visit(e, q) })
+	return ut
+}
+
+func (r *GoReceiver) VisitTypeDecl(td *golang.TypeDecl, p any) java.J {
+	q := p.(*ReceiveQueue)
 	c := *td // shallow copy to avoid mutating remoteObjects baseline
 	td = &c
-	result := q.Receive(td.Name, func(v any) any { return r.Visit(v, q) })
-	if result != nil {
-		td.Name = result.(*tree.Identifier)
+	// leadingAnnotations
+	if after := receiveTypedListNonNil(q, td.LeadingAnnotations,
+		func(v any) any { return r.Visit(v.(java.Tree), q) },
+		coerceAnnotation, annotationIsNil); after != nil {
+		td.LeadingAnnotations = after
 	}
+	td.Name = receiveValue(q, td.Name, func(e *java.Identifier) any { return r.Visit(e, q) })
+	// typeParameters
+	td.TypeParameters = receiveValue(q, td.TypeParameters, func(e *java.TypeParameters) any { return r.Visit(e, q) })
 	var beforeAssign any
 	if td.Assign != nil {
 		beforeAssign = *td.Assign
 	}
-	if result := q.Receive(beforeAssign, func(v any) any { return receiveLeftPadded(r, q, v) }); result != nil {
-		lp := result.(tree.LeftPadded[tree.Space])
+	if result := q.Receive(beforeAssign, func(v any) any { return receiveLeftPaddedSpaceVal(r, q, v) }); result != nil {
+		lp := result.(java.LeftPadded[java.Space])
 		td.Assign = &lp
 	} else {
 		td.Assign = nil
 	}
-	defResult := q.Receive(td.Definition, func(v any) any { return r.Visit(v, q) })
-	if defResult != nil {
-		td.Definition = defResult.(tree.Expression)
-	}
-	var beforeSpecs any
-	if td.Specs != nil {
-		beforeSpecs = *td.Specs
-	}
-	if result := q.Receive(beforeSpecs, func(v any) any { return receiveContainerAs(r, q, v, ContainerStatement) }); result != nil {
-		c := result.(tree.Container[tree.Statement])
-		td.Specs = &c
-	} else {
-		td.Specs = nil
-	}
+	td.Definition = receiveValue(q, td.Definition, func(e java.Expression) any { return r.Visit(e, q) })
+	td.Specs = receivePointerContainer[java.Statement](r, q, td.Specs)
 	return td
 }
 
-func (r *GoReceiver) receiveMultiAssignment(ma *tree.MultiAssignment, q *ReceiveQueue) *tree.MultiAssignment {
+func (r *GoReceiver) VisitDeclarationBlock(db *golang.DeclarationBlock, p any) java.J {
+	q := p.(*ReceiveQueue)
+	c := *db // shallow copy to avoid mutating remoteObjects baseline
+	db = &c
+	// leadingAnnotations
+	if after := receiveTypedListNonNil(q, db.LeadingAnnotations,
+		func(v any) any { return r.Visit(v.(java.Tree), q) },
+		coerceAnnotation, annotationIsNil); after != nil {
+		db.LeadingAnnotations = after
+	}
+	// kind
+	kindStr := receiveScalar[string](q, "")
+	switch kindStr {
+	case "CONST":
+		db.Kind = golang.DeclConst
+	case "VAR":
+		db.Kind = golang.DeclVar
+	}
+	db.Specs = receivePointerContainer[java.Statement](r, q, db.Specs)
+	return db
+}
+
+func (r *GoReceiver) VisitMultiAssignment(ma *golang.MultiAssignment, p any) java.J {
+	q := p.(*ReceiveQueue)
 	c := *ma // shallow copy to avoid mutating remoteObjects baseline
 	ma = &c
-	// Variables
-	beforeVars := make([]any, len(ma.Variables))
-	for i, v := range ma.Variables {
-		beforeVars[i] = v
+	if after := receiveTypedList(q, ma.Variables,
+		func(v any) any { return receiveRightPadded(r, q, v) },
+		coerceToExpressionRP); after != nil {
+		ma.Variables = after
 	}
-	afterVars := q.ReceiveList(beforeVars, func(v any) any { return receiveRightPadded(r, q, v) })
-	if afterVars != nil {
-		ma.Variables = make([]tree.RightPadded[tree.Expression], len(afterVars))
-		for i, v := range afterVars {
-			ma.Variables[i] = coerceToExpressionRP(v)
-		}
+	if result := q.Receive(ma.Operator, func(v any) any { return receiveLeftPaddedSpaceVal(r, q, v) }); result != nil {
+		ma.Operator = result.(java.LeftPadded[java.Space])
 	}
-	// Operator
-	if result := q.Receive(ma.Operator, func(v any) any { return receiveLeftPadded(r, q, v) }); result != nil {
-		ma.Operator = result.(tree.LeftPadded[tree.Space])
-	}
-	// Values
-	beforeVals := make([]any, len(ma.Values))
-	for i, v := range ma.Values {
-		beforeVals[i] = v
-	}
-	afterVals := q.ReceiveList(beforeVals, func(v any) any { return receiveRightPadded(r, q, v) })
-	if afterVals != nil {
-		ma.Values = make([]tree.RightPadded[tree.Expression], len(afterVals))
-		for i, v := range afterVals {
-			ma.Values[i] = coerceToExpressionRP(v)
-		}
+	if after := receiveTypedList(q, ma.Values,
+		func(v any) any { return receiveRightPadded(r, q, v) },
+		coerceToExpressionRP); after != nil {
+		ma.Values = after
 	}
 	return ma
 }
 
-func (r *GoReceiver) receiveCommClause(cc *tree.CommClause, q *ReceiveQueue) *tree.CommClause {
+func (r *GoReceiver) VisitGoReturn(ret *golang.Return, p any) java.J {
+	q := p.(*ReceiveQueue)
+	c := *ret // shallow copy to avoid mutating remoteObjects baseline
+	ret = &c
+	if after := receiveTypedList(q, ret.Expressions,
+		func(v any) any { return receiveRightPadded(r, q, v) },
+		coerceToExpressionRP); after != nil {
+		ret.Expressions = after
+	}
+	return ret
+}
+
+func (r *GoReceiver) VisitGoMethodDeclaration(md *golang.MethodDeclaration, p any) java.J {
+	q := p.(*ReceiveQueue)
+	c := *md // shallow copy to avoid mutating remoteObjects baseline
+	md = &c
+	md.Receiver = receiveContainer[java.Statement](r, q, md.Receiver)
+	md.Declaration = receiveValue(q, md.Declaration, func(e *java.MethodDeclaration) any { return r.Visit(e, q) })
+	return md
+}
+
+func (r *GoReceiver) VisitStatementWithInit(swi *golang.StatementWithInit, p any) java.J {
+	q := p.(*ReceiveQueue)
+	c := *swi // shallow copy to avoid mutating remoteObjects baseline
+	swi = &c
+	if result := q.Receive(swi.Init, func(v any) any { return receiveRightPadded(r, q, v) }); result != nil {
+		swi.Init = coerceToStatementRP(result)
+	}
+	swi.Statement = receiveValue(q, swi.Statement, func(e java.Statement) any { return r.Visit(e, q) })
+	return swi
+}
+
+func (r *GoReceiver) VisitCommClause(cc *golang.CommClause, p any) java.J {
+	q := p.(*ReceiveQueue)
 	c := *cc // shallow copy to avoid mutating remoteObjects baseline
 	cc = &c
-	result := q.Receive(cc.Comm, func(v any) any { return r.Visit(v, q) })
-	if result != nil {
-		cc.Comm = result.(tree.Statement)
-	}
-	if result := q.Receive(cc.Colon, func(v any) any { return receiveSpace(v.(tree.Space), q) }); result != nil {
-		cc.Colon = result.(tree.Space)
-	}
-	// Body
-	beforeBody := make([]any, len(cc.Body))
-	for i, s := range cc.Body {
-		beforeBody[i] = s
-	}
-	afterBody := q.ReceiveList(beforeBody, func(v any) any { return receiveRightPadded(r, q, v) })
-	if afterBody != nil {
-		cc.Body = make([]tree.RightPadded[tree.Statement], len(afterBody))
-		for i, s := range afterBody {
-			cc.Body[i] = coerceToStatementRP(s)
-		}
+	cc.Comm = receiveValue(q, cc.Comm, func(e java.Statement) any { return r.Visit(e, q) })
+	cc.Colon = receiveValue(q, cc.Colon, func(e java.Space) any { return receiveSpace(e, q) })
+	if after := receiveTypedList(q, cc.Body,
+		func(v any) any { return receiveRightPadded(r, q, v) },
+		coerceToStatementRP); after != nil {
+		cc.Body = after
 	}
 	return cc
 }
 
-func (r *GoReceiver) receiveIndexList(il *tree.IndexList, q *ReceiveQueue) *tree.IndexList {
-	c := *il // shallow copy to avoid mutating remoteObjects baseline
-	il = &c
-	result := q.Receive(il.Target, func(v any) any { return r.Visit(v, q) })
-	if result != nil {
-		il.Target = result.(tree.Expression)
-	}
-	if result := q.Receive(il.Indices, func(v any) any { return receiveContainer(r, q, v) }); result != nil {
-		il.Indices = result.(tree.Container[tree.Expression])
-	}
-	return il
+func (r *GoReceiver) VisitSelect(sel *golang.Select, p any) java.J {
+	q := p.(*ReceiveQueue)
+	c := *sel // shallow copy to avoid mutating remoteObjects baseline
+	sel = &c
+	sel.Body = receiveValue(q, sel.Body, func(e *java.Block) any { return r.Visit(e, q) })
+	return sel
 }
 
+func (r *GoReceiver) VisitIndexList(il *golang.IndexList, p any) java.J {
+	q := p.(*ReceiveQueue)
+	c := *il // shallow copy to avoid mutating remoteObjects baseline
+	il = &c
+	il.Target = receiveValue(q, il.Target, func(e java.Expression) any { return r.Visit(e, q) })
+	il.Indices = receiveContainer[java.Expression](r, q, il.Indices)
+	il.Type = r.receiveType(il.Type, q)
+	return il
+}

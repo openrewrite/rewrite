@@ -1,0 +1,123 @@
+/*
+ * Copyright 2026 the original author or authors.
+ *
+ * Licensed under the Moderne Source Available License (the "License");
+ * you may not use this file except in compliance with the License.
+ *
+ * https://docs.moderne.io/licensing/moderne-source-available-license
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package rpc
+
+import (
+	"testing"
+
+	"github.com/stretchr/testify/require"
+
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
+)
+
+// TestGoModRPCRoundTrip parses go.mod into a GoMod, ships it Go→wire→Go through
+// the sender/receiver, and asserts the received tree prints identically — i.e.
+// the RPC codec preserves the lossless tree.
+func TestGoModRPCRoundTrip(t *testing.T) {
+	cases := map[string]string{
+		"minimal":  "module example.com/foo\n",
+		"full":     "module example.com/foo\n\ngo 1.21\n\ntoolchain go1.22.0\n",
+		"requires": "module example.com/foo\n\nrequire (\n\tgithub.com/a/b v1.0.0\n\tgithub.com/c/d v1.5.0 // indirect\n)\n",
+		"replace":  "module example.com/foo\n\nreplace github.com/old v1 => ../local/path\n",
+		"retract":  "module example.com/foo\n\nretract (\n\tv1.0.0 // buggy\n\t[v1.2.0, v1.3.0]\n)\n",
+		"comments": "// header\nmodule example.com/foo\n\n// deps\nrequire github.com/x/y v1.2.3 // indirect\n",
+		"unknown":  "module example.com/foo\n\nsomenewdirective foo bar\n",
+	}
+
+	for name, content := range cases {
+		t.Run(name, func(t *testing.T) {
+			// given: a parsed GoMod LST
+			before, err := parser.ParseGoModFile("go.mod", content)
+			require.NoError(t, err, "parse error")
+
+			// when: round-tripped through the RPC sender/receiver
+			seed := &golang.GoMod{Ident: before.Ident}
+			got := roundTripNode(t, before, seed)
+
+			// then: the received tree prints identically to the original
+			gm, ok := got.(*golang.GoMod)
+			require.Truef(t, ok, "expected *golang.GoMod, got %T", got)
+			if printed := printer.PrintGoMod(gm); printed != content {
+				t.Fatalf("RPC round-trip not lossless\n--- want ---\n%q\n--- got ---\n%q", content, printed)
+			}
+		})
+	}
+}
+
+// TestGoModRPCPreservesResolutionMarker verifies a GoResolutionResult attached
+// to GoMod.Markers survives the RPC round-trip.
+func TestGoModRPCPreservesResolutionMarker(t *testing.T) {
+	content := "module example.com/foo\n\ngo 1.21\n\nrequire github.com/x/y v1.2.3\n"
+	before, err := parser.ParseGoModFile("go.mod", content)
+	require.NoError(t, err, "parse error")
+	mrr, err := parser.ParseGoMod("go.mod", content)
+	require.NoError(t, err, "marker parse error")
+	before.Markers = java.AddMarker(before.Markers, *mrr)
+
+	seed := &golang.GoMod{Ident: before.Ident}
+	got := roundTripNode(t, before, seed).(*golang.GoMod)
+
+	var found *golang.GoResolutionResult
+	for i := range got.Markers.Entries() {
+		if r, ok := got.Markers.Entries()[i].(golang.GoResolutionResult); ok {
+			found = &r
+		}
+	}
+	require.NotNilf(t, found, "GoResolutionResult marker lost in round-trip; markers=%#v", got.Markers.Entries())
+	require.False(t, found.ModulePath != "example.com/foo" || len(found.Requires) != 1, "marker fields not preserved")
+}
+
+// A peer that prints or visits part of a go.mod names that node by id, so the
+// node travels without the file around it.
+func TestGoModNodesRoundTripOnTheirOwn(t *testing.T) {
+	gm, err := parser.ParseGoModFile("go.mod",
+		"module example.com/foo\n\nrequire (\n\tgithub.com/a/b v1.0.0 // indirect\n)\n")
+	require.NoError(t, err)
+	directive := gm.Statements[0].Element.(*golang.GoModDirective)
+	block := gm.Statements[1].Element.(*golang.GoModBlock)
+
+	cases := []struct {
+		node, seed java.Tree
+		printed    string
+	}{
+		{directive, &golang.GoModDirective{}, "module example.com/foo"},
+		{block, &golang.GoModBlock{}, "\nrequire (\n\tgithub.com/a/b v1.0.0 // indirect\n)"},
+		{directive.Values[0], &golang.GoModValue{}, " example.com/foo"},
+	}
+	for _, c := range cases {
+		got, ok := roundTripNode(t, c.node, c.seed).(java.Tree)
+		require.Truef(t, ok, "%T did not come back as a tree", c.node)
+		require.Equal(t, c.printed, printer.PrintWithCursor(got, nil, nil))
+	}
+}
+
+func TestEmptyRequireBlockSendsAnEmptyEntriesList(t *testing.T) {
+	// given
+	gm, err := parser.ParseGoModFile("go.mod", "module example.com/foo\n\nrequire ()\n")
+	require.NoError(t, err)
+
+	// when
+	got := roundTripNode(t, gm, &golang.GoMod{Ident: gm.Ident}).(*golang.GoMod)
+
+	// then
+	block, ok := got.Statements[1].Element.(*golang.GoModBlock)
+	require.True(t, ok)
+	require.NotNil(t, block.Entries)
+	require.Empty(t, block.Entries)
+}

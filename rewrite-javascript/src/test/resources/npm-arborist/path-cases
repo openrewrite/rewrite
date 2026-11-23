@@ -1,0 +1,333 @@
+[
+ {
+  "fn": "resolve",
+  "args": [
+   "/a/b",
+   "c"
+  ],
+  "result": "/a/b/c"
+ },
+ {
+  "fn": "resolve",
+  "args": [
+   "/a/b",
+   "../c"
+  ],
+  "result": "/a/c"
+ },
+ {
+  "fn": "resolve",
+  "args": [
+   "/a/b",
+   "/c",
+   "d"
+  ],
+  "result": "/c/d"
+ },
+ {
+  "fn": "resolve",
+  "args": [
+   "a/b"
+  ],
+  "result": "/a/b"
+ },
+ {
+  "fn": "resolve",
+  "args": [
+   ""
+  ],
+  "result": "/"
+ },
+ {
+  "fn": "resolve",
+  "args": [
+   "/"
+  ],
+  "result": "/"
+ },
+ {
+  "fn": "resolve",
+  "args": [
+   "/a/b/./c/..//d/"
+  ],
+  "result": "/a/b/d"
+ },
+ {
+  "fn": "resolve",
+  "args": [
+   "/srv/user/projects/root",
+   "node_modules",
+   "foo"
+  ],
+  "result": "/srv/user/projects/root/node_modules/foo"
+ },
+ {
+  "fn": "resolve",
+  "args": [
+   "/x",
+   "..",
+   ".."
+  ],
+  "result": "/"
+ },
+ {
+  "fn": "relative",
+  "args": [
+   "/a/b/c",
+   "/a/b/c/d/e"
+  ],
+  "result": "d/e"
+ },
+ {
+  "fn": "relative",
+  "args": [
+   "/a/b/c",
+   "/a/x"
+  ],
+  "result": "../../x"
+ },
+ {
+  "fn": "relative",
+  "args": [
+   "/",
+   "/foo"
+  ],
+  "result": "foo"
+ },
+ {
+  "fn": "relative",
+  "args": [
+   "/foo/bar",
+   "/"
+  ],
+  "result": "../.."
+ },
+ {
+  "fn": "relative",
+  "args": [
+   "/foo",
+   "/foo"
+  ],
+  "result": ""
+ },
+ {
+  "fn": "relative",
+  "args": [
+   "/foo/bar",
+   "/foo/barbaz"
+  ],
+  "result": "../barbaz"
+ },
+ {
+  "fn": "relative",
+  "args": [
+   "/srv/user/projects/some/kind/of/path",
+   "/srv/user/some/other/path"
+  ],
+  "result": "../../../../../some/other/path"
+ },
+ {
+  "fn": "relative",
+  "args": [
+   "/x/y",
+   "/x/z/y/a/b/c"
+  ],
+  "result": "../z/y/a/b/c"
+ },
+ {
+  "fn": "relative",
+  "args": [
+   "/foo/bar/baz",
+   "/foo/bar"
+  ],
+  "result": ".."
+ },
+ {
+  "fn": "dirname",
+  "args": [
+   "/a/b/c"
+  ],
+  "result": "/a/b"
+ },
+ {
+  "fn": "dirname",
+  "args": [
+   "/a/b/c/"
+  ],
+  "result": "/a/b"
+ },
+ {
+  "fn": "dirname",
+  "args": [
+   "/a"
+  ],
+  "result": "/"
+ },
+ {
+  "fn": "dirname",
+  "args": [
+   "/"
+  ],
+  "result": "/"
+ },
+ {
+  "fn": "dirname",
+  "args": [
+   "a"
+  ],
+  "result": "."
+ },
+ {
+  "fn": "dirname",
+  "args": [
+   "//a"
+  ],
+  "result": "//"
+ },
+ {
+  "fn": "dirname",
+  "args": [
+   ""
+  ],
+  "result": "."
+ },
+ {
+  "fn": "dirname",
+  "args": [
+   "a/b"
+  ],
+  "result": "a"
+ },
+ {
+  "fn": "basename",
+  "args": [
+   "/a/b/c"
+  ],
+  "result": "c"
+ },
+ {
+  "fn": "basename",
+  "args": [
+   "/a/b/c/"
+  ],
+  "result": "c"
+ },
+ {
+  "fn": "basename",
+  "args": [
+   "/"
+  ],
+  "result": ""
+ },
+ {
+  "fn": "basename",
+  "args": [
+   ""
+  ],
+  "result": ""
+ },
+ {
+  "fn": "basename",
+  "args": [
+   "a"
+  ],
+  "result": "a"
+ },
+ {
+  "fn": "normalize",
+  "args": [
+   "/a/b/../c"
+  ],
+  "result": "/a/c"
+ },
+ {
+  "fn": "normalize",
+  "args": [
+   "a/./b/"
+  ],
+  "result": "a/b/"
+ },
+ {
+  "fn": "normalize",
+  "args": [
+   ""
+  ],
+  "result": "."
+ },
+ {
+  "fn": "normalize",
+  "args": [
+   "../../a"
+  ],
+  "result": "../../a"
+ },
+ {
+  "fn": "normalize",
+  "args": [
+   "/.."
+  ],
+  "result": "/"
+ },
+ {
+  "fn": "normalize",
+  "args": [
+   "./"
+  ],
+  "result": "./"
+ },
+ {
+  "fn": "join",
+  "args": [
+   "/a",
+   "b",
+   "../c"
+  ],
+  "result": "/a/c"
+ },
+ {
+  "fn": "join",
+  "args": [
+   "",
+   ""
+  ],
+  "result": "."
+ },
+ {
+  "fn": "join",
+  "args": [
+   "/",
+   "/path/to/foo"
+  ],
+  "result": "/path/to/foo"
+ },
+ {
+  "fn": "join",
+  "args": [
+   "a",
+   "",
+   "b"
+  ],
+  "result": "a/b"
+ },
+ {
+  "fn": "isAbsolute",
+  "args": [
+   "/a"
+  ],
+  "result": true
+ },
+ {
+  "fn": "isAbsolute",
+  "args": [
+   "a"
+  ],
+  "result": false
+ },
+ {
+  "fn": "isAbsolute",
+  "args": [
+   ""
+  ],
+  "result": false
+ }
+]

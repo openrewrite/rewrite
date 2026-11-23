@@ -23,6 +23,7 @@ import org.openrewrite.SourceFileWithReferences;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.TypeNameMatcher;
+import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
@@ -35,6 +36,24 @@ import java.util.function.Predicate;
 import static java.util.Objects.requireNonNull;
 
 public class UsesType<P> extends TreeVisitor<Tree, P> {
+
+    /**
+     * Whether {@link TypesInUse} on the current runtime exposes the trie-backed query methods.
+     * Recipes are commonly built against a newer {@code rewrite-java} than is deployed at runtime
+     * (parent-loaded), so we probe once at class load and fall back to the legacy iteration when
+     * the new methods aren't there. Once enough time has passed for older runtimes to fall out of
+     * support, the probe and the fallback path can be removed.
+     */
+    private static final boolean TYPES_IN_USE_HAS_TRIE_API = probeTypesInUseHasTrieApi();
+
+    private static boolean probeTypesInUseHasTrieApi() {
+        try {
+            TypesInUse.class.getMethod("hasType", String.class, boolean.class);
+            return true;
+        } catch (NoSuchMethodException e) {
+            return false;
+        }
+    }
 
     @Nullable
     @Getter
@@ -90,41 +109,8 @@ public class UsesType<P> extends TreeVisitor<Tree, P> {
     public @Nullable Tree visit(@Nullable Tree tree, P p) {
         if (tree instanceof JavaSourceFile) {
             JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
-            JavaSourceFile c = cu;
-
-            for (JavaType type : c.getTypesInUse().getTypesInUse()) {
-                JavaType checkType = type instanceof JavaType.Primitive ? type : TypeUtils.asFullyQualified(type);
-                if ((c = maybeMark(c, checkType)) != cu) {
-                    return c;
-                }
-            }
-
-            for (J.Import anImport : c.getImports()) {
-                if (anImport.isStatic()) {
-                    if ((c = maybeMark(c, TypeUtils.asFullyQualified(anImport.getQualid().getTarget().getType()))) != cu) {
-                        return c;
-                    }
-                } else if ((c = maybeMark(c, TypeUtils.asFullyQualified(anImport.getQualid().getType()))) != cu) {
-                    return c;
-                }
-            }
-
-            if (Boolean.TRUE.equals(includeImplicit)) {
-                for (JavaType.Method method : c.getTypesInUse().getUsedMethods()) {
-                    if ((c = maybeMark(c, method.getDeclaringType())) != cu) {
-                        return c;
-                    }
-                    if ((c = maybeMark(c, method.getReturnType())) != cu) {
-                        return c;
-                    }
-
-                    for (JavaType parameterType : method.getParameterTypes()) {
-                        if ((c = maybeMark(c, parameterType)) != cu) {
-                            return c;
-                        }
-                    }
-                }
-            }
+            Tree found = visitTypes(cu);
+            return found != cu || !importsUnresolvedMatch(cu) ? found : SearchResult.found(cu);
         } else if (tree instanceof SourceFileWithReferences) {
             SourceFileWithReferences sourceFile = (SourceFileWithReferences) tree;
             SourceFileWithReferences.References references = sourceFile.getReferences();
@@ -135,16 +121,118 @@ public class UsesType<P> extends TreeVisitor<Tree, P> {
         return tree;
     }
 
+    /// An unresolved import still names a type whose uses [TypesInUse] can't see, as when parsed without it on
+    /// the classpath. Package imports are skipped, as they have no type even when resolved.
+    private boolean importsUnresolvedMatch(JavaSourceFile cu) {
+        for (J.Import anImport : cu.getImports()) {
+            J.FieldAccess qualid = anImport.getQualid();
+            if ("*".equals(qualid.getSimpleName())) {
+                continue;
+            }
+            JavaType type = anImport.isStatic() ? qualid.getTarget().getType() : qualid.getType();
+            if (type != null && !(type instanceof JavaType.Unknown)) {
+                continue;
+            }
+            if (nameMatches(anImport.getTypeName(), anImport.getPackageName())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean nameMatches(String typeName, String packageName) {
+        if (fullyQualifiedType != null) {
+            return TypeUtils.fullyQualifiedNamesAreEqual(fullyQualifiedType, typeName);
+        }
+        if (typePattern instanceof GenericPattern) {
+            return ((GenericPattern) typePattern).getMatcher().matches(typeName.replace('$', '.')) ||
+                   ((GenericPattern) typePattern).getMatcher().matches(typeName);
+        }
+        if (typePattern instanceof PackagePattern) {
+            return packageName.equals(((PackagePattern) typePattern).getName());
+        }
+        if (typePattern instanceof PackagePrefixPattern) {
+            String prefix = ((PackagePrefixPattern) typePattern).getPrefix();
+            return packageName.equals(prefix) || packageName.startsWith(prefix + '.');
+        }
+        return false;
+    }
+
+    private Tree visitTypes(JavaSourceFile cu) {
+        boolean implicit = Boolean.TRUE.equals(includeImplicit);
+
+        if (TYPES_IN_USE_HAS_TRIE_API) {
+            // Exact FQN: O(1) closure lookup on TypesInUse.
+            if (fullyQualifiedType != null) {
+                return cu.getTypesInUse().hasType(fullyQualifiedType, implicit) ? SearchResult.found(cu) : cu;
+            }
+            // Package-shaped wildcards (com.foo.* / com.foo..*): O(prefix-depth) trie lookup.
+            if (typePattern instanceof PackagePattern) {
+                return cu.getTypesInUse().hasTypeInPackage(((PackagePattern) typePattern).getName(), implicit)
+                        ? SearchResult.found(cu) : cu;
+            }
+            if (typePattern instanceof PackagePrefixPattern) {
+                return cu.getTypesInUse().hasTypeInPackageOrSubpackage(((PackagePrefixPattern) typePattern).getPrefix(), implicit)
+                        ? SearchResult.found(cu) : cu;
+            }
+            // GenericPattern (regex-like): one trie walk, memoized per (matcher, implicit).
+            if (typePattern instanceof GenericPattern) {
+                return cu.getTypesInUse().hasTypeMatching(((GenericPattern) typePattern).getMatcher(), implicit)
+                        ? SearchResult.found(cu) : cu;
+            }
+            return cu;
+        }
+
+        // Legacy fallback: TypesInUse on the runtime classpath predates the trie API. Iterate
+        // types-in-use, imports, and (when implicit) used-method types directly. Kept verbatim
+        // from the pre-trie implementation so behavior matches whatever older versions of
+        // rewrite-java do.
+        return legacyVisit(cu);
+    }
+
+    private JavaSourceFile legacyVisit(JavaSourceFile cu) {
+        JavaSourceFile c = cu;
+        for (JavaType type : c.getTypesInUse().getTypesInUse()) {
+            JavaType checkType = type instanceof JavaType.Primitive ? type : TypeUtils.asFullyQualified(type);
+            if ((c = maybeMark(c, checkType)) != cu) {
+                return c;
+            }
+        }
+        for (J.Import anImport : c.getImports()) {
+            if (anImport.isStatic()) {
+                if ((c = maybeMark(c, TypeUtils.asFullyQualified(anImport.getQualid().getTarget().getType()))) != cu) {
+                    return c;
+                }
+            } else if ((c = maybeMark(c, TypeUtils.asFullyQualified(anImport.getQualid().getType()))) != cu) {
+                return c;
+            }
+        }
+        if (Boolean.TRUE.equals(includeImplicit)) {
+            for (JavaType.Method method : c.getTypesInUse().getUsedMethods()) {
+                if ((c = maybeMark(c, method.getDeclaringType())) != cu) {
+                    return c;
+                }
+                if ((c = maybeMark(c, method.getReturnType())) != cu) {
+                    return c;
+                }
+                for (JavaType parameterType : method.getParameterTypes()) {
+                    if ((c = maybeMark(c, parameterType)) != cu) {
+                        return c;
+                    }
+                }
+            }
+        }
+        return c;
+    }
+
     private JavaSourceFile maybeMark(JavaSourceFile c, @Nullable JavaType type) {
         if (type == null) {
             return c;
         }
-
         if (typePattern != null && TypeUtils.isAssignableTo(typePattern, type) ||
             fullyQualifiedType != null && TypeUtils.isAssignableTo(fullyQualifiedType, type)) {
             return SearchResult.found(c);
         }
-
         return c;
     }
 
@@ -240,7 +328,8 @@ public class UsesType<P> extends TreeVisitor<Tree, P> {
 
         @Override
         public boolean matchesReference(Reference reference) {
-            return reference.getKind() == Reference.Kind.TYPE && qualifiedName.equals(reference.getValue());
+            return reference.getKind() == Reference.Kind.TYPE &&
+                   TypeUtils.fullyQualifiedNamesAreEqual(qualifiedName, reference.getValue());
         }
 
         @Override

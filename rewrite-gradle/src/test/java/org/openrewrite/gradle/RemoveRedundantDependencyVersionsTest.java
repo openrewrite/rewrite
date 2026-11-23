@@ -737,6 +737,91 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     }
 
     @Test
+    void keepSameDependencyInUnrelatedConfigurations() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveRedundantDependencyVersions("io.awspring.cloud", null, null)),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation platform("io.awspring.cloud:spring-cloud-aws-dependencies:3.3.1")
+                  compileOnly("org.projectlombok:lombok:1.18.24")
+                  annotationProcessor("org.projectlombok:lombok:1.18.24")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepRepeatedDependencyNotMatchingPattern() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveRedundantDependencyVersions("io.awspring.cloud", null, null)),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation("org.openrewrite:rewrite-core:8.56.0")
+                  implementation("org.openrewrite:rewrite-core:8.55.0")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeRepeatedDependencyInSameConfigurationOnly() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  compileOnly("org.projectlombok:lombok:1.18.24")
+                  annotationProcessor("org.projectlombok:lombok:1.18.24")
+                  compileOnly("org.projectlombok:lombok:1.18.24")
+                  annotationProcessor("org.projectlombok:lombok:1.18.22")
+              }
+              """,
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  compileOnly("org.projectlombok:lombok:1.18.24")
+                  annotationProcessor("org.projectlombok:lombok:1.18.24")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void supportSpringBootDependenciesPlugin() {
         rewriteRun(
           spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE)),
@@ -1073,6 +1158,35 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
               dependencies {
                   implementation('org.springframework.boot:spring-boot')
                   implementation("org.apache.commons:commons-lang3")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotRemoveEarlyReturnFromClosure() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              subprojects { subproject ->
+                  if (subproject.name == 'bom') {
+                      return
+                  }
+
+                  apply plugin: 'java-library'
+              }
+
+              dependencies {
+                  implementation("org.apache.commons:commons-lang3:3.14.0")
               }
               """
           )

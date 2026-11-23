@@ -38,7 +38,6 @@ import static java.util.Comparator.comparingInt;
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
-import static org.openrewrite.config.ResourceLoader.RecipeDetail.EXAMPLES;
 
 public class Environment {
     private final Collection<? extends ResourceLoader> resourceLoaders;
@@ -52,31 +51,15 @@ public class Environment {
         Map<String, Recipe> dependencyRecipeMap = new HashMap<>();
         dependencyRecipes.forEach(r -> dependencyRecipeMap.putIfAbsent(r.getName(), r));
 
-        Map<String, List<RecipeExample>> recipeExamples = new HashMap<>();
-        for (ResourceLoader r : resourceLoaders) {
-            if (r instanceof YamlResourceLoader) {
-                recipeExamples.putAll(r.listRecipeExamples());
-            }
-        }
-
         List<Recipe> recipes = new ArrayList<>();
         for (ResourceLoader r : resourceLoaders) {
             recipes.addAll(r.listRecipes());
-        }
-        for (Recipe recipe : dependencyRecipes) {
-            if (recipe instanceof DeclarativeRecipe) {
-                ((DeclarativeRecipe) recipe).initialize(dependencyRecipeMap::get);
-            }
         }
 
         Map<String, Recipe> availableRecipeMap = new HashMap<>(dependencyRecipeMap);
         recipes.forEach(r -> availableRecipeMap.putIfAbsent(r.getName(), r));
 
         for (Recipe recipe : recipes) {
-            if (recipeExamples.containsKey(recipe.getName())) {
-                recipe.setExamples(recipeExamples.get(recipe.getName()));
-            }
-
             if (recipe instanceof DeclarativeRecipe) {
                 ((DeclarativeRecipe) recipe).initialize(availableRecipeMap::get);
             }
@@ -91,38 +74,9 @@ public class Environment {
     }
 
     public Collection<RecipeDescriptor> listRecipeDescriptors() {
-        Map<String, List<RecipeExample>> recipeToExamples = new HashMap<>();
-        for (ResourceLoader r : resourceLoaders) {
-            if (r instanceof YamlResourceLoader) {
-                recipeToExamples.putAll(r.listRecipeExamples());
-            } else if (r instanceof ClasspathScanningLoader) {
-                ClasspathScanningLoader classpathScanningLoader = (ClasspathScanningLoader) r;
-                Map<String, List<RecipeExample>> examplesMap = classpathScanningLoader.listRecipeExamples();
-                for (String key : examplesMap.keySet()) {
-                    if (recipeToExamples.containsKey(key)) {
-                        recipeToExamples.get(key).addAll(examplesMap.get(key));
-                    } else {
-                        recipeToExamples.put(key, examplesMap.get(key));
-                    }
-                }
-            }
-        }
-
-        List<RecipeDescriptor> result = new ArrayList<>();
-        for (ResourceLoader r : resourceLoaders) {
-            if (r instanceof YamlResourceLoader) {
-                result.addAll((((YamlResourceLoader) r).listRecipeDescriptors(emptyList(), recipeToExamples)));
-            } else {
-                Collection<RecipeDescriptor> descriptors = r.listRecipeDescriptors();
-                for (RecipeDescriptor descriptor : descriptors) {
-                    if (recipeToExamples.containsKey(descriptor.getName())) {
-                        descriptor.getExamples().addAll(recipeToExamples.get(descriptor.getName()));
-                    }
-                }
-                result.addAll(descriptors);
-            }
-        }
-        return result;
+        return resourceLoaders.stream()
+                .flatMap(r -> r.listRecipeDescriptors().stream())
+                .collect(toList());
     }
 
     public Recipe activateRecipes(Collection<String> activeRecipes) {
@@ -130,7 +84,7 @@ public class Environment {
         if (activeRecipes.isEmpty()) {
             recipes = emptyList();
         } else if (activeRecipes.size() == 1) {
-            Recipe recipe = loadRecipe(activeRecipes.iterator().next(), EXAMPLES);
+            Recipe recipe = loadRecipe(activeRecipes.iterator().next());
             if (recipe != null) {
                 return recipe;
             }
@@ -194,40 +148,26 @@ public class Environment {
             return null;
         }
 
-        boolean includeExamples = ResourceLoader.RecipeDetail.EXAMPLES.includedIn(details);
-
-        Map<String, List<RecipeExample>> recipeExamples = new HashMap<>();
-        if (includeExamples) {
-            for (ResourceLoader r : resourceLoaders) {
-                if (r instanceof YamlResourceLoader) {
-                    recipeExamples.putAll(r.listRecipeExamples());
-                }
-            }
-        }
-
-        Map<String, Recipe> nameToRecipe = new HashMap<>();
-        for (ResourceLoader dependencyResourceLoader : dependencyResourceLoaders) {
-            for (Recipe listedRecipe : dependencyResourceLoader.listRecipes()) {
-                nameToRecipe.putIfAbsent(listedRecipe.getName(), listedRecipe);
-            }
-        }
-        for (Recipe dependency : nameToRecipe.values()) {
-            if (dependency instanceof DeclarativeRecipe) {
-                ((DeclarativeRecipe) dependency).initialize(nameToRecipe::get);
-            }
-        }
-
-        if (includeExamples && recipeExamples.containsKey(recipe.getName())) {
-            recipe.setExamples(recipeExamples.get(recipe.getName()));
-        }
-
         if (recipe instanceof DeclarativeRecipe) {
+            Map<String, Recipe> nameToRecipe = new HashMap<>();
             Function<String, @Nullable Recipe> loadFunction = new Function<String, Recipe>() {
                 @Override
                 public @Nullable Recipe apply(String key) {
                     Recipe cached = nameToRecipe.get(key);
                     if (cached != null) {
                         return cached;
+                    }
+
+                    // Dependencies first to preserve "deps win on name conflicts" priority.
+                    for (ResourceLoader dependencyResourceLoader : dependencyResourceLoaders) {
+                        Recipe r = dependencyResourceLoader.loadRecipe(key, details);
+                        if (r != null) {
+                            nameToRecipe.put(key, r);
+                            if (r instanceof DeclarativeRecipe) {
+                                ((DeclarativeRecipe) r).initialize(this);
+                            }
+                            return r;
+                        }
                     }
 
                     for (ResourceLoader resourceLoader : resourceLoaders) {

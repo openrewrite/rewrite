@@ -81,6 +81,19 @@ class ObjectDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void finalObject() {
+        rewriteRun(
+            scala(
+                """
+                final object Foo {
+                  val x = 1
+                }
+                """
+            )
+        );
+    }
+
+    @Test
     void companionObject() {
         rewriteRun(
             scala(
@@ -116,6 +129,92 @@ class ObjectDeclarationTest implements RewriteTest {
                     val x = 1
                   }
                 }
+                """
+            )
+        );
+    }
+
+    @Test
+    void significantCharactersInComments() {
+        // visitModuleDef — `{` in line comment before object body
+        rewriteRun(
+            scala(
+                """
+                object Foo // {
+                {
+                  val x = 1
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void semicolonSeparatedMembers() {
+        rewriteRun(
+            scala(
+                """
+                object D { val v: Int = 2; def x = 1 }
+                """
+            )
+        );
+    }
+
+    @Test
+    void semicolonSeparatedNestedObject() {
+        rewriteRun(
+            scala(
+                """
+                object D { val v: Int = 2; object O { def x = 1 } }
+                """
+            )
+        );
+    }
+
+    @Test
+    void semicolonSeparatedMembersWithSpaceBeforeSemicolon() {
+        rewriteRun(
+            scala(
+                """
+                object D { val v = 2 ; def x = 1 ; }
+                """
+            )
+        );
+    }
+
+    @Test
+    void semicolonOnNextLine() {
+        rewriteRun(
+            scala(
+                """
+                object O {
+                  val a = 1
+                  ; val b = 2
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void emptyStatementBetweenMembers() {
+        rewriteRun(
+            scala(
+                """
+                object O { val a = 1;; val b = 2 }
+                """
+            )
+        );
+    }
+
+    @Test
+    void bracelessBodyWithTrailingSemicolons() {
+        rewriteRun(
+            scala(
+                """
+                object O:
+                  val a = 1;
+                  val b = 2;
                 """
             )
         );

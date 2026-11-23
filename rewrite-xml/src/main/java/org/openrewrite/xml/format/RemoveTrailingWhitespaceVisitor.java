@@ -20,7 +20,11 @@ import org.openrewrite.Tree;
 import org.openrewrite.xml.XmlIsoVisitor;
 import org.openrewrite.xml.tree.Xml;
 
+import java.util.regex.Pattern;
+
 public class RemoveTrailingWhitespaceVisitor<P> extends XmlIsoVisitor<P> {
+    private static final Pattern TRAILING_WHITESPACE = Pattern.compile("[ \\t]+(?=[\\r\\n]|$)");
+
     @Nullable
     private final Tree stopAfter;
 
@@ -34,10 +38,8 @@ public class RemoveTrailingWhitespaceVisitor<P> extends XmlIsoVisitor<P> {
 
     @Override
     public Xml.Document visitDocument(Xml.Document doc, P p) {
-        String eof = doc.getEof();
-        eof = eof.chars().filter(c -> c == '\n' || c == '\r')
-                .collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append)
-                .toString();
+        // `eof` holds everything after the root element, comments and processing instructions included
+        String eof = TRAILING_WHITESPACE.matcher(doc.getEof()).replaceAll("");
 
         Xml.Document d = super.visitDocument(doc, p);
         return d.withEof(eof);

@@ -22,9 +22,9 @@ import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.csharp.rpc.CSharpRewriteRpc;
 import org.openrewrite.csharp.tree.Cs;
+import org.openrewrite.internal.EncodingDetectingInputStream;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
@@ -85,14 +85,10 @@ public class CSharpParser implements Parser {
                         : input.getPath().getFileName().toString();
                 Path target = tempDir.resolve(sourcePath);
                 Files.createDirectories(target.getParent());
-                try (InputStream is = input.getSource(ctx)) {
-                    byte[] buf = new byte[4096];
-                    StringBuilder sb = new StringBuilder();
-                    int n;
-                    while ((n = is.read(buf)) != -1) {
-                        sb.append(new String(buf, 0, n, StandardCharsets.UTF_8));
-                    }
-                    writeString(target, sb.toString());
+                try (EncodingDetectingInputStream is = input.getSource(ctx)) {
+                    String source = is.readFully();
+                    // the stream consumes a byte order mark, and the file needs it back to be parsed as marked
+                    writeString(target, is.isCharsetBomMarked() ? '\uFEFF' + source : source);
                 }
             }
 

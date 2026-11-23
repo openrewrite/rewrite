@@ -16,47 +16,49 @@
 
 package matcher
 
-import "github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+import (
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
+)
 
 // GetFullyQualifiedName extracts the FQN from a JavaType.
 // Returns "" for nil, unknown, or types without a FQN.
-func GetFullyQualifiedName(t tree.JavaType) string {
+func GetFullyQualifiedName(t java.JavaType) string {
 	if t == nil {
 		return ""
 	}
 	switch v := t.(type) {
-	case *tree.JavaTypeClass:
+	case *java.JavaTypeClass:
 		return v.FullyQualifiedName
-	case *tree.JavaTypeParameterized:
+	case *java.JavaTypeParameterized:
 		if v.Type != nil {
-			return v.Type.FullyQualifiedName
+			return v.Type.GetFullyQualifiedName()
 		}
-	case *tree.JavaTypePrimitive:
+	case *java.JavaTypePrimitive:
 		return v.Keyword
-	case *tree.JavaTypeArray:
+	case *java.JavaTypeArray:
 		return GetFullyQualifiedName(v.ElemType) + "[]"
-	case tree.FullyQualified:
-		return v.GetFullyQualifiedName()
+	case java.FullyQualified:
+		return java.FQNOf(v)
 	}
 	return ""
 }
 
-// IsOfClassType checks if the type has the exact fully qualified name.
-func IsOfClassType(t tree.JavaType, fqn string) bool {
+func IsOfClassType(t java.JavaType, fqn string) bool {
 	return GetFullyQualifiedName(t) == fqn
 }
 
 // IsAssignableTo checks if the type is assignable to the target FQN.
 // For Go, this means the type IS the target, or the type implements
 // an interface with that FQN (structural typing).
-func IsAssignableTo(t tree.JavaType, fqn string) bool {
+func IsAssignableTo(t java.JavaType, fqn string) bool {
 	if t == nil {
 		return false
 	}
-	return isAssignableToFQN(t, fqn, make(map[tree.JavaType]bool))
+	return isAssignableToFQN(t, fqn, make(map[java.JavaType]bool))
 }
 
-func isAssignableToFQN(t tree.JavaType, fqn string, visited map[tree.JavaType]bool) bool {
+func isAssignableToFQN(t java.JavaType, fqn string, visited map[java.JavaType]bool) bool {
 	if visited[t] {
 		return false
 	}
@@ -67,7 +69,7 @@ func isAssignableToFQN(t tree.JavaType, fqn string, visited map[tree.JavaType]bo
 	}
 
 	switch v := t.(type) {
-	case *tree.JavaTypeClass:
+	case *java.JavaTypeClass:
 		// Check interfaces
 		for _, iface := range v.Interfaces {
 			if isAssignableToFQN(iface, fqn, visited) {
@@ -80,7 +82,7 @@ func isAssignableToFQN(t tree.JavaType, fqn string, visited map[tree.JavaType]bo
 				return true
 			}
 		}
-	case *tree.JavaTypeParameterized:
+	case *java.JavaTypeParameterized:
 		if v.Type != nil {
 			return isAssignableToFQN(v.Type, fqn, visited)
 		}
@@ -88,9 +90,123 @@ func isAssignableToFQN(t tree.JavaType, fqn string, visited map[tree.JavaType]bo
 	return false
 }
 
+// IsAssignableToType reports whether a value of type from may be used where to
+// is wanted. Go satisfies an interface by carrying its methods and declares it
+// nowhere, so an interface target is answered from the two method sets.
+func IsAssignableToType(from, to java.JavaType) bool {
+	if from == nil || to == nil || java.IsUnknown(from) || java.IsUnknown(to) {
+		return false
+	}
+	if IsSameGoType(from, to) {
+		return true
+	}
+	// A literal's keyword names a class of Go types, so it answers to any of
+	// them by name — and, carrying no method set, to no interface but the
+	// empty one.
+	if (isLiteralKeyword(from) || isLiteralKeyword(to)) && SharesGoTypeName(from, to) {
+		return true
+	}
+	// An interface is the only target a Go value reaches without being it,
+	// whether by carrying its methods or by a relation a peer model recorded.
+	if iface := AsClass(to); iface != nil && iface.Kind == "Interface" {
+		fqn := GetFullyQualifiedName(to)
+		_, parameterized := to.(*java.JavaTypeParameterized)
+		return hasMethodSet(from, to, iface) || (!parameterized && fqn != "" && IsAssignableTo(from, fqn))
+	}
+	return false
+}
+
+// hasMethodSet reports whether from carries every method of an interface. The
+// empty one asks for nothing, which is what makes `any` a target every
+// attributed type reaches.
+func hasMethodSet(from, to java.JavaType, iface *java.JavaTypeClass) bool {
+	if len(iface.Methods) == 0 {
+		return true
+	}
+	cls := AsClass(from)
+	if cls == nil {
+		return false
+	}
+	typeArgs := typeArgsOf(from, cls)
+	wantArgs := typeArgsOf(to, iface)
+	for _, want := range iface.Methods {
+		if !hasMethod(cls, want, typeArgs, wantArgs) {
+			return false
+		}
+	}
+	return true
+}
+
+// typeArgsOf binds a generic's type parameters to the arguments an
+// instantiation of it supplies, since its methods are declared in terms of
+// the parameters.
+func typeArgsOf(t java.JavaType, cls *java.JavaTypeClass) map[string]java.JavaType {
+	p, ok := t.(*java.JavaTypeParameterized)
+	if !ok || len(p.TypeParameters) != len(cls.TypeParameters) {
+		return nil
+	}
+	bound := make(map[string]java.JavaType, len(p.TypeParameters))
+	for i, tp := range cls.TypeParameters {
+		if v, ok := tp.(*java.JavaTypeGenericTypeVariable); ok {
+			bound[v.Name] = p.TypeParameters[i]
+		}
+	}
+	return bound
+}
+
+func hasMethod(cls *java.JavaTypeClass, want *java.JavaTypeMethod, typeArgs, wantArgs map[string]java.JavaType) bool {
+	for _, have := range cls.Methods {
+		if have.Name == want.Name && sameSignature(have, want, typeArgs, wantArgs) {
+			return true
+		}
+	}
+	return false
+}
+
+func sameSignature(a, b *java.JavaTypeMethod, typeArgs, wantArgs map[string]java.JavaType) bool {
+	if len(a.ParameterTypes) != len(b.ParameterTypes) {
+		return false
+	}
+	for i := range a.ParameterTypes {
+		if !IsSameGoType(substitute(a.ParameterTypes[i], typeArgs), substitute(b.ParameterTypes[i], wantArgs)) {
+			return false
+		}
+	}
+	return IsSameGoType(substitute(a.ReturnType, typeArgs), substitute(b.ReturnType, wantArgs))
+}
+
+func substitute(t java.JavaType, typeArgs map[string]java.JavaType) java.JavaType {
+	if len(typeArgs) == 0 {
+		return t
+	}
+	switch v := t.(type) {
+	case *java.JavaTypeGenericTypeVariable:
+		if arg, ok := typeArgs[v.Name]; ok {
+			return arg
+		}
+	case *java.JavaTypeArray:
+		return &java.JavaTypeArray{ElemType: substitute(v.ElemType, typeArgs), Annotations: v.Annotations}
+	case *java.JavaTypeParameterized:
+		params := make([]java.JavaType, len(v.TypeParameters))
+		for i, tp := range v.TypeParameters {
+			params[i] = substitute(tp, typeArgs)
+		}
+		return &java.JavaTypeParameterized{Type: v.Type, TypeParameters: params}
+	case *java.JavaTypeMethod:
+		sub := *v
+		sub.ParameterTypes = make([]java.JavaType, len(v.ParameterTypes))
+		for i, pt := range v.ParameterTypes {
+			sub.ParameterTypes[i] = substitute(pt, typeArgs)
+		}
+		sub.ReturnType = substitute(v.ReturnType, typeArgs)
+		return &sub
+	}
+	return t
+}
+
 // Implements checks if the type implements the given interface FQN.
 // Unlike IsAssignableTo, this returns false if the type IS the interface.
-func Implements(t tree.JavaType, interfaceFQN string) bool {
+func Implements(t java.JavaType, interfaceFQN string) bool {
 	if t == nil {
 		return false
 	}
@@ -101,128 +217,292 @@ func Implements(t tree.JavaType, interfaceFQN string) bool {
 	return IsAssignableTo(t, interfaceFQN)
 }
 
-// IsError checks if the type is the Go built-in `error` interface.
-func IsError(t tree.JavaType) bool {
+func IsError(t java.JavaType) bool {
 	return IsOfClassType(t, "error")
 }
 
-// IsString checks if the type is the Go `string` type.
-func IsString(t tree.JavaType) bool {
-	if t == nil {
-		return false
+// Classification is a lookup on the Go type name a basic type is attributed
+// under. An untyped constant is its own type (`const c = 1` is an untyped int,
+// not an int) and answers the same questions as its typed counterpart.
+var (
+	goIntegerTypes = map[string]bool{
+		"int": true, "int8": true, "int16": true, "int32": true, "int64": true,
+		"uint": true, "uint8": true, "uint16": true, "uint32": true, "uint64": true,
+		"uintptr": true, "byte": true, "rune": true,
+		"untyped int": true, "untyped rune": true,
 	}
-	if p, ok := t.(*tree.JavaTypePrimitive); ok {
-		return p.Keyword == "String" || p.Keyword == "string"
+	goFractionalTypes = map[string]bool{
+		"float32": true, "float64": true, "complex64": true, "complex128": true,
+		"untyped float": true, "untyped complex": true,
 	}
-	return IsOfClassType(t, "string")
+	goStringTypes = map[string]bool{"string": true, "untyped string": true}
+	goBoolTypes   = map[string]bool{"bool": true, "untyped bool": true}
+)
+
+// literalKeywordNames are the Go type names a literal's JavaType.Primitive
+// keyword stands for — several each, since Java has fewer keywords than Go has
+// types. See doc/recipe-authoring.md: The names types carry.
+var literalKeywordNames = map[string][]string{
+	"String":  {"string", "untyped string"},
+	"boolean": {"bool", "untyped bool"},
+	"byte":    {"byte", "int8"},
+	"short":   {"int16"},
+	"int":     {"int", "int32", "untyped int"},
+	"long":    {"int64"},
+	"char":    {"rune", "untyped rune"},
+	"float":   {"float32"},
+	"double":  {"float64", "untyped float"},
 }
 
-// IsNumeric checks if the type is a numeric type (int, float, etc.).
-func IsNumeric(t tree.JavaType) bool {
-	if t == nil {
-		return false
-	}
-	if p, ok := t.(*tree.JavaTypePrimitive); ok {
-		switch p.Keyword {
-		case "int", "long", "short", "byte", "float", "double", "char":
-			return true
+// GoTypeNames are the Go type names an attributed type answers to: one for a
+// type named after it, and the class a literal's keyword stands for.
+func GoTypeNames(t java.JavaType) []string {
+	if p, ok := t.(*java.JavaTypePrimitive); ok {
+		if names, ok := literalKeywordNames[p.Keyword]; ok {
+			return names
 		}
 	}
-	fqn := GetFullyQualifiedName(t)
-	switch fqn {
-	case "int", "int8", "int16", "int32", "int64",
-		"uint", "uint8", "uint16", "uint32", "uint64", "uintptr",
-		"float32", "float64", "byte", "rune":
-		return true
+	return []string{GetFullyQualifiedName(t)}
+}
+
+// SharesGoTypeName reports whether two attributed types name a Go type in
+// common, a literal `1` sharing one with an `int` and with an `int32`.
+func SharesGoTypeName(a, b java.JavaType) bool {
+	others := GoTypeNames(b)
+	for _, name := range GoTypeNames(a) {
+		for _, other := range others {
+			if name != "" && name == other {
+				return true
+			}
+		}
 	}
 	return false
 }
 
-// IsBool checks if the type is the Go `bool` type.
-func IsBool(t tree.JavaType) bool {
-	if p, ok := t.(*tree.JavaTypePrimitive); ok {
-		return p.Keyword == "boolean" || p.Keyword == "bool"
+func anyGoTypeName(t java.JavaType, in map[string]bool) bool {
+	for _, name := range GoTypeNames(t) {
+		if in[name] {
+			return true
+		}
 	}
-	return IsOfClassType(t, "bool")
+	return false
 }
 
-// AsClass safely casts a JavaType to *JavaTypeClass, returning nil if not a class.
-func AsClass(t tree.JavaType) *tree.JavaTypeClass {
-	if c, ok := t.(*tree.JavaTypeClass); ok {
-		return c
+func IsString(t java.JavaType) bool {
+	return anyGoTypeName(t, goStringTypes)
+}
+
+func IsNumeric(t java.JavaType) bool {
+	return IsInt(t) || anyGoTypeName(t, goFractionalTypes)
+}
+
+func IsInt(t java.JavaType) bool {
+	return anyGoTypeName(t, goIntegerTypes)
+}
+
+func IsBool(t java.JavaType) bool {
+	return anyGoTypeName(t, goBoolTypes)
+}
+
+// IsSameGoType reports whether two attributed types are the same Go type.
+// `byte` and `uint8` are one type spelled two ways, as are `rune` and `int32`;
+// attribution keeps each spelling, so identity compares canonical names. A
+// literal's keyword names a class of Go types rather than one, so it answers
+// false — `int` and `int32` are both the `int` keyword.
+func IsSameGoType(a, b java.JavaType) bool {
+	if a == nil || b == nil || isLiteralKeyword(a) || isLiteralKeyword(b) {
+		return false
 	}
-	if p, ok := t.(*tree.JavaTypeParameterized); ok {
-		return p.Type
+	return canonicalGoType(java.TypeSignature(a)) == canonicalGoType(java.TypeSignature(b))
+}
+
+func isLiteralKeyword(t java.JavaType) bool {
+	p, ok := t.(*java.JavaTypePrimitive)
+	if !ok {
+		return false
+	}
+	_, named := literalKeywordNames[p.Keyword]
+	return named
+}
+
+func canonicalGoType(signature string) string {
+	switch signature {
+	case "byte":
+		return "uint8"
+	case "rune":
+		return "int32"
+	}
+	return signature
+}
+
+// AsClass safely casts a JavaType to *JavaTypeClass, returning nil if not a
+// class. A JavaTypeShallowClass is unwrapped to its embedded JavaTypeClass
+// — callers that need to distinguish ShallowClass from Class should type
+// switch on the original JavaType, not on this accessor's result.
+func AsClass(t java.JavaType) *java.JavaTypeClass {
+	switch v := t.(type) {
+	case *java.JavaTypeClass:
+		return v
+	case *java.JavaTypeShallowClass:
+		return &v.JavaTypeClass
+	case *java.JavaTypeParameterized:
+		if c, ok := v.Type.(*java.JavaTypeClass); ok {
+			return c
+		}
+		if sc, ok := v.Type.(*java.JavaTypeShallowClass); ok {
+			return &sc.JavaTypeClass
+		}
 	}
 	return nil
 }
 
 // AsMethod safely casts a JavaType to *JavaTypeMethod, returning nil if not a method.
-func AsMethod(t tree.JavaType) *tree.JavaTypeMethod {
-	if m, ok := t.(*tree.JavaTypeMethod); ok {
+func AsMethod(t java.JavaType) *java.JavaTypeMethod {
+	if m, ok := t.(*java.JavaTypeMethod); ok {
 		return m
 	}
 	return nil
 }
 
 // AsArray safely casts a JavaType to *JavaTypeArray, returning nil if not an array.
-func AsArray(t tree.JavaType) *tree.JavaTypeArray {
-	if a, ok := t.(*tree.JavaTypeArray); ok {
+func AsArray(t java.JavaType) *java.JavaTypeArray {
+	if a, ok := t.(*java.JavaTypeArray); ok {
 		return a
 	}
 	return nil
 }
 
 // TypeOfExpression extracts the JavaType from an expression node.
-func TypeOfExpression(expr tree.Expression) tree.JavaType {
+func TypeOfExpression(expr java.Expression) java.JavaType {
 	if expr == nil {
 		return nil
 	}
 	switch n := expr.(type) {
-	case *tree.Identifier:
+	case *java.Identifier:
 		return n.Type
-	case *tree.Literal:
+	case *java.Literal:
 		return n.Type
-	case *tree.Binary:
+	case *java.Binary:
 		return n.Type
-	case *tree.Unary:
+	case *java.Unary:
 		return n.Type
-	case *tree.FieldAccess:
+	case *java.FieldAccess:
 		return n.Type
-	case *tree.TypeCast:
+	case *golang.TypeAssertion:
+		if n.Type != nil {
+			return n.Type
+		}
+		if n.AssertedType != nil {
+			return TypeOfExpression(n.AssertedType.Tree.Element)
+		}
+	case *java.TypeCast:
+		if n.Clazz != nil {
+			return TypeOfExpression(n.Clazz.Tree.Element)
+		}
+	case *java.ArrayAccess:
 		return n.Type
-	case *tree.ArrayAccess:
+	case *java.ArrayType:
 		return n.Type
-	case *tree.Parentheses:
+	case *java.ParameterizedType:
 		return n.Type
-	case *tree.MethodInvocation:
+	case *java.Parentheses:
+		return TypeOfExpression(n.Tree.Element)
+	case *java.ParenthesizedTypeTree:
+		return TypeOfExpression(n.Type.Tree.Element)
+	case *java.ControlParentheses:
+		return TypeOfExpression(n.Tree.Element)
+	case *java.MethodInvocation:
 		if n.MethodType != nil {
 			return n.MethodType.ReturnType
 		}
-	case *tree.Assignment:
+	case *golang.Composite:
 		return n.Type
-	case *tree.AssignmentOperation:
+	// A type spelling holds what the checker made of it.
+	case *golang.FuncType:
+		return n.Type
+	case *golang.StructType:
+		return n.Type
+	case *golang.InterfaceType:
+		return n.Type
+	case *golang.Union:
+		return n.Type
+	case *golang.TypeList:
+		return n.Type
+	case *golang.Variadic:
+		return n.Type
+	case *golang.IndexList:
+		return n.Type
+	// The four below also read their parts, which is all a spelling no checker
+	// saw — one a recipe built — has to go on. A pointer's parts give the type
+	// it points to; the type mapper draws no distinction between `T` and `*T`.
+	case *golang.PointerType:
+		if n.Type != nil {
+			return n.Type
+		}
+		return TypeOfExpression(n.Elem)
+	case *golang.MapType:
+		if n.Type != nil {
+			return n.Type
+		}
+		return &java.JavaTypeParameterized{
+			Type:           &java.JavaTypeClass{FullyQualifiedName: "map", Kind: "Class"},
+			TypeParameters: []java.JavaType{TypeOfExpression(n.Key.Element), TypeOfExpression(n.Value)},
+		}
+	case *golang.Channel:
+		if n.Type != nil {
+			return n.Type
+		}
+		return &java.JavaTypeParameterized{
+			Type:           &java.JavaTypeClass{FullyQualifiedName: channelName(n.Dir), Kind: "Class"},
+			TypeParameters: []java.JavaType{TypeOfExpression(n.Value)},
+		}
+	case *golang.ArrayType:
+		if n.Type != nil {
+			return n.Type
+		}
+		return &java.JavaTypeArray{ElemType: TypeOfExpression(n.ElementType)}
+	case *golang.Unary:
+		return n.Type
+	case *java.Assignment:
+		return n.Type
+	case *java.AssignmentOperation:
+		return n.Type
+	case *golang.AssignmentOperation:
 		return n.Type
 	}
 	return nil
 }
 
+func channelName(dir golang.ChanDir) string {
+	switch dir {
+	case golang.ChanSendOnly:
+		return "chan<-"
+	case golang.ChanRecvOnly:
+		return "<-chan"
+	}
+	return "chan"
+}
+
 // DeclaringTypeFQN extracts the declaring type's FQN from a MethodInvocation.
 // For `fmt.Println(...)`, this returns "fmt" (the package path).
 // For `t.Sub(...)`, this returns the type of the receiver.
-func DeclaringTypeFQN(mi *tree.MethodInvocation) string {
-	if mi.MethodType != nil && mi.MethodType.DeclaringType != nil {
-		return mi.MethodType.DeclaringType.FullyQualifiedName
+//
+// Every name comes from the type system, so an unresolved receiver yields "":
+// a local variable named `os` cannot read back as the `os` package.
+func DeclaringTypeFQN(mi *java.MethodInvocation) string {
+	if IsResolved(mi) {
+		return mi.MethodType.DeclaringType.GetFullyQualifiedName()
 	}
-	// Fallback: infer from Select expression
 	if mi.Select != nil {
-		if ident, ok := mi.Select.Element.(*tree.Identifier); ok {
-			// Package-qualified call: fmt.Println -> "fmt"
-			return ident.Name
-		}
-		// Method call on a typed receiver: try to get the type
-		t := TypeOfExpression(mi.Select.Element)
-		return GetFullyQualifiedName(t)
+		return GetFullyQualifiedName(TypeOfExpression(mi.Select.Element))
 	}
 	return ""
+}
+
+// IsResolved reports whether the type checker resolved the call to a method of
+// a known type. A false here and a non-empty DeclaringTypeFQN can coexist: an
+// import whose symbols failed to load still names its package.
+func IsResolved(mi *java.MethodInvocation) bool {
+	return mi.MethodType != nil && mi.MethodType.DeclaringType != nil &&
+		!java.IsUnknown(mi.MethodType.DeclaringType)
 }

@@ -638,6 +638,45 @@ def test_idempotent_string_concatenation():
     )
 
 
+def test_idempotent_implicit_concatenation_of_many_literals():
+    rewrite_run(
+        # language=python
+        python(
+            """\
+            f(
+                "a"
+                    "b"
+                    "c"
+                    "d"
+                    "e"
+                    "f"
+            )
+            """
+        ),
+        spec=RecipeSpec()
+        .with_recipe(AutoFormat())
+    )
+
+    rewrite_run(
+        # language=python
+        python(
+            """\
+            f(
+                "a"
+                    f"b{g(
+                        1)}"
+                    f"c{g(
+                        2)}"
+                    f"d{g(
+                        3)}"
+            )
+            """
+        ),
+        spec=RecipeSpec()
+        .with_recipe(AutoFormat())
+    )
+
+
 def test_idempotent_empty_containers():
     rewrite_run(
         # language=python

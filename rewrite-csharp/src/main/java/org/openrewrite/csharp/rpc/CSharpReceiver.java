@@ -19,7 +19,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.csharp.CSharpVisitor;
 import org.openrewrite.csharp.tree.Cs;
-import org.openrewrite.csharp.tree.CsDocCommentRawComment;
+import org.openrewrite.csharp.tree.CsDocComment;
 import org.openrewrite.csharp.tree.Linq;
 import org.openrewrite.java.internal.rpc.JavaReceiver;
 import org.openrewrite.java.tree.*;
@@ -28,7 +28,6 @@ import org.openrewrite.rpc.RpcReceiveQueue;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -52,6 +51,15 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
 
     @Override
     public J preVisit(J j, RpcReceiveQueue q) {
+        if (j instanceof Cs.ExpressionStatement) {
+            // its prefix and markers are its expression's, and arrive again with the expression
+            Cs.ExpressionStatement statement = (Cs.ExpressionStatement) j;
+            boolean received = statement.getPadding().getExpression() != null;
+            statement = statement.withId(q.receiveAndGet(statement.getId(), UUID::fromString));
+            q.receive(received ? statement.getPrefix() : null, space -> visitSpace(space, q));
+            q.receive(received ? statement.getMarkers() : null);
+            return statement;
+        }
         return ((J) j.withId(q.receiveAndGet(j.getId(), UUID::fromString)))
                 .withPrefix(q.receive(j.getPrefix(), space -> visitSpace(space, q)))
                 .withMarkers(q.receive(j.getMarkers()));
@@ -145,6 +153,7 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
     @Override
     public J visitPragmaChecksumDirective(Cs.PragmaChecksumDirective pragmaChecksumDirective, RpcReceiveQueue q) {
         return pragmaChecksumDirective
+                .withKeywordSpacing(q.receive(pragmaChecksumDirective.getKeywordSpacing(), space -> visitSpace(space, q)))
                 .withArguments(q.receiveAndGet(pragmaChecksumDirective.getArguments(), (String s) -> s));
     }
 
@@ -265,7 +274,9 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
     public J visitInterpolation(Cs.Interpolation interpolation, RpcReceiveQueue q) {
         return interpolation
                 .getPadding().withExpression(q.receive(interpolation.getPadding().getExpression(), el -> visitRightPadded(el, q)))
+                .withAlignmentBefore(q.receive(interpolation.getAlignmentBefore(), space -> visitSpace(space, q)))
                 .getPadding().withAlignment(q.receive(interpolation.getPadding().getAlignment(), el -> visitRightPadded(el, q)))
+                .withFormatBefore(q.receive(interpolation.getFormatBefore(), space -> visitSpace(space, q)))
                 .getPadding().withFormat(q.receive(interpolation.getPadding().getFormat(), el -> visitRightPadded(el, q)));
     }
 
@@ -286,6 +297,7 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
         return usingDirective
                 .getPadding().withGlobal(q.receive(usingDirective.getPadding().getGlobal(), el -> visitRightPadded(el, q)))
                 .getPadding().withStatic(q.receive(usingDirective.getPadding().getStatic(), el -> visitLeftPadded(el, q)))
+                .getPadding().withUnsafe(q.receive(usingDirective.getPadding().getUnsafe(), el -> visitLeftPadded(el, q)))
                 .getPadding().withAlias(q.receive(usingDirective.getPadding().getAlias(), el -> visitRightPadded(el, q)))
                 .withNamespaceOrType(q.receive(usingDirective.getNamespaceOrType(), el -> (TypeTree) visitNonNull(el, q)));
     }
@@ -306,9 +318,8 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
                 .withAccessors(q.receive(propertyDeclaration.getAccessors(), el -> (J.Block) visitNonNull(el, q)));
         propertyDeclaration = propertyDeclaration
                 .getPadding().withExpressionBody(q.receive(propertyDeclaration.getPadding().getExpressionBody(), el -> visitLeftPadded(el, q)));
-        propertyDeclaration = propertyDeclaration
+        return propertyDeclaration
                 .getPadding().withInitializer(q.receive(propertyDeclaration.getPadding().getInitializer(), el -> visitLeftPadded(el, q)));
-        return propertyDeclaration;
     }
 
     @Override
@@ -323,7 +334,7 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
     @Override
     public J visitUsingStatement(Cs.UsingStatement usingStatement, RpcReceiveQueue q) {
         return usingStatement
-                .getPadding().withExpression(q.receive(usingStatement.getPadding().getExpression(), el -> visitLeftPadded(el, q)))
+                .withExpression(q.receive(usingStatement.getExpression(), el -> (J.ControlParentheses<Expression>) visitNonNull(el, q)))
                 .withStatement(q.receive(usingStatement.getStatement(), el -> (Statement) visitNonNull(el, q)));
     }
 
@@ -442,8 +453,15 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
     @Override
     public J visitSizeOf(Cs.SizeOf sizeOf, RpcReceiveQueue q) {
         return sizeOf
-                .withExpression(q.receive(sizeOf.getExpression(), el -> (Expression) visitNonNull(el, q)))
+                .withClazz(q.receive(sizeOf.getClazz(), el -> (J.ControlParentheses<TypeTree>) visitNonNull(el, q)))
                 .withType(q.receive(sizeOf.getType(), t -> visitType(t, q)));
+    }
+
+    @Override
+    public J visitTypeOf(Cs.TypeOf typeOf, RpcReceiveQueue q) {
+        return typeOf
+                .withClazz(q.receive(typeOf.getClazz(), el -> (J.ControlParentheses<TypeTree>) visitNonNull(el, q)))
+                .withType(q.receive(typeOf.getType(), t -> visitType(t, q)));
     }
 
     @Override
@@ -656,7 +674,8 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
                 .getPadding().withReturnType(q.receive(conversionOperatorDeclaration.getPadding().getReturnType(), el -> visitLeftPadded(el, q)))
                 .getPadding().withParameters(q.receive(conversionOperatorDeclaration.getPadding().getParameters(), el -> visitContainer(el, q)))
                 .getPadding().withExpressionBody(q.receive(conversionOperatorDeclaration.getPadding().getExpressionBody(), el -> visitLeftPadded(el, q)))
-                .withBody(q.receive(conversionOperatorDeclaration.getBody(), el -> (J.Block) visitNonNull(el, q)));
+                .withBody(q.receive(conversionOperatorDeclaration.getBody(), el -> (J.Block) visitNonNull(el, q)))
+                .withMethodType(q.receive(conversionOperatorDeclaration.getMethodType(), type -> (JavaType.Method) visitType(type, q)));
     }
 
     // Cs.TypeParameter receiver DELETED — replaced by visitConstrainedTypeParameter
@@ -730,6 +749,8 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
     public J visitPragmaWarningDirective(Cs.PragmaWarningDirective pragmaWarningDirective, RpcReceiveQueue q) {
         return pragmaWarningDirective
                 .withAction(q.receiveAndGet(pragmaWarningDirective.getAction(), toEnum(Cs.PragmaWarningDirective.PragmaWarningAction.class)))
+                .withKeywordSpacing(q.receive(pragmaWarningDirective.getKeywordSpacing(), space -> visitSpace(space, q)))
+                .withActionSpacing(q.receive(pragmaWarningDirective.getActionSpacing(), space -> visitSpace(space, q)))
                 .getPadding().withWarningCodes(q.receiveList(pragmaWarningDirective.getPadding().getWarningCodes(), el -> visitRightPadded(el, q)));
     }
 
@@ -739,7 +760,8 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
                 .withSetting(q.receiveAndGet(nullableDirective.getSetting(), toEnum(Cs.NullableDirective.NullableSetting.class)))
                 .withTarget(q.receiveAndGet(nullableDirective.getTarget(), toEnum(Cs.NullableDirective.NullableTarget.class)))
                 .withHashSpacing(q.receive(nullableDirective.getHashSpacing()))
-                .withTrailingComment(q.receive(nullableDirective.getTrailingComment()));
+                .withTrailingComment(q.receive(nullableDirective.getTrailingComment()))
+                .withKeywordSpacing(q.receive(nullableDirective.getKeywordSpacing()));
     }
 
     @Override
@@ -884,14 +906,8 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
         public Space visitSpace(Space space, RpcReceiveQueue q) {
             return space
                     .withComments(q.receiveList(space.getComments(), c -> {
-                        if (c instanceof CsDocCommentRawComment) {
-                            CsDocCommentRawComment dc = (CsDocCommentRawComment) c;
-                            q.receive(dc.isMultiline()); // consume; always true
-                            return new CsDocCommentRawComment(
-                                    q.receive(dc.getText()),
-                                    q.receive(dc.getSuffix()),
-                                    q.receive(dc.getMarkers())
-                            );
+                        if (c instanceof CsDocComment.DocComment) {
+                            return (Comment) new CsDocCommentReceiver(delegate).visit((CsDocComment.DocComment) c, q);
                         }
                         if (c instanceof TextComment) {
                             TextComment tc = (TextComment) c;

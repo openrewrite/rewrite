@@ -33,7 +33,6 @@ import lombok.experimental.FieldDefaults;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.config.*;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NullUtils;
@@ -52,10 +51,10 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.Duration;
 import java.util.*;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptySet;
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.internal.RecipeIntrospectionUtils.dataTableDescriptorFromDataTable;
 
 /**
@@ -146,7 +145,7 @@ public abstract class Recipe implements Cloneable {
             }
 
             List<OptionDescriptor> options = new ArrayList<>(getOptionDescriptors());
-            options.removeIf(opt -> !opt.isRequired());
+            options.removeIf(opt -> !opt.isRequired() || opt.isSecret());
             if (options.isEmpty()) {
                 return getDisplayName();
             }
@@ -248,7 +247,7 @@ public abstract class Recipe implements Cloneable {
         }
 
         return new RecipeDescriptor(getName(), getDisplayName(), getInstanceName(), getDescription(), getTags(),
-                getEstimatedEffortPerOccurrence(), options, preconditionDescriptors, recipeDescriptors, getDataTableDescriptors(),
+                getEstimatedEffortPerOccurrence(), options, preconditionDescriptors, recipeDescriptors, aggregateDataTableDescriptors(recipeDescriptors),
                 getMaintainers(), getContributors(), getExamples(), recipeSource);
     }
 
@@ -277,7 +276,8 @@ public abstract class Recipe implements Cloneable {
                         option.example().isEmpty() ? null : option.example(),
                         validValues(option, field.getType()),
                         option.required(),
-                        value));
+                        value,
+                        option.secret()));
             }
         }
         // Option annotations can be placed on fields, bean-style getters, or on the primary constructor
@@ -292,7 +292,8 @@ public abstract class Recipe implements Cloneable {
                             option.example().isEmpty() ? null : option.example(),
                             validValues(option, method.getReturnType()),
                             option.required(),
-                            null));
+                            null,
+                            option.secret()));
                 }
             }
         }
@@ -308,7 +309,8 @@ public abstract class Recipe implements Cloneable {
                             option.example().isEmpty() ? null : option.example(),
                             validValues(option, parameter.getType()),
                             option.required(),
-                            null));
+                            null,
+                            option.secret()));
                 }
             }
         } catch (RecipeIntrospectionException ignored) {
@@ -326,7 +328,7 @@ public abstract class Recipe implements Cloneable {
         if (type.isEnum()) {
             return Arrays.stream(type.getEnumConstants())
                     .map(e -> ((Enum<?>) e).name())
-                    .collect(Collectors.toList());
+                    .collect(toList());
         }
         return null;
     }
@@ -338,8 +340,57 @@ public abstract class Recipe implements Cloneable {
             dataTableDescriptorFromDataTable(new RecipeRunStats(Recipe.noop()))
     );
 
+    private static final Set<String> GLOBAL_DATA_TABLE_NAMES;
+
+    static {
+        Set<String> names = new HashSet<>();
+        for (DataTableDescriptor dt : GLOBAL_DATA_TABLES) {
+            names.add(dt.getName());
+        }
+        GLOBAL_DATA_TABLE_NAMES = names;
+    }
+
+    /**
+     * The descriptors of every data table reachable from this recipe: this recipe's own data
+     * tables, those of its sub-recipes (recursively), and the data tables that the framework
+     * contributes to every recipe run. The result is derived from the (cached)
+     * {@link #getDescriptor()}, so repeated calls on the same instance do not re-walk the recipe
+     * tree.
+     *
+     * @return The descriptors of every data table reachable from this recipe.
+     */
     public List<DataTableDescriptor> getDataTableDescriptors() {
-        return ListUtils.concatAll(dataTables == null ? emptyList() : dataTables, GLOBAL_DATA_TABLES);
+        return getDescriptor().getDataTables();
+    }
+
+    /**
+     * Unions this recipe's own data tables with those of its already-described sub-recipes and the
+     * data tables that the framework contributes to every run, de-duplicating by name. Sub-recipe
+     * data tables are read from the {@link RecipeDescriptor}s that {@link #createRecipeDescriptor()}
+     * has already built for this recipe's children, so the recipe tree is walked exactly once per
+     * descriptor rather than once per level of nesting.
+     *
+     * @param subRecipeDescriptors The descriptors of this recipe's direct sub-recipes.
+     * @return The unioned, de-duplicated data table descriptors for this recipe.
+     */
+    protected List<DataTableDescriptor> aggregateDataTableDescriptors(List<RecipeDescriptor> subRecipeDescriptors) {
+        Map<String, DataTableDescriptor> byName = new LinkedHashMap<>();
+        if (dataTables != null) {
+            for (DataTableDescriptor dt : dataTables) {
+                byName.putIfAbsent(dt.getName(), dt);
+            }
+        }
+        for (RecipeDescriptor sub : subRecipeDescriptors) {
+            for (DataTableDescriptor dt : sub.getDataTables()) {
+                if (!GLOBAL_DATA_TABLE_NAMES.contains(dt.getName())) {
+                    byName.putIfAbsent(dt.getName(), dt);
+                }
+            }
+        }
+        for (DataTableDescriptor dt : GLOBAL_DATA_TABLES) {
+            byName.putIfAbsent(dt.getName(), dt);
+        }
+        return new ArrayList<>(byName.values());
     }
 
     /**
@@ -376,7 +427,8 @@ public abstract class Recipe implements Cloneable {
      * a further cycle is needed to update method invocations of that declaration that were visited prior to the declaration change. But other
      * visitors never need to cause another cycle, such as those that format whitespace or add search markers. Note that even when this is false,
      * the recipe will still run on another cycle if any other recipe causes another cycle to run. But if every recipe reports no need to run
-     * another cycle (or if there are no changes made in a cycle), then another will not run.
+     * another cycle (or if there are no changes made in a cycle), then another will not run. A change made by any
+     * recipe nested in this recipe's recipe list counts as a change made by this recipe.
      */
     public boolean causesAnotherCycle() {
         return false;
@@ -570,12 +622,12 @@ public abstract class Recipe implements Cloneable {
                 m.putAll(options);
                 for (OptionDescriptor optionDescriptor : clone.getDescriptor().getOptions()) {
                     Object value = options.get(optionDescriptor.getName());
-                    if (value instanceof String) {
+                    if (value != null) {
                         Map<String, Object> option = new HashMap<>();
                         option.put("value", value);
                         objectMapper.updateValue(optionDescriptor, option);
 
-                        if (optionDescriptor.getType().equals("List")) {
+                        if (value instanceof String && optionDescriptor.getType().equals("List")) {
                             m.put(optionDescriptor.getName(), Arrays.asList(((String) value).split(",")));
                         }
                     }

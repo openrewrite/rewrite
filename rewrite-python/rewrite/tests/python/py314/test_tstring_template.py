@@ -3,6 +3,7 @@
 import pytest
 
 from rewrite.python.template import template, pattern, capture, raw
+from rewrite.python.template.placeholder import substitute_placeholders
 
 
 # -- template() with t-strings --
@@ -17,14 +18,14 @@ class TestTemplateTstring:
     def test_single_capture(self):
         expr = capture('expr')
         tmpl = template(t"print({expr})")
-        assert tmpl.code == "print({expr})"
+        assert tmpl.code == "print(__plh_expr__)"
         assert tmpl.captures == {'expr': expr}
 
     def test_multiple_captures(self):
         a = capture('a')
         b = capture('b')
         tmpl = template(t"{a} + {b}")
-        assert tmpl.code == "{a} + {b}"
+        assert tmpl.code == "__plh_a__ + __plh_b__"
         assert tmpl.captures == {'a': a, 'b': b}
 
     def test_raw_code_spliced(self):
@@ -37,7 +38,7 @@ class TestTemplateTstring:
         method = raw("info")
         expr = capture('expr')
         tmpl = template(t"logger.{method}({expr})")
-        assert tmpl.code == "logger.info({expr})"
+        assert tmpl.code == "logger.info(__plh_expr__)"
         assert tmpl.captures == {'expr': expr}
 
     def test_non_capture_interpolation_raises(self):
@@ -53,13 +54,14 @@ class TestTemplateTstring:
         expr = capture('expr')
         t1 = template(t"print({expr})")
         t2 = template("print({expr})", expr=expr)
-        assert t1.code == t2.code
+        # t-strings pre-normalize captures to placeholders; the string form defers to the engine
+        assert t1.code == substitute_placeholders(t2.code, t2.captures)[0]
         assert t1.captures == t2.captures
 
     def test_with_imports(self):
         expr = capture('expr')
         tmpl = template(t"datetime.now() + {expr}", imports=["from datetime import datetime"])
-        assert tmpl.code == "datetime.now() + {expr}"
+        assert tmpl.code == "datetime.now() + __plh_expr__"
         assert tmpl.captures == {'expr': expr}
 
 
@@ -75,14 +77,14 @@ class TestPatternTstring:
     def test_single_capture(self):
         expr = capture('expr')
         pat = pattern(t"print({expr})")
-        assert pat.code == "print({expr})"
+        assert pat.code == "print(__plh_expr__)"
         assert pat.captures == {'expr': expr}
 
     def test_multiple_captures(self):
         a = capture('a')
         b = capture('b')
         pat = pattern(t"{a} + {b}")
-        assert pat.code == "{a} + {b}"
+        assert pat.code == "__plh_a__ + __plh_b__"
         assert pat.captures == {'a': a, 'b': b}
 
     def test_raw_code_spliced(self):
@@ -95,7 +97,7 @@ class TestPatternTstring:
         method = raw("info")
         expr = capture('expr')
         pat = pattern(t"logger.{method}({expr})")
-        assert pat.code == "logger.info({expr})"
+        assert pat.code == "logger.info(__plh_expr__)"
         assert pat.captures == {'expr': expr}
 
     def test_non_capture_interpolation_raises(self):
@@ -111,5 +113,6 @@ class TestPatternTstring:
         expr = capture('expr')
         p1 = pattern(t"print({expr})")
         p2 = pattern("print({expr})", expr=expr)
-        assert p1.code == p2.code
+        # t-strings pre-normalize captures to placeholders; the string form defers to the engine
+        assert p1.code == substitute_placeholders(p2.code, p2.captures)[0]
         assert p1.captures == p2.captures

@@ -33,6 +33,8 @@ public class EncodingDetectingInputStream extends InputStream {
     @Nullable
     private Charset charset;
 
+    private final boolean charsetProvided;
+
     private boolean bomChecked;
     private boolean charsetBomMarked;
 
@@ -49,6 +51,7 @@ public class EncodingDetectingInputStream extends InputStream {
     public EncodingDetectingInputStream(InputStream inputStream, @Nullable Charset charset) {
         this.inputStream = inputStream;
         this.charset = charset;
+        this.charsetProvided = charset != null;
     }
 
     public Charset getCharset() {
@@ -79,13 +82,7 @@ public class EncodingDetectingInputStream extends InputStream {
 
         // if we haven't yet determined a charset...
         if (read == -1) {
-            if (charset == null) {
-                if (remainingContinuationBytes > 0) {
-                    charset = WINDOWS_1252;
-                } else {
-                    charset = StandardCharsets.UTF_8;
-                }
-            }
+            endOfInput();
         } else if (charset == null) {
             guessCharset(read);
         }
@@ -95,8 +92,7 @@ public class EncodingDetectingInputStream extends InputStream {
     @Override
     public int read(byte[] b, int off, int len) throws IOException {
         if (charset == null) {
-            // we need to read the bytes one-by-one to determine the encoding
-            return super.read(b, off, len);
+            return readGuessingCharset(b, off, len);
         } else if (charset == StandardCharsets.UTF_8 && !bomChecked) {
             int read = checkAndSkipUtf8Bom();
             if (read == -1) {
@@ -108,6 +104,47 @@ public class EncodingDetectingInputStream extends InputStream {
             return read == -1 ? charsetBomMarked ? -1 : 1 : (charsetBomMarked ? 0 : 1) + read;
         } else {
             return inputStream.read(b, off, len);
+        }
+    }
+
+    /**
+     * Like {@link InputStream#read(byte[], int, int)}, fills {@code b} until it is full or the input ends,
+     * but reads the delegate a chunk at a time instead of a byte at a time.
+     */
+    private int readGuessingCharset(byte[] b, int off, int len) throws IOException {
+        if (off < 0 || len < 0 || len > b.length - off) {
+            throw new IndexOutOfBoundsException();
+        } else if (len == 0) {
+            return 0;
+        }
+
+        int n = 0;
+        if (!bomChecked) {
+            // the first byte comes from read(), which skips a byte order mark
+            int read = read();
+            if (read == -1) {
+                return -1;
+            }
+            b[off] = (byte) read;
+            n = 1;
+        }
+        while (n < len) {
+            int read = inputStream.read(b, off + n, len - n);
+            if (read == -1) {
+                endOfInput();
+                return n == 0 ? -1 : n;
+            }
+            for (int i = off + n; charset == null && i < off + n + read; i++) {
+                guessCharset(b[i] & 0xFF);
+            }
+            n += read;
+        }
+        return n;
+    }
+
+    private void endOfInput() {
+        if (charset == null) {
+            charset = remainingContinuationBytes > 0 ? WINDOWS_1252 : StandardCharsets.UTF_8;
         }
     }
 
@@ -148,7 +185,28 @@ public class EncodingDetectingInputStream extends InputStream {
                 bos.write(buffer, 0, n);
             }
 
-            return bos.toString();
+            Charset detectedCharset = getCharset();
+            String result = bos.toString();
+
+            // If the detected charset can't re-encode the content, the detection
+            // was likely wrong — fall back to UTF-8. This catches cases where
+            // UTF-8 files with CJK content are misdetected as Windows-1252,
+            // since Windows-1252 has undefined byte positions that decode to
+            // U+FFFD (which can't be re-encoded as Windows-1252).
+            //
+            // Only guessed charsets are second-guessed; an explicitly supplied
+            // charset is respected. U+FFFD is the only char a REPLACE-decode can
+            // produce that the charset can't re-encode, so this cheap scan gates
+            // the expensive encoder check and skips it for genuine content.
+            if (!charsetProvided &&
+                    detectedCharset != StandardCharsets.UTF_8 &&
+                    result.indexOf('\uFFFD') >= 0 &&
+                    !detectedCharset.newEncoder().canEncode(result)) {
+                charset = StandardCharsets.UTF_8;
+                return new String(bos.toByteArray(), StandardCharsets.UTF_8);
+            }
+
+            return result;
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

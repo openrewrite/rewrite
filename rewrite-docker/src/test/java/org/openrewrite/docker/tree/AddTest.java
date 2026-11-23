@@ -224,4 +224,28 @@ class AddTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void urlWithEqualsInQueryString() {
+        rewriteRun(
+          docker(
+            """
+              FROM x
+              ADD https://a.org/r?filepath=org/j/p-1.jar /opt/p-1.jar
+              """
+          )
+        );
+    }
+
+    @Test
+    void multipleSourcesWithEquals() {
+        rewriteRun(
+          docker(
+            """
+              FROM x
+              ADD https://a.org/r?x=y&z=w https://b.org/q?k=v /opt/
+              """
+          )
+        );
+    }
 }

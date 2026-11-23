@@ -22,14 +22,12 @@ import org.openrewrite.Cursor;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.ToBeRemoved;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.WrappingAndBracesStyle;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.style.NamedStyles;
-import org.openrewrite.style.Style;
 import org.openrewrite.style.StyleHelper;
 
 import java.util.List;
@@ -44,7 +42,7 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
     private final WrappingAndBracesStyle wrappingAndBracesStyle;
 
     public MergeSpacesVisitor(List<NamedStyles> styles) {
-        this.wrappingAndBracesStyle = getStyle(WrappingAndBracesStyle.class, styles, IntelliJ::wrappingAndBraces);
+        this.wrappingAndBracesStyle = StyleHelper.getStyle(WrappingAndBracesStyle.class, styles, (Supplier<WrappingAndBracesStyle>) IntelliJ::wrappingAndBraces);
     }
 
     @Override
@@ -1142,10 +1140,11 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
 
     @Override
     public <T extends J> J visitParentheses(J.Parentheses<T> parens, @Nullable Object ctx) {
-        J.Parentheses<T> newParens = (J.Parentheses<T>) ctx;
-        if (parens == newParens) {
+        if (parens == ctx || !(ctx instanceof J.Parentheses)) {
             return parens;
         }
+        //noinspection unchecked
+        J.Parentheses<T> newParens = (J.Parentheses<T>) ctx;
         J.Parentheses<T> pa = parens;
         pa = pa.withPrefix(visitSpace(pa.getPrefix(), Space.Location.PARENTHESES_PREFIX, newParens.getPrefix()));
         pa = pa.withMarkers(visitMarkers(pa.getMarkers(), newParens.getMarkers()));
@@ -1608,15 +1607,6 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         J.Erroneous u = erroneous;
         u = u.withPrefix(visitSpace(u.getPrefix(), Space.Location.ERRONEOUS, newErroneous.getPrefix()));
         return u.withMarkers(visitMarkers(u.getMarkers(), newErroneous.getMarkers()));
-    }
-
-    @ToBeRemoved(after = "2026-03-01", reason = "Replace me with org.openrewrite.style.StyleHelper.getStyle now available in parent runtime")
-    private static <S extends Style> S getStyle(Class<S> styleClass, List<NamedStyles> styles, Supplier<S> defaultStyle) {
-        S style = NamedStyles.merge(styleClass, styles);
-        if (style != null) {
-            return StyleHelper.merge(defaultStyle.get(), style);
-        }
-        return defaultStyle.get();
     }
 
     private boolean evaluate(Supplier<Boolean> supplier, boolean defaultValue) {

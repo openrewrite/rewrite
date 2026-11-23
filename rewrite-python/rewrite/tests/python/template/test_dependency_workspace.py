@@ -185,3 +185,23 @@ class TestDependencyWorkspaceIntegration:
         ws1 = DependencyWorkspace.get_or_create_from_pyproject(content)
         ws2 = DependencyWorkspace.get_or_create_from_pyproject(content)
         assert ws1 == ws2
+
+    def test_get_or_create_recovers_from_invalid_leftover(self):
+        """If final_dir exists but is invalid (e.g. crashed mid-build), rebuild."""
+        deps = (("six", "1.17.0"),)
+        cache_key = DependencyWorkspace._hash_dependencies(deps)
+        final_dir = os.path.join(WORKSPACE_BASE, cache_key)
+
+        DependencyWorkspace.clear_cache()
+        if os.path.isdir(final_dir):
+            shutil.rmtree(final_dir)
+
+        os.makedirs(final_dir)
+        with open(os.path.join(final_dir, "stale.txt"), "w") as f:
+            f.write("leftover from a previous crash\n")
+        assert not DependencyWorkspace._is_valid(final_dir)
+
+        workspace = DependencyWorkspace.get_or_create(deps)
+
+        assert workspace == final_dir
+        assert DependencyWorkspace._is_valid(workspace)

@@ -19,10 +19,10 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Space;
-import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.kotlin.KotlinParser;
 import org.openrewrite.kotlin.KotlinVisitor;
 import org.openrewrite.kotlin.marker.IsNullSafe;
@@ -58,7 +58,8 @@ public class EqualsMethodUsage extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new KotlinVisitor<ExecutionContext>() {
+        // `equals` can be a non-override overload on any type, so match it on any receiver.
+        return Preconditions.check(new UsesMethod<>("*..* equals(..)"), new KotlinVisitor<ExecutionContext>() {
             @Override
             public J visitUnary(J.Unary unary, ExecutionContext ctx) {
                 unary = (J.Unary) super.visitUnary(unary, ctx);
@@ -66,7 +67,9 @@ public class EqualsMethodUsage extends Recipe {
                     getCursor().pollMessage("replaced") != null) {
                     J.Binary binary = (J.Binary) unary.getExpression();
                     if (binary.getOperator() == J.Binary.Type.Equal) {
-                        return binary.withOperator(J.Binary.Type.NotEqual);
+                        binary = binary.withOperator(J.Binary.Type.NotEqual).withPrefix(unary.getPrefix());
+                        return getCursor().getParentTreeCursor().getValue() instanceof J.Block ?
+                                new K.ExpressionStatement(randomId(), binary) : binary;
                     }
                 }
                 return unary;
@@ -106,7 +109,7 @@ public class EqualsMethodUsage extends Recipe {
                 }
                 return method;
             }
-        };
+        });
     }
 
     @SuppressWarnings("all")

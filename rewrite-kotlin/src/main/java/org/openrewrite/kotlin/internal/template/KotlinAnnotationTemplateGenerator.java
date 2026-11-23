@@ -17,7 +17,9 @@ package org.openrewrite.kotlin.internal.template;
 
 import org.openrewrite.Cursor;
 import org.openrewrite.java.internal.template.AnnotationTemplateGenerator;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.java.tree.Space;
 
 import java.util.Set;
 
@@ -37,6 +39,25 @@ public class KotlinAnnotationTemplateGenerator extends AnnotationTemplateGenerat
     @Override
     protected void addDummyAnnotationType(StringBuilder after) {
         after.append("\nannotation class `$Placeholder` {}");
+    }
+
+    @Override
+    protected void addDummyMethod(StringBuilder after) {
+        after.insert(0, " fun `$method`() {};");
+    }
+
+    @Override
+    protected void addDummyVariable(StringBuilder after) {
+        after.insert(0, " val `$variable`: Int = 0;");
+    }
+
+    @Override
+    protected String variable(J.VariableDeclarations variable, Cursor cursor) {
+        if (variable.getTypeExpression() == null) {
+            return variable.getVariables().get(0).getSimpleName();
+        }
+        return "val " + variable.getVariables().get(0).getSimpleName() + ": " +
+               variable.getTypeExpression().withPrefix(Space.EMPTY).printTrimmed(cursor);
     }
 
 }

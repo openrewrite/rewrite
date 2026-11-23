@@ -15,7 +15,7 @@ From `rewrite-python/rewrite/`:
 uv pip install -e ".[dev]"
 ```
 
-Requires Python 3.10+ (`pyproject.toml` specifies `>=3.10`).
+Requires Python 3.12+ (`pyproject.toml` specifies `>=3.12`).
 
 ## Running Tests
 
@@ -30,6 +30,10 @@ pytest tests/python/all/tree/import_test.py -v --timeout=60
 # From repo root: ./gradlew :rewrite-python:generateTestClasspath
 pytest tests/rpc/ --timeout=120
 ```
+
+`REWRITE_PYTHON_DUMP_TYPES=1 pytest ... -s` prints each parsed file's type
+attribution, which is what a `MethodMatcher` pattern written for that test has
+to match. `missing`, `all` and `supertypes` are the other accepted values.
 
 **RPC tests can hang indefinitely** if communication fails (deadlock, malformed response, printer bugs). Always use explicit `--timeout`.
 
@@ -53,6 +57,7 @@ rewrite-python/rewrite/
 │   │   ├── _py2_parser_visitor.py        # Python 2 parser visitor
 │   │   ├── add_import.py                 # Import addition logic
 │   │   ├── remove_import.py              # Import removal logic
+│   │   ├── type_report.py                # Type attribution listing (rewrite-python-types)
 │   │   ├── recipes/                      # Built-in recipes
 │   │   ├── format/                       # Formatting visitors (auto_format, blank_lines, etc.)
 │   │   └── template/                     # Template engine (coordinates, patterns, etc.)
@@ -79,9 +84,11 @@ rewrite-python/rewrite/
 
 ## Development Patterns
 
-### Frozen Dataclasses with Padding
+### Read-only Dataclasses with Padding
 
-All LST nodes are immutable frozen dataclasses. Private fields (prefixed `_`) store padded versions; public `@property` accessors return unwrapped values.
+LST nodes are read-only to a type checker and plain dataclasses to the interpreter: `@lst_dataclass` is a `dataclass_transform` carrying `frozen_default=True`. Nothing raises on assignment, and `Space.build`/`Markers.build` return shared instances, so one in-place write can rewrite every node holding that instance.
+
+Private fields (prefixed `_`) store padded versions; public `@property` accessors return unwrapped values.
 
 ```python
 # Updating a node
@@ -109,7 +116,32 @@ When inserting after existing imports, the new import needs `prefix=Space([], '\
 ### Import Detection
 
 - `from datetime import datetime` → `MultiImport` with `from_=Identifier("datetime")`, names contain `Import` with qualid `"datetime"`
-- `import datetime` → `MultiImport` with `from_=None`, names contain `Import` with qualid `"datetime"`
+- `import datetime`, `import datetime as dt` and `import os.path` → a bare `Import` statement, with no `MultiImport` around it
+- `import os, sys` → `MultiImport` with `from_=None`, names contain one `Import` per module
+
+A visitor that only overrides `visit_multi_import` misses every single-module `import`.
+
+### Moving a binding: `maybe_bind` and `maybe_rebind`
+
+`binding.py` ports the JavaScript `maybeBind`/`maybeRebind`. `ChangeImport` is a thin wrapper over `maybe_rebind`.
+
+Every import of what moves is rewritten where it stands. A statement of the module is replaced through `maybe_add_import`. One in a block, such as a function or class body, a `try` or any `if` branch, is replaced in that block. A reference is renamed where it resolves to a scope holding a moved import. The JavaScript port has no counterpart. It rebinds only a top-level import or `require`.
+
+Which name a moved binding takes:
+
+- A pinned `alias` is used verbatim. If the file spells it elsewhere, nothing moves.
+- An aliased import keeps its alias.
+- An unaliased `from` import follows the new member's name. If the file spells that name for anything other than a module-scope import of that very member, it keeps its old name as an alias. A parameter or nested import of the name counts, since it would capture a renamed reference. So does an import or rebind queued earlier in the visit. In a function holding the moved import, any spelling of the name counts, since an import there makes the name local to the whole function.
+- A rename keeps the old name as an alias where it would strand a reference. That is where another import binds the old name in a scope holding a moved import, as a `try`/`except ImportError` fallback does. It is also where a class body holds the moved import, which code outside the class reads as `C.name`.
+- An unaliased `import m` follows the new module where nothing reads `m`, or where both names are single segments and the new one is free. Otherwise it keeps `m` as an alias. A dotted `import a.b` that is read refuses, since `a.b.x` has no counterpart.
+
+One call moves one binding, and a repeated call answers as the first did. A second import binding the member under another name stays, and so do its types. A member read through its module, as `m.member`, moves with it. So does one read through `import a.m`, `from a import m` or `import a`, as `a.m.member` or `m.member`. The old import stays while anything still reads through it. A module-level import of the old module has the new one spelled through `maybe_bind`. An import in an `if` block gets the new module bound in that block. A function's import of the old module gets the new one bound beside it, and goes unless the function reads it some other way. A function's reads move only where the function spells the new module's name nowhere else, since importing it there makes that name local too. No read goes through a name bound in a `try` or in an `if` with an `else`, since the fallback may bind another module under that name.
+
+What the attribution follows:
+
+- The old identity is read from the canonical types on the import's own name and on `m.member` references, as well as from `module.member`.
+- A parse names a class or function after the module that defines it (`acme.http._client.HttpClient`). That module cannot be read off an import path, so `declared_in` names it. Without it the new names use `to_module`, which differs from a fresh parse wherever the target re-exports.
+- A whole-module move renames the module object, and with it the functions it declares and the classes declared directly in it. Classes from its submodules keep their names.
 
 ### Padding and Whitespace
 
@@ -117,7 +149,7 @@ When inserting after existing imports, the new import needs `prefix=Space([], '\
 - `JLeftPadded[T]`: before-space + element T (used for operators like `=`)
 - `JContainer[T]`: leading `(`, elements, trailing `)` with full padding control
 - Always access public properties (`.statements`, `.names`); use `.padding` for modifications
-- All tree nodes are frozen. Use `replace_if_changed()` or `.padding.replace()` for modifications.
+- Never assign to a node's field. Use `replace_if_changed()` or `.padding.replace()` for modifications.
 
 ### Recipe Pattern
 
@@ -163,3 +195,88 @@ def test_my_recipe():
 Sender/Receiver implementations (`python_sender.py`, `python_receiver.py`) must stay aligned with the Java equivalents. Any mismatch causes deadlocks or data corruption.
 
 If an RPC test hangs, verify the Java classpath is generated (`./gradlew :rewrite-python:generateTestClasspath`) and run a single test with verbose output: `pytest tests/rpc/test_case.py -v -s --timeout=120`.
+
+<!-- prethink-context -->
+## Moderne Prethink Context
+
+This repository contains pre-analyzed context generated by [Moderne Prethink](https://docs.moderne.io/user-documentation/recipes/prethink). Prethink extracts structured knowledge from codebases to help you work more effectively. The context files in `.moderne/context/` contain analyzed information about this codebase.
+
+**IMPORTANT: Before exploring source code for architecture, dependency, or data flow questions:**
+1. ALWAYS check `.moderne/context/` files FIRST
+2. Do NOT perform broad codebase exploration (e.g., spawning Explore agents, searching multiple source files) unless CSV context is insufficient
+3. NEVER read entire CSV files - use SQL queries to retrieve only the rows you need
+
+**IMPORTANT: Prethink context is cheap to read — source code exploration is expensive. Always read MORE prethink context rather than less. The "do not explore broadly" rule applies to source code, NOT to prethink context files.**
+
+For cross-cutting questions (data flow, deletion, dependencies between services),
+ALWAYS query these context files in parallel on the first turn:
+- `architecture.md` — system diagram and component overview
+- `data-assets.csv` — entity fields and data model
+- `database-connections.csv` — which services own which tables
+- `service-endpoints.csv` — relevant API endpoints
+- `messaging-connections.csv` — Kafka/async event flows
+- `external-service-calls.csv` — cross-service HTTP calls
+
+Do NOT stop after reading a single context file when others are clearly relevant.
+
+### Available Context
+
+| Context | Description | Details |
+|---------|-------------|--------|
+| Architecture | FINOS CALM architecture diagram | [`architecture.md`](.moderne/context/architecture.md) |
+| Coding Conventions | Naming patterns, import organization, and coding style | [`coding-conventions.md`](.moderne/context/coding-conventions.md) |
+| Dependencies | Project dependencies including transitive dependencies | [`dependencies.md`](.moderne/context/dependencies.md) |
+| Error Handling | Exception handling strategies and logging patterns | [`error-handling.md`](.moderne/context/error-handling.md) |
+| Library Usage | How external libraries and frameworks are used | [`library-usage.md`](.moderne/context/library-usage.md) |
+| Method Quality Metrics | Per-method complexity and quality measurements | [`method-quality-metrics.md`](.moderne/context/method-quality-metrics.md) |
+| Test Quality | Test quality issues that may cause flakiness or silent failures | [`test-quality.md`](.moderne/context/test-quality.md) |
+| Token Estimates | Estimated input tokens for method comprehension | [`token-estimates.md`](.moderne/context/token-estimates.md) |
+
+### Querying Context Files
+
+For .md context files: Read the full file in a single view call. Never grep it progressively.
+
+For .csv context files: Query with DuckDB, SQLite, or grep (from most to least preference).
+
+Upfront parallel reads: At the start of any architecture question, read all relevant context files in parallel rather than discovering which ones matter through iteration.
+
+Use SQL to query CSV files efficiently. This returns only matching rows instead of loading entire files. Try these in order based on availability:
+
+#### Option 1: DuckDB (Preferred)
+DuckDB can query CSV files directly with no setup:
+
+```bash
+# Find all POST endpoints
+duckdb -c "SELECT * FROM '.moderne/context/service-endpoints.csv' WHERE \"HTTP method\" = 'POST'"
+
+# Find method descriptions containing a keyword
+duckdb -c "SELECT \"Class name\", Signature, Description FROM '.moderne/context/method-descriptions.csv' WHERE Description LIKE '%authentication%'"
+
+# Find tests for a specific class
+duckdb -c "SELECT \"Test method\", \"Test summary\" FROM '.moderne/context/test-mapping.csv' WHERE \"Implementation class\" LIKE '%OrderService%'"
+```
+
+#### Option 2: SQLite
+Import CSV into memory and query (available on most systems):
+
+```bash
+sqlite3 :memory: -cmd ".mode csv" -cmd ".import .moderne/context/service-endpoints.csv endpoints" \
+  "SELECT * FROM endpoints WHERE [HTTP method] = 'POST'"
+```
+
+#### Option 3: Grep (Last Resort)
+If SQL tools are unavailable, use grep. Note this loads more content into context:
+
+```bash
+grep -i "POST" .moderne/context/service-endpoints.csv
+```
+
+**Note:** Column names with spaces require quoting - use double quotes in DuckDB (`"HTTP method"`) or square brackets in SQLite (`[HTTP method]`).
+
+### Usage Pattern
+1. Read the `.md` file to understand the schema and available columns
+2. Query the `.csv` with DuckDB or SQLite to get only the rows you need
+3. Only explore source if the context doesn't answer the question
+
+When citing Moderne Prethink context, mention Moderne Prethink as the source (e.g., "Based on the architecture context from Moderne Prethink..." or "Based on the test coverage mapping from Prethink, this method is tested by...").
+<!-- /prethink-context -->

@@ -2,14 +2,15 @@
 # Do not edit manually - regenerate with: python scripts/generate_stubs.py
 
 from dataclasses import dataclass
-from typing import Any, ClassVar, List, Optional
+from typing import Any, ClassVar, List, Optional, Generic
 from typing_extensions import Self
 from uuid import UUID
 import weakref
 
+from rewrite.utils import replace_if_changed
 from enum import Enum
 from pathlib import Path
-from . import extensions as extensions
+from .visitor import JavaVisitor
 from rewrite import Checksum, FileAttributes, SourceFile, Tree, TreeVisitor, Markers, Cursor, PrintOutputCapture, PrinterFactory
 
 from .support_types import (
@@ -37,16 +38,13 @@ from .support_types import (
 
 @dataclass(frozen=True)
 class AnnotatedType(Expression, TypeTree):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _annotations: List[Annotation]
     _type_expression: TypeTree
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -60,7 +58,7 @@ class AnnotatedType(Expression, TypeTree):
 
 @dataclass(frozen=True)
 class Annotation(Expression):
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: Annotation
 
@@ -69,17 +67,14 @@ class Annotation(Expression):
         @property
         def arguments(self) -> Optional[JContainer[Expression]]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _annotation_type: NameTree
     _arguments: Optional[JContainer[Expression]]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -95,17 +90,14 @@ class Annotation(Expression):
 
 @dataclass(frozen=True)
 class ArrayAccess(Expression, TypedTree):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _indexed: Expression
     _dimension: ArrayDimension
     _type: Optional[JavaType]
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -121,7 +113,7 @@ class ArrayAccess(Expression, TypedTree):
 
 @dataclass(frozen=True)
 class ArrayType(TypeTree, Expression):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _element_type: TypeTree
@@ -129,10 +121,7 @@ class ArrayType(TypeTree, Expression):
     _dimension: Optional[JLeftPadded[Space]]
     _type: JavaType
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -150,16 +139,13 @@ class ArrayType(TypeTree, Expression):
 
 @dataclass(frozen=True)
 class Assert(Statement):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _condition: Expression
     _detail: Optional[JLeftPadded[Expression]]
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -173,7 +159,7 @@ class Assert(Statement):
 
 @dataclass(frozen=True)
 class Assignment(Statement, Expression, TypedTree):
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: Assignment
 
@@ -182,7 +168,7 @@ class Assignment(Statement, Expression, TypedTree):
         @property
         def assignment(self) -> JLeftPadded[Expression]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _variable: Expression
@@ -190,10 +176,7 @@ class Assignment(Statement, Expression, TypedTree):
     _type: Optional[JavaType]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -212,22 +195,22 @@ class Assignment(Statement, Expression, TypedTree):
 @dataclass(frozen=True)
 class AssignmentOperation(Statement, Expression, TypedTree):
     class Type(Enum):
-        Addition: Type
-        BitAnd: Type
-        BitOr: Type
-        BitXor: Type
-        Division: Type
-        Exponentiation: Type
-        FloorDivision: Type
-        LeftShift: Type
-        MatrixMultiplication: Type
-        Modulo: Type
-        Multiplication: Type
-        RightShift: Type
-        Subtraction: Type
-        UnsignedRightShift: Type
+        Addition = ...
+        BitAnd = ...
+        BitOr = ...
+        BitXor = ...
+        Division = ...
+        Exponentiation = ...
+        FloorDivision = ...
+        LeftShift = ...
+        MatrixMultiplication = ...
+        Modulo = ...
+        Multiplication = ...
+        RightShift = ...
+        Subtraction = ...
+        UnsignedRightShift = ...
 
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: AssignmentOperation
 
@@ -236,7 +219,7 @@ class AssignmentOperation(Statement, Expression, TypedTree):
         @property
         def operator(self) -> JLeftPadded[AssignmentOperation.Type]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _variable: Expression
@@ -245,10 +228,7 @@ class AssignmentOperation(Statement, Expression, TypedTree):
     _type: Optional[JavaType]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -269,27 +249,27 @@ class AssignmentOperation(Statement, Expression, TypedTree):
 @dataclass(frozen=True)
 class Binary(Expression, TypedTree):
     class Type(Enum):
-        Addition: Type
-        Subtraction: Type
-        Multiplication: Type
-        Division: Type
-        Modulo: Type
-        LessThan: Type
-        GreaterThan: Type
-        LessThanOrEqual: Type
-        GreaterThanOrEqual: Type
-        Equal: Type
-        NotEqual: Type
-        BitAnd: Type
-        BitOr: Type
-        BitXor: Type
-        LeftShift: Type
-        RightShift: Type
-        UnsignedRightShift: Type
-        Or: Type
-        And: Type
+        Addition = ...
+        Subtraction = ...
+        Multiplication = ...
+        Division = ...
+        Modulo = ...
+        LessThan = ...
+        GreaterThan = ...
+        LessThanOrEqual = ...
+        GreaterThanOrEqual = ...
+        Equal = ...
+        NotEqual = ...
+        BitAnd = ...
+        BitOr = ...
+        BitXor = ...
+        LeftShift = ...
+        RightShift = ...
+        UnsignedRightShift = ...
+        Or = ...
+        And = ...
 
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: Binary
 
@@ -298,7 +278,7 @@ class Binary(Expression, TypedTree):
         @property
         def operator(self) -> JLeftPadded[Binary.Type]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _left: Expression
@@ -307,10 +287,7 @@ class Binary(Expression, TypedTree):
     _type: Optional[JavaType]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -330,7 +307,7 @@ class Binary(Expression, TypedTree):
 
 @dataclass(frozen=True)
 class Block(Statement):
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: Block
 
@@ -341,7 +318,7 @@ class Block(Statement):
         @property
         def statements(self) -> List[JRightPadded[Statement]]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _static: JRightPadded[bool]
@@ -349,10 +326,7 @@ class Block(Statement):
     _end: Space
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -370,15 +344,12 @@ class Block(Statement):
 
 @dataclass(frozen=True)
 class Break(Statement):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _label: Optional[Identifier]
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -391,10 +362,10 @@ class Break(Statement):
 @dataclass(frozen=True)
 class Case(Statement):
     class Type(Enum):
-        Statement: Type
-        Rule: Type
+        Statement = ...
+        Rule = ...
 
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: Case
 
@@ -407,7 +378,7 @@ class Case(Statement):
         @property
         def body(self) -> Optional[JRightPadded[J]]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _type: Type
@@ -417,10 +388,7 @@ class Case(Statement):
     _guard: Optional[Expression]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -445,23 +413,20 @@ class ClassDeclaration(Statement, TypedTree):
     @dataclass(frozen=True)
     class Kind(J):
         class Type(Enum):
-            Class: Type
-            Enum: Type
-            Interface: Type
-            Annotation: Type
-            Record: Type
-            Value: Type
+            Class = ...
+            Enum = ...
+            Interface = ...
+            Annotation = ...
+            Record = ...
+            Value = ...
 
-        _id: UUID
+        _id: int | UUID
         _prefix: Space
         _markers: Markers
         _annotations: List[Annotation]
         _type: Type
 
-        def replace(self, **kwargs: Any) -> Self: ...
 
-        @property
-        def id(self) -> UUID: ...
         @property
         def prefix(self) -> Space: ...
         @property
@@ -471,14 +436,14 @@ class ClassDeclaration(Statement, TypedTree):
         @property
         def type(self) -> Type: ...
 
-        def with_id(self, id: UUID) -> ClassDeclaration.Kind: ...
+        def with_id(self, id: int | UUID) -> ClassDeclaration.Kind: ...
         def with_prefix(self, prefix: Space) -> ClassDeclaration.Kind: ...
         def with_markers(self, markers: Markers) -> ClassDeclaration.Kind: ...
         def with_annotations(self, annotations: List[Annotation]) -> ClassDeclaration.Kind: ...
         def with_type(self, type: Type) -> ClassDeclaration.Kind: ...
         def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: ClassDeclaration
 
@@ -497,7 +462,7 @@ class ClassDeclaration(Statement, TypedTree):
         @property
         def permits(self) -> Optional[JContainer[TypeTree]]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _leading_annotations: List[Annotation]
@@ -513,10 +478,7 @@ class ClassDeclaration(Statement, TypedTree):
     _type: Optional[JavaType.FullyQualified]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -548,7 +510,7 @@ class ClassDeclaration(Statement, TypedTree):
 
 @dataclass(frozen=True)
 class CompilationUnit(JavaSourceFile, SourceFile):
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: CompilationUnit
 
@@ -559,7 +521,7 @@ class CompilationUnit(JavaSourceFile, SourceFile):
         @property
         def imports(self) -> List[JRightPadded[Import]]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _source_path: Path
@@ -573,10 +535,7 @@ class CompilationUnit(JavaSourceFile, SourceFile):
     _eof: Space
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -607,15 +566,12 @@ class CompilationUnit(JavaSourceFile, SourceFile):
 
 @dataclass(frozen=True)
 class Continue(Statement):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _label: Optional[Identifier]
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -627,7 +583,7 @@ class Continue(Statement):
 
 @dataclass(frozen=True)
 class DoWhileLoop(Loop):
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: DoWhileLoop
 
@@ -638,17 +594,14 @@ class DoWhileLoop(Loop):
         @property
         def while_condition(self) -> JLeftPadded[ControlParentheses[Expression]]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _body: JRightPadded[Statement]
     _while_condition: JLeftPadded[ControlParentheses[Expression]]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -664,14 +617,11 @@ class DoWhileLoop(Loop):
 
 @dataclass(frozen=True)
 class Empty(Statement, Expression, TypeTree):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -681,17 +631,14 @@ class Empty(Statement, Expression, TypeTree):
 
 @dataclass(frozen=True)
 class EnumValue(J):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _annotations: List[Annotation]
     _name: Identifier
     _initializer: Optional[NewClass]
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -707,7 +654,7 @@ class EnumValue(J):
 
 @dataclass(frozen=True)
 class EnumValueSet(Statement):
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: EnumValueSet
 
@@ -716,17 +663,14 @@ class EnumValueSet(Statement):
         @property
         def enums(self) -> List[JRightPadded[EnumValue]]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _enums: List[JRightPadded[EnumValue]]
     _terminated_with_semicolon: bool
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -742,7 +686,7 @@ class EnumValueSet(Statement):
 
 @dataclass(frozen=True)
 class FieldAccess(TypeTree, Expression, Statement):
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: FieldAccess
 
@@ -751,7 +695,7 @@ class FieldAccess(TypeTree, Expression, Statement):
         @property
         def name(self) -> JLeftPadded[Identifier]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _target: Expression
@@ -759,10 +703,7 @@ class FieldAccess(TypeTree, Expression, Statement):
     _type: Optional[JavaType]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -782,7 +723,7 @@ class FieldAccess(TypeTree, Expression, Statement):
 class ForEachLoop(Loop):
     @dataclass(frozen=True)
     class Control(J):
-        @dataclass(frozen=True)
+        @dataclass
         class PaddingHelper:
             _t: ForEachLoop.Control
 
@@ -793,17 +734,14 @@ class ForEachLoop(Loop):
             @property
             def iterable(self) -> JRightPadded[Expression]: ...
 
-        _id: UUID
+        _id: int | UUID
         _prefix: Space
         _markers: Markers
         _variable: JRightPadded[Statement]
         _iterable: JRightPadded[Expression]
         _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-        def replace(self, **kwargs: Any) -> Self: ...
 
-        @property
-        def id(self) -> UUID: ...
         @property
         def prefix(self) -> Space: ...
         @property
@@ -815,14 +753,14 @@ class ForEachLoop(Loop):
         @property
         def padding(self) -> PaddingHelper: ...
 
-        def with_id(self, id: UUID) -> ForEachLoop.Control: ...
+        def with_id(self, id: int | UUID) -> ForEachLoop.Control: ...
         def with_prefix(self, prefix: Space) -> ForEachLoop.Control: ...
         def with_markers(self, markers: Markers) -> ForEachLoop.Control: ...
         def with_variable(self, variable: Statement) -> ForEachLoop.Control: ...
         def with_iterable(self, iterable: Expression) -> ForEachLoop.Control: ...
         def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: ForEachLoop
 
@@ -831,17 +769,14 @@ class ForEachLoop(Loop):
         @property
         def body(self) -> JRightPadded[Statement]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _control: Control
     _body: JRightPadded[Statement]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -859,7 +794,7 @@ class ForEachLoop(Loop):
 class ForLoop(Loop):
     @dataclass(frozen=True)
     class Control(J):
-        @dataclass(frozen=True)
+        @dataclass
         class PaddingHelper:
             _t: ForLoop.Control
 
@@ -872,7 +807,7 @@ class ForLoop(Loop):
             @property
             def update(self) -> List[JRightPadded[Statement]]: ...
 
-        _id: UUID
+        _id: int | UUID
         _prefix: Space
         _markers: Markers
         _init: List[JRightPadded[Statement]]
@@ -880,10 +815,7 @@ class ForLoop(Loop):
         _update: List[JRightPadded[Statement]]
         _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-        def replace(self, **kwargs: Any) -> Self: ...
 
-        @property
-        def id(self) -> UUID: ...
         @property
         def prefix(self) -> Space: ...
         @property
@@ -897,7 +829,7 @@ class ForLoop(Loop):
         @property
         def padding(self) -> PaddingHelper: ...
 
-        def with_id(self, id: UUID) -> ForLoop.Control: ...
+        def with_id(self, id: int | UUID) -> ForLoop.Control: ...
         def with_prefix(self, prefix: Space) -> ForLoop.Control: ...
         def with_markers(self, markers: Markers) -> ForLoop.Control: ...
         def with_init(self, init: List[Statement]) -> ForLoop.Control: ...
@@ -905,7 +837,7 @@ class ForLoop(Loop):
         def with_update(self, update: List[Statement]) -> ForLoop.Control: ...
         def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: ForLoop
 
@@ -914,17 +846,14 @@ class ForLoop(Loop):
         @property
         def body(self) -> JRightPadded[Statement]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _control: Control
     _body: JRightPadded[Statement]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -940,16 +869,13 @@ class ForLoop(Loop):
 
 @dataclass(frozen=True)
 class ParenthesizedTypeTree(TypeTree, Expression):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _annotations: List[Annotation]
     _parenthesized_type: Parentheses[TypeTree]
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -963,7 +889,7 @@ class ParenthesizedTypeTree(TypeTree, Expression):
 
 @dataclass(frozen=True)
 class Identifier(TypeTree, Expression):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _annotations: List[Annotation]
@@ -971,10 +897,7 @@ class Identifier(TypeTree, Expression):
     _type: Optional[JavaType]
     _field_type: Optional[JavaType.Variable]
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -994,7 +917,7 @@ class Identifier(TypeTree, Expression):
 class If(Statement):
     @dataclass(frozen=True)
     class Else(J):
-        @dataclass(frozen=True)
+        @dataclass
         class PaddingHelper:
             _t: If.Else
 
@@ -1003,16 +926,13 @@ class If(Statement):
             @property
             def body(self) -> JRightPadded[Statement]: ...
 
-        _id: UUID
+        _id: int | UUID
         _prefix: Space
         _markers: Markers
         _body: JRightPadded[Statement]
         _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-        def replace(self, **kwargs: Any) -> Self: ...
 
-        @property
-        def id(self) -> UUID: ...
         @property
         def prefix(self) -> Space: ...
         @property
@@ -1022,13 +942,13 @@ class If(Statement):
         @property
         def padding(self) -> PaddingHelper: ...
 
-        def with_id(self, id: UUID) -> If.Else: ...
+        def with_id(self, id: int | UUID) -> If.Else: ...
         def with_prefix(self, prefix: Space) -> If.Else: ...
         def with_markers(self, markers: Markers) -> If.Else: ...
         def with_body(self, body: Statement) -> If.Else: ...
         def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: If
 
@@ -1037,7 +957,7 @@ class If(Statement):
         @property
         def then_part(self) -> JRightPadded[Statement]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _if_condition: ControlParentheses[Expression]
@@ -1045,10 +965,7 @@ class If(Statement):
     _else_part: Optional[Else]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -1066,7 +983,7 @@ class If(Statement):
 
 @dataclass(frozen=True)
 class Import(Statement):
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: Import
 
@@ -1077,7 +994,7 @@ class Import(Statement):
         @property
         def alias(self) -> Optional[JLeftPadded[Identifier]]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _static: JLeftPadded[bool]
@@ -1085,10 +1002,7 @@ class Import(Statement):
     _alias: Optional[JLeftPadded[Identifier]]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -1106,7 +1020,7 @@ class Import(Statement):
 
 @dataclass(frozen=True)
 class InstanceOf(Expression, TypedTree):
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: InstanceOf
 
@@ -1115,7 +1029,7 @@ class InstanceOf(Expression, TypedTree):
         @property
         def expression(self) -> JRightPadded[Expression]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _expression: JRightPadded[Expression]
@@ -1124,10 +1038,7 @@ class InstanceOf(Expression, TypedTree):
     _type: Optional[JavaType]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -1147,7 +1058,7 @@ class InstanceOf(Expression, TypedTree):
 
 @dataclass(frozen=True)
 class DeconstructionPattern(TypedTree):
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: DeconstructionPattern
 
@@ -1156,7 +1067,7 @@ class DeconstructionPattern(TypedTree):
         @property
         def nested(self) -> JContainer[J]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _deconstructor: Expression
@@ -1164,10 +1075,7 @@ class DeconstructionPattern(TypedTree):
     _type: JavaType
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -1185,7 +1093,7 @@ class DeconstructionPattern(TypedTree):
 
 @dataclass(frozen=True)
 class IntersectionType(TypeTree, Expression):
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: IntersectionType
 
@@ -1194,16 +1102,13 @@ class IntersectionType(TypeTree, Expression):
         @property
         def bounds(self) -> JContainer[TypeTree]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _bounds: JContainer[TypeTree]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -1217,7 +1122,7 @@ class IntersectionType(TypeTree, Expression):
 
 @dataclass(frozen=True)
 class Label(Statement):
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: Label
 
@@ -1226,17 +1131,14 @@ class Label(Statement):
         @property
         def label(self) -> JRightPadded[Identifier]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _label: JRightPadded[Identifier]
     _statement: Statement
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -1254,7 +1156,7 @@ class Label(Statement):
 class Lambda(Statement, Expression, TypedTree):
     @dataclass(frozen=True)
     class Parameters(J):
-        @dataclass(frozen=True)
+        @dataclass
         class PaddingHelper:
             _t: Lambda.Parameters
 
@@ -1263,17 +1165,14 @@ class Lambda(Statement, Expression, TypedTree):
             @property
             def parameters(self) -> List[JRightPadded[J]]: ...
 
-        _id: UUID
+        _id: int | UUID
         _prefix: Space
         _markers: Markers
         _parenthesized: bool
         _parameters: List[JRightPadded[J]]
         _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-        def replace(self, **kwargs: Any) -> Self: ...
 
-        @property
-        def id(self) -> UUID: ...
         @property
         def prefix(self) -> Space: ...
         @property
@@ -1285,14 +1184,14 @@ class Lambda(Statement, Expression, TypedTree):
         @property
         def padding(self) -> PaddingHelper: ...
 
-        def with_id(self, id: UUID) -> Lambda.Parameters: ...
+        def with_id(self, id: int | UUID) -> Lambda.Parameters: ...
         def with_prefix(self, prefix: Space) -> Lambda.Parameters: ...
         def with_markers(self, markers: Markers) -> Lambda.Parameters: ...
         def with_parenthesized(self, parenthesized: bool) -> Lambda.Parameters: ...
         def with_parameters(self, parameters: List[J]) -> Lambda.Parameters: ...
         def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _parameters: Parameters
@@ -1300,10 +1199,7 @@ class Lambda(Statement, Expression, TypedTree):
     _body: J
     _type: Optional[JavaType]
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -1321,12 +1217,11 @@ class Lambda(Statement, Expression, TypedTree):
 
 @dataclass(frozen=True)
 class Literal(Expression, TypedTree):
-    @dataclass(frozen=True)
+    @dataclass
     class UnicodeEscape:
         _value_source_index: int
         _code_point: str
 
-        def replace(self, **kwargs: Any) -> Self: ...
 
         @property
         def value_source_index(self) -> int: ...
@@ -1336,7 +1231,7 @@ class Literal(Expression, TypedTree):
         def with_value_source_index(self, value_source_index: int) -> Literal.UnicodeEscape: ...
         def with_code_point(self, code_point: str) -> Literal.UnicodeEscape: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _value: Optional[object]
@@ -1344,10 +1239,7 @@ class Literal(Expression, TypedTree):
     _unicode_escapes: Optional[List[UnicodeEscape]]
     _type: JavaType.Primitive
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -1365,7 +1257,7 @@ class Literal(Expression, TypedTree):
 
 @dataclass(frozen=True)
 class MemberReference(TypedTree, MethodCall):
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: MemberReference
 
@@ -1378,7 +1270,7 @@ class MemberReference(TypedTree, MethodCall):
         @property
         def reference(self) -> JLeftPadded[Identifier]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _containing: JRightPadded[Expression]
@@ -1389,10 +1281,7 @@ class MemberReference(TypedTree, MethodCall):
     _variable_type: Optional[JavaType.Variable]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -1416,7 +1305,7 @@ class MemberReference(TypedTree, MethodCall):
 
 @dataclass(frozen=True)
 class MethodDeclaration(Statement, TypedTree):
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: MethodDeclaration
 
@@ -1435,11 +1324,10 @@ class MethodDeclaration(Statement, TypedTree):
         @property
         def default_value(self) -> Optional[JLeftPadded[Expression]]: ...
 
-    @dataclass(frozen=True)
+    @dataclass
     class AnnotationsHelper:
         _t: MethodDeclaration
 
-        def replace(self, **kwargs: Any) -> Self: ...
 
         @property
         def type_parameters(self) -> Optional[TypeParameters]: ...
@@ -1461,7 +1349,7 @@ class MethodDeclaration(Statement, TypedTree):
         def with_throws(self, throws: Optional[JContainer[NameTree]]) -> MethodDeclaration: ...
         def with_default_value(self, default_value: Optional[JLeftPadded[Expression]]) -> MethodDeclaration: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _leading_annotations: List[Annotation]
@@ -1471,6 +1359,7 @@ class MethodDeclaration(Statement, TypedTree):
     _name_annotations: List[Annotation]
     _name: Identifier
     _parameters: JContainer[Statement]
+    _dimensions_after_name: List[JLeftPadded[Space]]
     _throws: Optional[JContainer[NameTree]]
     _body: Optional[Block]
     _default_value: Optional[JLeftPadded[Expression]]
@@ -1478,10 +1367,7 @@ class MethodDeclaration(Statement, TypedTree):
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
     _annotations: Optional[weakref.ReferenceType[AnnotationsHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -1499,6 +1385,8 @@ class MethodDeclaration(Statement, TypedTree):
     @property
     def parameters(self) -> List[Statement]: ...
     @property
+    def dimensions_after_name(self) -> List[JLeftPadded[Space]]: ...
+    @property
     def throws(self) -> Optional[List[NameTree]]: ...
     @property
     def body(self) -> Optional[Block]: ...
@@ -1507,15 +1395,18 @@ class MethodDeclaration(Statement, TypedTree):
     @property
     def method_type(self) -> Optional[JavaType.Method]: ...
     @property
+    def type(self) -> Optional[JavaType]: ...
+    @property
     def padding(self) -> PaddingHelper: ...
     @property
     def annotations(self) -> AnnotationsHelper: ...
 
+    def with_dimensions_after_name(self, dimensions_after_name: List[JLeftPadded[Space]]) -> MethodDeclaration: ...
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
 @dataclass(frozen=True)
 class MethodInvocation(Statement, TypedTree, MethodCall):
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: MethodInvocation
 
@@ -1528,7 +1419,7 @@ class MethodInvocation(Statement, TypedTree, MethodCall):
         @property
         def arguments(self) -> JContainer[Expression]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _select: Optional[JRightPadded[Expression]]
@@ -1538,10 +1429,7 @@ class MethodInvocation(Statement, TypedTree, MethodCall):
     _method_type: Optional[JavaType.Method]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -1557,6 +1445,8 @@ class MethodInvocation(Statement, TypedTree, MethodCall):
     @property
     def method_type(self) -> Optional[JavaType.Method]: ...
     @property
+    def type(self) -> Optional[JavaType]: ...
+    @property
     def padding(self) -> PaddingHelper: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
@@ -1564,36 +1454,33 @@ class MethodInvocation(Statement, TypedTree, MethodCall):
 @dataclass(frozen=True)
 class Modifier(J):
     class Type(Enum):
-        Default: Type
-        Public: Type
-        Protected: Type
-        Private: Type
-        Abstract: Type
-        Static: Type
-        Final: Type
-        Sealed: Type
-        NonSealed: Type
-        Transient: Type
-        Volatile: Type
-        Synchronized: Type
-        Native: Type
-        Strictfp: Type
-        Async: Type
-        Reified: Type
-        Inline: Type
-        LanguageExtension: Type
+        Default = ...
+        Public = ...
+        Protected = ...
+        Private = ...
+        Abstract = ...
+        Static = ...
+        Final = ...
+        Sealed = ...
+        NonSealed = ...
+        Transient = ...
+        Volatile = ...
+        Synchronized = ...
+        Native = ...
+        Strictfp = ...
+        Async = ...
+        Reified = ...
+        Inline = ...
+        LanguageExtension = ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _keyword: Optional[str]
     _type: Type
     _annotations: List[Annotation]
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -1609,7 +1496,7 @@ class Modifier(J):
 
 @dataclass(frozen=True)
 class MultiCatch(TypeTree):
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: MultiCatch
 
@@ -1618,16 +1505,13 @@ class MultiCatch(TypeTree):
         @property
         def alternatives(self) -> List[JRightPadded[NameTree]]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _alternatives: List[JRightPadded[NameTree]]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -1641,7 +1525,7 @@ class MultiCatch(TypeTree):
 
 @dataclass(frozen=True)
 class NewArray(Expression, TypedTree):
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: NewArray
 
@@ -1650,7 +1534,7 @@ class NewArray(Expression, TypedTree):
         @property
         def initializer(self) -> Optional[JContainer[Expression]]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _type_expression: Optional[TypeTree]
@@ -1659,10 +1543,7 @@ class NewArray(Expression, TypedTree):
     _type: Optional[JavaType]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -1682,7 +1563,7 @@ class NewArray(Expression, TypedTree):
 
 @dataclass(frozen=True)
 class ArrayDimension(J):
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: ArrayDimension
 
@@ -1691,16 +1572,13 @@ class ArrayDimension(J):
         @property
         def index(self) -> JRightPadded[Expression]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _index: JRightPadded[Expression]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -1714,7 +1592,7 @@ class ArrayDimension(J):
 
 @dataclass(frozen=True)
 class NewClass(Statement, TypedTree, MethodCall):
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: NewClass
 
@@ -1725,7 +1603,7 @@ class NewClass(Statement, TypedTree, MethodCall):
         @property
         def arguments(self) -> JContainer[Expression]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _enclosing: Optional[JRightPadded[Expression]]
@@ -1736,10 +1614,7 @@ class NewClass(Statement, TypedTree, MethodCall):
     _constructor_type: Optional[JavaType.Method]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -1757,13 +1632,15 @@ class NewClass(Statement, TypedTree, MethodCall):
     @property
     def constructor_type(self) -> Optional[JavaType.Method]: ...
     @property
+    def type(self) -> Optional[JavaType]: ...
+    @property
     def padding(self) -> PaddingHelper: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
 @dataclass(frozen=True)
 class NullableType(TypeTree, Expression):
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: NullableType
 
@@ -1772,17 +1649,14 @@ class NullableType(TypeTree, Expression):
         @property
         def type_tree(self) -> JRightPadded[TypeTree]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _annotations: List[Annotation]
     _type_tree: JRightPadded[TypeTree]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -1798,16 +1672,13 @@ class NullableType(TypeTree, Expression):
 
 @dataclass(frozen=True)
 class Package(Statement):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _expression: Expression
     _annotations: List[Annotation]
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -1821,7 +1692,7 @@ class Package(Statement):
 
 @dataclass(frozen=True)
 class ParameterizedType(TypeTree, Expression):
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: ParameterizedType
 
@@ -1830,7 +1701,7 @@ class ParameterizedType(TypeTree, Expression):
         @property
         def type_parameters(self) -> Optional[JContainer[Expression]]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _clazz: NameTree
@@ -1838,10 +1709,7 @@ class ParameterizedType(TypeTree, Expression):
     _type: Optional[JavaType]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -1859,25 +1727,22 @@ class ParameterizedType(TypeTree, Expression):
 
 @dataclass(frozen=True)
 class Parentheses(Expression, Generic[J2]):
-    @dataclass(frozen=True)
-    class PaddingHelper:
-        _t: Parentheses[J2]
+    @dataclass
+    class PaddingHelper(Generic[J3]):
+        _t: Parentheses[J3]
 
-        def replace(self, **kwargs: Any) -> Parentheses[J2]: ...
+        def replace(self, **kwargs: Any) -> Parentheses[J3]: ...
 
         @property
-        def tree(self) -> JRightPadded[J2]: ...
+        def tree(self) -> JRightPadded[J3]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _tree: JRightPadded[J2]
-    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
+    _padding: Optional[weakref.ReferenceType[Parentheses.PaddingHelper[J2]]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -1887,31 +1752,28 @@ class Parentheses(Expression, Generic[J2]):
     @property
     def type(self) -> Optional[JavaType]: ...
     @property
-    def padding(self) -> PaddingHelper: ...
+    def padding(self) -> Parentheses.PaddingHelper[J2]: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
 @dataclass(frozen=True)
 class ControlParentheses(Expression, Generic[J2]):
-    @dataclass(frozen=True)
-    class PaddingHelper:
-        _t: ControlParentheses[J2]
+    @dataclass
+    class PaddingHelper(Generic[J3]):
+        _t: ControlParentheses[J3]
 
-        def replace(self, **kwargs: Any) -> ControlParentheses[J2]: ...
+        def replace(self, **kwargs: Any) -> ControlParentheses[J3]: ...
 
         @property
-        def tree(self) -> JRightPadded[J2]: ...
+        def tree(self) -> JRightPadded[J3]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _tree: JRightPadded[J2]
-    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
+    _padding: Optional[weakref.ReferenceType[ControlParentheses.PaddingHelper[J2]]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -1919,21 +1781,18 @@ class ControlParentheses(Expression, Generic[J2]):
     @property
     def tree(self) -> J2: ...
     @property
-    def padding(self) -> PaddingHelper: ...
+    def padding(self) -> ControlParentheses.PaddingHelper[J2]: ...
 
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
 @dataclass(frozen=True)
 class Primitive(TypeTree, Expression):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _type: JavaType.Primitive
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -1945,15 +1804,12 @@ class Primitive(TypeTree, Expression):
 
 @dataclass(frozen=True)
 class Return(Statement):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _expression: Optional[Expression]
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -1965,16 +1821,13 @@ class Return(Statement):
 
 @dataclass(frozen=True)
 class Switch(Statement):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _selector: ControlParentheses[Expression]
     _cases: Block
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -1988,17 +1841,14 @@ class Switch(Statement):
 
 @dataclass(frozen=True)
 class SwitchExpression(Expression, TypedTree):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _selector: ControlParentheses[Expression]
     _cases: Block
     _type: Optional[JavaType]
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -2014,16 +1864,13 @@ class SwitchExpression(Expression, TypedTree):
 
 @dataclass(frozen=True)
 class Synchronized(Statement):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _lock: ControlParentheses[Expression]
     _body: Block
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -2037,7 +1884,7 @@ class Synchronized(Statement):
 
 @dataclass(frozen=True)
 class Ternary(Expression, Statement, TypedTree):
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: Ternary
 
@@ -2048,7 +1895,7 @@ class Ternary(Expression, Statement, TypedTree):
         @property
         def false_part(self) -> JLeftPadded[Expression]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _condition: Expression
@@ -2057,10 +1904,7 @@ class Ternary(Expression, Statement, TypedTree):
     _type: Optional[JavaType]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -2080,15 +1924,12 @@ class Ternary(Expression, Statement, TypedTree):
 
 @dataclass(frozen=True)
 class Throw(Statement):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _exception: Expression
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -2102,16 +1943,13 @@ class Throw(Statement):
 class Try(Statement):
     @dataclass(frozen=True)
     class Resource(J):
-        _id: UUID
+        _id: int | UUID
         _prefix: Space
         _markers: Markers
         _variable_declarations: TypedTree
         _terminated_with_semicolon: bool
 
-        def replace(self, **kwargs: Any) -> Self: ...
 
-        @property
-        def id(self) -> UUID: ...
         @property
         def prefix(self) -> Space: ...
         @property
@@ -2121,7 +1959,7 @@ class Try(Statement):
         @property
         def terminated_with_semicolon(self) -> bool: ...
 
-        def with_id(self, id: UUID) -> Try.Resource: ...
+        def with_id(self, id: int | UUID) -> Try.Resource: ...
         def with_prefix(self, prefix: Space) -> Try.Resource: ...
         def with_markers(self, markers: Markers) -> Try.Resource: ...
         def with_variable_declarations(self, variable_declarations: TypedTree) -> Try.Resource: ...
@@ -2130,16 +1968,13 @@ class Try(Statement):
 
     @dataclass(frozen=True)
     class Catch(J):
-        _id: UUID
+        _id: int | UUID
         _prefix: Space
         _markers: Markers
         _parameter: ControlParentheses[VariableDeclarations]
         _body: Block
 
-        def replace(self, **kwargs: Any) -> Self: ...
 
-        @property
-        def id(self) -> UUID: ...
         @property
         def prefix(self) -> Space: ...
         @property
@@ -2149,14 +1984,14 @@ class Try(Statement):
         @property
         def body(self) -> Block: ...
 
-        def with_id(self, id: UUID) -> Try.Catch: ...
+        def with_id(self, id: int | UUID) -> Try.Catch: ...
         def with_prefix(self, prefix: Space) -> Try.Catch: ...
         def with_markers(self, markers: Markers) -> Try.Catch: ...
         def with_parameter(self, parameter: ControlParentheses[VariableDeclarations]) -> Try.Catch: ...
         def with_body(self, body: Block) -> Try.Catch: ...
         def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: Try
 
@@ -2167,7 +2002,7 @@ class Try(Statement):
         @property
         def finally_(self) -> Optional[JLeftPadded[Block]]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _resources: Optional[JContainer[Resource]]
@@ -2176,10 +2011,7 @@ class Try(Statement):
     _finally: Optional[JLeftPadded[Block]]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -2199,16 +2031,13 @@ class Try(Statement):
 
 @dataclass(frozen=True)
 class TypeCast(Expression, TypedTree):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _clazz: ControlParentheses[TypeTree]
     _expression: Expression
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -2222,7 +2051,7 @@ class TypeCast(Expression, TypedTree):
 
 @dataclass(frozen=True)
 class TypeParameter(J):
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: TypeParameter
 
@@ -2231,7 +2060,7 @@ class TypeParameter(J):
         @property
         def bounds(self) -> Optional[JContainer[TypeTree]]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _annotations: List[Annotation]
@@ -2240,10 +2069,7 @@ class TypeParameter(J):
     _bounds: Optional[JContainer[TypeTree]]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -2263,7 +2089,7 @@ class TypeParameter(J):
 
 @dataclass(frozen=True)
 class TypeParameters(J):
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: TypeParameters
 
@@ -2272,17 +2098,14 @@ class TypeParameters(J):
         @property
         def type_parameters(self) -> List[JRightPadded[TypeParameter]]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _annotations: List[Annotation]
     _type_parameters: List[JRightPadded[TypeParameter]]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -2299,16 +2122,16 @@ class TypeParameters(J):
 @dataclass(frozen=True)
 class Unary(Statement, Expression, TypedTree):
     class Type(Enum):
-        PreIncrement: Type
-        PreDecrement: Type
-        PostIncrement: Type
-        PostDecrement: Type
-        Positive: Type
-        Negative: Type
-        Complement: Type
-        Not: Type
+        PreIncrement = ...
+        PreDecrement = ...
+        PostIncrement = ...
+        PostDecrement = ...
+        Positive = ...
+        Negative = ...
+        Complement = ...
+        Not = ...
 
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: Unary
 
@@ -2317,7 +2140,7 @@ class Unary(Statement, Expression, TypedTree):
         @property
         def operator(self) -> JLeftPadded[Unary.Type]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _operator: JLeftPadded[Type]
@@ -2325,10 +2148,7 @@ class Unary(Statement, Expression, TypedTree):
     _type: Optional[JavaType]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -2348,7 +2168,7 @@ class Unary(Statement, Expression, TypedTree):
 class VariableDeclarations(Statement, TypedTree):
     @dataclass(frozen=True)
     class NamedVariable(NameTree):
-        @dataclass(frozen=True)
+        @dataclass
         class PaddingHelper:
             _t: VariableDeclarations.NamedVariable
 
@@ -2357,7 +2177,7 @@ class VariableDeclarations(Statement, TypedTree):
             @property
             def initializer(self) -> Optional[JLeftPadded[Expression]]: ...
 
-        _id: UUID
+        _id: int | UUID
         _prefix: Space
         _markers: Markers
         _name: Identifier
@@ -2366,10 +2186,7 @@ class VariableDeclarations(Statement, TypedTree):
         _variable_type: Optional[JavaType.Variable]
         _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-        def replace(self, **kwargs: Any) -> Self: ...
 
-        @property
-        def id(self) -> UUID: ...
         @property
         def prefix(self) -> Space: ...
         @property
@@ -2385,7 +2202,7 @@ class VariableDeclarations(Statement, TypedTree):
         @property
         def padding(self) -> PaddingHelper: ...
 
-        def with_id(self, id: UUID) -> VariableDeclarations.NamedVariable: ...
+        def with_id(self, id: int | UUID) -> VariableDeclarations.NamedVariable: ...
         def with_prefix(self, prefix: Space) -> VariableDeclarations.NamedVariable: ...
         def with_markers(self, markers: Markers) -> VariableDeclarations.NamedVariable: ...
         def with_name(self, name: Identifier) -> VariableDeclarations.NamedVariable: ...
@@ -2394,7 +2211,7 @@ class VariableDeclarations(Statement, TypedTree):
         def with_variable_type(self, variable_type: Optional[JavaType.Variable]) -> VariableDeclarations.NamedVariable: ...
         def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: VariableDeclarations
 
@@ -2403,7 +2220,7 @@ class VariableDeclarations(Statement, TypedTree):
         @property
         def variables(self) -> List[JRightPadded[VariableDeclarations.NamedVariable]]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _leading_annotations: List[Annotation]
@@ -2414,10 +2231,7 @@ class VariableDeclarations(Statement, TypedTree):
     _variables: List[JRightPadded[NamedVariable]]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -2441,7 +2255,7 @@ class VariableDeclarations(Statement, TypedTree):
 
 @dataclass(frozen=True)
 class WhileLoop(Loop):
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: WhileLoop
 
@@ -2450,17 +2264,14 @@ class WhileLoop(Loop):
         @property
         def body(self) -> JRightPadded[Statement]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _condition: ControlParentheses[Expression]
     _body: JRightPadded[Statement]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -2477,10 +2288,10 @@ class WhileLoop(Loop):
 @dataclass(frozen=True)
 class Wildcard(Expression, TypeTree):
     class Bound(Enum):
-        Extends: Bound
-        Super: Bound
+        Extends = ...
+        Super = ...
 
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: Wildcard
 
@@ -2489,17 +2300,14 @@ class Wildcard(Expression, TypeTree):
         @property
         def bound(self) -> Optional[JLeftPadded[Wildcard.Bound]]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _bound: Optional[JLeftPadded[Bound]]
     _bounded_type: Optional[NameTree]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -2515,16 +2323,13 @@ class Wildcard(Expression, TypeTree):
 
 @dataclass(frozen=True)
 class Yield(Statement):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _implicit: bool
     _value: Expression
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -2540,15 +2345,12 @@ class Yield(Statement):
 class Unknown(Statement, Expression, TypeTree):
     @dataclass(frozen=True)
     class Source(J):
-        _id: UUID
+        _id: int | UUID
         _prefix: Space
         _markers: Markers
         _text: str
 
-        def replace(self, **kwargs: Any) -> Self: ...
 
-        @property
-        def id(self) -> UUID: ...
         @property
         def prefix(self) -> Space: ...
         @property
@@ -2556,21 +2358,18 @@ class Unknown(Statement, Expression, TypeTree):
         @property
         def text(self) -> str: ...
 
-        def with_id(self, id: UUID) -> Unknown.Source: ...
+        def with_id(self, id: int | UUID) -> Unknown.Source: ...
         def with_prefix(self, prefix: Space) -> Unknown.Source: ...
         def with_markers(self, markers: Markers) -> Unknown.Source: ...
         def with_text(self, text: str) -> Unknown.Source: ...
         def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _source: Source
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property
@@ -2582,15 +2381,12 @@ class Unknown(Statement, Expression, TypeTree):
 
 @dataclass(frozen=True)
 class Erroneous(Statement, Expression):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _text: str
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def prefix(self) -> Space: ...
     @property

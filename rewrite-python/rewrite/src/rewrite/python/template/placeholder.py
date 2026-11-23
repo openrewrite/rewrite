@@ -27,7 +27,7 @@ PLACEHOLDER_PREFIX = "__plh_"
 PLACEHOLDER_SUFFIX = "__"
 
 # Regex to find {name} placeholders in template code
-# Matches: {name} or {name:type}
+# Matches {name}, and {name:type} so that substitution can reject the type
 PLACEHOLDER_PATTERN = re.compile(r'\{([a-zA-Z_][a-zA-Z0-9_]*)(?::([^}]+))?\}')
 
 
@@ -156,6 +156,11 @@ def substitute_placeholders(code: str, captures: Dict[str, Capture]) -> Tuple[st
             raise ValueError(
                 f"Placeholder '{{{ph.name}}}' has no corresponding capture. "
                 f"Available captures: {list(captures.keys())}"
+            )
+        if ph.type_hint is not None:
+            raise ValueError(
+                f"Placeholder '{{{ph.name}:{ph.type_hint}}}' declares a type in the code. "
+                f"Use capture('{ph.name}', type_hint='{ph.type_hint}') instead."
             )
 
     # Build result string with substitutions

@@ -1,0 +1,14 @@
+{
+  "modulePath": "example.com/withlocal",
+  "goVersion": "1.22",
+  "toolchain": "",
+  "requires": [
+    {"modulePath": "github.com/x/y", "version": "v0.0.0", "indirect": false}
+  ],
+  "replaces": [
+    {"oldPath": "github.com/x/y", "oldVersion": null, "newPath": "../local/y", "newVersion": null}
+  ],
+  "excludes": [],
+  "retracts": [],
+  "resolvedDependencies": []
+}

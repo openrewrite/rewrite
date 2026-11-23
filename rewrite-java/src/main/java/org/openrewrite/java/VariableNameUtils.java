@@ -19,14 +19,21 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
+import org.openrewrite.java.trait.Scope;
 import org.openrewrite.java.tree.*;
 
 import java.text.Normalizer;
 import java.util.*;
 
+/**
+ * Names for variables a recipe declares, answered from {@link Scope}. A recipe that needs more than a name, such as the
+ * declaration a name reads or whether a rename keeps every name reading the same thing, asks {@link Scope} directly.
+ */
 @Incubating(since = "7.25.0")
 @Value
 public class VariableNameUtils {
+
+    private static final String ENUM_NAMES = VariableNameUtils.class.getName() + ".enumNames";
 
     private VariableNameUtils() {
     }
@@ -40,6 +47,9 @@ public class VariableNameUtils {
      * Since the client recipe may have modified the LST element represented by {@code scope}, this method will
      * visit the value held by {@code scope} once it encounters it in the tree. For this to work, the client recipe
      * must use {@link Cursor#Cursor(Cursor, Object)} to pass a cursor holding the modified LST element.
+     * <p>
+     * {@link Scope#freeName(String, java.util.function.Predicate)} answers the same question, and also passes over the
+     * names a visit has handed out but not yet written into the tree.
      *
      * @param baseName baseName for the variable.
      * @param scope The cursor position of a JavaVisitor, {@link org.openrewrite.java.JavaVisitor#getCursor()}.
@@ -90,19 +100,58 @@ public class VariableNameUtils {
      * Find the names of variables that already exist in the scope of a cursor.
      * A JavaSourceFile must be available in the Cursor path to account for all names
      * available in the cursor scope.
+     * <p>
+     * They include the names of the bindings {@link Scope#visible()} at the cursor and {@link Scope#declaredWithin(Cursor)
+     * declared within} its tree, which {@link Scope} gives with the declaration of each.
      *
      * @param scope The cursor position of a JavaVisitor, {@link org.openrewrite.java.JavaVisitor#getCursor()}.
      * @return Variable names available in the name scope of the cursor.
      */
     public static Set<String> findNamesInScope(Cursor scope) {
-        JavaSourceFile compilationUnit = scope.firstEnclosing(JavaSourceFile.class);
-        if (compilationUnit == null) {
+        if (scope.firstEnclosing(JavaSourceFile.class) == null) {
             throw new IllegalStateException("A JavaSourceFile is required in the cursor path.");
         }
-
         Set<String> names = new HashSet<>();
-        VariableNameScopeVisitor variableNameScopeVisitor = new VariableNameScopeVisitor(scope);
-        variableNameScopeVisitor.visit(compilationUnit, names);
+        Scope.at(scope).visible()
+                .filter(binding -> binding.getNamespace() == Scope.Namespace.VARIABLE)
+                .forEach(binding -> names.add(binding.getName()));
+        Scope.declaredWithin(scope)
+                .filter(binding -> binding.getNamespace() == Scope.Namespace.VARIABLE)
+                .forEach(binding -> names.add(binding.getName()));
+        // A class at or under the cursor has the fields it inherits too, which nothing under it declares.
+        new JavaIsoVisitor<Set<String>>() {
+            @Override
+            public J preVisit(J tree, Set<String> found) {
+                if (tree instanceof J.ClassDeclaration ||
+                    tree instanceof J.NewClass && ((J.NewClass) tree).getBody() != null) {
+                    for (Scope.Binding binding : Scope.at(getCursor()).getBindings()) {
+                        if (binding.getNamespace() == Scope.Namespace.VARIABLE &&
+                            binding.getKind() == Scope.Kind.INHERITED) {
+                            found.add(binding.getName());
+                        }
+                    }
+                }
+                return tree;
+            }
+        }.visit(scope.<J>getValue(), names, scope.getParentOrThrow());
+        // A variable named like an enum the file uses would obscure that enum wherever it qualifies a constant
+        // (JLS 6.4.2).
+        Cursor sourceFile = scope.getValue() instanceof JavaSourceFile ? scope :
+                scope.dropParentUntil(JavaSourceFile.class::isInstance);
+        names.addAll(sourceFile.computeMessageIfAbsent(ENUM_NAMES, k -> {
+            Set<String> enums = new HashSet<>();
+            new JavaIsoVisitor<Set<String>>() {
+                @Override
+                public J.Identifier visitIdentifier(J.Identifier identifier, Set<String> found) {
+                    if (identifier.getType() instanceof JavaType.Class &&
+                        ((JavaType.Class) identifier.getType()).getKind() == JavaType.FullyQualified.Kind.Enum) {
+                        found.add(identifier.getSimpleName());
+                    }
+                    return identifier;
+                }
+            }.visit(sourceFile.<JavaSourceFile>getValue(), enums);
+            return enums;
+        }));
         return names;
     }
 
@@ -110,6 +159,9 @@ public class VariableNameUtils {
      * Collects class field names inherited from super classes.
      * <p>
      * Note: Does not currently account for {@link JavaType.Unknown}.
+     * <p>
+     * The {@link Scope} of a class lists its inherited fields as bindings of kind {@link Scope.Kind#INHERITED}, with
+     * those of its interfaces and its inherited methods.
      */
     public static Set<String> findInheritedNames(J.ClassDeclaration classDeclaration) {
         Set<String> names = new HashSet<>();
@@ -136,161 +188,5 @@ public class VariableNameUtils {
 
     public enum GenerationStrategy {
         INCREMENT_NUMBER
-    }
-
-    private static final class VariableNameScopeVisitor extends JavaIsoVisitor<Set<String>> {
-        private final Cursor scope;
-        private final Map<Cursor, Set<String>> nameScopes;
-        private final Stack<Cursor> currentScope;
-
-        public VariableNameScopeVisitor(Cursor scope) {
-            this.scope = scope;
-            this.nameScopes = new LinkedHashMap<>();
-            this.currentScope = new Stack<>();
-        }
-
-        /**
-         * Aggregates namespaces into specific scopes.
-         * I.E. names declared in a {@link J.ControlParentheses} will belong to the parent AST element.
-         */
-        private Cursor aggregateNameScope() {
-            return getCursor().dropParentUntil(is ->
-                    is instanceof JavaSourceFile ||
-                            is instanceof J.ClassDeclaration ||
-                            is instanceof J.MethodDeclaration ||
-                            is instanceof J.Block ||
-                            is instanceof J.ForLoop ||
-                            is instanceof J.ForEachLoop ||
-                            is instanceof J.Case ||
-                            is instanceof J.Try ||
-                            is instanceof J.Try.Catch ||
-                            is instanceof J.Lambda);
-        }
-
-        @Override
-        public Statement visitStatement(Statement statement, Set<String> namesInScope) {
-            Statement s = super.visitStatement(statement, namesInScope);
-            Cursor aggregatedScope = aggregateNameScope();
-            if (currentScope.isEmpty() || currentScope.peek() != aggregatedScope) {
-                Set<String> namesInAggregatedScope = nameScopes.computeIfAbsent(aggregatedScope, k -> new HashSet<>());
-                // Pass the name scopes available from a parent scope down to the child.
-                if (!currentScope.isEmpty() && aggregatedScope.isScopeInPath(currentScope.peek().getValue())) {
-                    namesInAggregatedScope.addAll(nameScopes.get(currentScope.peek()));
-                }
-                currentScope.push(aggregatedScope);
-            }
-            return s;
-        }
-
-        @Override
-        public @Nullable J preVisit(J tree, Set<String> namesInScope) {
-            // visit value from scope rather than `tree`, since calling recipe may have modified it already
-            return scope.<J> getValue().isScope(tree) ? scope.getValue() : super.preVisit(tree, namesInScope);
-        }
-
-        // Stop after the tree has been processed to ensure all the names in scope have been collected.
-        @Override
-        public @Nullable J postVisit(J tree, Set<String> namesInScope) {
-            if (!currentScope.isEmpty() && currentScope.peek().getValue().equals(tree)) {
-                currentScope.pop();
-            }
-
-            if (scope.getValue().equals(tree)) {
-                Cursor aggregatedScope = getCursor().getValue() instanceof JavaSourceFile ? getCursor() : aggregateNameScope();
-                // Add names from parent scope.
-                Set<String> names = nameScopes.get(aggregatedScope);
-
-                // Add the names created in the target scope.
-                namesInScope.addAll(names);
-                nameScopes.forEach((key, value) -> {
-                    if (key.isScopeInPath(scope.getValue())) {
-                        namesInScope.addAll(value);
-                    }
-                });
-                return tree;
-            }
-
-            return super.postVisit(tree, namesInScope);
-        }
-
-        @Override
-        public J.Import visitImport(J.Import _import, Set<String> namesInScope) {
-            // Skip identifiers from `import`s.
-            return _import;
-        }
-
-        @Override
-        public J.Package visitPackage(J.Package pkg, Set<String> namesInScope) {
-            // Skip identifiers from `package`.
-            return pkg;
-        }
-
-        @Override
-        public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Set<String> namesInScope) {
-            // Collect class fields first, because class fields are always visible regardless of what order the statements are declared.
-            classDecl.getBody().getStatements().forEach(o -> {
-                if (o instanceof J.VariableDeclarations) {
-                    J.VariableDeclarations variableDeclarations = (J.VariableDeclarations) o;
-                    variableDeclarations.getVariables().forEach(v ->
-                            nameScopes.computeIfAbsent(getCursor(), k -> new HashSet<>()).add(v.getSimpleName()));
-                }
-            });
-
-            addImportedStaticFieldNames(getCursor().firstEnclosing(JavaSourceFile.class), getCursor());
-            if (classDecl.getType() != null) {
-                namesInScope.addAll(findInheritedNames(classDecl));
-            }
-            return super.visitClassDeclaration(classDecl, namesInScope);
-        }
-
-        @Override
-        public J.InstanceOf visitInstanceOf(J.InstanceOf instanceOf, Set<String> strings) {
-            if (instanceOf.getPattern() instanceof J.Identifier) {
-                Set<String> names = nameScopes.get(currentScope.peek());
-                if (names != null) {
-                    names.add(((J.Identifier)instanceOf.getPattern()).getSimpleName());
-                }
-            }
-            return super.visitInstanceOf(instanceOf, strings);
-        }
-
-        @Override
-        public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Set<String> strings) {
-            Set<String> names = nameScopes.get(currentScope.peek());
-            if (names != null) {
-                names.add(variable.getSimpleName());
-            }
-            return super.visitVariable(variable, strings);
-        }
-
-        @Override
-        public J.Identifier visitIdentifier(J.Identifier identifier, Set<String> namesInScope) {
-            J.Identifier v = super.visitIdentifier(identifier, namesInScope);
-            if (v.getType() instanceof JavaType.Class &&
-                    ((JavaType.Class) v.getType()).getKind() == JavaType.FullyQualified.Kind.Enum) {
-                namesInScope.add(v.getSimpleName());
-            }
-            return v;
-        }
-
-        private void addImportedStaticFieldNames(@Nullable JavaSourceFile cu, Cursor classCursor) {
-            if (cu != null) {
-                List<J.Import> imports = cu.getImports();
-                imports.forEach(i -> {
-                    if (i.isStatic()) {
-                        // Note: Currently, adds all statically imported identifiers including method and classes rather than restricting the names to static fields.
-                        Set<String> namesAtCursor = nameScopes.computeIfAbsent(classCursor, k -> new HashSet<>());
-                        if (isValidImportName(i.getQualid().getTarget().getType(), i.getQualid().getSimpleName())) {
-                            namesAtCursor.add(i.getQualid().getSimpleName());
-                        }
-                    }
-                });
-            }
-        }
-
-        private boolean isValidImportName(@Nullable JavaType targetType, String name) {
-            // Consider the id a valid field if the type is null since it is indistinguishable from a method name or class name.
-            return targetType == null || (targetType instanceof JavaType.FullyQualified && ((JavaType.FullyQualified) targetType).getMembers().stream().anyMatch(o -> o.getName().equals(name)));
-        }
     }
 }

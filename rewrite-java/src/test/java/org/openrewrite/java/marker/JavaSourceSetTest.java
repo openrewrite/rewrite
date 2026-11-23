@@ -21,6 +21,7 @@ import org.openrewrite.java.tree.JavaType;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
@@ -65,10 +66,46 @@ class JavaSourceSetTest {
           .containsExactly("net.bytebuddy.asm.Advice");
     }
 
+    @Test
+    void relativeDirectoryClasspath() throws Exception {
+        Files.createDirectories(tempDir.resolve("net/bytebuddy/asm"));
+        Files.write(tempDir.resolve("net/bytebuddy/asm/Advice.class"), new byte[]{(byte) 0xCA, (byte) 0xFE, (byte) 0xBA, (byte) 0xBE});
+
+        List<JavaType.FullyQualified> types = JavaSourceSet.typesFromPath(Paths.get("").toAbsolutePath().relativize(tempDir), null);
+
+        assertThat(types)
+          .extracting(JavaType.FullyQualified::getFullyQualifiedName)
+          .containsExactly("net.bytebuddy.asm.Advice");
+    }
+
     private static void writeEntry(JarOutputStream jos, String name, byte[] content) throws java.io.IOException {
         JarEntry entry = new JarEntry(name);
         jos.putNextEntry(entry);
         jos.write(content);
         jos.closeEntry();
+    }
+
+    @Test
+    void gavFromTypeTableClassesDirPath() {
+        Path p = Paths.get(System.getProperty("user.home"),
+          ".rewrite/classpath/.tt/org/junit/jupiter/junit-jupiter-api/6.0.2");
+        assertThat(JavaSourceSet.gavFromPath(p))
+          .isEqualTo("org.junit.jupiter:junit-jupiter-api:6.0.2");
+    }
+
+    @Test
+    void gavFromTypeTableJarPath() {
+        Path p = Paths.get(System.getProperty("user.home"),
+          ".rewrite/classpath/.tt/org/junit/jupiter/junit-jupiter-api/6.0.2/junit-jupiter-api-6.0.2.jar");
+        assertThat(JavaSourceSet.gavFromPath(p))
+          .isEqualTo("org.junit.jupiter:junit-jupiter-api:6.0.2");
+    }
+
+    @Test
+    void gavFromGradleCachePath() {
+        Path p = Paths.get(System.getProperty("user.home"),
+          ".gradle/caches/modules-2/files-2.1/org.openrewrite/rewrite-core/8.32.0/64ddcc371f1bf29593b4b27e907757d5554d1a83/rewrite-core-8.32.0.jar");
+        assertThat(JavaSourceSet.gavFromPath(p))
+          .isEqualTo("org.openrewrite:rewrite-core:8.32.0");
     }
 }

@@ -18,6 +18,12 @@ package org.openrewrite.python.rpc;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 
+/**
+ * Response to an {@code InstallRecipes} RPC request. The reader gets the bundle's recipes from a
+ * follow-up {@code GetMarketplace} call, whose rows now carry each recipe's origin
+ * {@code packageName} so the host attributes each to its own bundle — so this response only needs
+ * to report how many recipes were installed and the resolved version.
+ */
 @Value
 public class InstallRecipesResponse {
     int recipesInstalled;

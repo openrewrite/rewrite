@@ -57,6 +57,17 @@ public class PathUtils {
         return separatorsToSystem(a).equals(separatorsToSystem(b));
     }
 
+    /**
+     * Whether {@code path} is usable as a {@link SourceFile} source path: relative and already normalized.
+     */
+    public static boolean isValidSourcePath(Path path) {
+        if (path.isAbsolute() || path.toString().isEmpty()) {
+            return false;
+        }
+        Path normalized = path.normalize();
+        return !normalized.startsWith("..") && normalized.equals(path);
+    }
+
     public static String separatorsToUnix(String path) {
         return path.replace(WINDOWS_SEPARATOR, UNIX_SEPARATOR);
     }
@@ -70,6 +81,21 @@ public class PathUtils {
             return separatorsToWindows(path);
         }
         return separatorsToUnix(path);
+    }
+
+    /**
+     * Join the elements of {@code path} with forward slashes, keeping any backslash that is part of a file name.
+     */
+    public static String toSlashPath(Path path) {
+        Path root = path.getRoot();
+        StringBuilder slashPath = new StringBuilder(root == null ? "" : separatorsToUnix(root.toString()));
+        for (int i = 0; i < path.getNameCount(); i++) {
+            if (i > 0) {
+                slashPath.append(UNIX_SEPARATOR);
+            }
+            slashPath.append(path.getName(i));
+        }
+        return slashPath.toString();
     }
 
     public static boolean matchesGlob(@Nullable Path path, @Nullable String globPattern) {

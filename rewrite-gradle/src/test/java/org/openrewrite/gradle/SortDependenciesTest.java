@@ -220,4 +220,134 @@ class SortDependenciesTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void preservesCommentsAttachedToDependencies() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  // Spring web for the controllers
+                  implementation "org.springframework:spring-web:5.3.23"
+                  // Guava for collection helpers
+                  api "com.google.guava:guava:31.1-jre"
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  // Guava for collection helpers
+                  api "com.google.guava:guava:31.1-jre"
+                  // Spring web for the controllers
+                  implementation "org.springframework:spring-web:5.3.23"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void preservesCommentsAttachedToDependenciesKotlinDsl() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  // Spring web for the controllers
+                  implementation("org.springframework:spring-web:5.3.23")
+
+                  // Guava for collection helpers
+                  api("com.google.guava:guava:31.1-jre")
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  // Guava for collection helpers
+                  api("com.google.guava:guava:31.1-jre")
+
+                  // Spring web for the controllers
+                  implementation("org.springframework:spring-web:5.3.23")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void preservesCommentsBlocksWithBlankLines() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  // Enable the Swing console
+                  implementation "org.springframework:spring-web:5.3.23"
+
+                  // Enable Guava
+                  api "com.google.guava:guava:31.1-jre"
+
+                  // Enable JUnit
+                  testImplementation "org.junit.jupiter:junit-jupiter-api:5.9.1"
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  // Enable Guava
+                  api "com.google.guava:guava:31.1-jre"
+
+                  // Enable the Swing console
+                  implementation "org.springframework:spring-web:5.3.23"
+
+                  // Enable JUnit
+                  testImplementation "org.junit.jupiter:junit-jupiter-api:5.9.1"
+              }
+              """
+          )
+        );
+    }
 }

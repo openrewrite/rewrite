@@ -1,0 +1,12 @@
+{
+  "modulePath": "example.com/withretract",
+  "goVersion": "1.22",
+  "toolchain": "",
+  "requires": [],
+  "replaces": [],
+  "excludes": [],
+  "retracts": [
+    {"versionRange": "v0.0.5", "rationale": "accidentally deleted main.go"}
+  ],
+  "resolvedDependencies": []
+}

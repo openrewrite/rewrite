@@ -2,7 +2,7 @@ plugins {
     id("org.openrewrite.build.language-library")
 }
 
-val antlrGeneration by configurations.creating {
+val antlrGeneration = configurations.create("antlrGeneration") {
     extendsFrom(configurations.implementation.get())
 }
 tasks.register<JavaExec>("generateAntlrSources") {
@@ -28,12 +28,11 @@ dependencies {
 
     implementation("org.antlr:antlr4-runtime:4.13.2")
     implementation("org.yaml:snakeyaml:latest.release")
-    implementation("io.micrometer:micrometer-core:1.9.+")
 
     antlrGeneration("org.antlr:antlr4:4.13.2"){
         exclude(group = "com.ibm.icu", module = "icu4j")
     }
 
     testImplementation(project(":rewrite-test"))
-    testImplementation("org.junit-pioneer:junit-pioneer:2.0.0")
+    testImplementation("org.junit-pioneer:junit-pioneer:latest.release")
 }

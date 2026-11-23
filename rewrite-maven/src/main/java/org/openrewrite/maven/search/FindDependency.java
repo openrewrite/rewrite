@@ -19,8 +19,11 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.java.marker.JavaProject;
+import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.MavenIsoVisitor;
+import org.openrewrite.maven.table.DependenciesDeclared;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
@@ -33,6 +36,7 @@ import java.util.function.Supplier;
 @EqualsAndHashCode(callSuper = false)
 @Value
 public class FindDependency extends Recipe {
+    transient DependenciesDeclared dependenciesDeclared = new DependenciesDeclared(this);
 
     @Option(displayName = "Group",
             description = "The first part of a dependency coordinate `com.google.guava:guava:VERSION`. Supports glob.",
@@ -87,15 +91,44 @@ public class FindDependency extends Recipe {
         return String.format("`%s:%s%s`", groupId, artifactId, maybeVersionSuffix);
     }
 
-    String description = "Finds first-order dependency uses, i.e. dependencies that are defined directly in a project.";
+    String description = "Finds first-order dependency uses, i.e. dependencies that are defined directly in a project. " +
+                         "Each match is also recorded as a row in the `DependenciesDeclared` data table.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new MavenIsoVisitor<ExecutionContext>() {
+            String projectName = "";
+            String sourceSetName = "main";
+
+            @Override
+            public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
+                projectName = document.getMarkers()
+                        .findFirst(JavaProject.class)
+                        .map(JavaProject::getProjectName)
+                        .orElse("");
+                sourceSetName = document.getMarkers()
+                        .findFirst(JavaSourceSet.class)
+                        .map(JavaSourceSet::getName)
+                        .orElse("main");
+                return super.visitDocument(document, ctx);
+            }
+
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 if (isDependencyTag(groupId, artifactId) &&
                     versionIsValid(version, versionPattern, () -> findDependency(tag))) {
+                    ResolvedDependency resolved = findDependency(tag);
+                    if (resolved != null) {
+                        dependenciesDeclared.insertRow(ctx, new DependenciesDeclared.Row(
+                                projectName,
+                                sourceSetName,
+                                resolved.getGroupId(),
+                                resolved.getArtifactId(),
+                                resolved.getVersion(),
+                                resolved.getDatedSnapshotVersion(),
+                                tag.getChildValue("scope").orElse("compile")
+                        ));
+                    }
                     return SearchResult.found(tag);
                 }
                 return super.visitTag(tag, ctx);

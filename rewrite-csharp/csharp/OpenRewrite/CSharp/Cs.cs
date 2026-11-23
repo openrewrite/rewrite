@@ -16,6 +16,7 @@
 using OpenRewrite.Core;
 using OpenRewrite.Core.Rpc;
 using OpenRewrite.Java;
+using OpenRewrite.Java.Rpc;
 
 namespace OpenRewrite.CSharp;
 
@@ -51,6 +52,20 @@ public sealed class ExpressionStatement(
     // ExpressionStatement delegates prefix/markers to its expression
     public Space Prefix => Expression.Prefix;
     public Markers Markers => Expression.Markers;
+
+    /// <summary>
+    /// Delegates to the wrapped expression, mirroring <see cref="Markers"/>. Without it the
+    /// reflective wither lookup in <c>Markup</c>/<c>SearchResult</c> finds nothing on this type,
+    /// so marking a bare expression statement (<c>Foo();</c>) would silently drop the marker.
+    /// </summary>
+    public ExpressionStatement WithMarkers(Markers markers) =>
+        WithExpression(J.SetMarkers(Expression, markers));
+
+    /// <summary>
+    /// Delegates to the wrapped expression, mirroring <see cref="Prefix"/>.
+    /// </summary>
+    public ExpressionStatement WithPrefix(Space prefix) =>
+        WithExpression(J.SetPrefix(Expression, prefix));
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -229,6 +244,9 @@ public sealed class AccessorDeclaration(
     public IList<Modifier> Modifiers { get; } = modifiers;
     public JLeftPadded<AccessorKind> Kind { get; } = kind;
     public Block? Body { get; } = body;
+    // For auto-implemented accessors (e.g. "get ;"), Element is a J.Empty whose Prefix
+    // carries any whitespace between the keyword and the trailing ';'. For "get => x;" the
+    // Element is the body expression and Before is the space before '=>'.
     public JLeftPadded<Expression>? ExpressionBody { get; } = expressionBody;
 
     public AccessorDeclaration WithId(Guid id) =>
@@ -308,7 +326,7 @@ public sealed class DelegateInvocation(
     public DelegateInvocation RpcReceive(DelegateInvocation before, RpcReceiveQueue q) =>
         before.WithId(q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse));
 
-    public static DelegateInvocation Instance { get; } = new(Guid.Empty);
+    public static DelegateInvocation Instance { get; } = new(new Guid("1e5a0003-0000-4000-8000-000000000003"));
 
     public bool Equals(DelegateInvocation? other) => other is not null && Id == other.Id;
     public override bool Equals(object? obj) => Equals(obj as DelegateInvocation);
@@ -342,20 +360,32 @@ public sealed class PrimaryConstructor(
 /// Marker indicating a struct declaration.
 /// Applied to ClassDeclaration to distinguish structs from classes.
 /// The printer checks for this marker and prints "struct" instead of "class".
-/// For record structs, both KindType.Record and Struct marker are used.
+/// For record structs, both KindType.Record and Struct marker are used, and <see cref="Prefix"/>
+/// holds the space between <c>record</c> and <c>struct</c>.
 /// </summary>
 public sealed class Struct(
-    Guid id
+    Guid id,
+    Space? prefix = null
 ) : Marker, IRpcCodec<Struct>, IEquatable<Struct>
 {
     public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix ?? Space.Empty;
 
     public Struct WithId(Guid id) =>
-        id == Id ? this : new(id);
+        id == Id ? this : new(id, Prefix);
+    public Struct WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix);
 
-    public void RpcSend(Struct after, RpcSendQueue q) => q.GetAndSend(after, m => m.Id);
+    public void RpcSend(Struct after, RpcSendQueue q)
+    {
+        q.GetAndSend(after, m => m.Id);
+        q.GetAndSend(after, m => JavaSender.SpaceRef(m.Prefix), s => new JavaSender().VisitSpace(Rewrite.Core.Rpc.Reference.GetValueNonNull<Space>(s), q));
+    }
+
     public Struct RpcReceive(Struct before, RpcReceiveQueue q) =>
-        before.WithId(q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse));
+        before
+            .WithId(q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse))
+            .WithPrefix(q.Receive(before.Prefix, s => new JavaReceiver().VisitSpace(s, q)));
 
     public bool Equals(Struct? other) => other is not null && Id == other.Id;
     public override bool Equals(object? obj) => Equals(obj as Struct);
@@ -366,19 +396,31 @@ public sealed class Struct(
 /// Marker indicating "record class" syntax was used (vs. just "record").
 /// Applied to ClassDeclaration to preserve the explicit "class" keyword.
 /// The printer checks for this marker and prints "record class" instead of "record".
+/// <see cref="Prefix"/> holds the space between <c>record</c> and <c>class</c>.
 /// </summary>
 public sealed class RecordClass(
-    Guid id
+    Guid id,
+    Space? prefix = null
 ) : Marker, IRpcCodec<RecordClass>, IEquatable<RecordClass>
 {
     public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix ?? Space.Empty;
 
     public RecordClass WithId(Guid id) =>
-        id == Id ? this : new(id);
+        id == Id ? this : new(id, Prefix);
+    public RecordClass WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix);
 
-    public void RpcSend(RecordClass after, RpcSendQueue q) => q.GetAndSend(after, m => m.Id);
+    public void RpcSend(RecordClass after, RpcSendQueue q)
+    {
+        q.GetAndSend(after, m => m.Id);
+        q.GetAndSend(after, m => JavaSender.SpaceRef(m.Prefix), s => new JavaSender().VisitSpace(Rewrite.Core.Rpc.Reference.GetValueNonNull<Space>(s), q));
+    }
+
     public RecordClass RpcReceive(RecordClass before, RpcReceiveQueue q) =>
-        before.WithId(q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse));
+        before
+            .WithId(q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse))
+            .WithPrefix(q.Receive(before.Prefix, s => new JavaReceiver().VisitSpace(s, q)));
 
     public bool Equals(RecordClass? other) => other is not null && Id == other.Id;
     public override bool Equals(object? obj) => Equals(obj as RecordClass);
@@ -468,7 +510,7 @@ public sealed class NullCoalescing(
     public NullCoalescing RpcReceive(NullCoalescing before, RpcReceiveQueue q) =>
         before.WithId(q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse));
 
-    public static NullCoalescing Instance { get; } = new(Guid.Empty);
+    public static NullCoalescing Instance { get; } = new(new Guid("1e5a0004-0000-4000-8000-000000000004"));
 
     public bool Equals(NullCoalescing? other) => other is not null && Id == other.Id;
     public override bool Equals(object? obj) => Equals(obj as NullCoalescing);
@@ -493,7 +535,7 @@ public sealed class MultiDimensionalArray(
     public MultiDimensionalArray RpcReceive(MultiDimensionalArray before, RpcReceiveQueue q) =>
         before.WithId(q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse));
 
-    public static MultiDimensionalArray Instance { get; } = new(Guid.Empty);
+    public static MultiDimensionalArray Instance { get; } = new(new Guid("1e5a0005-0000-4000-8000-000000000005"));
 
     public bool Equals(MultiDimensionalArray? other) => other is not null && Id == other.Id;
     public override bool Equals(object? obj) => Equals(obj as MultiDimensionalArray);
@@ -512,7 +554,7 @@ public sealed class PatternCombinator(Guid id)
     public PatternCombinator WithId(Guid id) =>
         id == Id ? this : new(id);
 
-    public static PatternCombinator Instance { get; } = new(Guid.Empty);
+    public static PatternCombinator Instance { get; } = new(new Guid("1e5a0006-0000-4000-8000-000000000006"));
     public void RpcSend(PatternCombinator after, RpcSendQueue q) => q.GetAndSend(after, m => m.Id);
     public PatternCombinator RpcReceive(PatternCombinator before, RpcReceiveQueue q) =>
         before.WithId(q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse));
@@ -594,7 +636,7 @@ public sealed class MultiDimensionContinuation(Guid id)
     public MultiDimensionContinuation WithId(Guid id) =>
         id == Id ? this : new(id);
 
-    public static MultiDimensionContinuation Instance { get; } = new(Guid.Empty);
+    public static MultiDimensionContinuation Instance { get; } = new(new Guid("1e5a0007-0000-4000-8000-000000000007"));
     public void RpcSend(MultiDimensionContinuation after, RpcSendQueue q) => q.GetAndSend(after, m => m.Id);
     public MultiDimensionContinuation RpcReceive(MultiDimensionContinuation before, RpcReceiveQueue q) =>
         before.WithId(q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse));
@@ -853,14 +895,15 @@ public sealed class IsPattern(
     Space prefix,
     Markers markers,
     Expression expression,
-    JLeftPadded<Pattern> pattern
+    JLeftPadded<Expression> pattern
 ) : Cs, Expression, IEquatable<IsPattern>
 {
     public Guid Id { get; } = id;
     public Space Prefix { get; } = prefix;
     public Markers Markers { get; } = markers;
     public Expression Expression { get; } = expression;
-    public JLeftPadded<Pattern> Pattern { get; } = pattern;
+    // Widened from Pattern to Expression so parenthesized patterns (J.Parentheses<Expression>) fit too.
+    public JLeftPadded<Expression> Pattern { get; } = pattern;
 
     public IsPattern WithId(Guid id) =>
         id == Id ? this : new(id, Prefix, Markers, Expression, Pattern);
@@ -870,7 +913,7 @@ public sealed class IsPattern(
         ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Expression, Pattern);
     public IsPattern WithExpression(Expression expression) =>
         ReferenceEquals(expression, Expression) ? this : new(Id, Prefix, Markers, expression, Pattern);
-    public IsPattern WithPattern(JLeftPadded<Pattern> pattern) =>
+    public IsPattern WithPattern(JLeftPadded<Expression> pattern) =>
         ReferenceEquals(pattern, Pattern) ? this : new(Id, Prefix, Markers, Expression, pattern);
 
     public JavaType? Type => JavaType.Primitive.Of(JavaType.PrimitiveKind.Boolean);
@@ -923,31 +966,66 @@ public sealed class SizeOf(
     Guid id,
     Space prefix,
     Markers markers,
-    Expression expression,
+    ControlParentheses<TypeTree> clazz,
     JavaType? type
 ) : Cs, Expression, IEquatable<SizeOf>
 {
     public Guid Id { get; } = id;
     public Space Prefix { get; } = prefix;
     public Markers Markers { get; } = markers;
-    public Expression Expression { get; } = expression;
+    public ControlParentheses<TypeTree> Clazz { get; } = clazz;
     public JavaType? Type { get; } = type;
 
     public SizeOf WithId(Guid id) =>
-        id == Id ? this : new(id, Prefix, Markers, Expression, Type);
+        id == Id ? this : new(id, Prefix, Markers, Clazz, Type);
     public SizeOf WithPrefix(Space prefix) =>
-        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Expression, Type);
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Clazz, Type);
     public SizeOf WithMarkers(Markers markers) =>
-        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Expression, Type);
-    public SizeOf WithExpression(Expression expression) =>
-        ReferenceEquals(expression, Expression) ? this : new(Id, Prefix, Markers, expression, Type);
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Clazz, Type);
+    public SizeOf WithClazz(ControlParentheses<TypeTree> clazz) =>
+        ReferenceEquals(clazz, Clazz) ? this : new(Id, Prefix, Markers, clazz, Type);
     public SizeOf WithType(JavaType? type) =>
-        ReferenceEquals(type, Type) ? this : new(Id, Prefix, Markers, Expression, type);
+        ReferenceEquals(type, Type) ? this : new(Id, Prefix, Markers, Clazz, type);
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
     public bool Equals(SizeOf? other) => other is not null && Id == other.Id;
     public override bool Equals(object? obj) => Equals(obj as SizeOf);
+    public override int GetHashCode() => Id.GetHashCode();
+}
+
+/// <summary>
+/// A C# typeof expression, e.g. typeof(int).
+/// </summary>
+public sealed class TypeOf(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    ControlParentheses<TypeTree> clazz,
+    JavaType? type
+) : Cs, Expression, IEquatable<TypeOf>
+{
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public ControlParentheses<TypeTree> Clazz { get; } = clazz;
+    public JavaType? Type { get; } = type;
+
+    public TypeOf WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, Clazz, Type);
+    public TypeOf WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Clazz, Type);
+    public TypeOf WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Clazz, Type);
+    public TypeOf WithClazz(ControlParentheses<TypeTree> clazz) =>
+        ReferenceEquals(clazz, Clazz) ? this : new(Id, Prefix, Markers, clazz, Type);
+    public TypeOf WithType(JavaType? type) =>
+        ReferenceEquals(type, Type) ? this : new(Id, Prefix, Markers, Clazz, type);
+
+    Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(TypeOf? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as TypeOf);
     public override int GetHashCode() => Id.GetHashCode();
 }
 
@@ -1304,7 +1382,9 @@ public sealed class PragmaWarningDirective(
     Space prefix,
     Markers markers,
     PragmaWarningAction action,
-    IList<JRightPadded<Expression>> warningCodes
+    IList<JRightPadded<Expression>> warningCodes,
+    Space keywordSpacing,
+    Space actionSpacing
 ) : Cs, Statement, IEquatable<PragmaWarningDirective>
 {
     public Guid Id { get; } = id;
@@ -1313,16 +1393,26 @@ public sealed class PragmaWarningDirective(
     public PragmaWarningAction Action { get; } = action;
     public IList<JRightPadded<Expression>> WarningCodes { get; } = warningCodes;
 
+    /// <summary>Whitespace between <c>#pragma</c> and <c>warning</c> (usually a single space).</summary>
+    public Space KeywordSpacing { get; } = keywordSpacing;
+
+    /// <summary>Whitespace between <c>warning</c> and the action keyword (<c>disable</c>/<c>restore</c>).</summary>
+    public Space ActionSpacing { get; } = actionSpacing;
+
     public PragmaWarningDirective WithId(Guid id) =>
-        id == Id ? this : new(id, Prefix, Markers, Action, WarningCodes);
+        id == Id ? this : new(id, Prefix, Markers, Action, WarningCodes, KeywordSpacing, ActionSpacing);
     public PragmaWarningDirective WithPrefix(Space prefix) =>
-        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Action, WarningCodes);
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Action, WarningCodes, KeywordSpacing, ActionSpacing);
     public PragmaWarningDirective WithMarkers(Markers markers) =>
-        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Action, WarningCodes);
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Action, WarningCodes, KeywordSpacing, ActionSpacing);
     public PragmaWarningDirective WithAction(PragmaWarningAction action) =>
-        action == Action ? this : new(Id, Prefix, Markers, action, WarningCodes);
+        action == Action ? this : new(Id, Prefix, Markers, action, WarningCodes, KeywordSpacing, ActionSpacing);
     public PragmaWarningDirective WithWarningCodes(IList<JRightPadded<Expression>> warningCodes) =>
-        ReferenceEquals(warningCodes, WarningCodes) ? this : new(Id, Prefix, Markers, Action, warningCodes);
+        ReferenceEquals(warningCodes, WarningCodes) ? this : new(Id, Prefix, Markers, Action, warningCodes, KeywordSpacing, ActionSpacing);
+    public PragmaWarningDirective WithKeywordSpacing(Space keywordSpacing) =>
+        ReferenceEquals(keywordSpacing, KeywordSpacing) ? this : new(Id, Prefix, Markers, Action, WarningCodes, keywordSpacing, ActionSpacing);
+    public PragmaWarningDirective WithActionSpacing(Space actionSpacing) =>
+        ReferenceEquals(actionSpacing, ActionSpacing) ? this : new(Id, Prefix, Markers, Action, WarningCodes, KeywordSpacing, actionSpacing);
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -1338,22 +1428,30 @@ public sealed class PragmaChecksumDirective(
     Guid id,
     Space prefix,
     Markers markers,
+    Space keywordSpacing,
     string arguments
 ) : Cs, Statement, IEquatable<PragmaChecksumDirective>
 {
     public Guid Id { get; } = id;
     public Space Prefix { get; } = prefix;
     public Markers Markers { get; } = markers;
+
+    /// <summary>Whitespace between <c>#pragma</c> and <c>checksum</c> (usually a single space).</summary>
+    public Space KeywordSpacing { get; } = keywordSpacing;
+
+    /// <summary>The raw text following <c>checksum</c> (file/guid/hash), whitespace preserved verbatim.</summary>
     public string Arguments { get; } = arguments;
 
     public PragmaChecksumDirective WithId(Guid id) =>
-        id == Id ? this : new(id, Prefix, Markers, Arguments);
+        id == Id ? this : new(id, Prefix, Markers, KeywordSpacing, Arguments);
     public PragmaChecksumDirective WithPrefix(Space prefix) =>
-        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Arguments);
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, KeywordSpacing, Arguments);
     public PragmaChecksumDirective WithMarkers(Markers markers) =>
-        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Arguments);
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, KeywordSpacing, Arguments);
+    public PragmaChecksumDirective WithKeywordSpacing(Space keywordSpacing) =>
+        ReferenceEquals(keywordSpacing, KeywordSpacing) ? this : new(Id, Prefix, Markers, keywordSpacing, Arguments);
     public PragmaChecksumDirective WithArguments(string arguments) =>
-        arguments == Arguments ? this : new(Id, Prefix, Markers, arguments);
+        arguments == Arguments ? this : new(Id, Prefix, Markers, KeywordSpacing, arguments);
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -1372,7 +1470,8 @@ public sealed class NullableDirective(
     NullableSetting setting,
     NullableTarget? target,
     string hashSpacing = "",
-    string trailingComment = ""
+    string trailingComment = "",
+    string keywordSpacing = " "
 ) : Cs, Statement, IEquatable<NullableDirective>
 {
     public Guid Id { get; } = id;
@@ -1382,21 +1481,25 @@ public sealed class NullableDirective(
     public NullableTarget? Target { get; } = target;
     public string HashSpacing { get; } = hashSpacing;
     public string TrailingComment { get; } = trailingComment;
+    // Whitespace between the "nullable" keyword and the setting keyword (e.g. "  " in "#nullable  enable").
+    public string KeywordSpacing { get; } = keywordSpacing;
 
     public NullableDirective WithId(Guid id) =>
-        id == Id ? this : new(id, Prefix, Markers, Setting, Target, HashSpacing, TrailingComment);
+        id == Id ? this : new(id, Prefix, Markers, Setting, Target, HashSpacing, TrailingComment, KeywordSpacing);
     public NullableDirective WithPrefix(Space prefix) =>
-        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Setting, Target, HashSpacing, TrailingComment);
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Setting, Target, HashSpacing, TrailingComment, KeywordSpacing);
     public NullableDirective WithMarkers(Markers markers) =>
-        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Setting, Target, HashSpacing, TrailingComment);
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Setting, Target, HashSpacing, TrailingComment, KeywordSpacing);
     public NullableDirective WithSetting(NullableSetting setting) =>
-        setting == Setting ? this : new(Id, Prefix, Markers, setting, Target, HashSpacing, TrailingComment);
+        setting == Setting ? this : new(Id, Prefix, Markers, setting, Target, HashSpacing, TrailingComment, KeywordSpacing);
     public NullableDirective WithTarget(NullableTarget? target) =>
-        target == Target ? this : new(Id, Prefix, Markers, Setting, target, HashSpacing, TrailingComment);
+        target == Target ? this : new(Id, Prefix, Markers, Setting, target, HashSpacing, TrailingComment, KeywordSpacing);
     public NullableDirective WithHashSpacing(string hashSpacing) =>
-        string.Equals(hashSpacing, HashSpacing, StringComparison.Ordinal) ? this : new(Id, Prefix, Markers, Setting, Target, hashSpacing, TrailingComment);
+        string.Equals(hashSpacing, HashSpacing, StringComparison.Ordinal) ? this : new(Id, Prefix, Markers, Setting, Target, hashSpacing, TrailingComment, KeywordSpacing);
     public NullableDirective WithTrailingComment(string trailingComment) =>
-        string.Equals(trailingComment, TrailingComment, StringComparison.Ordinal) ? this : new(Id, Prefix, Markers, Setting, Target, HashSpacing, trailingComment);
+        string.Equals(trailingComment, TrailingComment, StringComparison.Ordinal) ? this : new(Id, Prefix, Markers, Setting, Target, HashSpacing, trailingComment, KeywordSpacing);
+    public NullableDirective WithKeywordSpacing(string keywordSpacing) =>
+        string.Equals(keywordSpacing, KeywordSpacing, StringComparison.Ordinal) ? this : new(Id, Prefix, Markers, Setting, Target, HashSpacing, TrailingComment, keywordSpacing);
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -2579,26 +2682,26 @@ public sealed class UsingStatement(
     Guid id,
     Space prefix,
     Markers markers,
-    JLeftPadded<Expression> expressionPadded,
+    ControlParentheses<Expression> expression,
     Statement statement
 ) : Cs, Statement, IEquatable<UsingStatement>
 {
     public Guid Id { get; } = id;
     public Space Prefix { get; } = prefix;
     public Markers Markers { get; } = markers;
-    public JLeftPadded<Expression> ExpressionPadded { get; } = expressionPadded;
+    public ControlParentheses<Expression> Expression { get; } = expression;
     public Statement Statement { get; } = statement;
 
     public UsingStatement WithId(Guid id) =>
-        id == Id ? this : new(id, Prefix, Markers, ExpressionPadded, Statement);
+        id == Id ? this : new(id, Prefix, Markers, Expression, Statement);
     public UsingStatement WithPrefix(Space prefix) =>
-        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, ExpressionPadded, Statement);
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Expression, Statement);
     public UsingStatement WithMarkers(Markers markers) =>
-        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, ExpressionPadded, Statement);
-    public UsingStatement WithExpressionPadded(JLeftPadded<Expression> expressionPadded) =>
-        ReferenceEquals(expressionPadded, ExpressionPadded) ? this : new(Id, Prefix, Markers, expressionPadded, Statement);
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Expression, Statement);
+    public UsingStatement WithExpression(ControlParentheses<Expression> expression) =>
+        ReferenceEquals(expression, Expression) ? this : new(Id, Prefix, Markers, expression, Statement);
     public UsingStatement WithStatement(Statement statement) =>
-        ReferenceEquals(statement, Statement) ? this : new(Id, Prefix, Markers, ExpressionPadded, statement);
+        ReferenceEquals(statement, Statement) ? this : new(Id, Prefix, Markers, Expression, statement);
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -3369,7 +3472,8 @@ public sealed class ConversionOperatorDeclaration(
     JLeftPadded<TypeTree> returnType,
     JContainer<Statement> parameters,
     JLeftPadded<Expression>? expressionBody,
-    Block? body
+    Block? body,
+    JavaType.Method? methodType
 ) : Cs, Statement, IEquatable<ConversionOperatorDeclaration>
 {
     public Guid Id { get; } = id;
@@ -3383,27 +3487,30 @@ public sealed class ConversionOperatorDeclaration(
     public JContainer<Statement> Parameters { get; } = parameters;
     public JLeftPadded<Expression>? ExpressionBody { get; } = expressionBody;
     public Block? Body { get; } = body;
+    public JavaType.Method? MethodType { get; } = methodType;
 
     public ConversionOperatorDeclaration WithId(Guid id) =>
-        id == Id ? this : new(id, Prefix, Markers, Modifiers, Kind, InterfaceSpecifier, ReturnType, Parameters, ExpressionBody, Body);
+        id == Id ? this : new(id, Prefix, Markers, Modifiers, Kind, InterfaceSpecifier, ReturnType, Parameters, ExpressionBody, Body, MethodType);
     public ConversionOperatorDeclaration WithPrefix(Space prefix) =>
-        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Modifiers, Kind, InterfaceSpecifier, ReturnType, Parameters, ExpressionBody, Body);
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Modifiers, Kind, InterfaceSpecifier, ReturnType, Parameters, ExpressionBody, Body, MethodType);
     public ConversionOperatorDeclaration WithMarkers(Markers markers) =>
-        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Modifiers, Kind, InterfaceSpecifier, ReturnType, Parameters, ExpressionBody, Body);
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Modifiers, Kind, InterfaceSpecifier, ReturnType, Parameters, ExpressionBody, Body, MethodType);
     public ConversionOperatorDeclaration WithModifiers(IList<Modifier> modifiers) =>
-        ReferenceEquals(modifiers, Modifiers) ? this : new(Id, Prefix, Markers, modifiers, Kind, InterfaceSpecifier, ReturnType, Parameters, ExpressionBody, Body);
+        ReferenceEquals(modifiers, Modifiers) ? this : new(Id, Prefix, Markers, modifiers, Kind, InterfaceSpecifier, ReturnType, Parameters, ExpressionBody, Body, MethodType);
     public ConversionOperatorDeclaration WithKind(JLeftPadded<ConversionOperatorDeclaration.ExplicitImplicit> kind) =>
-        ReferenceEquals(kind, Kind) ? this : new(Id, Prefix, Markers, Modifiers, kind, InterfaceSpecifier, ReturnType, Parameters, ExpressionBody, Body);
+        ReferenceEquals(kind, Kind) ? this : new(Id, Prefix, Markers, Modifiers, kind, InterfaceSpecifier, ReturnType, Parameters, ExpressionBody, Body, MethodType);
     public ConversionOperatorDeclaration WithInterfaceSpecifier(JRightPadded<TypeTree>? interfaceSpecifier) =>
-        ReferenceEquals(interfaceSpecifier, InterfaceSpecifier) ? this : new(Id, Prefix, Markers, Modifiers, Kind, interfaceSpecifier, ReturnType, Parameters, ExpressionBody, Body);
+        ReferenceEquals(interfaceSpecifier, InterfaceSpecifier) ? this : new(Id, Prefix, Markers, Modifiers, Kind, interfaceSpecifier, ReturnType, Parameters, ExpressionBody, Body, MethodType);
     public ConversionOperatorDeclaration WithReturnType(JLeftPadded<TypeTree> returnType) =>
-        ReferenceEquals(returnType, ReturnType) ? this : new(Id, Prefix, Markers, Modifiers, Kind, InterfaceSpecifier, returnType, Parameters, ExpressionBody, Body);
+        ReferenceEquals(returnType, ReturnType) ? this : new(Id, Prefix, Markers, Modifiers, Kind, InterfaceSpecifier, returnType, Parameters, ExpressionBody, Body, MethodType);
     public ConversionOperatorDeclaration WithParameters(JContainer<Statement> parameters) =>
-        ReferenceEquals(parameters, Parameters) ? this : new(Id, Prefix, Markers, Modifiers, Kind, InterfaceSpecifier, ReturnType, parameters, ExpressionBody, Body);
+        ReferenceEquals(parameters, Parameters) ? this : new(Id, Prefix, Markers, Modifiers, Kind, InterfaceSpecifier, ReturnType, parameters, ExpressionBody, Body, MethodType);
     public ConversionOperatorDeclaration WithExpressionBody(JLeftPadded<Expression>? expressionBody) =>
-        ReferenceEquals(expressionBody, ExpressionBody) ? this : new(Id, Prefix, Markers, Modifiers, Kind, InterfaceSpecifier, ReturnType, Parameters, expressionBody, Body);
+        ReferenceEquals(expressionBody, ExpressionBody) ? this : new(Id, Prefix, Markers, Modifiers, Kind, InterfaceSpecifier, ReturnType, Parameters, expressionBody, Body, MethodType);
     public ConversionOperatorDeclaration WithBody(Block? body) =>
-        ReferenceEquals(body, Body) ? this : new(Id, Prefix, Markers, Modifiers, Kind, InterfaceSpecifier, ReturnType, Parameters, ExpressionBody, body);
+        ReferenceEquals(body, Body) ? this : new(Id, Prefix, Markers, Modifiers, Kind, InterfaceSpecifier, ReturnType, Parameters, ExpressionBody, body, MethodType);
+    public ConversionOperatorDeclaration WithMethodType(JavaType.Method? methodType) =>
+        ReferenceEquals(methodType, MethodType) ? this : new(Id, Prefix, Markers, Modifiers, Kind, InterfaceSpecifier, ReturnType, Parameters, ExpressionBody, Body, methodType);
 
     public enum ExplicitImplicit { Implicit, Explicit }
     Tree Tree.WithId(Guid id) => WithId(id);

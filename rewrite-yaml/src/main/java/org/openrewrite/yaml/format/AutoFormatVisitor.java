@@ -17,10 +17,12 @@ package org.openrewrite.yaml.format;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
+import org.openrewrite.FormattingListener;
 import org.openrewrite.Tree;
 import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.style.Style;
 import org.openrewrite.yaml.YamlIsoVisitor;
+import org.openrewrite.yaml.internal.MultilineScalarIndents;
 import org.openrewrite.yaml.style.Autodetect;
 import org.openrewrite.yaml.style.IndentsStyle;
 import org.openrewrite.yaml.style.YamlDefaultStyles;
@@ -44,10 +46,12 @@ public class AutoFormatVisitor<P> extends YamlIsoVisitor<P> {
 
         y = new MinimumViableSpacingVisitor<>(stopAfter).visitNonNull(y, p, cursor.fork());
 
+        Cursor indentsCursor = cursor.fork();
+        MultilineScalarIndents.forward(cursor, indentsCursor);
         y = new IndentsVisitor<>(
                 Style.from(IndentsStyle.class, docs, () -> Autodetect.tabsAndIndents(docs, YamlDefaultStyles.indents())),
                     stopAfter)
-                .visitNonNull(y, p, cursor.fork());
+                .visitNonNull(y, p, indentsCursor);
 
         return new NormalizeLineBreaksVisitor<>(
                 Style.from(GeneralFormatStyle.class, docs, () -> Autodetect.generalFormat(docs)),
@@ -84,6 +88,9 @@ public class AutoFormatVisitor<P> extends YamlIsoVisitor<P> {
     public @Nullable Yaml visit(@Nullable Tree tree, P p) {
         if (getCursor().getNearestMessage("stop") != null) {
             return (Yaml) tree;
+        }
+        if (tree instanceof Yaml.Documents) {
+            FormattingListener.beforeFormat(tree, stopAfter, getCursor());
         }
         return super.visit(tree, p);
     }

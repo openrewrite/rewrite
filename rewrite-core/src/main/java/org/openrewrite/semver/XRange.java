@@ -17,6 +17,7 @@ package org.openrewrite.semver;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Validated;
+import org.openrewrite.internal.StringUtils;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -32,10 +33,25 @@ import static org.openrewrite.semver.Semver.isVersion;
 public class XRange extends LatestRelease {
     private static final Pattern X_RANGE_PATTERN = Pattern.compile("([*xX+]|\\d+)(?:\\.([*xX+]|\\d+)(?:\\.([*xX+]|\\d+))?(?:\\.([*xX+]|\\d+))?)?");
 
+    static final String XRANGE_ID = ParsedVersion.NUMERIC_ID + "|x|X|\\*";
+
+    // node-semver XRANGEPLAIN; groups: major, minor, patch, prerelease.
+    static final String XRANGE_PLAIN =
+            "[v=\\s]*(" + XRANGE_ID + ")(?:\\.(" + XRANGE_ID + ")(?:\\.(" + XRANGE_ID + ")" +
+                    ParsedVersion.PRERELEASE_GROUP + "?" + ParsedVersion.BUILD + "?)?)?";
+
+    // The npm x-range grammar (no + wildcard, no 4th component); groups: operator, major, minor, patch, prerelease.
+    private static final Pattern NODE_X_RANGE_PATTERN = Pattern.compile("^((?:<|>)?=?)\\s*" + XRANGE_PLAIN + "$");
+
+    private static final Pattern NODE_STAR_PATTERN = Pattern.compile("^(?:<|>)?=?\\s*\\*$");
+
     private final String major;
     private final String minor;
     private final String patch;
     private final String micro;
+
+    // Non-null in npm mode; evaluation delegates to it.
+    private final @Nullable UnionRange node;
 
     XRange(String major, String minor, String patch, String micro, @Nullable String metadataPattern) {
         super(metadataPattern);
@@ -43,11 +59,23 @@ public class XRange extends LatestRelease {
         this.minor = minor;
         this.patch = patch;
         this.micro = micro;
+        this.node = null;
     }
 
-    @SuppressWarnings("ResultOfMethodCallIgnored")
+    private XRange(UnionRange node, @Nullable String metadataPattern) {
+        super(metadataPattern);
+        this.major = "";
+        this.minor = "";
+        this.patch = "";
+        this.micro = "";
+        this.node = node;
+    }
+
     @Override
     public boolean isValid(@Nullable String currentVersion, String version) {
+        if (node != null) {
+            return node.isValidVersion(version, getMetadataPattern());
+        }
         if (!super.isValid(currentVersion, version)) {
             return false;
         }
@@ -56,10 +84,9 @@ public class XRange extends LatestRelease {
             return true;
         }
 
-        Matcher gav = VersionComparator.RELEASE_PATTERN.matcher(normalizeVersion(version));
-        gav.matches();
+        ParsedVersion gav = ParsedVersion.parse(normalizeVersion(version));
 
-        if (!gav.group(1).equals(major)) {
+        if (!major.equals(gav.group(1))) {
             return false;
         }
 
@@ -101,11 +128,108 @@ public class XRange extends LatestRelease {
     }
 
     private static String normalizeWildcard(String part) {
-        return "*".equals(part) || "x".equals(part) || "X".equals(part) || "+".equals(part) ? "*" : part;
+        return isWildcard(part) ? "*" : part;
+    }
+
+    /**
+     * @return whether {@code segment} is a Maven/Gradle-flavored wildcard: {@code *}, {@code x},
+     * {@code X}, or {@code +}. npm's notion (no {@code +}) is {@link NodeComparand#isX}.
+     */
+    static boolean isWildcard(String segment) {
+        return "*".equals(segment) || "x".equals(segment) || "X".equals(segment) || "+".equals(segment);
+    }
+
+    // npm's wildcard test: x, X, * or an absent component.
+    static boolean isX(@Nullable String id) {
+        return id == null || "x".equalsIgnoreCase(id) || "*".equals(id);
+    }
+
+    // Requires an operator or a wildcard/partial component; bare exact versions fall through to UnionRange.
+    static Validated<VersionComparator> buildNode(String pattern, @Nullable String metadataPattern) {
+        Matcher m = NODE_X_RANGE_PATTERN.matcher(pattern.trim());
+        if (!m.matches() || (m.group(1).isEmpty() &&
+                !(isX(m.group(2)) || isX(m.group(3)) || isX(m.group(4))))) {
+            return Validated.invalid("xRange", pattern, "not a node x-range");
+        }
+        UnionRange node = UnionRange.parse(pattern);
+        if (node == null) {
+            return Validated.invalid("xRange", pattern, "not a valid node range");
+        }
+        return Validated.valid("xRange", new XRange(node, metadataPattern));
+    }
+
+    // Port of node-semver range.js replaceXRange; tokens without wildcard or partial components pass through.
+    static String replaceXRange(String token) {
+        Matcher m = NODE_X_RANGE_PATTERN.matcher(token.trim());
+        if (!m.matches()) {
+            return token;
+        }
+        String gtlt = m.group(1);
+        String mj = m.group(2), mn = m.group(3), p = m.group(4);
+        boolean xM = isX(mj);
+        boolean xm = xM || isX(mn);
+        boolean xp = xm || isX(p);
+        boolean anyX = xp;
+
+        if ("=".equals(gtlt) && anyX) {
+            gtlt = "";
+        }
+        String pr = "";
+
+        if (xM) {
+            return (">".equals(gtlt) || "<".equals(gtlt)) ? "<0.0.0-0" : "*";
+        }
+        if (!gtlt.isEmpty() && anyX) {
+            if (xm) {
+                mn = "0";
+            }
+            p = "0";
+            if (">".equals(gtlt)) {
+                gtlt = ">=";
+                if (xm) {
+                    mj = NodeComparand.incr(mj);
+                    mn = "0";
+                } else {
+                    mn = NodeComparand.incr(mn);
+                }
+                p = "0";
+            } else if ("<=".equals(gtlt)) {
+                gtlt = "<";
+                if (xm) {
+                    mj = NodeComparand.incr(mj);
+                } else {
+                    mn = NodeComparand.incr(mn);
+                }
+            }
+            if ("<".equals(gtlt)) {
+                pr = "-0";
+            }
+            return gtlt + mj + "." + mn + "." + p + pr;
+        }
+        if (xm) {
+            return ">=" + mj + ".0.0" + pr + " <" + NodeComparand.incr(mj) + ".0.0-0";
+        }
+        if (xp) {
+            return ">=" + mj + "." + mn + ".0" + pr + " <" + mj + "." + NodeComparand.incr(mn) + ".0-0";
+        }
+        return token;
+    }
+
+    // node-semver's star replacement: a bare or operator-prefixed * collapses to the ANY clause.
+    static String replaceStar(String token) {
+        return NODE_STAR_PATTERN.matcher(token).matches() ? "" : token;
+    }
+
+    @Override
+    public String toString() {
+        return node != null ? node.toString() : super.toString();
     }
 
     @Override
     public int compare(@Nullable String currentVersion, String v1, String v2) {
+        if (node != null) {
+            return ParsedVersion.compareLenient(v1, v2);
+        }
         Validated<XRange> maybeXRangeV1 = build(v1, null);
         Validated<XRange> maybeXRangeV2 = build(v2, null);
         if (maybeXRangeV1.isValid() && maybeXRangeV2.isValid()) {
@@ -120,7 +244,7 @@ public class XRange extends LatestRelease {
                 return -1;
             }
 
-            int compare = xrangeV1.major.compareTo(xrangeV2.major);
+            int compare = compareSegment(xrangeV1.major, xrangeV2.major);
             if (compare != 0) {
                 return compare;
             }
@@ -133,7 +257,7 @@ public class XRange extends LatestRelease {
                 return -1;
             }
 
-            compare =  xrangeV1.minor.compareTo(xrangeV2.minor);
+            compare = compareSegment(xrangeV1.minor, xrangeV2.minor);
             if (compare != 0) {
                 return compare;
             }
@@ -147,7 +271,7 @@ public class XRange extends LatestRelease {
             }
 
             // Micro is guaranteed to be the same, so we can stop here
-            return xrangeV1.patch.compareTo(xrangeV2.patch);
+            return compareSegment(xrangeV1.patch, xrangeV2.patch);
         } else if (maybeXRangeV1.isValid()) {
             if (!isVersion(v2)) {
                 return 1;
@@ -158,23 +282,22 @@ public class XRange extends LatestRelease {
                 return 0;
             }
 
-            Matcher gav = VersionComparator.RELEASE_PATTERN.matcher(normalizeVersion(v2));
-            gav.matches();
+            ParsedVersion gav = ParsedVersion.parse(normalizeVersion(v2));
 
             if (!xrangeV1.major.equals(gav.group(1))) {
-                return xrangeV1.major.compareTo(gav.group(1));
+                return compareSegment(xrangeV1.major, gav.group(1));
             }
 
             if ("*".equals(xrangeV1.minor)) {
                 return 0;
             } else if (gav.group(2) == null || !xrangeV1.minor.equals(gav.group(2))) {
-                return xrangeV1.minor.compareTo(gav.group(2));
+                return compareSegment(xrangeV1.minor, gav.group(2));
             }
 
             if ("*".equals(xrangeV1.patch)) {
                 return 0;
             } else if (gav.group(3) == null || !xrangeV1.patch.equals(gav.group(3))) {
-                return xrangeV1.patch.compareTo(gav.group(3));
+                return compareSegment(xrangeV1.patch, gav.group(3));
             }
 
             return 0;
@@ -188,28 +311,52 @@ public class XRange extends LatestRelease {
                 return 0;
             }
 
-            Matcher gav = VersionComparator.RELEASE_PATTERN.matcher(normalizeVersion(v1));
-            gav.matches();
+            ParsedVersion gav = ParsedVersion.parse(normalizeVersion(v1));
 
-            if (!gav.group(1).equals(xrangeV2.major)) {
-                return gav.group(1).compareTo(xrangeV2.major);
+            String major = gav.group(1);
+            if (!xrangeV2.major.equals(major)) {
+                return compareSegment(requireNonNull(major), xrangeV2.major);
             }
 
+            String minor = gav.group(2);
             if ("*".equals(xrangeV2.minor)) {
                 return 0;
-            } else if (gav.group(2) == null || !gav.group(2).equals(xrangeV2.minor)) {
-                return gav.group(2).compareTo(xrangeV2.minor);
+            } else if (minor == null || !minor.equals(xrangeV2.minor)) {
+                return compareSegment(requireNonNull(minor), xrangeV2.minor);
             }
 
+            String patch = gav.group(3);
             if ("*".equals(xrangeV2.patch)) {
                 return 0;
-            } else if (gav.group(3) == null || !gav.group(3).equals(xrangeV2.patch)) {
-                return gav.group(3).compareTo(xrangeV2.patch);
+            } else if (patch == null || !patch.equals(xrangeV2.patch)) {
+                return compareSegment(requireNonNull(patch), xrangeV2.patch);
             }
 
             return 0;
         }
 
         return super.compare(currentVersion, v1, v2);
+    }
+
+    /**
+     * Compares a major, minor or patch segment. When both segments are numeric they are compared by numeric
+     * value (so "5" sorts before "14"), otherwise they are compared as strings.
+     */
+    private static int compareSegment(String s1, @Nullable String s2) {
+        if (s2 != null && StringUtils.isNumeric(s1) && StringUtils.isNumeric(s2)) {
+            String n1 = stripLeadingZeros(s1);
+            String n2 = stripLeadingZeros(s2);
+            // Compare by digit count first so that arbitrarily long segments cannot overflow
+            return n1.length() != n2.length() ? Integer.compare(n1.length(), n2.length()) : n1.compareTo(n2);
+        }
+        return s1.compareTo(s2);
+    }
+
+    private static String stripLeadingZeros(String s) {
+        int i = 0;
+        while (i < s.length() - 1 && s.charAt(i) == '0') {
+            i++;
+        }
+        return s.substring(i);
     }
 }

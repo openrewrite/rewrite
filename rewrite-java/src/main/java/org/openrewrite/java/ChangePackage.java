@@ -21,6 +21,7 @@ import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.internal.PackageNameUtils;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.SearchResult;
@@ -28,7 +29,6 @@ import org.openrewrite.trait.Reference;
 
 import java.nio.file.Paths;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.Tree.randomId;
@@ -44,7 +44,7 @@ import static org.openrewrite.Tree.randomId;
  */
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class ChangePackage extends Recipe {
+public class ChangePackage extends Recipe implements RenamingRecipe {
     @Option(displayName = "Old package name",
             description = "The package name to replace.",
             example = "com.yourorg.foo")
@@ -57,10 +57,39 @@ public class ChangePackage extends Recipe {
 
     @With
     @Option(displayName = "Recursive",
-            description = "Recursively change subpackage names",
+            description = "Recursively change subpackage names. Defaults to `false`, renaming only types " +
+                          "directly in `oldPackageName`; set to `true` to also rename types in its subpackages.",
             required = false)
     @Nullable
     Boolean recursive;
+
+    private boolean isRecursive() {
+        return Boolean.TRUE.equals(recursive);
+    }
+
+    @Override
+    public String kindOfName() {
+        return ChangeType.JAVA_TYPES_AND_PACKAGES;
+    }
+
+    @Override
+    public String oldName() {
+        return oldPackageName;
+    }
+
+    @Override
+    public String rename(String name) {
+        if (name.equals(oldPackageName)) {
+            return newPackageName;
+        } else if (name.startsWith(oldPackageName + ".")) {
+            String rest = name.substring(oldPackageName.length() + 1);
+            // a lowercase name after the package names a subpackage, and an uppercase one a type in it
+            if (isRecursive() || rest.isEmpty() || !Character.isLowerCase(rest.charAt(0))) {
+                return newPackageName + "." + rest;
+            }
+        }
+        return name;
+    }
 
     @Override
     public String getInstanceNameSuffix() {
@@ -84,17 +113,16 @@ public class ChangePackage extends Recipe {
             @Override
             public @Nullable Tree preVisit(@Nullable Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
+                boolean recursive = isRecursive();
+                String recursivePackageNamePrefix = oldPackageName + ".";
                 if (tree instanceof JavaSourceFile) {
                     JavaSourceFile cu = (JavaSourceFile) tree;
                     if (cu.getPackageDeclaration() != null) {
-                        String original = cu.getPackageDeclaration().getExpression()
-                                .printTrimmed(getCursor()).replaceAll("\\s", "");
-                        if (original.startsWith(oldPackageName)) {
+                        String original = PackageNameUtils.getPackageName(cu.getPackageDeclaration());
+                        if (original.equals(oldPackageName) || recursive && original.startsWith(recursivePackageNamePrefix)) {
                             return SearchResult.found(cu);
                         }
                     }
-                    boolean recursive = Boolean.TRUE.equals(ChangePackage.this.recursive);
-                    String recursivePackageNamePrefix = oldPackageName + ".";
                     for (J.Import anImport : cu.getImports()) {
                         String importedPackage = anImport.getPackageName();
                         if (importedPackage.equals(oldPackageName) || recursive && importedPackage.startsWith(recursivePackageNamePrefix)) {
@@ -109,17 +137,16 @@ public class ChangePackage extends Recipe {
                             }
                         }
                     }
-                    // Fully qualified javadoc references are excluded from TypesInUse
-                    // (they don't affect imports), but they still need package renaming.
-                    if (hasJavadocReferenceToPackage(cu, oldPackageName, recursive, recursivePackageNamePrefix)) {
+                    // Fully qualified documentation-comment references are excluded from TypesInUse's
+                    // import-retention set (they don't affect imports), but they still need package renaming.
+                    if (cu.getTypesInUse().hasDocReferenceInPackage(oldPackageName, recursive)) {
                         return SearchResult.found(cu);
                     }
                 } else if (tree instanceof SourceFileWithReferences) {
                     SourceFileWithReferences cu = (SourceFileWithReferences) tree;
-                    boolean recursive = Boolean.TRUE.equals(ChangePackage.this.recursive);
-                    String recursivePackageNamePrefix = oldPackageName + ".";
+                    PackageMatcher matcher = new PackageMatcher(oldPackageName, recursive);
                     for (Reference ref : cu.getReferences().getReferences()) {
-                        if (ref.getValue().equals(oldPackageName) || recursive && ref.getValue().startsWith(recursivePackageNamePrefix)) {
+                        if (matcher.matchesReference(ref)) {
                             return SearchResult.found(cu);
                         }
                     }
@@ -142,8 +169,7 @@ public class ChangePackage extends Recipe {
                 } else if (tree instanceof SourceFileWithReferences) {
                     SourceFileWithReferences sourceFile = (SourceFileWithReferences) tree;
                     SourceFileWithReferences.References references = sourceFile.getReferences();
-                    boolean recursive = Boolean.TRUE.equals(ChangePackage.this.recursive);
-                    PackageMatcher matcher = new PackageMatcher(oldPackageName, recursive);
+                    PackageMatcher matcher = new PackageMatcher(oldPackageName, isRecursive());
                     Map<Tree, List<Reference>> matches = new HashMap<>();
                     for (Reference ref : references.findMatches(matcher)) {
                         matches.computeIfAbsent(ref.getTree(), k -> new java.util.ArrayList<>()).add(ref);
@@ -159,30 +185,84 @@ public class ChangePackage extends Recipe {
         private static final String RENAME_TO_KEY = "renameTo";
         private static final String RENAME_FROM_KEY = "renameFrom";
 
-        private final Map<JavaType, JavaType> oldNameToChangedType = new IdentityHashMap<>();
+        private final TypeReplacer types = new TypeReplacer(this::replacement);
         private final JavaType.Class newPackageType = JavaType.ShallowClass.build(newPackageName);
+        private final boolean singleSegmentOldPackage = !oldPackageName.contains(".");
 
         @Override
         public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
             J f = super.visitFieldAccess(fieldAccess, ctx);
 
-            if (((J.FieldAccess) f).isFullyQualifiedClassReference(oldPackageName)) {
-                Cursor parent = getCursor().getParent();
-                if (parent != null &&
-                    // Ensure the parent isn't a J.FieldAccess OR the parent doesn't match the target package name.
-                    (!(parent.getValue() instanceof J.FieldAccess) ||
-                     (!(((J.FieldAccess) parent.getValue()).isFullyQualifiedClassReference(newPackageName))))) {
-
-                    f = TypeTree.build(((JavaType.FullyQualified) newPackageType).getFullyQualifiedName())
-                            .withPrefix(f.getPrefix());
+            if (f instanceof J.FieldAccess) {
+                J.FieldAccess fa = (J.FieldAccess) f;
+                if (fa.isFullyQualifiedClassReference(oldPackageName)) {
+                    Cursor parent = getCursor().getParent();
+                    if (parent == null) {
+                        return f;
+                    }
+                    if (parent.getValue() instanceof J.FieldAccess) {
+                        J.FieldAccess enclosing = (J.FieldAccess) parent.getValue();
+                        if (enclosing.isFullyQualifiedClassReference(newPackageName)) {
+                            // Already rewritten to the new package.
+                            return f;
+                        }
+                        if (!isRecursive() && !namesTypeDirectlyInOldPackage(enclosing)) {
+                            // Leading segments of a subpackage-qualified name such as oldPackageName.sub.Type.
+                            return f;
+                        }
+                    }
+                    return newPackageTypeTree(f.getPrefix());
+                }
+                if (singleSegmentOldPackage && isSingleSegmentOldPackageTarget(fieldAccess, fa)) {
+                    return fa.withTarget(newPackageTypeTree(fa.getTarget().getPrefix()));
                 }
             }
             return f;
         }
 
+        private Expression newPackageTypeTree(Space prefix) {
+            Expression tree = TypeTree.build(newPackageType.getFullyQualifiedName());
+            return tree.withPrefix(prefix);
+        }
+
+        private boolean isSingleSegmentOldPackageTarget(J.FieldAccess original, J.FieldAccess visited) {
+            if (!(visited.getTarget() instanceof J.Identifier)) {
+                return false;
+            }
+            J.Identifier target = (J.Identifier) visited.getTarget();
+            if (!target.getSimpleName().equals(oldPackageName) ||
+                    target.getFieldType() != null ||
+                    (target.getType() != null && !(target.getType() instanceof JavaType.Unknown)) ||
+                    visited.getName().getFieldType() != null) {
+                return false;
+            }
+            for (Cursor c = getCursor(); c != null && c.getValue() instanceof J.FieldAccess; c = c.getParent()) {
+                if (((J.FieldAccess) c.getValue()).isFullyQualifiedClassReference(newPackageName)) {
+                    return false;
+                }
+            }
+            return namesTypeDirectlyInOldPackage(original) ||
+                   isRecursive() && getCursor().getParentTreeCursor().getValue() instanceof J.FieldAccess;
+        }
+
+        /**
+         * Whether the name enclosing this occurrence of {@code oldPackageName} is a type declared
+         * directly in it, rather than a subpackage. Uses the same leading-capital convention as
+         * {@link PackageMatcher} where type attribution is unavailable.
+         */
+        private boolean namesTypeDirectlyInOldPackage(J.FieldAccess enclosing) {
+            JavaType.FullyQualified fq = TypeUtils.asFullyQualified(enclosing.getType());
+            if (fq != null) {
+                return oldPackageName.equals(fq.getPackageName());
+            }
+            String nextSegment = enclosing.getSimpleName();
+            return "*".equals(nextSegment) ||
+                   !nextSegment.isEmpty() && Character.isUpperCase(nextSegment.charAt(0));
+        }
+
         @Override
         public J visitPackage(J.Package pkg, ExecutionContext ctx) {
-            String original = pkg.getExpression().printTrimmed(getCursor()).replaceAll("\\s", "");
+            String original = PackageNameUtils.getPackageName(pkg);
             getCursor().putMessageOnFirstEnclosing(JavaSourceFile.class, RENAME_FROM_KEY, original);
 
             pkg = pkg.withAnnotations(ListUtils.map(pkg.getAnnotations(), a -> visitAndCast(a, ctx)));
@@ -278,18 +358,18 @@ public class ChangePackage extends Recipe {
                 }
 
                 // Expand changed star imports that would create ambiguity with other star imports
-                sf = maybeExpandStarImport(sf, newPackageName, oldPackageName);
+                sf = maybeExpandStarImport(sf, newPackageName, oldPackageName, ctx);
                 if (changingTo != null && !changingTo.equals(newPackageName)) {
                     String oldSubPkg = oldPackageName + changingTo.substring(newPackageName.length());
-                    sf = maybeExpandStarImport(sf, changingTo, oldSubPkg);
+                    sf = maybeExpandStarImport(sf, changingTo, oldSubPkg, ctx);
                 }
-                if (Boolean.TRUE.equals(recursive)) {
+                if (isRecursive()) {
                     for (J.Import anImport : sf.getImports()) {
                         if (!anImport.isStatic() && "*".equals(anImport.getQualid().getSimpleName())) {
                             String pkg = anImport.getPackageName();
                             if (pkg.startsWith(newPackageName + ".")) {
                                 String oldPkg = oldPackageName + pkg.substring(newPackageName.length());
-                                sf = maybeExpandStarImport(sf, pkg, oldPkg);
+                                sf = maybeExpandStarImport(sf, pkg, oldPkg, ctx);
                             }
                         }
                     }
@@ -309,7 +389,7 @@ public class ChangePackage extends Recipe {
          * @param changedPackage the new package name (after rename)
          * @param originalPackage the old package name (before rename), used to find types on classpath
          */
-        private JavaSourceFile maybeExpandStarImport(JavaSourceFile sf, String changedPackage, String originalPackage) {
+        private JavaSourceFile maybeExpandStarImport(JavaSourceFile sf, String changedPackage, String originalPackage, ExecutionContext ctx) {
             J.Import changedStarImport = null;
             Set<String> otherStarPackages = new LinkedHashSet<>();
             for (J.Import anImport : sf.getImports()) {
@@ -327,7 +407,7 @@ public class ChangePackage extends Recipe {
                 return sf;
             }
 
-            if (!hasAmbiguity(sf, changedPackage, originalPackage, otherStarPackages)) {
+            if (!hasAmbiguity(sf, changedPackage, originalPackage, otherStarPackages, ctx)) {
                 return sf;
             }
 
@@ -336,7 +416,9 @@ public class ChangePackage extends Recipe {
             for (JavaType type : sf.getTypesInUse().getTypesInUse()) {
                 if (type instanceof JavaType.FullyQualified) {
                     JavaType.FullyQualified fq = (JavaType.FullyQualified) type;
-                    if (fq.getPackageName().equals(changedPackage)) {
+                    // A package wildcard imports only top-level types. Nested types are
+                    // referenced through their enclosing type or a separate explicit import.
+                    if (fq.getOwningClass() == null && fq.getPackageName().equals(changedPackage)) {
                         usedFromChangedPackage.add(fq.getClassName());
                     }
                 }
@@ -372,7 +454,12 @@ public class ChangePackage extends Recipe {
          * Checks both the new package name and the original package name, since the
          * classpath may still have types under the old package name.
          */
-        private boolean hasAmbiguity(JavaSourceFile sf, String changedPackage, String originalPackage, Set<String> otherStarPackages) {
+        private boolean hasAmbiguity(JavaSourceFile sf, String changedPackage, String originalPackage, Set<String> otherStarPackages, ExecutionContext ctx) {
+            if (JavaSourceSet.isDirty(ctx, sf)) {
+                // An earlier dependency mutation in this run means the classpath cannot be trusted to
+                // prove non-ambiguity; fall back to the safe path and expand the star.
+                return true;
+            }
             Optional<JavaSourceSet> sourceSet = sf.getMarkers().findFirst(JavaSourceSet.class);
             if (!sourceSet.isPresent()) {
                 return false;
@@ -419,102 +506,24 @@ public class ChangePackage extends Recipe {
         }
 
         private @Nullable JavaType updateType(@Nullable JavaType oldType) {
-            if (oldType == null || oldType instanceof JavaType.Unknown) {
-                return oldType;
-            }
-
-            JavaType type = oldNameToChangedType.get(oldType);
-            if (type != null) {
-                return type;
-            }
-
-            if (oldType instanceof JavaType.Parameterized) {
-                JavaType.Parameterized pt = (JavaType.Parameterized) oldType;
-                pt = pt.withTypeParameters(ListUtils.map(pt.getTypeParameters(), tp -> {
-                    if (tp instanceof JavaType.FullyQualified) {
-                        JavaType.FullyQualified tpFq = (JavaType.FullyQualified) tp;
-                        if (isTargetFullyQualifiedType(tpFq)) {
-                            return updateType(tpFq);
-                        }
-                    }
-                    return tp;
-                }));
-
-                if (isTargetFullyQualifiedType(pt)) {
-                    //noinspection DataFlowIssue
-                    pt = pt.withType((JavaType.FullyQualified) updateType(pt.getType()));
-                }
-
-                oldNameToChangedType.put(oldType, pt);
-                return pt;
-            } else if (oldType instanceof JavaType.FullyQualified) {
-                JavaType.FullyQualified original = TypeUtils.asFullyQualified(oldType);
-                if (isTargetFullyQualifiedType(original)) {
-                    JavaType.FullyQualified fq = TypeUtils.asFullyQualified(JavaType.buildType(getNewPackageName(original.getPackageName()) + "." + original.getRawClassName()));
-                    //noinspection DataFlowIssue
-                    oldNameToChangedType.put(oldType, fq);
-                    oldNameToChangedType.put(fq, fq);
-                    return fq;
-                } else if (oldType instanceof JavaType.Class) {
-                    JavaType.Class clazz = ((JavaType.Class) oldType)
-                            .withInterfaces(ListUtils.map(original.getInterfaces(), t -> (JavaType.FullyQualified) updateType(t)))
-                            .withSupertype((JavaType.FullyQualified) updateType(original.getSupertype()));
-                    oldNameToChangedType.put(oldType, clazz);
-                    oldNameToChangedType.put(clazz, clazz);
-                    return clazz;
-                }
-            } else if (oldType instanceof JavaType.GenericTypeVariable) {
-                JavaType.GenericTypeVariable gtv = (JavaType.GenericTypeVariable) oldType;
-                gtv = gtv.withBounds(ListUtils.map(gtv.getBounds(), b -> {
-                    if (b instanceof JavaType.FullyQualified && isTargetFullyQualifiedType((JavaType.FullyQualified) b)) {
-                        return updateType(b);
-                    }
-                    return b;
-                }));
-
-                oldNameToChangedType.put(oldType, gtv);
-                oldNameToChangedType.put(gtv, gtv);
-                return gtv;
-            } else if (oldType instanceof JavaType.Variable) {
-                JavaType.Variable variable = (JavaType.Variable) oldType;
-                variable = variable.withOwner(updateType(variable.getOwner()));
-                //noinspection DataFlowIssue
-                variable = variable.withType(updateType(variable.getType()));
-                oldNameToChangedType.put(oldType, variable);
-                oldNameToChangedType.put(variable, variable);
-                return variable;
-            } else if (oldType instanceof JavaType.Array) {
-                JavaType.Array array = (JavaType.Array) oldType;
-                //noinspection DataFlowIssue
-                array = array.withElemType(updateType(array.getElemType()));
-                oldNameToChangedType.put(oldType, array);
-                oldNameToChangedType.put(array, array);
-                return array;
-            }
-            return oldType;
+            return types.replace(oldType);
         }
 
         private JavaType.@Nullable Method updateType(JavaType.@Nullable Method oldMethodType) {
-            if (oldMethodType != null) {
-                JavaType.Method method = (JavaType.Method) oldNameToChangedType.get(oldMethodType);
-                if (method != null) {
-                    return method;
-                }
+            return types.replace(oldMethodType);
+        }
 
-                method = oldMethodType;
-                //noinspection DataFlowIssue
-                method = method.withDeclaringType((JavaType.FullyQualified) updateType(method.getDeclaringType()))
-                        .withReturnType(updateType(method.getReturnType()))
-                        .withParameterTypes(ListUtils.map(method.getParameterTypes(), this::updateType));
-                oldNameToChangedType.put(oldMethodType, method);
-                oldNameToChangedType.put(method, method);
-                return method;
+        private JavaType.@Nullable FullyQualified replacement(JavaType.FullyQualified fq) {
+            if (!isTargetFullyQualifiedType(fq)) {
+                return null;
             }
-            return null;
+            String newPackage = getNewPackageName(fq.getPackageName());
+            return TypeUtils.asFullyQualified(JavaType.buildType(
+                    (newPackage.isEmpty() ? "" : newPackage + ".") + fq.getRawClassName()));
         }
 
         private String getNewPackageName(String packageName) {
-            return (recursive == null || recursive) && !newPackageName.endsWith(packageName.substring(oldPackageName.length())) ?
+            return isRecursive() && !newPackageName.endsWith(packageName.substring(oldPackageName.length())) ?
                     newPackageName + packageName.substring(oldPackageName.length()) : newPackageName;
         }
 
@@ -525,38 +534,11 @@ public class ChangePackage extends Recipe {
         }
 
         private boolean isTargetRecursivePackageName(String packageName) {
-            return (recursive == null || recursive) &&
+            return isRecursive() &&
                    packageName.startsWith(oldPackageName + ".") &&
                    !packageName.startsWith(newPackageName);
         }
 
-    }
-
-    private static boolean hasJavadocReferenceToPackage(JavaSourceFile cu, String packageName, boolean recursive, String recursivePrefix) {
-        return new JavaIsoVisitor<AtomicBoolean>() {
-            @Override
-            public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, AtomicBoolean f) {
-                if (f.get()) {
-                    return fieldAccess;
-                }
-                for (Object o : getCursor().getPathAsStream().toArray()) {
-                    if (o instanceof Javadoc.Reference) {
-                        JavaType type = fieldAccess.getType();
-                        if (type instanceof JavaType.FullyQualified) {
-                            String pkg = ((JavaType.FullyQualified) type).getPackageName();
-                            if (pkg.equals(packageName) || recursive && pkg.startsWith(recursivePrefix)) {
-                                f.set(true);
-                            }
-                        }
-                        break;
-                    }
-                    if (o instanceof J.Block) {
-                        break;
-                    }
-                }
-                return fieldAccess;
-            }
-        }.reduce(cu, new AtomicBoolean()).get();
     }
 
     @Value

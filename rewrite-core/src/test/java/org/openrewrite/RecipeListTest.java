@@ -38,11 +38,10 @@ class RecipeListTest implements RewriteTest {
     @Test
     void declarativeRecipeInCode() {
         rewriteRun(
-          specs -> specs.recipe(new FormalHello("jon", "jonathan"))
-            .expectedCyclesThatMakeChanges(1).cycles(1),
+          specs -> specs.recipe(new FormalHello("jon", "Jonathan")),
           text(
             "hi jon",
-            "hello jonathan",
+            "hello Jonathan",
             spec -> spec.afterRecipe(txt -> {
                 Optional<Stream<String>> recipeNames = txt.getMarkers().findFirst(RecipesThatMadeChanges.class)
                   .map(recipes -> recipes.getRecipes().stream()

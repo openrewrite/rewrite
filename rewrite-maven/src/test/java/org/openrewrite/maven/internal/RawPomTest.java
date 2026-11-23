@@ -610,4 +610,108 @@ class RawPomTest {
         assertThat(plugin.getConfigurationList("grandparent.parent.child.stringList", String.class)).hasSize(4)
           .contains("f", "r", "e", "d");
     }
+
+    @Test
+    void missingGroupIdThrowsParsingException() {
+        RawPom pom = RawPom.parse(
+          //language=xml
+          new ByteArrayInputStream("""
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                </project>
+            """.getBytes()),
+          null
+        );
+
+        assertThatThrownBy(() -> pom.toPom(null, null))
+          .isInstanceOf(MavenParsingException.class)
+          .hasMessageContaining("missing a required coordinate")
+          .hasMessageContaining("groupId")
+          .hasMessageContaining("my-app");
+    }
+
+    @Test
+    void missingVersionThrowsParsingException() {
+        RawPom pom = RawPom.parse(
+          //language=xml
+          new ByteArrayInputStream("""
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                </project>
+            """.getBytes()),
+          null
+        );
+
+        assertThatThrownBy(() -> pom.toPom(null, null))
+          .isInstanceOf(MavenParsingException.class)
+          .hasMessageContaining("missing a required coordinate")
+          .hasMessageContaining("version");
+    }
+
+    @Test
+    void emptyGroupIdElementThrowsParsingException() {
+        RawPom pom = RawPom.parse(
+          //language=xml
+          new ByteArrayInputStream("""
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId/>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                </project>
+            """.getBytes()),
+          null
+        );
+
+        assertThatThrownBy(() -> pom.toPom(null, null))
+          .isInstanceOf(MavenParsingException.class)
+          .hasMessageContaining("groupId");
+    }
+
+    @Test
+    void whitespaceVersionElementThrowsParsingException() {
+        RawPom pom = RawPom.parse(
+          //language=xml
+          new ByteArrayInputStream("""
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>   </version>
+                </project>
+            """.getBytes()),
+          null
+        );
+
+        assertThatThrownBy(() -> pom.toPom(null, null))
+          .isInstanceOf(MavenParsingException.class)
+          .hasMessageContaining("version");
+    }
+
+    @Test
+    void groupIdInheritedFromParentStillResolves() {
+        RawPom pom = RawPom.parse(
+          //language=xml
+          new ByteArrayInputStream("""
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>my-parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>my-app</artifactId>
+                </project>
+            """.getBytes()),
+          null
+        );
+
+        Pom resolved = pom.toPom(null, null);
+        assertThat(resolved.getGroupId()).isEqualTo("com.mycompany.app");
+        assertThat(resolved.getVersion()).isEqualTo("1");
+    }
 }

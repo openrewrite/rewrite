@@ -16,16 +16,22 @@
 package org.openrewrite.python.internal;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.python.internal.poetrylock.PoetryConstraint;
 import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.marker.PythonResolutionResult.Dependency;
 import org.openrewrite.toml.tree.Toml;
 import org.openrewrite.toml.tree.TomlValue;
 
 import java.nio.file.Path;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 import static org.openrewrite.Tree.randomId;
 
 /**
@@ -38,21 +44,29 @@ public class PythonDependencyParser {
      *
      * @param doc        the parsed pyproject.toml document
      * @param relativeTo the base path (used as the path field in the marker)
-     * @return the marker, or null if the document has no [project] section
+     * @return the marker, or null if the document has neither a [project] nor a [tool.poetry] section
      */
     public static @Nullable PythonResolutionResult createMarker(Toml.Document doc, @Nullable Path relativeTo) {
         Map<String, Toml.Table> tables = indexTables(doc);
 
+        // Detect package manager from tool sections
+        PythonResolutionResult.PackageManager packageManager = detectPackageManager(tables);
+
         Toml.Table projectTable = tables.get("project");
-        if (projectTable == null) {
+        if (projectTable == null && packageManager != PythonResolutionResult.PackageManager.Poetry) {
             return null;
         }
+        Toml.Table metadataTable = projectTable != null ? projectTable : tables.get("tool.poetry");
 
-        String name = getStringValue(projectTable, "name");
-        String version = getStringValue(projectTable, "version");
-        String description = getStringValue(projectTable, "description");
-        String license = getLicense(projectTable);
+        String name = getStringValue(metadataTable, "name");
+        String version = getStringValue(metadataTable, "version");
+        String description = getStringValue(metadataTable, "description");
+        String license = getLicense(metadataTable);
         String requiresPython = getStringValue(projectTable, "requires-python");
+        if (requiresPython == null) {
+            String poetryPython = getStringValue(tables.get("tool.poetry.dependencies"), "python");
+            requiresPython = poetryPython == null ? null : PoetryConstraint.toPep440(poetryPython);
+        }
 
         Toml.Table buildSystemTable = tables.get("build-system");
         String buildBackend = getStringValue(buildSystemTable, "build-backend");
@@ -72,9 +86,6 @@ public class PythonDependencyParser {
             overrideDependencies = pdmOverrides;
         }
 
-        // Detect package manager from tool sections
-        PythonResolutionResult.PackageManager packageManager = detectPackageManager(tables);
-
         String path = doc.getSourcePath().toString();
 
         return new PythonResolutionResult(
@@ -92,10 +103,43 @@ public class PythonDependencyParser {
                 dependencyGroups,
                 constraintDependencies,
                 overrideDependencies,
-                Collections.emptyList(),
+                emptyList(),
                 packageManager,
-                null
+                getUvIndexes(doc)
         );
+    }
+
+    /**
+     * The {@code [[tool.uv.index]]} entries uv searches for any package. An {@code explicit} index serves
+     * only the packages {@code [tool.uv.sources]} pins to it, so it is left out.
+     */
+    private static @Nullable List<PythonResolutionResult.SourceIndex> getUvIndexes(Toml.Document doc) {
+        List<PythonResolutionResult.SourceIndex> indexes = new ArrayList<>();
+        for (TomlValue value : doc.getValues()) {
+            if (!(value instanceof Toml.Table) || ((Toml.Table) value).getName() == null ||
+                !"tool.uv.index".equals(((Toml.Table) value).getName().getName())) {
+                continue;
+            }
+            Toml.Table table = (Toml.Table) value;
+            String url = getStringValue(table, "url");
+            if (url != null && !getBooleanValue(table, "explicit")) {
+                String name = getStringValue(table, "name");
+                indexes.add(new PythonResolutionResult.SourceIndex(name == null ? url : name, url,
+                        getBooleanValue(table, "default")));
+            }
+        }
+        return indexes.isEmpty() ? null : indexes;
+    }
+
+    private static boolean getBooleanValue(Toml.Table table, String key) {
+        for (Toml value : table.getValues()) {
+            if (value instanceof Toml.KeyValue && ((Toml.KeyValue) value).getKey() instanceof Toml.Identifier &&
+                key.equals(((Toml.Identifier) ((Toml.KeyValue) value).getKey()).getName()) &&
+                ((Toml.KeyValue) value).getValue() instanceof Toml.Literal) {
+                return Boolean.TRUE.equals(((Toml.Literal) ((Toml.KeyValue) value).getValue()).getValue());
+            }
+        }
+        return false;
     }
 
     private static Map<String, Toml.Table> indexTables(Toml.Document doc) {
@@ -133,7 +177,7 @@ public class PythonDependencyParser {
 
     static List<Dependency> getDependencyList(Toml.@Nullable Table table, String key) {
         if (table == null) {
-            return Collections.emptyList();
+            return emptyList();
         }
         for (Toml value : table.getValues()) {
             if (value instanceof Toml.KeyValue) {
@@ -146,7 +190,7 @@ public class PythonDependencyParser {
                 }
             }
         }
-        return Collections.emptyList();
+        return emptyList();
     }
 
     private static List<Dependency> parseDependencyArray(Toml.Array array) {
@@ -188,7 +232,7 @@ public class PythonDependencyParser {
             }
         }
 
-        return Collections.emptyMap();
+        return emptyMap();
     }
 
     /**
@@ -230,14 +274,14 @@ public class PythonDependencyParser {
     private static Map<String, List<Dependency>> getDependencyGroups(Map<String, Toml.Table> tables) {
         Toml.Table groupsTable = tables.get("dependency-groups");
         if (groupsTable == null) {
-            return Collections.emptyMap();
+            return emptyMap();
         }
         Map<String, List<Dependency>> result = new LinkedHashMap<>();
         for (Toml value : groupsTable.getValues()) {
             if (value instanceof Toml.KeyValue) {
                 Toml.KeyValue kv = (Toml.KeyValue) value;
-                if (kv.getKey() instanceof Toml.Identifier && kv.getValue() instanceof Toml.Array) {
-                    String groupName = ((Toml.Identifier) kv.getKey()).getName();
+                String groupName = PyProjectHelper.extractKeyName(kv);
+                if (groupName != null && kv.getValue() instanceof Toml.Array) {
                     List<Dependency> deps = parseDependencyArraySkippingIncludes((Toml.Array) kv.getValue());
                     result.put(groupName, deps);
                 }
@@ -272,8 +316,8 @@ public class PythonDependencyParser {
         for (Toml value : table.getValues()) {
             if (value instanceof Toml.KeyValue) {
                 Toml.KeyValue kv = (Toml.KeyValue) value;
-                if (kv.getKey() instanceof Toml.Identifier && kv.getValue() instanceof Toml.Array) {
-                    String groupName = ((Toml.Identifier) kv.getKey()).getName();
+                String groupName = PyProjectHelper.extractKeyName(kv);
+                if (groupName != null && kv.getValue() instanceof Toml.Array) {
                     List<Dependency> deps = parseDependencyArray((Toml.Array) kv.getValue());
                     result.put(groupName, deps);
                 }
@@ -289,14 +333,14 @@ public class PythonDependencyParser {
     private static List<Dependency> getPdmOverrides(Map<String, Toml.Table> tables) {
         Toml.Table pdmOverridesTable = tables.get("tool.pdm.overrides");
         if (pdmOverridesTable == null) {
-            return Collections.emptyList();
+            return emptyList();
         }
         List<Dependency> result = new ArrayList<>();
         for (Toml value : pdmOverridesTable.getValues()) {
             if (value instanceof Toml.KeyValue) {
                 Toml.KeyValue kv = (Toml.KeyValue) value;
-                if (kv.getKey() instanceof Toml.Identifier && kv.getValue() instanceof Toml.Literal) {
-                    String pkgName = ((Toml.Identifier) kv.getKey()).getName();
+                String pkgName = PyProjectHelper.extractKeyName(kv);
+                if (pkgName != null && kv.getValue() instanceof Toml.Literal) {
                     Object val = ((Toml.Literal) kv.getValue()).getValue();
                     if (val instanceof String) {
                         result.add(new Dependency(pkgName, (String) val, null, null, null));

@@ -24,14 +24,13 @@ import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.marker.PythonResolutionResult.Dependency;
 import org.openrewrite.toml.tree.Toml;
 
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
 
+import static java.util.Collections.singletonList;
+import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class PyProjectTomlParserTest {
@@ -69,10 +68,10 @@ class PyProjectTomlParserTest {
           pyprojectToml
         );
         List<SourceFile> parsed = parser.parseInputs(
-          Collections.singletonList(input),
+          singletonList(input),
           null,
           new InMemoryExecutionContext(Throwable::printStackTrace)
-        ).collect(Collectors.toList());
+        ).collect(toList());
 
         assertThat(parsed).hasSize(1);
         assertThat(parsed.get(0)).isInstanceOf(Toml.Document.class);
@@ -96,7 +95,7 @@ class PyProjectTomlParserTest {
     }
 
     @Test
-    void parsesWithResolvedDependencies(@TempDir Path tempDir) throws IOException {
+    void parsesWithResolvedDependencies(@TempDir Path tempDir) throws Exception {
         String pyprojectToml = """
           [project]
           name = "my-project"
@@ -135,10 +134,10 @@ class PyProjectTomlParserTest {
         PyProjectTomlParser parser = new PyProjectTomlParser();
         Parser.Input input = Parser.Input.fromFile(tempDir.resolve("pyproject.toml"));
         List<SourceFile> parsed = parser.parseInputs(
-          Collections.singletonList(input),
+          singletonList(input),
           tempDir,
           new InMemoryExecutionContext(Throwable::printStackTrace)
-        ).collect(Collectors.toList());
+        ).collect(toList());
 
         assertThat(parsed).hasSize(1);
         Toml.Document doc = (Toml.Document) parsed.get(0);
@@ -177,10 +176,10 @@ class PyProjectTomlParserTest {
           pyprojectToml
         );
         List<SourceFile> parsed = parser.parseInputs(
-          Collections.singletonList(input),
+          singletonList(input),
           null,
           new InMemoryExecutionContext(Throwable::printStackTrace)
-        ).collect(Collectors.toList());
+        ).collect(toList());
 
         assertThat(parsed).hasSize(1);
         Toml.Document doc = (Toml.Document) parsed.get(0);
@@ -211,10 +210,10 @@ class PyProjectTomlParserTest {
           pyprojectToml
         );
         List<SourceFile> parsed = parser.parseInputs(
-          Collections.singletonList(input),
+          singletonList(input),
           null,
           new InMemoryExecutionContext(Throwable::printStackTrace)
-        ).collect(Collectors.toList());
+        ).collect(toList());
 
         assertThat(parsed).hasSize(1);
         Toml.Document doc = (Toml.Document) parsed.get(0);
@@ -227,7 +226,45 @@ class PyProjectTomlParserTest {
     }
 
     @Test
-    void skipsUvResolutionWhenPoetryLockExists(@TempDir Path tempDir) throws IOException {
+    void resolvesFromInstalledEnvWithoutLockFile(@TempDir Path tempDir) throws Exception {
+        String pyprojectToml = """
+          [project]
+          name = "my-project"
+          version = "1.0.0"
+          dependencies = ["click>=8.0"]
+          """;
+        Files.write(tempDir.resolve("pyproject.toml"), pyprojectToml.getBytes());
+
+        // A provisioned venv whose installed dists are the resolution (no lock file, no uv run).
+        Path venv = tempDir.resolve(".venv");
+        Path sitePackages = venv.resolve("lib/python3.12/site-packages");
+        Files.createDirectories(sitePackages.resolve("click-8.1.7.dist-info"));
+        Files.createDirectories(sitePackages.resolve("colorama-0.4.6.dist-info"));
+
+        PyProjectTomlParser parser = new PyProjectTomlParser(venv);
+        Parser.Input input = Parser.Input.fromFile(tempDir.resolve("pyproject.toml"));
+        List<SourceFile> parsed = parser.parseInputs(
+          singletonList(input),
+          tempDir,
+          new InMemoryExecutionContext(Throwable::printStackTrace)
+        ).collect(toList());
+
+        assertThat(parsed).hasSize(1);
+        Toml.Document doc = (Toml.Document) parsed.get(0);
+        PythonResolutionResult marker = doc.getMarkers().findFirst(PythonResolutionResult.class).orElse(null);
+        assertThat(marker).isNotNull();
+        assertThat(marker.getResolvedDependencies())
+          .extracting(r -> r.getName() + "==" + r.getVersion())
+          .containsExactly("click==8.1.7", "colorama==0.4.6");
+
+        // The declared dependency links to its resolved entry.
+        Dependency click = marker.getDependencies().get(0);
+        assertThat(click.getResolved()).isNotNull();
+        assertThat(click.getResolved().getVersion()).isEqualTo("8.1.7");
+    }
+
+    @Test
+    void skipsUvResolutionWhenPoetryLockExists(@TempDir Path tempDir) throws Exception {
         String pyprojectToml = """
           [project]
           name = "poetry-managed"
@@ -241,10 +278,10 @@ class PyProjectTomlParserTest {
         PyProjectTomlParser parser = new PyProjectTomlParser();
         Parser.Input input = Parser.Input.fromFile(tempDir.resolve("pyproject.toml"));
         List<SourceFile> parsed = parser.parseInputs(
-          Collections.singletonList(input),
+          singletonList(input),
           tempDir,
           new InMemoryExecutionContext(Throwable::printStackTrace)
-        ).collect(Collectors.toList());
+        ).collect(toList());
 
         assertThat(parsed).hasSize(1);
         Toml.Document doc = (Toml.Document) parsed.get(0);
@@ -254,7 +291,7 @@ class PyProjectTomlParserTest {
     }
 
     @Test
-    void skipsUvResolutionWhenPdmLockExists(@TempDir Path tempDir) throws IOException {
+    void skipsUvResolutionWhenPdmLockExists(@TempDir Path tempDir) throws Exception {
         String pyprojectToml = """
           [project]
           name = "pdm-managed"
@@ -268,10 +305,10 @@ class PyProjectTomlParserTest {
         PyProjectTomlParser parser = new PyProjectTomlParser();
         Parser.Input input = Parser.Input.fromFile(tempDir.resolve("pyproject.toml"));
         List<SourceFile> parsed = parser.parseInputs(
-          Collections.singletonList(input),
+          singletonList(input),
           tempDir,
           new InMemoryExecutionContext(Throwable::printStackTrace)
-        ).collect(Collectors.toList());
+        ).collect(toList());
 
         assertThat(parsed).hasSize(1);
         Toml.Document doc = (Toml.Document) parsed.get(0);
@@ -281,7 +318,7 @@ class PyProjectTomlParserTest {
     }
 
     @Test
-    void skipsUvResolutionWhenPoetryToolSectionDetected(@TempDir Path tempDir) throws IOException {
+    void skipsUvResolutionWhenPoetryToolSectionDetected(@TempDir Path tempDir) throws Exception {
         String pyprojectToml = """
           [project]
           name = "poetry-tool"
@@ -297,10 +334,10 @@ class PyProjectTomlParserTest {
         PyProjectTomlParser parser = new PyProjectTomlParser();
         Parser.Input input = Parser.Input.fromFile(tempDir.resolve("pyproject.toml"));
         List<SourceFile> parsed = parser.parseInputs(
-          Collections.singletonList(input),
+          singletonList(input),
           tempDir,
           new InMemoryExecutionContext(Throwable::printStackTrace)
-        ).collect(Collectors.toList());
+        ).collect(toList());
 
         assertThat(parsed).hasSize(1);
         Toml.Document doc = (Toml.Document) parsed.get(0);

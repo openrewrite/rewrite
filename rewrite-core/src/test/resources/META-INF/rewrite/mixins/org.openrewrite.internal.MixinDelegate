@@ -1,0 +1,2 @@
+# Test fixture: mixin registered for org.openrewrite.internal.MixinDelegate
+org.openrewrite.internal.RegisteredMixin

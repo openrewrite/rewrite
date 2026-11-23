@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/test"
 )
 
@@ -36,6 +38,16 @@ func TestDetectScaffoldKind(t *testing.T) {
 		{"func foo() { }", ScaffoldTopLevel},
 		{"type Foo struct{}", ScaffoldTopLevel},
 		{"var x = 1", ScaffoldTopLevel},
+		{"v := f(x)", ScaffoldStatement},
+		{"v = x", ScaffoldStatement},
+		{"a, b = b, a", ScaffoldStatement},
+		{"x += 2", ScaffoldStatement},
+		{"i++", ScaffoldStatement},
+		{"ch <- v", ScaffoldStatement},
+		{"return", ScaffoldStatement},
+		{"break", ScaffoldStatement},
+		{"<-ch", ScaffoldExpression},
+		{"func() int { return 1 }()", ScaffoldExpression},
 	}
 	for _, tt := range tests {
 		got := detectScaffoldKind(tt.code)
@@ -45,8 +57,89 @@ func TestDetectScaffoldKind(t *testing.T) {
 	}
 }
 
+func TestNewRecipeDetectsAShortVarDeclAfter(t *testing.T) {
+	x := Expr("x")
+	r := NewRecipe(
+		RecipeName("test.DeclareInstead"),
+		WithDisplayName("Declare instead"),
+		WithBefore(fmt.Sprintf(`declare(%s)`, x)),
+		WithAfter(fmt.Sprintf(`v := %s`, x)),
+		WithCaptures(x),
+	)
+
+	spec := test.NewRecipeSpec().WithRecipe(r)
+	spec.RewriteRun(t,
+		test.Golang(`
+			package main
+
+			func f() {
+				declare(1)
+			}
+		`, `
+			package main
+
+			func f() {
+				v := 1
+			}
+		`),
+	)
+}
+
+func TestNewRecipeDetectsABareReturnAfter(t *testing.T) {
+	r := NewRecipe(
+		RecipeName("test.ReturnInstead"),
+		WithDisplayName("Return instead"),
+		WithBefore(`done()`),
+		WithAfter(`return`),
+	)
+
+	spec := test.NewRecipeSpec().WithRecipe(r)
+	spec.RewriteRun(t,
+		test.Golang(`
+			package main
+
+			func f() {
+				done()
+			}
+		`, `
+			package main
+
+			func f() {
+				return
+			}
+		`),
+	)
+}
+
+func TestNewRecipeDetectsASendAfter(t *testing.T) {
+	ch, v := Expr("ch"), Expr("v")
+	r := NewRecipe(
+		RecipeName("test.SendInstead"),
+		WithDisplayName("Send instead"),
+		WithBefore(fmt.Sprintf(`send(%s, %s)`, ch, v)),
+		WithAfter(fmt.Sprintf(`%s <- %s`, ch, v)),
+		WithCaptures(ch, v),
+	)
+
+	spec := test.NewRecipeSpec().WithRecipe(r)
+	spec.RewriteRun(t,
+		test.Golang(`
+			package main
+
+			func f(c chan int) {
+				send(c, 1)
+			}
+		`, `
+			package main
+
+			func f(c chan int) {
+				c <- 1
+			}
+		`),
+	)
+}
+
 func TestNewRecipeSimpleRewrite(t *testing.T) {
-	// Replace identifier `x` with `y`
 	r := NewRecipe(
 		RecipeName("test.ReplaceXWithY"),
 		WithDisplayName("Replace x with y"),
@@ -112,7 +205,6 @@ func TestNewRecipeNoChangeWhenNoMatch(t *testing.T) {
 }
 
 func TestNewRecipeMultipleBefores(t *testing.T) {
-	// Replace both `1 + 2` and `2 + 1` with `3`
 	r := NewRecipe(
 		RecipeName("test.OnePlusTwo"),
 		WithDisplayName("Simplify 1+2"),
@@ -123,7 +215,6 @@ func TestNewRecipeMultipleBefores(t *testing.T) {
 
 	spec := test.NewRecipeSpec().WithRecipe(r)
 
-	// First alternative matches
 	spec.RewriteRun(t,
 		test.Golang(`
 			package main
@@ -148,7 +239,6 @@ func TestNewRecipeMultipleBeforeSecondMatches(t *testing.T) {
 
 	spec := test.NewRecipeSpec().WithRecipe(r)
 
-	// Second alternative matches
 	spec.RewriteRun(t,
 		test.Golang(`
 			package main
@@ -162,8 +252,10 @@ func TestNewRecipeMultipleBeforeSecondMatches(t *testing.T) {
 	)
 }
 
-func TestNewRecipeWithImports(t *testing.T) {
-	// Replace `fmt.Sprintf("%d", n)` with `strconv.Itoa(n)`
+func TestNewRecipeImportsAreTemplateContextOnly(t *testing.T) {
+	// Imports on the after template let `strconv.Itoa(n)` parse, but callers
+	// are responsible for adding source-file imports via SourceImports. The
+	// import only the replaced code used goes, as Go compiles no unused one.
 	n := Expr("n")
 	r := NewRecipe(
 		RecipeName("test.SprintfToItoa"),
@@ -186,11 +278,102 @@ func TestNewRecipeWithImports(t *testing.T) {
 		`, `
 			package main
 
+			func f(n int) string {
+				return strconv.Itoa(n)
+			}
+		`),
+	)
+}
+
+func TestNewRecipeNamingThePackageOfAConversionBuildsWhatTheParserBuilds(t *testing.T) {
+	// Imports let the template resolve `time.Duration` to a type, so it builds
+	// the java.TypeCast the parser makes of the same text, not a call.
+	r := NewRecipe(
+		RecipeName("test.DurationOf"),
+		WithDisplayName("Use a duration"),
+		WithBefore(`x + 1`),
+		WithAfter(`time.Duration(x)`, Imports("time")),
+	)
+
+	spec := test.NewRecipeSpec().WithRecipe(r)
+	spec.RewriteRun(t,
+		test.Golang(`
+			package main
+
+			import "time"
+
+			var x = 1
+			var a = x + 1
+			var _ = time.Second
+		`, `
+			package main
+
+			import "time"
+
+			var x = 1
+			var a = time.Duration(x)
+			var _ = time.Second
+		`),
+	)
+}
+
+func TestNewRecipeWithSourceImports(t *testing.T) {
+	// SourceImports explicitly adds "strconv" to the file; the import cleanup
+	// pass removes "fmt" once the replacement no longer uses it.
+	n := Expr("n")
+	r := NewRecipe(
+		RecipeName("test.SprintfToItoa"),
+		WithDisplayName("Use strconv.Itoa"),
+		WithBefore(fmt.Sprintf(`fmt.Sprintf("%%d", %s)`, n), Imports("fmt")),
+		WithAfter(fmt.Sprintf(`strconv.Itoa(%s)`, n), Imports("strconv"), SourceImports("strconv")),
+		WithCaptures(n),
+	)
+
+	spec := test.NewRecipeSpec().WithRecipe(r)
+	spec.RewriteRun(t,
+		test.Golang(`
+			package main
+
 			import "fmt"
+
+			func f(n int) string {
+				return fmt.Sprintf("%d", n)
+			}
+		`, `
+			package main
+
+			import (
+				"strconv"
+			)
 
 			func f(n int) string {
 				return strconv.Itoa(n)
 			}
+		`),
+	)
+}
+
+func TestNewRecipeWithAliasedSourceImport(t *testing.T) {
+	blank := "_"
+	r := NewRecipe(
+		RecipeName("test.AddPprofImport"),
+		WithDisplayName("Add pprof import"),
+		WithBefore(`x`),
+		WithAfter(`y`, SourceImport("net/http/pprof", &blank)),
+	)
+
+	spec := test.NewRecipeSpec().WithRecipe(r)
+	spec.RewriteRun(t,
+		test.Golang(`
+			package main
+
+			var a = x
+		`, `
+			package main
+
+			import _ "net/http/pprof"
+
+			var a = y
 		`),
 	)
 }
@@ -205,18 +388,10 @@ func TestNewRecipeMetadata(t *testing.T) {
 		WithAfter(`y`),
 	)
 
-	if r.Name() != "org.openrewrite.golang.MyRecipe" {
-		t.Errorf("Name() = %q", r.Name())
-	}
-	if r.DisplayName() != "My Recipe" {
-		t.Errorf("DisplayName() = %q", r.DisplayName())
-	}
-	if r.Description() != "Does something useful." {
-		t.Errorf("Description() = %q", r.Description())
-	}
-	if len(r.Tags()) != 2 || r.Tags()[0] != "cleanup" {
-		t.Errorf("Tags() = %v", r.Tags())
-	}
+	assert.Equal(t, "org.openrewrite.golang.MyRecipe", r.Name(), "Name")
+	assert.Equal(t, "My Recipe", r.DisplayName(), "DisplayName")
+	assert.Equal(t, "Does something useful.", r.Description(), "Description")
+	assert.False(t, len(r.Tags()) != 2 || r.Tags()[0] != "cleanup", "Tags")
 }
 
 type myRecipe struct {
@@ -224,8 +399,8 @@ type myRecipe struct {
 }
 
 func (r *myRecipe) Name() string        { return "test.MyRecipe" }
-func (r *myRecipe) DisplayName() string  { return "My Recipe" }
-func (r *myRecipe) Description() string  { return "Test recipe" }
+func (r *myRecipe) DisplayName() string { return "My Recipe" }
+func (r *myRecipe) Description() string { return "Test recipe" }
 
 func TestTemplateRecipeStruct(t *testing.T) {
 	expr := Expr("expr")
@@ -270,6 +445,48 @@ func TestNewRecipePreservesFormatting(t *testing.T) {
 			package main
 
 			var longVariableName = someFunction()
+		`),
+	)
+}
+
+func TestNewRecipeWithSourceImportsKeepsVersionedPathImport(t *testing.T) {
+	// Declaring SourceImports runs the import cleanup over the whole file,
+	// including imports the recipe never touches.
+	r := NewRecipe(
+		RecipeName("test.RenameX"),
+		WithDisplayName("Rename x to y"),
+		WithBefore(`x`),
+		WithAfter(`y`, SourceImports("fmt")),
+	)
+
+	spec := test.NewRecipeSpec().WithRecipe(r)
+	spec.RewriteRun(t,
+		test.Golang(`
+			package main
+
+			import (
+				"fmt"
+
+				"gopkg.in/yaml.v3"
+			)
+
+			func load(b []byte, out any) error {
+				fmt.Println(x)
+				return yaml.Unmarshal(b, out)
+			}
+		`, `
+			package main
+
+			import (
+				"fmt"
+
+				"gopkg.in/yaml.v3"
+			)
+
+			func load(b []byte, out any) error {
+				fmt.Println(y)
+				return yaml.Unmarshal(b, out)
+			}
 		`),
 	)
 }

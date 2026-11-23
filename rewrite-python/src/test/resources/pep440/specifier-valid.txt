@@ -1,0 +1,13 @@
+# Extracted from https://raw.githubusercontent.com/pypa/packaging/main/tests/test_specifiers.py (SPECIFIERS)
+# Retrieved: 2026-07-16
+# Valid specifier clauses.
+# Fields are tab-separated; \t, \n, \r, \\ are escaped.
+~=2.0
+==2.1.*
+==2.1.0.3
+!=2.2.*
+!=2.2.0.5
+<=5
+>=7.9a1
+<1.0.dev1
+>2.0.post1

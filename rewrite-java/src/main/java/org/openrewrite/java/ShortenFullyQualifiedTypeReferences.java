@@ -17,13 +17,16 @@ package org.openrewrite.java;
 
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.internal.DefaultJavaTypeSignatureBuilder;
+import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.service.ImportService;
+import org.openrewrite.java.trait.Scope;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
@@ -32,7 +35,11 @@ import org.openrewrite.java.tree.Space;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
+import java.util.function.Predicate;
 
+import static org.openrewrite.java.tree.TypeUtils.fullyQualifiedNamesAreEqual;
+import static org.openrewrite.java.tree.TypeUtils.isOfClassType;
 import static org.openrewrite.java.tree.TypeUtils.isWellFormedType;
 
 public class ShortenFullyQualifiedTypeReferences extends Recipe {
@@ -74,10 +81,22 @@ public class ShortenFullyQualifiedTypeReferences extends Recipe {
      * @see JavaVisitor#service(Class)
      */
     public static <J2 extends J> JavaVisitor<ExecutionContext> modifyOnly(J2 subtree) {
-        return getVisitor(subtree);
+        return getVisitor(subtree, fqn -> false);
     }
 
-    private static JavaVisitor<ExecutionContext> getVisitor(@Nullable J scope) {
+    /**
+     * Like {@link #modifyOnly(J)}, but leaves references to types matching {@code keepQualified} fully qualified.
+     */
+    public static <J2 extends J> JavaVisitor<ExecutionContext> modifyOnly(J2 subtree, Predicate<String> keepQualified) {
+        return getVisitor(subtree, keepQualified);
+    }
+
+    private static JavaVisitor<ExecutionContext> getVisitor(@Nullable J scope, Predicate<String> keepQualified) {
+        return getVisitor(scope, keepQualified, null);
+    }
+
+    static JavaVisitor<ExecutionContext> getVisitor(@Nullable J scope, Predicate<String> keepQualified,
+                                                  @Nullable Set<String> requestedImports) {
         return new JavaVisitor<ExecutionContext>() {
             final Map<String, JavaType> usedTypes = new HashMap<>();
             final JavaTypeSignatureBuilder signatureBuilder = new DefaultJavaTypeSignatureBuilder();
@@ -94,7 +113,8 @@ public class ShortenFullyQualifiedTypeReferences extends Recipe {
                         @Override
                         public J.Import visitImport(J.Import import_, Map<String, JavaType> types) {
                             if (!import_.isStatic() && isWellFormedType(import_.getQualid().getType())) {
-                                types.put(import_.getQualid().getSimpleName(), import_.getQualid().getType());
+                                J.Identifier alias = import_.getAlias();
+                                types.put(alias != null ? alias.getSimpleName() : import_.getQualid().getSimpleName(), import_.getQualid().getType());
                             }
                             return import_;
                         }
@@ -164,32 +184,107 @@ public class ShortenFullyQualifiedTypeReferences extends Recipe {
                 }
 
                 JavaType type = fieldAccess.getType();
-                if (fieldAccess.getName().getFieldType() == null && type instanceof JavaType.Class && ((JavaType.Class) type).getOwningClass() == null) {
+                if (fieldAccess.getName().getFieldType() == null && type instanceof JavaType.Class && ((JavaType.Class) type).getOwningClass() == null &&
+                    fieldAccess.getSimpleName().equals(((JavaType.Class) type).getClassName()) &&
+                    !keepQualified.test(((JavaType.Class) type).getFullyQualifiedName())) {
                     ensureInitialized();
 
                     String simpleName = fieldAccess.getSimpleName();
+                    if (!isTypeReferenceSafeToShorten(getCursor(), simpleName, (JavaType.FullyQualified) type)) {
+                        return fieldAccess;
+                    }
                     JavaType usedType = usedTypes.get(simpleName);
                     if (type == usedType || signatureBuilder.signature(type).equals(signatureBuilder.signature(usedType))) {
-                        return !fieldAccess.getPrefix().isEmpty() ? fieldAccess.getName().withPrefix(fieldAccess.getPrefix()) : fieldAccess.getName();
+                        return shorten(fieldAccess);
                     } else if (!usedTypes.containsKey(simpleName)) {
                         String fullyQualifiedName = ((JavaType.FullyQualified) type).getFullyQualifiedName();
-                        if (!fullyQualifiedName.startsWith("java.lang.")) {
-                            maybeAddImport(fullyQualifiedName);
-                            usedTypes.put(simpleName, type);
-                            if (!fieldAccess.getName().getAnnotations().isEmpty()) {
-                                return fieldAccess.getName().withAnnotations(ListUtils.map(fieldAccess.getName().getAnnotations(), (i, a) -> {
-                                    if (i == 0) {
-                                        return a.withPrefix(fieldAccess.getPrefix());
-                                    }
-                                    return a;
-                                }));
+                        if ("java.lang".equals(((JavaType.FullyQualified) type).getPackageName())) {
+                            if (!isAnnotationTypeName() || conflictsWithSamePackageType(simpleName, fullyQualifiedName)) {
+                                return fieldAccess;
                             }
-                            return fieldAccess.getName().withPrefix(fieldAccess.getPrefix());
+                        } else if (requestedImports == null) {
+                            maybeAddImport(fullyQualifiedName);
                         }
+                        usedTypes.put(simpleName, type);
+                        return shorten(fieldAccess);
                     }
                 }
                 return super.visitFieldAccess(fieldAccess, ctx);
             }
+
+            private J shorten(J.FieldAccess fieldAccess) {
+                if (requestedImports != null) {
+                    requestedImports.add(((JavaType.FullyQualified) fieldAccess.getType()).getFullyQualifiedName());
+                }
+                // the name has the type of the qualified name it replaces, which keeps the import that provides it
+                J.Identifier name = fieldAccess.getName().withType(fieldAccess.getType());
+                if (!name.getAnnotations().isEmpty()) {
+                    return name.withAnnotations(ListUtils.map(name.getAnnotations(), (i, a) -> {
+                        if (i == 0) {
+                            return a.withPrefix(fieldAccess.getPrefix());
+                        }
+                        return a;
+                    }));
+                }
+                return name.withPrefix(fieldAccess.getPrefix());
+            }
+
+            private boolean isAnnotationTypeName() {
+                J.Annotation annotation = getCursor().firstEnclosing(J.Annotation.class);
+                return annotation != null && annotation.getAnnotationType() == getCursor().getValue();
+            }
+
+            private boolean conflictsWithSamePackageType(String simpleName, String fullyQualifiedName) {
+                SourceFile sourceFile = getCursor().firstEnclosing(SourceFile.class);
+                if (!(sourceFile instanceof JavaSourceFile)) {
+                    return false;
+                }
+                JavaSourceFile javaSourceFile = (JavaSourceFile) sourceFile;
+                J.Package packageDeclaration = javaSourceFile.getPackageDeclaration();
+                String packageName = packageDeclaration == null ? "" : packageDeclaration.getPackageName();
+                String samePackageType = packageName.isEmpty() ? simpleName : packageName + "." + simpleName;
+                return javaSourceFile.getMarkers().findFirst(JavaSourceSet.class)
+                        .map(JavaSourceSet::getClasspath)
+                        .orElseGet(java.util.Collections::emptyList)
+                        .stream()
+                        .anyMatch(fq -> !fullyQualifiedNamesAreEqual(fq.getFullyQualifiedName(), fullyQualifiedName) &&
+                                fullyQualifiedNamesAreEqual(fq.getFullyQualifiedName(), samePackageType));
+            }
         };
     }
+
+    // AddImport also shortens references after inserting an import, so both visitors must honor the scope at each use.
+    static boolean isTypeReferenceSafeToShorten(Cursor cursor, String simpleName, JavaType.FullyQualified type) {
+        Scope scope = Scope.at(cursor);
+        Scope.Binding binding = scope.lookup(simpleName, Scope.Namespace.TYPE).orElse(null);
+        if (binding != null && !isOfClassType(binding.getType(), type.getFullyQualifiedName())) {
+            return false;
+        }
+        return !isTypeQualifierInExpression(cursor) || !scope.lookup(simpleName).isPresent();
+    }
+
+    static boolean isTypeQualifierInExpression(Cursor cursor) {
+        J qualifier = cursor.getValue();
+        for (Cursor parent = cursor.getParentTreeCursor(); ; parent = parent.getParentTreeCursor()) {
+            Object tree = parent.getValue();
+            if (tree instanceof J.FieldAccess && ((J.FieldAccess) tree).getTarget() == qualifier) {
+                J.FieldAccess access = (J.FieldAccess) tree;
+                if ("class".equals(access.getSimpleName()) || "this".equals(access.getSimpleName()) || "super".equals(access.getSimpleName())) {
+                    return false;
+                }
+                if (access.getName().getFieldType() != null) {
+                    return true;
+                }
+                qualifier = access;
+            } else if (tree instanceof J.MethodInvocation && ((J.MethodInvocation) tree).getSelect() == qualifier) {
+                return true;
+            } else if (tree instanceof J.MemberReference && ((J.MemberReference) tree).getContaining() == qualifier) {
+                return !"new".equals(((J.MemberReference) tree).getReference().getSimpleName());
+            } else {
+                return false;
+            }
+        }
+    }
+
+
 }

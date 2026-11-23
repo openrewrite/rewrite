@@ -19,9 +19,11 @@ import lombok.*;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.internal.TreeShapeValidationService;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.toml.TomlVisitor;
 import org.openrewrite.toml.internal.TomlPrinter;
+import org.openrewrite.toml.internal.TomlTreeShapeValidationService;
 
 import java.lang.ref.WeakReference;
 import java.nio.charset.Charset;
@@ -157,6 +159,15 @@ public interface Toml extends Tree {
         @Override
         public <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
             return new TomlPrinter<>();
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public <S, T extends S> T service(Class<S> service) {
+            if (TreeShapeValidationService.class.getName().equals(service.getName())) {
+                return (T) new TomlTreeShapeValidationService();
+            }
+            return SourceFile.super.service(service);
         }
     }
 

@@ -16,6 +16,7 @@
 package org.openrewrite.csharp.rpc;
 
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -26,6 +27,7 @@ import java.util.List;
  */
 class ParseSolutionResponse {
     private List<Item> items = new ArrayList<>();
+    private long restoreTimeMs;
 
     public List<Item> getItems() {
         return items;
@@ -33,6 +35,14 @@ class ParseSolutionResponse {
 
     public void setItems(List<Item> items) {
         this.items = items;
+    }
+
+    public long getRestoreTimeMs() {
+        return restoreTimeMs;
+    }
+
+    public void setRestoreTimeMs(long restoreTimeMs) {
+        this.restoreTimeMs = restoreTimeMs;
     }
 
     /**
@@ -50,5 +60,13 @@ class ParseSolutionResponse {
          * Example: org.openrewrite.csharp.tree.Cs$CompilationUnit
          */
         String sourceFileType;
+
+        /**
+         * The relative source path. Quark items are built from it locally, and it names the
+         * file in the {@link org.openrewrite.tree.ParseError} substituted for an item that
+         * could not be fetched. Null from a C# peer that predates populating it for every item.
+         */
+        @Nullable
+        String sourcePath;
     }
 }

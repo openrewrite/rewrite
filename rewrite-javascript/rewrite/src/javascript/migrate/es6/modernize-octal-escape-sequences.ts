@@ -19,12 +19,13 @@ import {TreeVisitor} from "../../../visitor";
 import {ExecutionContext} from "../../../execution";
 import {JavaScriptVisitor} from "../../visitor";
 import {J} from "../../../java";
+import {JS} from "../../tree";
 import {create as produce} from "mutative";
 
 export class ModernizeOctalEscapeSequences extends Recipe {
     name = "org.openrewrite.javascript.migrate.es6.modernize-octal-escape-sequences";
     displayName = "Modernize octal escape sequences";
-    description = "Convert old-style octal escape sequences (e.g., `\\0`, `\\123`) to modern hex escape sequences (e.g., `\\x00`, `\\x53`) or Unicode escape sequences (e.g., `\\u0000`, `\\u0053`).";
+    description = "Convert legacy octal escape sequences in string literals (e.g., `\\1`, `\\123`) to hex escape sequences (e.g., `\\x01`, `\\x53`) or Unicode escape sequences (e.g., `\\u0001`, `\\u0053`). The `\\0` escape is left alone unless a digit follows it.";
 
     @Option({
         displayName: "Use Unicode escapes",
@@ -41,50 +42,41 @@ export class ModernizeOctalEscapeSequences extends Recipe {
 
     async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
         const useUnicode = this.useUnicodeEscapes;
+        const modernize = (source: string) => source.replace(
+            /\\([0-3][0-7]{0,2}|[4-7][0-7]?|[\s\S])/g,
+            (escape: string, body: string, offset: number) => {
+                if (!/^[0-7]/.test(body) || (body === '0' && !/[0-9]/.test(source[offset + 2] ?? ''))) {
+                    return escape;
+                }
+                const code = parseInt(body, 8);
+                return useUnicode ?
+                    `\\u${code.toString(16).padStart(4, '0')}` :
+                    `\\x${code.toString(16).padStart(2, '0')}`;
+            });
         return new class extends JavaScriptVisitor<ExecutionContext> {
 
             protected async visitLiteral(literal: J.Literal, _ctx: ExecutionContext): Promise<J | undefined> {
-                // Only process string literals
-                if (typeof literal.value !== 'string') {
-                    return literal;
-                }
-
                 const valueSource = literal.valueSource;
-                if (!valueSource) {
+                if (!valueSource || (valueSource[0] !== '"' && valueSource[0] !== "'") ||
+                    this.cursor.parentTree()?.value.kind === JS.Kind.JsxAttribute) {
                     return literal;
                 }
 
-                // Check if this string contains octal escape sequences
-                // Octal escape sequences: \0 through \377 (1-3 octal digits)
-                // Pattern: backslash followed by 1-3 octal digits (0-7)
-                // We need to be careful not to match already escaped sequences
-                const octalEscapePattern = /\\([0-7]{1,3})/g;
-
-                let hasOctalEscapes = false;
-                let modernized = valueSource;
-
-                // Replace all octal escape sequences with hex or Unicode equivalents
-                modernized = valueSource.replace(octalEscapePattern, (match, octalDigits) => {
-                    hasOctalEscapes = true;
-                    // Convert octal string to decimal number
-                    const decimalValue = parseInt(octalDigits, 8);
-
-                    if (useUnicode) {
-                        // Convert to Unicode escape sequence (4 hex digits, zero-padded)
-                        return `\\u${decimalValue.toString(16).padStart(4, '0')}`;
-                    } else {
-                        // Convert to hex escape sequence (2 hex digits, zero-padded)
-                        return `\\x${decimalValue.toString(16).padStart(2, '0')}`;
-                    }
+                // Surrogate escapes are held outside valueSource, so each run between them is rewritten on its own
+                // and the escapes are moved to where their runs now end.
+                let modernized = '';
+                let cut = 0;
+                const unicodeEscapes = literal.unicodeEscapes?.map(escape => {
+                    modernized += modernize(valueSource.slice(cut, escape.valueSourceIndex));
+                    cut = escape.valueSourceIndex;
+                    return {...escape, valueSourceIndex: modernized.length};
                 });
+                modernized += modernize(valueSource.slice(cut));
 
-                if (hasOctalEscapes) {
-                    return produce(literal, draft => {
-                        draft.valueSource = modernized;
-                    });
-                }
-
-                return literal;
+                return modernized === valueSource ? literal : produce(literal, draft => {
+                    draft.valueSource = modernized;
+                    draft.unicodeEscapes = unicodeEscapes;
+                });
             }
         }
     }

@@ -18,12 +18,15 @@ package org.openrewrite.java;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.Cursor;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.NameTree;
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -1038,12 +1041,14 @@ class JavaTemplateMatchTest implements RewriteTest {
     void matchMemberReferenceContainingParameter() {
         rewriteRun(
           spec -> spec
-            .expectedCyclesThatMakeChanges(1).cycles(1)
             .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
                 JavaTemplate template = JavaTemplate.builder("java.util.function.Predicate.not(#{any(java.util.Set)}::contains)").build();
 
                 @Override
                 public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+                    if (method.getMarkers().findFirst(SearchResult.class).isPresent()) {
+                        return method;
+                    }
                     JavaTemplate.Matcher matcher = template.matcher(getCursor());
                     if (matcher.find()) {
                         JavaTemplateSemanticallyEqual.TemplateMatchResult result = matcher.getMatchResult();
@@ -1086,6 +1091,7 @@ class JavaTemplateMatchTest implements RewriteTest {
         //noinspection Convert2MethodRef
         rewriteRun(
           spec -> spec
+            // the visitor swaps method references and lambdas, so every cycle undoes the last
             .expectedCyclesThatMakeChanges(1).cycles(1)
             .recipe(toRecipe(() -> new JavaVisitor<>() {
                 final JavaTemplate refTemplate = JavaTemplate.builder("String::valueOf")
@@ -1153,7 +1159,9 @@ class JavaTemplateMatchTest implements RewriteTest {
     @Test
     void matchMemberReferenceWithLiteralReceiver() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+          // the template resolves `contains` on its parameter's type, Collection, not on List
+          spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build())
+            .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               final JavaTemplate before = JavaTemplate
                 .builder("#{collection:any(java.util.Collection)}.stream().anyMatch(#{value:any(java.lang.Object)}::equals)")
                 .build();
@@ -1192,6 +1200,149 @@ class JavaTemplateMatchTest implements RewriteTest {
                       boolean a = list.contains(value);
                       boolean b = list.contains("string");
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void parameterizedMatch() {
+        JavaTemplate template = JavaTemplate.builder("#{any(java.util.List<String>)}")
+          .build();
+
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public <N extends NameTree> N visitTypeName(N nameTree, ExecutionContext ctx) {
+                  // visitFieldAccess() calls visitTypeName() on the field access itself, the others on a child
+                  Cursor cursor = getCursor().getValue() == nameTree ? getCursor() : new Cursor(getCursor(), nameTree);
+                  if (template.matches(cursor)) {
+                      return SearchResult.found(nameTree);
+                  }
+                  return super.visitTypeName(nameTree, ctx);
+              }
+          })),
+          java(
+            """
+              import java.util.List;
+              class Test {
+                  List<Object> o;
+                  List<String> s;
+                  List<Number> n;
+                  List<Integer> i;
+                  List<java.lang.Object> qo;
+                  List<java.lang.String> qs;
+                  List<java.lang.Number> qn;
+                  List<java.lang.Integer> qi;
+              }
+              """,
+            """
+              import java.util.List;
+              class Test {
+                  List<Object> o;
+                  /*~~>*/List<String> s;
+                  List<Number> n;
+                  List<Integer> i;
+                  List<java.lang.Object> qo;
+                  /*~~>*/List<java.lang.String> qs;
+                  List<java.lang.Number> qn;
+                  List<java.lang.Integer> qi;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void parameterizedMatchWithBounds() {
+        JavaTemplate template = JavaTemplate.builder("#{any(java.util.List<? extends java.lang.Number>)}")
+          .build();
+
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public <N extends NameTree> N visitTypeName(N nameTree, ExecutionContext ctx) {
+                  // the cursor points at the parent when `visitTypeName()` is called
+                  if (getCursor().getValue() != nameTree && template.matches(new Cursor(getCursor(), nameTree))) {
+                      return SearchResult.found(nameTree);
+                  }
+                  return super.visitTypeName(nameTree, ctx);
+              }
+          })),
+          java(
+            """
+              import java.util.List;
+              class Test {
+                  List<Object> o;
+                  List<String> s;
+                  List<Number> n;
+                  List<Integer> i;
+                  List<java.lang.Object> qo;
+                  List<java.lang.String> qs;
+                  List<java.lang.Number> qn;
+                  List<java.lang.Integer> qi;
+              }
+              """,
+            """
+              import java.util.List;
+              class Test {
+                  List<Object> o;
+                  List<String> s;
+                  /*~~>*/List<Number> n;
+                  /*~~>*/List<Integer> i;
+                  List<java.lang.Object> qo;
+                  List<java.lang.String> qs;
+                  /*~~>*/List<java.lang.Number> qn;
+                  /*~~>*/List<java.lang.Integer> qi;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void parameterizedArrayMatch() {
+        JavaTemplate template = JavaTemplate.builder("#{anyArray(java.util.List<String>)}")
+          .build();
+
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public <N extends NameTree> N visitTypeName(N nameTree, ExecutionContext ctx) {
+                  // visitFieldAccess() calls visitTypeName() on the field access itself, the others on a child
+                  Cursor cursor = getCursor().getValue() == nameTree ? getCursor() : new Cursor(getCursor(), nameTree);
+                  if (template.matches(cursor)) {
+                      return SearchResult.found(nameTree);
+                  }
+                  return super.visitTypeName(nameTree, ctx);
+              }
+          })),
+          java(
+            """
+              import java.util.List;
+              class Test {
+                  List<Object>[] o;
+                  List<String>[] s;
+                  List<Number>[] n;
+                  List<Integer>[] i;
+                  List<java.lang.Object>[] qo;
+                  List<java.lang.String>[] qs;
+                  List<java.lang.Number>[] qn;
+                  List<java.lang.Integer>[] qi;
+              }
+              """,
+            """
+              import java.util.List;
+              class Test {
+                  List<Object>[] o;
+                  /*~~>*/List<String>[] s;
+                  List<Number>[] n;
+                  List<Integer>[] i;
+                  List<java.lang.Object>[] qo;
+                  /*~~>*/List<java.lang.String>[] qs;
+                  List<java.lang.Number>[] qn;
+                  List<java.lang.Integer>[] qi;
               }
               """
           )

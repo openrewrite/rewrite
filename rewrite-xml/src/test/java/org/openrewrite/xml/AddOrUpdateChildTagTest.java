@@ -17,14 +17,14 @@ package org.openrewrite.xml;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.xml.Assertions.xml;
 
 class AddOrUpdateChildTagTest implements RewriteTest {
-    @CsvSource({"true", "false"})
+    @ValueSource(booleans = {true, false})
     @NullSource
     @ParameterizedTest
     void addsTagEverywhereWhenAbsent(Boolean replaceExisting) {
@@ -186,7 +186,7 @@ class AddOrUpdateChildTagTest implements RewriteTest {
         );
     }
 
-    @CsvSource("true")
+    @ValueSource(booleans = true)
     @NullSource
     @ParameterizedTest
     void updateTagEverywhere(Boolean replaceExisting) {
@@ -416,7 +416,7 @@ class AddOrUpdateChildTagTest implements RewriteTest {
         );
     }
 
-    @CsvSource({"true", "false"})
+    @ValueSource(booleans = {true, false})
     @NullSource
     @ParameterizedTest
     void dontTouchAnythingElse(Boolean replaceExisting) {
@@ -490,6 +490,56 @@ class AddOrUpdateChildTagTest implements RewriteTest {
                             </profiles>
                         </project>
                         """
+                )
+        );
+    }
+
+    @Test
+    void replacedTagKeepsTheIndentationOfItsLine() {
+        rewriteRun(spec -> spec.recipe(new AddOrUpdateChildTag("/project/build/plugins/plugin/configuration",
+                        "<skip>true</skip>", true)),
+                xml(
+                        """
+                                <project>
+                                    <build>
+                                        <plugins>
+                                            <plugin>
+                                                <configuration>
+                                \t\t\t\t\t<skip>false</skip>
+                                                    <encoding>UTF-8</encoding>
+                                                </configuration>
+                                            </plugin>
+                                        </plugins>
+                                    </build>
+                                </project>
+                                """,
+                        """
+                                <project>
+                                    <build>
+                                        <plugins>
+                                            <plugin>
+                                                <configuration>
+                                \t\t\t\t\t<skip>true</skip>
+                                                    <encoding>UTF-8</encoding>
+                                                </configuration>
+                                            </plugin>
+                                        </plugins>
+                                    </build>
+                                </project>
+                                """
+                )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"\n", "\r\n"})
+    void replacedTagKeepsTheBlankLinesAboveIt(String lineBreak) {
+        rewriteRun(spec -> spec.recipe(new AddOrUpdateChildTag("/project/configuration", "<skip>true</skip>", true)),
+                xml(
+                        "<project>\n  <configuration>\n    <encoding>UTF-8</encoding>\n \t \n    <skip>false</skip>\n  </configuration>\n</project>"
+                                .replace("\n", lineBreak),
+                        "<project>\n  <configuration>\n    <encoding>UTF-8</encoding>\n \t \n    <skip>true</skip>\n  </configuration>\n</project>"
+                                .replace("\n", lineBreak)
                 )
         );
     }

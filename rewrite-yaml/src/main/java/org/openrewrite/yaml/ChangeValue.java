@@ -20,6 +20,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.yaml.trait.BlockScalar;
 import org.openrewrite.yaml.tree.Yaml;
 
 import static org.openrewrite.Tree.randomId;
@@ -66,23 +67,71 @@ public class ChangeValue extends Recipe {
             @Override
             public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext ctx) {
                 Yaml.Mapping.Entry e = super.visitMappingEntry(entry, ctx);
-                if (matcher.matches(getCursor()) && (!(e.getValue() instanceof Yaml.Scalar) || !((Yaml.Scalar) e.getValue()).getValue().equals(value))) {
+                if (!matcher.matches(getCursor())) {
+                    return e;
+                }
+                BlockScalar block = new BlockScalar.Matcher().get(new Cursor(getCursor(), e.getValue())).orElse(null);
+                if (block != null) {
+                    if (!block.getBody().equals(value)) {
+                        e = e.withValue(block.withBody(value));
+                    }
+                } else if (!(e.getValue() instanceof Yaml.Scalar) || !((Yaml.Scalar) e.getValue()).getValue().equals(value)) {
                     Yaml.Anchor anchor = (e.getValue() instanceof Yaml.Scalar) ? ((Yaml.Scalar) e.getValue()).getAnchor() : null;
                     Yaml.Tag tag = (e.getValue() instanceof Yaml.Scalar) ? ((Yaml.Scalar) e.getValue()).getTag() : null;
                     String prefix = e.getValue() instanceof Yaml.Sequence ? ((Yaml.Sequence) e.getValue()).getOpeningBracketPrefix() : e.getValue().getPrefix();
-                    e = e.withValue(
-                            new Yaml.Scalar(randomId(), prefix, Markers.EMPTY,
-                                    Yaml.Scalar.Style.PLAIN, anchor, tag, value)
-                    );
+                    Yaml.Block parsed = parsed(prefix, anchor, tag);
+                    if (parsed == null) {
+                        e = e.withValue(
+                                new Yaml.Scalar(randomId(), prefix, Markers.EMPTY,
+                                        Yaml.Scalar.Style.PLAIN, anchor, tag, value)
+                        );
+                    } else if (!parsed.printTrimmed(getCursor()).equals(e.getValue().printTrimmed(getCursor()))) {
+                        e = e.withValue(parsed);
+                    }
                 }
                 return e;
+            }
+
+            /**
+             * The value as the parser reads it, such as a flow sequence for `[a, b]` or a quoted scalar for `"*"`, or
+             * null when it reads the value as the plain scalar it is.
+             */
+            private Yaml.@Nullable Block parsed(@Nullable String prefix, Yaml.@Nullable Anchor anchor,
+                                                Yaml.@Nullable Tag tag) {
+                Yaml.Block parsed = new YamlParser().parse(new InMemoryExecutionContext(),
+                                "key:" + (prefix == null || prefix.isEmpty() ? " " : prefix) + value)
+                        .filter(documents -> documents instanceof Yaml.Documents &&
+                                             !((Yaml.Documents) documents).getDocuments().isEmpty())
+                        .map(documents -> ((Yaml.Documents) documents).getDocuments().get(0).getBlock())
+                        .filter(Yaml.Mapping.class::isInstance)
+                        .map(mapping -> ((Yaml.Mapping) mapping).getEntries())
+                        .filter(entries -> entries.size() == 1)
+                        .map(entries -> entries.get(0).getValue())
+                        .findFirst()
+                        .orElse(null);
+                if (parsed instanceof Yaml.Scalar) {
+                    Yaml.Scalar scalar = (Yaml.Scalar) parsed;
+                    return scalar.getStyle() == Yaml.Scalar.Style.PLAIN ? null : scalar.withAnchor(anchor).withTag(tag);
+                } else if (parsed instanceof Yaml.Sequence) {
+                    return ((Yaml.Sequence) parsed).withAnchor(anchor).withTag(tag);
+                } else if (parsed instanceof Yaml.Mapping) {
+                    return ((Yaml.Mapping) parsed).withAnchor(anchor).withTag(tag);
+                }
+                return null;
             }
 
             @Override
             public Yaml.Scalar visitScalar(Yaml.Scalar scalar, ExecutionContext ctx) {
                 Yaml.Scalar s = super.visitScalar(scalar, ctx);
                 if (matcher.matches(getCursor())) {
-                    s = s.withValue(value);
+                    BlockScalar block = new BlockScalar.Matcher().get(getCursor()).orElse(null);
+                    if (block != null) {
+                        if (!block.getBody().equals(value)) {
+                            s = block.withBody(value);
+                        }
+                    } else if (!s.getValue().equals(value)) {
+                        s = s.withValue(value);
+                    }
                 }
                 return s;
             }

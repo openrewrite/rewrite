@@ -15,7 +15,9 @@
  */
 package org.openrewrite.golang.marketplace;
 
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.golang.rpc.GoRewriteRpc;
 import org.openrewrite.golang.rpc.InstallRecipesResponse;
 import org.openrewrite.marketplace.RecipeBundle;
@@ -30,6 +32,16 @@ import java.nio.file.Paths;
 public class GolangRecipeBundleResolver implements RecipeBundleResolver {
     private final GoRewriteRpc rpc;
 
+    /**
+     * The {@link InstallRecipesResponse} returned by the most recent
+     * {@link #resolve(RecipeBundle)} call, or {@code null} if {@code resolve}
+     * has not been called yet. Callers (e.g. Moderne CLI) read
+     * {@link InstallRecipesResponse#getActivatePkg()} from here after each
+     * resolve to learn the just-installed module's activate package.
+     */
+    @Getter
+    private @Nullable InstallRecipesResponse lastResponse;
+
     @Override
     public String getEcosystem() {
         return "go";
@@ -39,14 +51,20 @@ public class GolangRecipeBundleResolver implements RecipeBundleResolver {
     public RecipeBundleReader resolve(RecipeBundle bundle) {
         Path pkgPath = Paths.get(bundle.getPackageName());
         InstallRecipesResponse response;
+        RecipeBundle resolved = bundle;
         if (Files.exists(pkgPath)) {
-            response = rpc.installRecipes(pkgPath.toFile());
+            Path absolute = pkgPath.toAbsolutePath().normalize();
+            // Key the bundle on the absolute, normalized path so it matches the origin the server records for it.
+            resolved = new RecipeBundle(bundle.getPackageEcosystem(), absolute.toString(),
+                    bundle.getRequestedVersion(), bundle.getVersion(), bundle.getTeam());
+            response = rpc.installRecipes(absolute.toFile());
         } else {
-            response = rpc.installRecipes(bundle.getPackageName(), bundle.getVersion());
+            response = rpc.installRecipes(bundle.getPackageName(), bundle.getEffectiveVersion());
         }
+        this.lastResponse = response;
         if (response.getVersion() != null) {
-            bundle.setVersion(response.getVersion());
+            resolved = resolved.withVersion(response.getVersion());
         }
-        return new GolangRecipeBundleReader(bundle, rpc);
+        return new GolangRecipeBundleReader(resolved, rpc);
     }
 }

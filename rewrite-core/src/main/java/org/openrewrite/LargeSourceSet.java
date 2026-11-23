@@ -112,4 +112,15 @@ public interface LargeSourceSet {
      */
     default void onGenerateCollision(Path sourcePath, boolean existingFile) {
     }
+
+    /**
+     * Called when a recipe's {@code generate()} produces a file whose path is structurally invalid
+     * (for example absolute, empty, not normalized, or outside the source root). The generated file
+     * is dropped. Implementations may override this to detect the problem (e.g. the test framework
+     * raises an assertion failure).
+     *
+     * @param sourcePath The invalid source path.
+     */
+    default void onGenerateInvalidPath(Path sourcePath) {
+    }
 }

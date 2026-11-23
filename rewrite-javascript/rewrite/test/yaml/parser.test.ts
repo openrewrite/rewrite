@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {isDirective, isDocuments, isMapping, isScalar, isSequence, Yaml, yaml, YamlParser} from "../../src/yaml";
-import {findMarker, printer} from "../../src";
-import {RecipeSpec} from "../../src/test";
+import {isDirective, isDocuments, isMapping, isScalar, isSequence, Yaml, yaml, YamlParser, YamlVisitor} from "../../src/yaml";
+import {ExecutionContext, findMarker, printer, randomId} from "../../src";
+import {dedent, fromVisitor, RecipeSpec} from "../../src/test";
 
 async function parseAndPrint(yaml: string): Promise<string> {
     const parser = new YamlParser();
@@ -514,4 +514,356 @@ host: {C App}.colruyt.int/{C App}`;
         const result = await parseAndPrint(yaml);
         expect(result).toBe(yaml);
     });
+});
+
+describe('Multi-line flow scalars', () => {
+    const spec = new RecipeSpec();
+
+    test('plain scalar continued on the following lines', () =>
+        spec.rewriteRun(
+            yaml(`
+                build:
+                  - script: npm ci &&
+                            npm test &&
+                            npm run build
+            `)
+        ));
+
+    test('plain scalar with a blank line and extra indentation', () =>
+        spec.rewriteRun(
+            yaml(`
+                a: one
+                  two
+
+                    three
+            `)
+        ));
+
+    test('plain scalars in flow collections', () =>
+        spec.rewriteRun(
+            yaml(`
+                seq: [one
+                  two, three]
+                map: {a: one
+                  two}
+            `)
+        ));
+
+    test('single-quoted scalar with an escaped quote and a line break', () =>
+        spec.rewriteRun(
+            yaml(`
+                a: 'it''s
+                  continued'
+            `)
+        ));
+
+    test('double-quoted scalar with escapes and an escaped line break', () =>
+        spec.rewriteRun(
+            yaml(String.raw`
+                a: "tab\t, quote \", escaped \
+                  line break"
+            `)
+        ));
+
+    test('scalar value is the source text between any quotes', async () => {
+        const docs = await parseYaml(dedent(String.raw`
+            plain: one
+              two
+            single: 'it''s'
+            double: "a\tb"
+        `));
+        const [plain, single, double] = (docs.documents[0].block as Yaml.Mapping).entries
+            .map(e => (e.value as Yaml.Scalar).value);
+
+        expect(plain).toBe(dedent(`
+            one
+              two`));
+        expect(single).toBe("it''s");
+        expect(double).toBe(String.raw`a\tb`);
+    });
+});
+
+describe('Anchor and tag on a scalar', () => {
+    const spec = new RecipeSpec();
+
+    test('either order, on every scalar style and position', () =>
+        spec.rewriteRun(
+            yaml(`
+                plain: &a !!str one
+                single: &b !!str 'two'
+                double: &c !!str "three"
+                literal: &d !!str |
+                  four
+                folded: &e !!str >-
+                  five
+                tagFirst: !!str &f six
+                seq:
+                  - &g !!str seven
+                  - !!str &h eight
+                flowSeq: [&i !!str nine, !!str &j ten]
+                flowMap: {k: &k !!str eleven}
+                &l !!str key: twelve
+                aliases: [*a, *d, *g]
+            `)
+        ));
+});
+
+describe('Tag on a mapping or sequence', () => {
+    const spec = new RecipeSpec();
+
+    test('block and flow collections, with and without an anchor', () =>
+        spec.rewriteRun(
+            yaml(`
+                map: !!map
+                  k: v
+                anchoredMap: &m !!map
+                  k: v
+                seq: !!seq
+                  - x
+                anchoredSeq: &s !!seq
+                  - x
+                flowMap: !!map {k: v}
+                flowSeq: &f !!seq [x]
+                local: !custom
+                  k: v
+                entries:
+                  - !!map
+                    k: v
+                  - !!seq [x]
+                aliases: [*m, *s, *f]
+            `)
+        ));
+});
+
+describe('Text after the last document', () => {
+    const spec = new RecipeSpec();
+
+    test('newline, blank lines and comments after the last document end marker', () =>
+        spec.rewriteRun(
+            yaml(`
+                a: b
+                ...
+            `),
+            yaml(`
+                ---
+                a: b
+                ...
+
+
+            `),
+            yaml(`
+                a: b
+                ...
+                ---
+                c: d
+                ...
+                # trailing
+            `)
+        ));
+
+    test('file with only a comment', () =>
+        spec.rewriteRun(
+            yaml(`
+                # only a comment
+            `)
+        ));
+});
+
+describe('Comment after the last entry of a block sequence', () => {
+    const spec = new RecipeSpec();
+    spec.recipe = fromVisitor(new class extends YamlVisitor<ExecutionContext> {
+        protected async visitSequence(sequence: Yaml.Sequence, p: ExecutionContext): Promise<Yaml | undefined> {
+            const first = sequence.entries[0];
+            if ((sequence.entries[sequence.entries.length - 1].block as Yaml.Scalar).value === 'c') {
+                return sequence;
+            }
+            const appended: Yaml.Sequence = {
+                ...sequence,
+                entries: [...sequence.entries, {...first, id: randomId(), block: {...first.block as Yaml.Scalar, id: randomId(), value: 'c'}}]
+            };
+            return appended;
+        }
+    });
+
+    test('an appended entry goes before the comment', () =>
+        spec.rewriteRun(
+            yaml(
+                `
+                steps:
+                  - a
+                  # b
+                `,
+                `
+                steps:
+                  - a
+                  - c
+                  # b
+                `
+            )
+        ));
+
+    test('comment at the sequence indent before the next key', () =>
+        spec.rewriteRun(
+            yaml(
+                `
+                steps:
+                  - a
+                  # b
+                other: d
+                `,
+                `
+                steps:
+                  - a
+                  - c
+                  # b
+                other: d
+                `
+            )
+        ));
+
+    test('an empty last entry stays an entry', () =>
+        spec.rewriteRun(
+            yaml(
+                `
+                steps:
+                  - a
+                  -`,
+                `
+                steps:
+                  - a
+                  -
+                  - c`
+            )
+        ));
+});
+
+describe('Flow sequence of pairs', () => {
+    const spec = new RecipeSpec();
+
+    function flowSequence(docs: Yaml.Documents): Yaml.Sequence {
+        return (docs.documents[0].block as Yaml.Mapping).entries[0].value as Yaml.Sequence;
+    }
+
+    function pair(entry: Yaml.SequenceEntry): [string, string] {
+        expect(isMapping(entry.block)).toBe(true);
+        const mapping = entry.block as Yaml.Mapping;
+        expect(mapping.openingBracePrefix).toBeUndefined();
+        expect(mapping.closingBracePrefix).toBeUndefined();
+        expect(mapping.entries).toHaveLength(1);
+        const mappingEntry = mapping.entries[0];
+        expect(mappingEntry.prefix).not.toContain(",");
+        return [(mappingEntry.key as Yaml.Scalar).value, (mappingEntry.value as Yaml.Scalar).value];
+    }
+
+    test('each pair is a single-entry mapping', () => spec.rewriteRun({
+        ...yaml(`f: [a: 1, b: 2]`),
+        afterRecipe: docs => {
+            const [first, second] = flowSequence(docs).entries;
+            expect(pair(first)).toEqual(["a", "1"]);
+            expect(first.trailingCommaPrefix).toBe("");
+            expect(pair(second)).toEqual(["b", "2"]);
+            expect(second.prefix).toBe("");
+            expect(second.trailingCommaPrefix).toBeUndefined();
+        }
+    }));
+
+    test('single pair', () => spec.rewriteRun({
+        ...yaml(`f: [a: 1]`),
+        afterRecipe: docs => {
+            const entries = flowSequence(docs).entries;
+            expect(entries).toHaveLength(1);
+            expect(pair(entries[0])).toEqual(["a", "1"]);
+        }
+    }));
+
+    test('scalar followed by a pair', () => spec.rewriteRun({
+        ...yaml(`f: [x, a: 1]`),
+        afterRecipe: docs => {
+            const [first, second] = flowSequence(docs).entries;
+            expect((first.block as Yaml.Scalar).value).toBe("x");
+            expect(pair(second)).toEqual(["a", "1"]);
+        }
+    }));
+
+    test('pair without a value', () => spec.rewriteRun({
+        ...yaml(`f: [a:]`),
+        afterRecipe: docs => {
+            expect(pair(flowSequence(docs).entries[0])).toEqual(["a", ""]);
+        }
+    }));
+
+    test('pair followed by a trailing comma', () => spec.rewriteRun({
+        ...yaml(`f: [a: 1, ]`),
+        afterRecipe: docs => {
+            const sequence = flowSequence(docs);
+            expect(sequence.entries).toHaveLength(1);
+            expect(pair(sequence.entries[0])).toEqual(["a", "1"]);
+            expect(sequence.entries[0].trailingCommaPrefix).toBe("");
+            expect(sequence.closingBracketPrefix).toBe(" ");
+        }
+    }));
+
+    test('pairs spread over lines with extra spaces', () => spec.rewriteRun({
+        ...yaml(`
+            f: [ a : 1 ,
+               b:  2 ]
+        `),
+        afterRecipe: docs => {
+            const [first, second] = flowSequence(docs).entries;
+            expect(pair(first)).toEqual(["a", "1"]);
+            expect(first.trailingCommaPrefix).toBe(" ");
+            expect(pair(second)).toEqual(["b", "2"]);
+        }
+    }));
+
+    test('comma on the line after a pair and its comment', () => spec.rewriteRun({
+        ...yaml(`
+            f: [a: 1 # one
+              , b: 2]
+        `),
+        afterRecipe: docs => {
+            const [first, second] = flowSequence(docs).entries;
+            expect(first.trailingCommaPrefix).toBe(" # one\n  ");
+            expect(pair(second)).toEqual(["b", "2"]);
+            expect(second.prefix).toBe("");
+        }
+    }));
+});
+
+describe('Flow sequence without a trailing entry', () => {
+    const spec = new RecipeSpec();
+
+    function flowSequence(docs: Yaml.Documents): Yaml.Sequence {
+        return (docs.documents[0].block as Yaml.Mapping).entries[0].value as Yaml.Sequence;
+    }
+
+    test('blank sequence has no entries', () => spec.rewriteRun({
+        ...yaml(`f: [ ]`),
+        afterRecipe: docs => {
+            const sequence = flowSequence(docs);
+            expect(sequence.entries).toHaveLength(0);
+            expect(sequence.closingBracketPrefix).toBe(" ");
+        }
+    }));
+
+    test('trailing comma followed by a comment adds no entry', () => spec.rewriteRun({
+        ...yaml(`
+            f: [a , # c
+              ]
+        `),
+        afterRecipe: docs => {
+            const sequence = flowSequence(docs);
+            expect(sequence.entries).toHaveLength(1);
+            expect((sequence.entries[0].block as Yaml.Scalar).value).toBe("a");
+            expect(sequence.entries[0].trailingCommaPrefix).toBe(" ");
+            expect(sequence.closingBracketPrefix).toBe(" # c\n  ");
+        }
+    }));
+
+    test('trailing anchored null is still an entry', () => spec.rewriteRun({
+        ...yaml(`f: [a, &x ]`),
+        afterRecipe: docs => {
+            expect(flowSequence(docs).entries).toHaveLength(2);
+        }
+    }));
 });

@@ -26,21 +26,20 @@ type ExecutionContext struct {
 	messages map[string]any
 }
 
-// NewExecutionContext creates a new ExecutionContext.
 func NewExecutionContext() *ExecutionContext {
 	return &ExecutionContext{
 		messages: make(map[string]any),
 	}
 }
 
-// PutMessage stores a value by key.
+func (*ExecutionContext) IsHeavyweight() {}
+
 func (ctx *ExecutionContext) PutMessage(key string, value any) {
 	ctx.mu.Lock()
 	defer ctx.mu.Unlock()
 	ctx.messages[key] = value
 }
 
-// GetMessage retrieves a value by key.
 func (ctx *ExecutionContext) GetMessage(key string) (any, bool) {
 	ctx.mu.RLock()
 	defer ctx.mu.RUnlock()
@@ -48,7 +47,6 @@ func (ctx *ExecutionContext) GetMessage(key string) (any, bool) {
 	return v, ok
 }
 
-// GetMessageOrDefault retrieves a value by key, or returns the default if not found.
 func (ctx *ExecutionContext) GetMessageOrDefault(key string, defaultValue any) any {
 	ctx.mu.RLock()
 	defer ctx.mu.RUnlock()
@@ -56,4 +54,17 @@ func (ctx *ExecutionContext) GetMessageOrDefault(key string, defaultValue any) a
 		return v
 	}
 	return defaultValue
+}
+
+// MessageKeys returns a snapshot of the current message keys. Used by the
+// BatchVisit handler to detect whether a visitor pass added new keys
+// (`hasNewMessages` in the per-visitor result).
+func (ctx *ExecutionContext) MessageKeys() []string {
+	ctx.mu.RLock()
+	defer ctx.mu.RUnlock()
+	keys := make([]string, 0, len(ctx.messages))
+	for k := range ctx.messages {
+		keys = append(keys, k)
+	}
+	return keys
 }

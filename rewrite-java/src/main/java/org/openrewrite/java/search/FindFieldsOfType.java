@@ -23,6 +23,7 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.TypeMatcher;
 import org.openrewrite.java.table.FieldsOfTypeUses;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.SearchResult;
 
@@ -79,12 +80,12 @@ public class FindFieldsOfType extends Recipe {
                             varType = variable.getInitializer().getType().toString();
                         }
                         fieldsOfTypeUses.insertRow(ctx, new FieldsOfTypeUses.Row(
-                            getCursor().firstEnclosingOrThrow(J.CompilationUnit.class).getSourcePath().toString(),
+                            getCursor().firstEnclosingOrThrow(JavaSourceFile.class).getSourcePath().toString(),
                             variable.getSimpleName(),
                             multiVariable.getTypeExpression().getType().toString(),
                             varType,
                             multiVariable.getModifiers().stream().map(J.Modifier::toString).reduce((m1, m2) -> m1 + " " + m2).orElse(""),
-                            multiVariable.printTrimmed(getCursor())
+                            multiVariable.printTrimmed(getCursor().getParentOrThrow())
                         ));
                     }
                     return SearchResult.found(multiVariable);
@@ -110,9 +111,7 @@ public class FindFieldsOfType extends Recipe {
             }
         };
 
-        Set<J.VariableDeclarations> vs = new HashSet<>();
-        findVisitor.visit(j, vs);
-        return vs;
+        return findVisitor.reduce(j, new HashSet<>());
     }
 
     private static boolean isField(Cursor cursor) {

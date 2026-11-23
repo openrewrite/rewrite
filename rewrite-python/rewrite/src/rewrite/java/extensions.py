@@ -2,7 +2,7 @@ from typing import Optional, TYPE_CHECKING
 
 from rewrite import Cursor
 from rewrite.tree import Tree
-from rewrite.utils import list_map
+from rewrite.utils import list_map, replace_if_changed
 from .support_types import J, JRightPadded, JLeftPadded, JContainer, Space, P, T, J2
 
 if TYPE_CHECKING:
@@ -68,4 +68,4 @@ def visit_space(v: 'JavaVisitor', space: Optional[Space], p: P) -> Space:
 
 def with_name(method: 'MethodInvocation', name: 'Identifier') -> 'MethodInvocation':
     # FIXME add type attribution logic
-    return method if name is method.name else replace(method, _name=name)
+    return replace_if_changed(method, _name=name)

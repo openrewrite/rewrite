@@ -13,6 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using System.Reflection;
+
 namespace OpenRewrite.Core;
 
 /// <summary>
@@ -52,6 +54,103 @@ public class RecipeMarketplace
     public void Install(RecipeDescriptor descriptor, params CategoryDescriptor[] categoryPath)
     {
         _root.Install(descriptor, categoryPath);
+    }
+
+    /// <summary>
+    /// Discover and install all <see cref="Recipe"/> types in the given assembly that declare
+    /// their marketplace placement via <see cref="CategoryAttribute"/> + <see cref="CategoryDescriptorAttribute"/>.
+    /// <para>
+    /// Attributes are read in declaration order. Every <see cref="CategoryAttribute"/> opens a new
+    /// path bucket; subsequent <see cref="CategoryDescriptorAttribute"/> instances (until the next
+    /// marker) form that path from root to leaf. Multiple <c>[Category, ...]</c> stacks on the same
+    /// recipe install it under multiple paths. Recipes with no <c>[Category]</c> marker are skipped.
+    /// </para>
+    /// <para>
+    /// Relies on <see cref="MemberInfo.GetCustomAttributesData"/> preserving metadata declaration
+    /// order, which is the de-facto behavior of CoreCLR and Mono runtimes.
+    /// </para>
+    /// </summary>
+    public void InstallAssembly(Assembly assembly)
+    {
+        Type[] types;
+        try
+        {
+            types = assembly.GetTypes();
+        }
+        catch (ReflectionTypeLoadException ex)
+        {
+            types = ex.Types.Where(t => t != null).ToArray()!;
+        }
+
+        foreach (var type in types)
+        {
+            if (type.IsAbstract || type.IsInterface || !typeof(Recipe).IsAssignableFrom(type))
+                continue;
+
+            var paths = ReadCategoryPaths(type);
+            if (paths.Count == 0)
+                continue;
+
+            if (type.GetConstructor(Type.EmptyTypes) == null)
+            {
+                throw new InvalidOperationException(
+                    $"Recipe '{type.FullName}' is decorated with [Category] but has no parameterless constructor.");
+            }
+
+            var recipe = (Recipe)Activator.CreateInstance(type)!;
+            foreach (var path in paths)
+            {
+                Install(recipe, path.ToArray());
+            }
+        }
+    }
+
+    private static readonly Dictionary<Type, CategoryDescriptor> _descriptorCache = new();
+
+    private static List<List<CategoryDescriptor>> ReadCategoryPaths(Type recipeType)
+    {
+        var paths = new List<List<CategoryDescriptor>>();
+        List<CategoryDescriptor>? current = null;
+
+        foreach (var attrData in recipeType.GetCustomAttributesData())
+        {
+            var attrType = attrData.AttributeType;
+            if (attrType == typeof(CategoryAttribute))
+            {
+                current = new List<CategoryDescriptor>();
+                paths.Add(current);
+                continue;
+            }
+
+            if (typeof(CategoryDescriptorAttribute).IsAssignableFrom(attrType))
+            {
+                if (current == null)
+                {
+                    throw new InvalidOperationException(
+                        $"Recipe '{recipeType.FullName}' applies '{attrType.Name}' without a preceding [Category] marker. " +
+                        $"Start each path with [Category, ...].");
+                }
+                current.Add(ResolveDescriptor(attrType));
+            }
+        }
+
+        return paths;
+    }
+
+    private static CategoryDescriptor ResolveDescriptor(Type attrType)
+    {
+        if (_descriptorCache.TryGetValue(attrType, out var cached))
+            return cached;
+
+        if (attrType.GetConstructor(Type.EmptyTypes) == null)
+        {
+            throw new InvalidOperationException(
+                $"CategoryDescriptorAttribute subclass '{attrType.FullName}' must expose a parameterless constructor.");
+        }
+
+        var instance = (CategoryDescriptorAttribute)Activator.CreateInstance(attrType)!;
+        _descriptorCache[attrType] = instance.Descriptor;
+        return instance.Descriptor;
     }
 
     /// <summary>

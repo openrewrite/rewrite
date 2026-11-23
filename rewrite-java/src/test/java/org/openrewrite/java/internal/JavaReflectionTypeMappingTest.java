@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.java.JavaTypeGoat;
 import org.openrewrite.java.JavaTypeMappingTest;
+import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
@@ -74,4 +75,37 @@ class JavaReflectionTypeMappingTest implements JavaTypeMappingTest {
         );
     }
 
+    @Test
+    void syntheticEnumConstructorParametersAreExcluded() {
+        JavaType.FullyQualified roundingMode = TypeUtils.asFullyQualified(typeMapping.type(java.math.RoundingMode.class));
+        JavaType.Method constructor = null;
+        for (JavaType.Method method : roundingMode.getMethods()) {
+            if (method.isConstructor()) {
+                constructor = method;
+                break;
+            }
+        }
+        assertThat(constructor).isNotNull();
+        // An enum constructor carries synthetic name/ordinal parameters in the byte
+        // code. They are excluded from parameterTypes, so they must also be excluded
+        // from parameterNames -- otherwise the names list has null holes for the
+        // synthetic slots and a different length than the types list.
+        assertThat(constructor.getParameterNames()).doesNotContainNull();
+        assertThat(constructor.getParameterNames()).hasSameSizeAs(constructor.getParameterTypes());
+    }
+
+
+    @Test
+    void varargsMethod() {
+        // Reflection gives a varargs method the modifier bit a field uses for transient.
+        JavaType.Method format = classType("java.lang.String").getMethods().stream()
+          .filter(m -> "format".equals(m.getName()) && m.getParameterTypes().size() == 2)
+          .findFirst().orElseThrow();
+        assertThat(format.getFlags()).contains(Flag.Varargs).doesNotContain(Flag.Transient);
+
+        JavaType.Method length = classType("java.lang.String").getMethods().stream()
+          .filter(m -> "length".equals(m.getName()))
+          .findFirst().orElseThrow();
+        assertThat(length.getFlags()).doesNotContain(Flag.Varargs);
+    }
 }

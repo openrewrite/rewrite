@@ -17,14 +17,56 @@ package org.openrewrite.java.internal;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.LinkedHashSet;
+import java.util.Set;
+
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptySet;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 
 @SuppressWarnings("ConstantConditions")
 class TypesInUseTest implements RewriteTest {
+
+    @Test
+    void methodIndexIgnoresUnknownDeclaringTypes() {
+        rewriteRun(
+          java(
+            "class A { void known() {} }",
+            spec -> spec.afterRecipe(cu -> {
+                // Foreign-language method types can have no Java declaring type.
+                var unknown = new JavaType.Method(null, 0, null, "rubyCall", JavaType.Primitive.Void,
+                  emptyList(), emptyList(), emptyList(), emptyList(), null, emptyList()) {
+                    @Override
+                    public JavaType.FullyQualified getDeclaringType() {
+                        return null;
+                    }
+                };
+                var known = cu.getTypesInUse().getDeclaredMethods().stream()
+                  .filter(method -> "known".equals(method.getName())).findFirst().orElseThrow();
+                Set<JavaType.Method> methods = new LinkedHashSet<>();
+                methods.add(unknown);
+                methods.add(known);
+                TypesInUse types = TypesInUse.of(cu, emptySet(), methods, methods, emptySet());
+
+                assertThat(types.hasMethodUse(new MethodMatcher("java.lang.Runtime exec(..)"))).isFalse();
+                assertThat(types.declaresMethod(new MethodMatcher("java.lang.Runtime exec(..)"))).isFalse();
+                assertThat(types.hasMethodUse(new MethodMatcher("A known()"))).isTrue();
+                assertThat(types.declaresMethod(new MethodMatcher("A known()"))).isTrue();
+
+                methods.remove(known);
+                TypesInUse onlyUnknown = TypesInUse.of(cu, emptySet(), methods, methods, emptySet());
+                assertThat(onlyUnknown.hasMethodUse(new MethodMatcher("java.lang.Runtime exec(..)"))).isFalse();
+                assertThat(onlyUnknown.declaresMethod(new MethodMatcher("A known()"))).isFalse();
+            })
+          )
+        );
+    }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/617")
     @Test
@@ -56,6 +98,147 @@ class TypesInUseTest implements RewriteTest {
                   .map(v -> TypeUtils.asFullyQualified(v.getType()).getFullyQualifiedName())
                   .toList();
                 assertThat(foundTypes).containsExactlyInAnyOrder("org.openrewrite.test.YesOrNo$Status");
+            })
+          )
+        );
+    }
+
+    @Test
+    void recordsFullyQualifiedJavadocReferencesSeparately() {
+        rewriteRun(
+          java(
+            """
+              package org.openrewrite.other;
+              public class Target {}
+              """
+          ),
+          java(
+            """
+              package com.example;
+              /**
+               * See {@link org.openrewrite.other.Target} for details.
+               */
+              public class Bar {}
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                TypesInUse tiu = cu.getTypesInUse();
+
+                // Fully qualified Javadoc references stay out of the import-retention set (#5738)...
+                assertThat(tiu.getTypesInUse().stream()
+                  .filter(t -> t instanceof JavaType.FullyQualified)
+                  .map(t -> ((JavaType.FullyQualified) t).getFullyQualifiedName()))
+                  .doesNotContain("org.openrewrite.other.Target");
+
+                // ...but their packages are recorded separately so package-renaming recipes can find them.
+                assertThat(tiu.hasDocReferenceInPackage("org.openrewrite.other", false)).isTrue();
+                assertThat(tiu.hasDocReferenceInPackage("org.openrewrite", false)).isFalse();
+                assertThat(tiu.hasDocReferenceInPackage("org.openrewrite", true)).isTrue();
+                assertThat(tiu.hasDocReferenceInPackage("com.other", true)).isFalse();
+                assertThat(tiu.hasDocReference("org.openrewrite.other.Target")).isTrue();
+                assertThat(tiu.hasDocReference("org.openrewrite.other.Other")).isFalse();
+            })
+          )
+        );
+    }
+
+    @Test
+    void methodMatchingAcrossPatternShapes() {
+        rewriteRun(
+          java(
+            """
+              import java.util.Collections;
+              import java.util.List;
+              class A {
+                  void f(List<String> l) {
+                      l.add("x");
+                      l.get(0);
+                      Collections.emptyList();
+                      "a".concat("b");
+                  }
+                  int g() {
+                      return 1;
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                TypesInUse tiu = cu.getTypesInUse();
+
+                // Exact method name on a concrete type.
+                assertThat(tiu.hasMethodUse(new MethodMatcher("java.util.List add(..)"))).isTrue();
+                // Wildcard method name on a concrete type — the case the declaring-type prefix index must cover.
+                assertThat(tiu.hasMethodUse(new MethodMatcher("java.util.List *(..)"))).isTrue();
+                // Subpackage prefix matches both List and Collections.
+                assertThat(tiu.hasMethodUse(new MethodMatcher("java.util..* *(..)"))).isTrue();
+                // Mid-string type wildcard yields the weak "java." prefix but still matches.
+                assertThat(tiu.hasMethodUse(new MethodMatcher("java.*.List add(..)"))).isTrue();
+                // Full type wildcard with a pinned name falls back to a full scan.
+                assertThat(tiu.hasMethodUse(new MethodMatcher("*..* concat(..)"))).isTrue();
+
+                // Negative: declaring type is referenced, but the method is not used.
+                assertThat(tiu.hasMethodUse(new MethodMatcher("java.util.List remove(..)"))).isFalse();
+                // Negative: declaring type is not referenced at all (sorts past every key).
+                assertThat(tiu.hasMethodUse(new MethodMatcher("java.util.Map put(..)"))).isFalse();
+
+                // matchOverrides bypasses the prefix index: List.add matches the Collection#add supertype pattern.
+                assertThat(tiu.hasMethodUse(new MethodMatcher("java.util.Collection add(..)", true))).isTrue();
+                assertThat(tiu.hasMethodUse(new MethodMatcher("java.util.Collection add(..)", false))).isFalse();
+
+                // Declared methods go through the same path.
+                assertThat(tiu.declaresMethod(new MethodMatcher("A g()"))).isTrue();
+                assertThat(tiu.declaresMethod(new MethodMatcher("A *(..)"))).isTrue();
+                assertThat(tiu.declaresMethod(new MethodMatcher("A nonexistent()"))).isFalse();
+            })
+          )
+        );
+    }
+
+    @Test
+    void publicFactoryReturnsInstanceWithSuppliedSets() {
+        rewriteRun(
+          java(
+            """
+              package org.openrewrite.test;
+              public class Foo {}
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                Set<JavaType> types = emptySet();
+                Set<JavaType.Method> declaredMethods = emptySet();
+                Set<JavaType.Method> usedMethods = emptySet();
+                Set<JavaType.Variable> variables = emptySet();
+
+                TypesInUse tiu = TypesInUse.of(cu, types, declaredMethods, usedMethods, variables);
+
+                assertThat(tiu.getCu()).isSameAs(cu);
+                assertThat(tiu.getTypesInUse()).isSameAs(types);
+                assertThat(tiu.getDeclaredMethods()).isSameAs(declaredMethods);
+                assertThat(tiu.getUsedMethods()).isSameAs(usedMethods);
+                assertThat(tiu.getVariables()).isSameAs(variables);
+            })
+          )
+        );
+    }
+
+    @Test
+    void stringLiteralBeforeStringClassKeepsStringSupertypes() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  String s() { return "s"; }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                JavaType stringClass = cu.getTypesInUse().getTypesInUse().stream()
+                  .filter(t -> TypeUtils.isOfClassType(t, "java.lang.String"))
+                  .findFirst().orElseThrow();
+                // `getTypesInUse()` is identity-hashed, so pin the order in which the literal comes first
+                Set<JavaType> types = new LinkedHashSet<>();
+                types.add(JavaType.Primitive.String);
+                types.add(stringClass);
+
+                TypesInUse tiu = TypesInUse.of(cu, types, emptySet(), emptySet(), emptySet());
+
+                assertThat(tiu.hasType("java.io.Serializable", false)).isTrue();
             })
           )
         );

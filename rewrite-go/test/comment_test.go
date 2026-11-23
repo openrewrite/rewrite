@@ -113,6 +113,19 @@ func TestParseCommentInsideEmptyDelimiters(t *testing.T) {
 		`))
 }
 
+func TestParseBlockCommentBeforeSelector(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			import "unsafe"
+
+			func f(x int) {
+				unsafe /* a comment */ .Alignof(x)
+			}
+		`))
+}
+
 func TestParseMultilineBlockComment(t *testing.T) {
 	NewRecipeSpec().RewriteRun(t,
 		Golang(`
@@ -123,6 +136,49 @@ func TestParseMultilineBlockComment(t *testing.T) {
 			 */
 			func hello() string {
 				return "hello"
+			}
+		`))
+}
+
+// A comma inside a comment must not be mistaken for the trailing comma
+// of a parameter list; the text after it belongs to the comment, not to
+// a marker's spacing.
+func TestParseCommaInsideParamListComment(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			func f(a int /* x, y */) {
+			}
+		`))
+}
+
+func TestParseCommaInsideCallArgComment(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			func f() {
+				g(1 /* x, y */, 2)
+			}
+		`))
+}
+
+func TestParseCommaInsideCompositeLiteralComment(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			var xs = []int{1 /* x, y */, 2}
+		`))
+}
+
+func TestParseCommaInsideParamSeparatorComment(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			func f(a string /* x, y */, b string) {
 			}
 		`))
 }

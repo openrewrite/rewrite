@@ -16,11 +16,17 @@
 package org.openrewrite.java.search;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
+import org.openrewrite.test.TypeValidation;
 
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.test.RewriteTest.toRecipe;
+import static org.openrewrite.xml.Assertions.xml;
 
 class UsesTypeTest implements RewriteTest {
 
@@ -28,7 +34,7 @@ class UsesTypeTest implements RewriteTest {
     @Test
     void usesTypeFindsImports() {
         rewriteRun(
-          spec -> spec.recipe(RewriteTest.toRecipe(() -> new UsesType<>("java.util.Collections", false))),
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>("java.util.Collections", false))),
           java(
             """
               import java.io.File;
@@ -52,7 +58,7 @@ class UsesTypeTest implements RewriteTest {
     @Test
     void primitiveTypes() {
         rewriteRun(
-          spec -> spec.recipe(RewriteTest.toRecipe(() -> new UsesType<>("double", false))),
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>("double", false))),
           java(
             """
               class Test {
@@ -72,7 +78,7 @@ class UsesTypeTest implements RewriteTest {
     @Test
     void emptyConstructor() {
         rewriteRun(
-          spec -> spec.recipe(RewriteTest.toRecipe(() -> new UsesType<>("java.util.ArrayList", false))),
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>("java.util.ArrayList", false))),
           java(
             """
               import java.util.ArrayList;
@@ -101,7 +107,7 @@ class UsesTypeTest implements RewriteTest {
     void usesTypeWildcardFindsImports() {
         rewriteRun(
           spec ->
-            spec.recipe(RewriteTest.toRecipe(() -> new UsesType<>("java.util.*", false))),
+            spec.recipe(toRecipe(() -> new UsesType<>("java.util.*", false))),
           java(
             """
               import java.io.File;
@@ -128,7 +134,7 @@ class UsesTypeTest implements RewriteTest {
     void usesRecursiveTypeWildcard() {
         rewriteRun(
           spec ->
-            spec.recipe(RewriteTest.toRecipe(() -> new UsesType<>("java..*", false))),
+            spec.recipe(toRecipe(() -> new UsesType<>("java..*", false))),
           java(
             """
               import java.io.File;
@@ -152,7 +158,7 @@ class UsesTypeTest implements RewriteTest {
     void usesFullyQualifiedReference() {
         rewriteRun(
           spec ->
-            spec.recipe(RewriteTest.toRecipe(() -> new UsesType<>("java.util.*", false))),
+            spec.recipe(toRecipe(() -> new UsesType<>("java.util.*", false))),
           java(
             """
               import java.util.Set;
@@ -177,7 +183,7 @@ class UsesTypeTest implements RewriteTest {
     @Test
     void usesTypeFindsInheritedTypes() {
         rewriteRun(
-          spec -> spec.recipe(RewriteTest.toRecipe(() -> new UsesType<>("java.util.Collection", false))),
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>("java.util.Collection", false))),
           java(
             """
               import java.util.List;
@@ -199,7 +205,7 @@ class UsesTypeTest implements RewriteTest {
     @Test
     void findImplicitTypes() {
         rewriteRun(
-          spec -> spec.recipe(RewriteTest.toRecipe(() -> new UsesType<>("java.util.List", true))),
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>("java.util.List", true))),
           java(
             """
               import java.util.Collections;
@@ -223,7 +229,7 @@ class UsesTypeTest implements RewriteTest {
     @Test
     void findImplicitTypesFalse() {
         rewriteRun(
-          spec -> spec.recipe(RewriteTest.toRecipe(() -> new UsesType<>("java.util.List", false))),
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>("java.util.List", false))),
           java(
             """
               import java.util.Collections;
@@ -240,7 +246,7 @@ class UsesTypeTest implements RewriteTest {
     @Test
     void findImplicitTypesParams() {
         rewriteRun(
-          spec -> spec.recipe(RewriteTest.toRecipe(() -> new UsesType<>("java.util.List", true))),
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>("java.util.List", true))),
           java(
             """
               import java.util.Collections;
@@ -268,7 +274,7 @@ class UsesTypeTest implements RewriteTest {
     @Test
     void findImplicitTypesParamsFalse() {
         rewriteRun(
-          spec -> spec.recipe(RewriteTest.toRecipe(() -> new UsesType<>("java.util.List", false))),
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>("java.util.List", false))),
           java(
             """
               import java.util.Collections;
@@ -286,7 +292,7 @@ class UsesTypeTest implements RewriteTest {
     @Test
     void findNestedType() {
         rewriteRun(
-          spec -> spec.recipe(RewriteTest.toRecipe(() -> new UsesType<>("java.util.Map.Entry", false))),
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>("java.util.Map.Entry", false))),
           java(
             """
               import java.util.Map.Entry;
@@ -298,6 +304,407 @@ class UsesTypeTest implements RewriteTest {
               /*~~>*/import java.util.Map.Entry;
 
               class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void fullWildcardMatchesAnyType() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>("*..*", false))),
+          java(
+            """
+              import java.util.HashMap;
+              class Test {
+                  HashMap<String, String> map = new HashMap<>();
+              }
+              """,
+            """
+              /*~~>*/import java.util.HashMap;
+              class Test {
+                  HashMap<String, String> map = new HashMap<>();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void packageRecursiveWildcardHit() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>("java.util..*", false))),
+          java(
+            """
+              import java.util.concurrent.ConcurrentHashMap;
+              class Test {
+                  ConcurrentHashMap<String, String> m = new ConcurrentHashMap<>();
+              }
+              """,
+            """
+              /*~~>*/import java.util.concurrent.ConcurrentHashMap;
+              class Test {
+                  ConcurrentHashMap<String, String> m = new ConcurrentHashMap<>();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void packageRecursiveWildcardMiss() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>("javax.swing..*", false))),
+          java(
+            """
+              import java.util.HashMap;
+              class Test {
+                  HashMap<String, String> map = new HashMap<>();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void subpackageWithNamePatternHit() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>("java.util..*Map*", false))),
+          java(
+            """
+              import java.util.concurrent.ConcurrentHashMap;
+              class Test {
+                  ConcurrentHashMap<String, String> m = new ConcurrentHashMap<>();
+              }
+              """,
+            """
+              /*~~>*/import java.util.concurrent.ConcurrentHashMap;
+              class Test {
+                  ConcurrentHashMap<String, String> m = new ConcurrentHashMap<>();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void subpackageWithNamePatternMiss() {
+        // The package prefix doesn't match — `javax.swing` doesn't appear in the closure of a
+        // file that only references `java.util.HashMap`.
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>("javax.swing..*Frame*", false))),
+          java(
+            """
+              import java.util.HashMap;
+              class Test {
+                  HashMap<String, String> map = new HashMap<>();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void middleWildcardHit() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>("java.*.ArrayList", false))),
+          java(
+            """
+              import java.util.ArrayList;
+              class Test {
+                  ArrayList<String> list = new ArrayList<>();
+              }
+              """,
+            """
+              /*~~>*/import java.util.ArrayList;
+              class Test {
+                  ArrayList<String> list = new ArrayList<>();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void middleWildcardMiss() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>("java.*.ArrayList", false))),
+          java(
+            """
+              import java.util.concurrent.ConcurrentHashMap;
+              class Test {
+                  ConcurrentHashMap<String, String> m = new ConcurrentHashMap<>();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doubleDotIsLiteralWithoutWildcard() {
+        // No '*' in the input means UsesType treats it as an exact FQN. Real Java FQNs never have
+        // consecutive dots, so this should miss every well-formed compilation unit.
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>("java..util.ArrayList", false))),
+          java(
+            """
+              import java.util.ArrayList;
+              class Test {
+                  ArrayList<String> list = new ArrayList<>();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void nestedTypeInDottedForm() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>("a.b.Outer.Inner", false))),
+          java(
+            """
+              package a.b;
+              public class Outer {
+                  public static class Inner {}
+              }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              import a.b.Outer;
+              class Test {
+                  Outer.Inner i;
+              }
+              """,
+            """
+              /*~~>*/import a.b.Outer;
+              class Test {
+                  Outer.Inner i;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void nestedTypeInBinaryForm() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>("a.b.Outer$Inner", false))),
+          java(
+            """
+              package a.b;
+              public class Outer {
+                  public static class Inner {}
+              }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              import a.b.Outer;
+              class Test {
+                  Outer.Inner i;
+              }
+              """,
+            """
+              /*~~>*/import a.b.Outer;
+              class Test {
+                  Outer.Inner i;
+              }
+              """
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"a.b.Outer.Mid.Inner", "a.b.Outer$Mid$Inner", "a.b.Outer.Mid$Inner"})
+    void doublyNestedType(String type) {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>(type, false))),
+          java(
+            """
+              package a.b;
+              public class Outer {
+                  public static class Mid {
+                      public static class Inner {}
+                  }
+              }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              import a.b.Outer;
+              class Test {
+                  Outer.Mid.Inner i;
+              }
+              """,
+            """
+              /*~~>*/import a.b.Outer;
+              class Test {
+                  Outer.Mid.Inner i;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void topLevelTypeMiss() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>("a.b.Other", false))),
+          java(
+            """
+              package a.b;
+              public class Thing {}
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              import a.b.Thing;
+              class Test {
+                  Thing t;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void packageSegmentStartingUppercase() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>("a.B.Thing", false))),
+          java(
+            """
+              package a.B;
+              public class Thing {}
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              import a.B.Thing;
+              class Test {
+                  Thing t;
+              }
+              """,
+            """
+              /*~~>*/import a.B.Thing;
+              class Test {
+                  Thing t;
+              }
+              """
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"a.b.Outer.Inner", "a.b.Outer$Inner"})
+    void nestedTypeReference(String type) {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>(type, false))),
+          xml(
+            """
+              <beans xsi:schemaLocation="www.springframework.org/schema/beans">
+                  <bean id="abc" class="a.b.Outer$Inner"/>
+              </beans>
+              """,
+            """
+              <!--~~>--><beans xsi:schemaLocation="www.springframework.org/schema/beans">
+                  <bean id="abc" class="a.b.Outer$Inner"/>
+              </beans>
+              """
+          )
+        );
+    }
+
+    @Test
+    void unresolvedImportCountsAsUse() {
+        // Spring Boot 4's migration removed spring-boot-starter-aop when AspectJ types did not resolve
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>("org.aspectj.lang.ProceedingJoinPoint", false)))
+            .typeValidationOptions(TypeValidation.all().identifiers(false).methodDeclarations(false)), // no AspectJ
+          java(
+            """
+              import org.aspectj.lang.ProceedingJoinPoint;
+              import org.aspectj.lang.annotation.Around;
+
+              class LoggingAspect {
+                  @Around("execution(* *(..))")
+                  Object log(ProceedingJoinPoint pjp) throws Throwable {
+                      return pjp.proceed();
+                  }
+              }
+              """,
+            """
+              /*~~>*/import org.aspectj.lang.ProceedingJoinPoint;
+              import org.aspectj.lang.annotation.Around;
+
+              class LoggingAspect {
+                  @Around("execution(* *(..))")
+                  Object log(ProceedingJoinPoint pjp) throws Throwable {
+                      return pjp.proceed();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"org.aspectj..*", "org.aspectj.lang.annotation.*", "org.aspectj.lang.annotation.A*"})
+    void unresolvedImportMatchesPatterns(String pattern) {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>(pattern, false)))
+            .typeValidationOptions(TypeValidation.all().identifiers(false)), // no AspectJ
+          java(
+            """
+              import org.aspectj.lang.annotation.Aspect;
+
+              @Aspect
+              class LoggingAspect {
+              }
+              """,
+            """
+              /*~~>*/import org.aspectj.lang.annotation.Aspect;
+
+              @Aspect
+              class LoggingAspect {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void unresolvedImportOfAnotherTypeOrAPackageIsNotAUse() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>("org.aspectj.lang.annotation.Aspect", false))),
+          java(
+            """
+              import org.aspectj.lang.annotation.*;
+              import org.aspectj.lang.ProceedingJoinPoint;
+
+              class NotQuiteAnAspect {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void resolvedImportIsMatchedByTypeAsBefore() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>("java.util.Collections", false))),
+          java(
+            """
+              import java.util.List;
+
+              class Test {
+                  List<String> l;
               }
               """
           )

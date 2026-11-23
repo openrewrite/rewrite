@@ -56,7 +56,7 @@ public class FindRepositoryOrder extends Recipe {
                 }
                 for (MavenRepository repository : MavenExecutionContextView.view(ctx)
                         .getRepositories(
-                                mrr.getMavenSettings(),
+                                MavenExecutionContextView.view(ctx).effectiveSettings(mrr),
                                 StreamSupport.stream(mrr.getPom().getActiveProfiles().spliterator(), false)
                                         .collect(toList())
                         )) {

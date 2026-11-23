@@ -19,6 +19,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.java.internal.JavaTypeCache;
+import org.openrewrite.java.internal.JavaTypeFactory;
 
 import java.lang.reflect.Constructor;
 import java.net.URI;
@@ -61,6 +62,10 @@ public class Java25Parser implements JavaParser {
     }
 
     public static class Builder extends JavaParser.Builder<Java25Parser, Builder> {
+        @Override
+        protected boolean supportsCompilerConfiguration(@Nullable Integer sourceVersion) {
+            return sourceVersion == null || sourceVersion >= 8 && sourceVersion <= 25;
+        }
 
         @Nullable
         private static ClassLoader moduleClassLoader;
@@ -83,13 +88,13 @@ public class Java25Parser implements JavaParser {
                 Class<?> parserImplementation = Class.forName("org.openrewrite.java.isolated.ReloadableJava25Parser", true, moduleClassLoader);
 
                 Constructor<?> parserConstructor = parserImplementation
-                        .getDeclaredConstructor(Boolean.TYPE, Collection.class, Collection.class, Collection.class, Charset.class,
-                                Collection.class, JavaTypeCache.class);
+                        .getDeclaredConstructor(Boolean.TYPE, Boolean.TYPE, Collection.class, Collection.class, Collection.class, Charset.class,
+                                Collection.class, JavaTypeCache.class, JavaTypeFactory.class, Path.class, Integer.class);
 
                 parserConstructor.setAccessible(true);
 
                 JavaParser delegate = (JavaParser) parserConstructor
-                        .newInstance(logCompilationWarningsAndErrors, resolvedClasspath(), classBytesClasspath, dependsOn, charset, styles, javaTypeCache);
+                        .newInstance(logCompilationWarningsAndErrors, typeAttribution, resolvedClasspath(), classBytesClasspath, dependsOn, charset, styles, resolvedTypeCache(), resolvedTypeFactory(), javaPlatform, sourceCompatibility);
 
                 return new Java25Parser(delegate);
             } catch (Exception e) {

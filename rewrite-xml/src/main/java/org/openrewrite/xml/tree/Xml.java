@@ -23,13 +23,19 @@ import org.apache.commons.text.StringEscapeUtils;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.internal.CommentService;
+import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.StringUtils;
+import org.openrewrite.internal.TreeShapeValidationService;
 import org.openrewrite.internal.WhitespaceValidationService;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.xml.XmlParser;
 import org.openrewrite.xml.XmlVisitor;
 import org.openrewrite.xml.internal.WithPrefix;
 import org.openrewrite.xml.internal.XmlPrinter;
+import org.openrewrite.xml.internal.XmlTreeShapeValidationService;
 import org.openrewrite.xml.internal.XmlWhitespaceValidationService;
+import org.openrewrite.xml.service.XmlCommentService;
 
 import java.lang.ref.SoftReference;
 import java.nio.charset.Charset;
@@ -54,6 +60,7 @@ public interface Xml extends Tree {
     @SuppressWarnings("unchecked")
     @Override
     default <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+        //noinspection DataFlowIssue
         return (R) acceptXml(v.adapt(XmlVisitor.class), p);
     }
 
@@ -163,6 +170,10 @@ public interface Xml extends Tree {
         public <S, T extends S> T service(Class<S> service) {
             if (WhitespaceValidationService.class.getName().equals(service.getName())) {
                 return (T) new XmlWhitespaceValidationService();
+            } else if (CommentService.class.getName().equals(service.getName())) {
+                return (T) new XmlCommentService();
+            } else if (TreeShapeValidationService.class.getName().equals(service.getName())) {
+                return (T) new XmlTreeShapeValidationService();
             }
             return SourceFileWithReferences.super.service(service);
         }
@@ -267,6 +278,12 @@ public interface Xml extends Tree {
 
         Markers markers;
         String name;
+
+        /**
+         * The instruction's data, which the XML specification makes optional: {@code <?target?>}
+         * carries a target but no data, so this is {@code null}.
+         */
+        @Nullable
         CharData processingInstructions;
 
         /**
@@ -330,8 +347,12 @@ public interface Xml extends Tree {
         }
 
         public Tag withValue(String value) {
+            if (content != null && content.size() == 1 && content.get(0) instanceof CharData &&
+                ((CharData) content.get(0)).getText().equals(value)) {
+                return this;
+            }
             CharData charData;
-            if (content != null && content.get(0) instanceof CharData) {
+            if (content != null && !content.isEmpty() && content.get(0) instanceof CharData) {
                 charData = ((CharData) content.get(0)).withText(value);
             } else {
                 charData = new CharData(randomId(), "", Markers.EMPTY,
@@ -348,7 +369,7 @@ public interface Xml extends Tree {
 
         public Optional<Tag> getChild(String name) {
             return content == null ? Optional.empty() : content.stream()
-                    .filter(t -> t instanceof Xml.Tag)
+                    .filter(Xml.Tag.class::isInstance)
                     .map(Tag.class::cast)
                     .filter(t -> t.getName().equals(name))
                     .findAny();
@@ -356,7 +377,7 @@ public interface Xml extends Tree {
 
         public List<Tag> getChildren(String name) {
             return content == null ? emptyList() : content.stream()
-                    .filter(t -> t instanceof Xml.Tag)
+                    .filter(Xml.Tag.class::isInstance)
                     .map(Tag.class::cast)
                     .filter(t -> t.getName().equals(name))
                     .collect(toList());
@@ -364,7 +385,7 @@ public interface Xml extends Tree {
 
         public List<Tag> getChildren() {
             return content == null ? emptyList() : content.stream()
-                    .filter(t -> t instanceof Xml.Tag)
+                    .filter(Xml.Tag.class::isInstance)
                     .map(Tag.class::cast)
                     .collect(toList());
         }
@@ -376,17 +397,11 @@ public interface Xml extends Tree {
          * @param text      The text value to set.
          * @return This tag.
          */
+        @SuppressWarnings("unchecked")
         public Xml.Tag withChildValue(String childName, String text) {
             return getChild(childName)
-                    .map(tag -> this.withContent(
-                            content == null ?
-                                    null :
-                                    content.stream()
-                                            .map(content -> content == tag ?
-                                                    ((Tag) content).withValue(text) :
-                                                    content)
-                                            .collect(toList())
-                    ))
+                    .map(tag -> this.withContent(ListUtils.map((List<Content>) content,
+                            c -> c == tag ? ((Tag) c).withValue(text) : c)))
                     .orElse(this);
         }
 
@@ -398,9 +413,9 @@ public interface Xml extends Tree {
                 return Optional.empty();
             }
             if (content.size() == 1 && content.get(0) instanceof Xml.CharData) {
-                return Optional.ofNullable(((CharData) content.get(0)).getText());
+                return Optional.of(((CharData) content.get(0)).getText());
             }
-            if (content.stream().allMatch(c -> c instanceof Xml.CharData)) {
+            if (content.stream().allMatch(Xml.CharData.class::isInstance)) {
                 return Optional.of(content.stream()
                         .map(c -> ((CharData) c).getText())
                         .map(StringEscapeUtils::unescapeXml)
@@ -626,7 +641,7 @@ public interface Xml extends Tree {
         public String toString() {
             StringBuilder sb = new StringBuilder();
             sb.append("text = \"").append(text).append("\"");
-            if (afterText != null && !afterText.isEmpty()) {
+            if (StringUtils.isNotEmpty(afterText)) {
                 sb.append(" afterText = \"").append(afterText).append("\"");
             }
             return sb.toString();
@@ -854,6 +869,9 @@ public interface Xml extends Tree {
         String type;
 
         public JspDirective withType(String type) {
+            if (type.equals(this.type)) {
+                return this;
+            }
             return new JspDirective(id, prefixUnsafe, markers, beforeTypePrefix, type, attributes,
                     beforeDirectiveEndPrefix);
         }

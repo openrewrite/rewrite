@@ -73,6 +73,48 @@ class DependencyConstraintToRuleTest implements RewriteTest {
     }
 
     @Test
+    void separatedFromWhatPrecedesItAsTheDependenciesBlockIs() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+
+              description = "Scan Tools"
+
+              dependencies {
+                  constraints {
+                      implementation('com.fasterxml.jackson.core:jackson-core:2.12.5')
+                  }
+
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+              }
+
+              description = "Scan Tools"
+
+              configurations.all {
+                  resolutionStrategy.eachDependency { details ->
+                      if (details.requested.group == 'com.fasterxml.jackson.core' && details.requested.name == 'jackson-core') {
+                          details.useVersion('2.12.5')
+                      }
+                  }
+              }
+
+              dependencies {
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void newResolutionStrategyBlockKts() {
         rewriteRun(
           buildGradleKts(
@@ -105,6 +147,94 @@ class DependencyConstraintToRuleTest implements RewriteTest {
               }
               dependencies {
                   implementation("org.openrewrite:rewrite-java:7.0.0")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void existingResolutionStrategyBlockWithoutParameterKts() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins {
+                  id("java")
+              }
+              repositories { mavenCentral() }
+              configurations.all {
+                  resolutionStrategy.eachDependency {
+                      applyCveFixes()
+                  }
+              }
+              dependencies {
+                  constraints {
+                      implementation("com.fasterxml.jackson.core:jackson-core:2.12.5")
+                  }
+                  implementation("org.openrewrite:rewrite-java:7.0.0")
+              }
+              fun DependencyResolveDetails.applyCveFixes() {
+              }
+              """,
+            """
+              plugins {
+                  id("java")
+              }
+              repositories { mavenCentral() }
+              configurations.all {
+                  resolutionStrategy.eachDependency {
+                      if (this.requested.group == "com.fasterxml.jackson.core" && this.requested.name == "jackson-core") {
+                          this.useVersion("2.12.5")
+                      }
+                      applyCveFixes()
+                  }
+              }
+              dependencies {
+                  implementation("org.openrewrite:rewrite-java:7.0.0")
+              }
+              fun DependencyResolveDetails.applyCveFixes() {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void existingResolutionStrategyBlockWithoutParameter() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+              repositories { mavenCentral() }
+              configurations.all {
+                  resolutionStrategy.eachDependency {
+                      println it.requested
+                  }
+              }
+              dependencies {
+                  constraints {
+                      implementation('com.fasterxml.jackson.core:jackson-core:2.12.5')
+                  }
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+              }
+              repositories { mavenCentral() }
+              configurations.all {
+                  resolutionStrategy.eachDependency {
+                      if (it.requested.group == 'com.fasterxml.jackson.core' && it.requested.name == 'jackson-core') {
+                          it.useVersion('2.12.5')
+                      }
+                      println it.requested
+                  }
+              }
+              dependencies {
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
               }
               """
           )

@@ -73,10 +73,11 @@ public class XmlParser
         var charsetName = "UTF-8";
         var charsetBomMarked = false;
 
-        // Detect UTF-8 BOM
+        // Detect and strip UTF-8 BOM (matches Java EncodingDetectingInputStream behavior)
         if (sourceStr.Length > 0 && sourceStr[0] == '\uFEFF')
         {
             charsetBomMarked = true;
+            sourceStr = sourceStr.Substring(1);
         }
 
         var lexer = new XMLLexer(new AntlrInputStream(sourceStr));

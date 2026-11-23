@@ -1,0 +1,1176 @@
+{"header":"Node 24.19.0 (V8 13.6.233.17-node.51): the built-ins the lock package ports, asked; generate/node-builtins.js"}
+{"test":"parseInt","fn":"parseInt","args":["",{"$":"undefined"}],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":[" 12",{"$":"undefined"}],"out":12}
+{"test":"parseInt","fn":"parseInt","args":["　 -12",{"$":"undefined"}],"out":-12}
+{"test":"parseInt","fn":"parseInt","args":["﻿42",{"$":"undefined"}],"out":42}
+{"test":"parseInt","fn":"parseInt","args":["0x1F",{"$":"undefined"}],"out":31}
+{"test":"parseInt","fn":"parseInt","args":["-0x1F",{"$":"undefined"}],"out":-31}
+{"test":"parseInt","fn":"parseInt","args":["+0x10",{"$":"undefined"}],"out":16}
+{"test":"parseInt","fn":"parseInt","args":["0X1a",{"$":"undefined"}],"out":26}
+{"test":"parseInt","fn":"parseInt","args":["0x",{"$":"undefined"}],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["0xg",{"$":"undefined"}],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["-0",{"$":"undefined"}],"out":{"$":"number","value":"-0"}}
+{"test":"parseInt","fn":"parseInt","args":["  -0  ",{"$":"undefined"}],"out":{"$":"number","value":"-0"}}
+{"test":"parseInt","fn":"parseInt","args":["1e3",{"$":"undefined"}],"out":1}
+{"test":"parseInt","fn":"parseInt","args":["12abc",{"$":"undefined"}],"out":12}
+{"test":"parseInt","fn":"parseInt","args":["077",{"$":"undefined"}],"out":77}
+{"test":"parseInt","fn":"parseInt","args":["0b101",{"$":"undefined"}],"out":0}
+{"test":"parseInt","fn":"parseInt","args":["0o17",{"$":"undefined"}],"out":0}
+{"test":"parseInt","fn":"parseInt","args":["1_000",{"$":"undefined"}],"out":1}
+{"test":"parseInt","fn":"parseInt","args":["99999999999999999999999",{"$":"undefined"}],"out":1e+23}
+{"test":"parseInt","fn":"parseInt","args":["9007199254740993",{"$":"undefined"}],"out":9007199254740992}
+{"test":"parseInt","fn":"parseInt","args":["123456789012345678901234567890",{"$":"undefined"}],"out":1.2345678901234568e+29}
+{"test":"parseInt","fn":"parseInt","args":["١٢",{"$":"undefined"}],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["４２",{"$":"undefined"}],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["z",{"$":"undefined"}],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["Z9",{"$":"undefined"}],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["-",{"$":"undefined"}],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["+",{"$":"undefined"}],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["+-1",{"$":"undefined"}],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["Infinity",{"$":"undefined"}],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["NaN",{"$":"undefined"}],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":[".5",{"$":"undefined"}],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["-.5",{"$":"undefined"}],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["00012",{"$":"undefined"}],"out":12}
+{"test":"parseInt","fn":"parseInt","args":["ffffffffffffffffffffffff",{"$":"undefined"}],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000007",{"$":"undefined"}],"out":7}
+{"test":"parseInt","fn":"parseInt","args":["100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",{"$":"undefined"}],"out":{"$":"number","value":"Infinity"}}
+{"test":"parseInt","fn":"parseInt","args":["9999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",{"$":"undefined"}],"out":{"$":"number","value":"Infinity"}}
+{"test":"parseInt","fn":"parseInt","args":["111111111111111111111111111111",{"$":"undefined"}],"out":1.111111111111111e+29}
+{"test":"parseInt","fn":"parseInt","args":["zzzzzzzzzzzzzzzzzzzzzzzzz",{"$":"undefined"}],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["",2],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":[" 12",2],"out":1}
+{"test":"parseInt","fn":"parseInt","args":["　 -12",2],"out":-1}
+{"test":"parseInt","fn":"parseInt","args":["﻿42",2],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["0x1F",2],"out":0}
+{"test":"parseInt","fn":"parseInt","args":["-0x1F",2],"out":{"$":"number","value":"-0"}}
+{"test":"parseInt","fn":"parseInt","args":["+0x10",2],"out":0}
+{"test":"parseInt","fn":"parseInt","args":["0X1a",2],"out":0}
+{"test":"parseInt","fn":"parseInt","args":["0x",2],"out":0}
+{"test":"parseInt","fn":"parseInt","args":["0xg",2],"out":0}
+{"test":"parseInt","fn":"parseInt","args":["-0",2],"out":{"$":"number","value":"-0"}}
+{"test":"parseInt","fn":"parseInt","args":["  -0  ",2],"out":{"$":"number","value":"-0"}}
+{"test":"parseInt","fn":"parseInt","args":["1e3",2],"out":1}
+{"test":"parseInt","fn":"parseInt","args":["12abc",2],"out":1}
+{"test":"parseInt","fn":"parseInt","args":["077",2],"out":0}
+{"test":"parseInt","fn":"parseInt","args":["0b101",2],"out":0}
+{"test":"parseInt","fn":"parseInt","args":["0o17",2],"out":0}
+{"test":"parseInt","fn":"parseInt","args":["1_000",2],"out":1}
+{"test":"parseInt","fn":"parseInt","args":["99999999999999999999999",2],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["9007199254740993",2],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["123456789012345678901234567890",2],"out":1}
+{"test":"parseInt","fn":"parseInt","args":["١٢",2],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["４２",2],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["z",2],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["Z9",2],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["-",2],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["+",2],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["+-1",2],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["Infinity",2],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["NaN",2],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":[".5",2],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["-.5",2],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["00012",2],"out":1}
+{"test":"parseInt","fn":"parseInt","args":["ffffffffffffffffffffffff",2],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000007",2],"out":0}
+{"test":"parseInt","fn":"parseInt","args":["100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",2],"out":2.13598703592091e+96}
+{"test":"parseInt","fn":"parseInt","args":["9999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",2],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["111111111111111111111111111111",2],"out":1073741823}
+{"test":"parseInt","fn":"parseInt","args":["zzzzzzzzzzzzzzzzzzzzzzzzz",2],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["",8],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":[" 12",8],"out":10}
+{"test":"parseInt","fn":"parseInt","args":["　 -12",8],"out":-10}
+{"test":"parseInt","fn":"parseInt","args":["﻿42",8],"out":34}
+{"test":"parseInt","fn":"parseInt","args":["0x1F",8],"out":0}
+{"test":"parseInt","fn":"parseInt","args":["-0x1F",8],"out":{"$":"number","value":"-0"}}
+{"test":"parseInt","fn":"parseInt","args":["+0x10",8],"out":0}
+{"test":"parseInt","fn":"parseInt","args":["0X1a",8],"out":0}
+{"test":"parseInt","fn":"parseInt","args":["0x",8],"out":0}
+{"test":"parseInt","fn":"parseInt","args":["0xg",8],"out":0}
+{"test":"parseInt","fn":"parseInt","args":["-0",8],"out":{"$":"number","value":"-0"}}
+{"test":"parseInt","fn":"parseInt","args":["  -0  ",8],"out":{"$":"number","value":"-0"}}
+{"test":"parseInt","fn":"parseInt","args":["1e3",8],"out":1}
+{"test":"parseInt","fn":"parseInt","args":["12abc",8],"out":10}
+{"test":"parseInt","fn":"parseInt","args":["077",8],"out":63}
+{"test":"parseInt","fn":"parseInt","args":["0b101",8],"out":0}
+{"test":"parseInt","fn":"parseInt","args":["0o17",8],"out":0}
+{"test":"parseInt","fn":"parseInt","args":["1_000",8],"out":1}
+{"test":"parseInt","fn":"parseInt","args":["99999999999999999999999",8],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["9007199254740993",8],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["123456789012345678901234567890",8],"out":342391}
+{"test":"parseInt","fn":"parseInt","args":["١٢",8],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["４２",8],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["z",8],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["Z9",8],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["-",8],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["+",8],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["+-1",8],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["Infinity",8],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["NaN",8],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":[".5",8],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["-.5",8],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["00012",8],"out":10}
+{"test":"parseInt","fn":"parseInt","args":["ffffffffffffffffffffffff",8],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000007",8],"out":7}
+{"test":"parseInt","fn":"parseInt","args":["100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",8],"out":9.7453140114e+288}
+{"test":"parseInt","fn":"parseInt","args":["9999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",8],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["111111111111111111111111111111",8],"out":1.768485770407686e+26}
+{"test":"parseInt","fn":"parseInt","args":["zzzzzzzzzzzzzzzzzzzzzzzzz",8],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["",10],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":[" 12",10],"out":12}
+{"test":"parseInt","fn":"parseInt","args":["　 -12",10],"out":-12}
+{"test":"parseInt","fn":"parseInt","args":["﻿42",10],"out":42}
+{"test":"parseInt","fn":"parseInt","args":["0x1F",10],"out":0}
+{"test":"parseInt","fn":"parseInt","args":["-0x1F",10],"out":{"$":"number","value":"-0"}}
+{"test":"parseInt","fn":"parseInt","args":["+0x10",10],"out":0}
+{"test":"parseInt","fn":"parseInt","args":["0X1a",10],"out":0}
+{"test":"parseInt","fn":"parseInt","args":["0x",10],"out":0}
+{"test":"parseInt","fn":"parseInt","args":["0xg",10],"out":0}
+{"test":"parseInt","fn":"parseInt","args":["-0",10],"out":{"$":"number","value":"-0"}}
+{"test":"parseInt","fn":"parseInt","args":["  -0  ",10],"out":{"$":"number","value":"-0"}}
+{"test":"parseInt","fn":"parseInt","args":["1e3",10],"out":1}
+{"test":"parseInt","fn":"parseInt","args":["12abc",10],"out":12}
+{"test":"parseInt","fn":"parseInt","args":["077",10],"out":77}
+{"test":"parseInt","fn":"parseInt","args":["0b101",10],"out":0}
+{"test":"parseInt","fn":"parseInt","args":["0o17",10],"out":0}
+{"test":"parseInt","fn":"parseInt","args":["1_000",10],"out":1}
+{"test":"parseInt","fn":"parseInt","args":["99999999999999999999999",10],"out":1e+23}
+{"test":"parseInt","fn":"parseInt","args":["9007199254740993",10],"out":9007199254740992}
+{"test":"parseInt","fn":"parseInt","args":["123456789012345678901234567890",10],"out":1.2345678901234568e+29}
+{"test":"parseInt","fn":"parseInt","args":["١٢",10],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["４２",10],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["z",10],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["Z9",10],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["-",10],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["+",10],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["+-1",10],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["Infinity",10],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["NaN",10],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":[".5",10],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["-.5",10],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["00012",10],"out":12}
+{"test":"parseInt","fn":"parseInt","args":["ffffffffffffffffffffffff",10],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000007",10],"out":7}
+{"test":"parseInt","fn":"parseInt","args":["100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",10],"out":{"$":"number","value":"Infinity"}}
+{"test":"parseInt","fn":"parseInt","args":["9999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",10],"out":{"$":"number","value":"Infinity"}}
+{"test":"parseInt","fn":"parseInt","args":["111111111111111111111111111111",10],"out":1.111111111111111e+29}
+{"test":"parseInt","fn":"parseInt","args":["zzzzzzzzzzzzzzzzzzzzzzzzz",10],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["",16],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":[" 12",16],"out":18}
+{"test":"parseInt","fn":"parseInt","args":["　 -12",16],"out":-18}
+{"test":"parseInt","fn":"parseInt","args":["﻿42",16],"out":66}
+{"test":"parseInt","fn":"parseInt","args":["0x1F",16],"out":31}
+{"test":"parseInt","fn":"parseInt","args":["-0x1F",16],"out":-31}
+{"test":"parseInt","fn":"parseInt","args":["+0x10",16],"out":16}
+{"test":"parseInt","fn":"parseInt","args":["0X1a",16],"out":26}
+{"test":"parseInt","fn":"parseInt","args":["0x",16],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["0xg",16],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["-0",16],"out":{"$":"number","value":"-0"}}
+{"test":"parseInt","fn":"parseInt","args":["  -0  ",16],"out":{"$":"number","value":"-0"}}
+{"test":"parseInt","fn":"parseInt","args":["1e3",16],"out":483}
+{"test":"parseInt","fn":"parseInt","args":["12abc",16],"out":76476}
+{"test":"parseInt","fn":"parseInt","args":["077",16],"out":119}
+{"test":"parseInt","fn":"parseInt","args":["0b101",16],"out":45313}
+{"test":"parseInt","fn":"parseInt","args":["0o17",16],"out":0}
+{"test":"parseInt","fn":"parseInt","args":["1_000",16],"out":1}
+{"test":"parseInt","fn":"parseInt","args":["99999999999999999999999",16],"out":2.9710560942849125e+27}
+{"test":"parseInt","fn":"parseInt","args":["9007199254740993",16],"out":10378291982571407000}
+{"test":"parseInt","fn":"parseInt","args":["123456789012345678901234567890",16],"out":9.452287968736547e+34}
+{"test":"parseInt","fn":"parseInt","args":["١٢",16],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["４２",16],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["z",16],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["Z9",16],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["-",16],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["+",16],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["+-1",16],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["Infinity",16],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["NaN",16],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":[".5",16],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["-.5",16],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["00012",16],"out":18}
+{"test":"parseInt","fn":"parseInt","args":["ffffffffffffffffffffffff",16],"out":7.922816251426434e+28}
+{"test":"parseInt","fn":"parseInt","args":["000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000007",16],"out":7}
+{"test":"parseInt","fn":"parseInt","args":["100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",16],"out":{"$":"number","value":"Infinity"}}
+{"test":"parseInt","fn":"parseInt","args":["9999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",16],"out":{"$":"number","value":"Infinity"}}
+{"test":"parseInt","fn":"parseInt","args":["111111111111111111111111111111",16],"out":8.861519971899439e+34}
+{"test":"parseInt","fn":"parseInt","args":["zzzzzzzzzzzzzzzzzzzzzzzzz",16],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["",36],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":[" 12",36],"out":38}
+{"test":"parseInt","fn":"parseInt","args":["　 -12",36],"out":-38}
+{"test":"parseInt","fn":"parseInt","args":["﻿42",36],"out":146}
+{"test":"parseInt","fn":"parseInt","args":["0x1F",36],"out":42819}
+{"test":"parseInt","fn":"parseInt","args":["-0x1F",36],"out":-42819}
+{"test":"parseInt","fn":"parseInt","args":["+0x10",36],"out":42804}
+{"test":"parseInt","fn":"parseInt","args":["0X1a",36],"out":42814}
+{"test":"parseInt","fn":"parseInt","args":["0x",36],"out":33}
+{"test":"parseInt","fn":"parseInt","args":["0xg",36],"out":1204}
+{"test":"parseInt","fn":"parseInt","args":["-0",36],"out":{"$":"number","value":"-0"}}
+{"test":"parseInt","fn":"parseInt","args":["  -0  ",36],"out":{"$":"number","value":"-0"}}
+{"test":"parseInt","fn":"parseInt","args":["1e3",36],"out":1803}
+{"test":"parseInt","fn":"parseInt","args":["12abc",36],"out":1786296}
+{"test":"parseInt","fn":"parseInt","args":["077",36],"out":259}
+{"test":"parseInt","fn":"parseInt","args":["0b101",36],"out":514513}
+{"test":"parseInt","fn":"parseInt","args":["0o17",36],"out":31147}
+{"test":"parseInt","fn":"parseInt","args":["1_000",36],"out":1}
+{"test":"parseInt","fn":"parseInt","args":["99999999999999999999999",36],"out":1.6037326933824684e+35}
+{"test":"parseInt","fn":"parseInt","args":["9007199254740993",36],"out":1.9896986116031812e+24}
+{"test":"parseInt","fn":"parseInt","args":["123456789012345678901234567890",36],"out":1.436287679432363e+45}
+{"test":"parseInt","fn":"parseInt","args":["١٢",36],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["４２",36],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["z",36],"out":35}
+{"test":"parseInt","fn":"parseInt","args":["Z9",36],"out":1269}
+{"test":"parseInt","fn":"parseInt","args":["-",36],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["+",36],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["+-1",36],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["Infinity",36],"out":1461559270678}
+{"test":"parseInt","fn":"parseInt","args":["NaN",36],"out":30191}
+{"test":"parseInt","fn":"parseInt","args":[".5",36],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["-.5",36],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["00012",36],"out":38}
+{"test":"parseInt","fn":"parseInt","args":["ffffffffffffffffffffffff",36],"out":9.62239616029481e+36}
+{"test":"parseInt","fn":"parseInt","args":["000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000007",36],"out":7}
+{"test":"parseInt","fn":"parseInt","args":["100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",36],"out":{"$":"number","value":"Infinity"}}
+{"test":"parseInt","fn":"parseInt","args":["9999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",36],"out":{"$":"number","value":"Infinity"}}
+{"test":"parseInt","fn":"parseInt","args":["111111111111111111111111111111",36],"out":1.3963907994482643e+45}
+{"test":"parseInt","fn":"parseInt","args":["zzzzzzzzzzzzzzzzzzzzzzzzz",36],"out":8.08281277464764e+38}
+{"test":"parseInt","fn":"parseInt","args":["",1],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":[" 12",1],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["　 -12",1],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["﻿42",1],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["0x1F",1],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["-0x1F",1],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["+0x10",1],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["0X1a",1],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["0x",1],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["0xg",1],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["-0",1],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["  -0  ",1],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["1e3",1],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["12abc",1],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["077",1],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["0b101",1],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["0o17",1],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["1_000",1],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["99999999999999999999999",1],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["9007199254740993",1],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["123456789012345678901234567890",1],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["١٢",1],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["４２",1],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["z",1],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["Z9",1],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["-",1],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["+",1],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["+-1",1],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["Infinity",1],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["NaN",1],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":[".5",1],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["-.5",1],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["00012",1],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["ffffffffffffffffffffffff",1],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000007",1],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",1],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["9999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",1],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["111111111111111111111111111111",1],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["zzzzzzzzzzzzzzzzzzzzzzzzz",1],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["",37],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":[" 12",37],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["　 -12",37],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["﻿42",37],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["0x1F",37],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["-0x1F",37],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["+0x10",37],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["0X1a",37],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["0x",37],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["0xg",37],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["-0",37],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["  -0  ",37],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["1e3",37],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["12abc",37],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["077",37],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["0b101",37],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["0o17",37],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["1_000",37],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["99999999999999999999999",37],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["9007199254740993",37],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["123456789012345678901234567890",37],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["١٢",37],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["４２",37],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["z",37],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["Z9",37],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["-",37],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["+",37],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["+-1",37],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["Infinity",37],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["NaN",37],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":[".5",37],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["-.5",37],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["00012",37],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["ffffffffffffffffffffffff",37],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000007",37],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",37],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["9999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",37],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["111111111111111111111111111111",37],"out":{"$":"number","value":"NaN"}}
+{"test":"parseInt","fn":"parseInt","args":["zzzzzzzzzzzzzzzzzzzzzzzzz",37],"out":{"$":"number","value":"NaN"}}
+{"test":"String.prototype.slice","fn":"slice","args":["abcdef",2,-1],"out":"cde"}
+{"test":"String.prototype.slice","fn":"slice","args":["abcdef",-3],"out":"def"}
+{"test":"String.prototype.slice","fn":"slice","args":["abcdef",-10,2],"out":"ab"}
+{"test":"String.prototype.slice","fn":"slice","args":["abcdef",4,2],"out":""}
+{"test":"String.prototype.slice","fn":"slice","args":["abcdef",0,{"$":"number","value":"-0"}],"out":""}
+{"test":"String.prototype.slice","fn":"slice","args":["",0,1],"out":""}
+{"test":"String.prototype.slice","fn":"slice","args":["abc",1,100],"out":"bc"}
+{"test":"String.prototype.slice","fn":"slice","args":["abc",3],"out":""}
+{"test":"String.prototype.slice","fn":"slice","args":["abc",0,-3],"out":""}
+{"test":"String.prototype.repeat","fn":"repeat","args":["ab",0],"out":""}
+{"test":"String.prototype.repeat","fn":"repeat","args":["ab",3],"out":"ababab"}
+{"test":"String.prototype.repeat","fn":"repeat","args":["",5],"out":""}
+{"test":"String.prototype.repeat","fn":"repeat","args":["0",1],"out":"0"}
+{"test":"String.prototype.split","fn":"split","args":["a/b//c","/"],"out":["a","b","","c"]}
+{"test":"String.prototype.split","fn":"split","args":["abc",""],"out":["a","b","c"]}
+{"test":"String.prototype.split","fn":"split","args":["","/"],"out":[""]}
+{"test":"String.prototype.split","fn":"split","args":["",""],"out":[]}
+{"test":"String.prototype.split","fn":"split","args":["a..b..",".."],"out":["a","b",""]}
+{"test":"String.prototype.split","fn":"split","args":["/a/","/"],"out":["","a",""]}
+{"test":"ToInt32","fn":"toInt32","args":[0],"out":0}
+{"test":"Number.isInteger","fn":"isInteger","args":[0],"out":true}
+{"test":"ToInt32","fn":"toInt32","args":[{"$":"number","value":"-0"}],"out":0}
+{"test":"Number.isInteger","fn":"isInteger","args":[{"$":"number","value":"-0"}],"out":true}
+{"test":"ToInt32","fn":"toInt32","args":[1.5],"out":1}
+{"test":"Number.isInteger","fn":"isInteger","args":[1.5],"out":false}
+{"test":"ToInt32","fn":"toInt32","args":[-1.5],"out":-1}
+{"test":"Number.isInteger","fn":"isInteger","args":[-1.5],"out":false}
+{"test":"ToInt32","fn":"toInt32","args":[2147483647],"out":2147483647}
+{"test":"Number.isInteger","fn":"isInteger","args":[2147483647],"out":true}
+{"test":"ToInt32","fn":"toInt32","args":[2147483648],"out":-2147483648}
+{"test":"Number.isInteger","fn":"isInteger","args":[2147483648],"out":true}
+{"test":"ToInt32","fn":"toInt32","args":[-2147483649],"out":2147483647}
+{"test":"Number.isInteger","fn":"isInteger","args":[-2147483649],"out":true}
+{"test":"ToInt32","fn":"toInt32","args":[4294967296.5],"out":0}
+{"test":"Number.isInteger","fn":"isInteger","args":[4294967296.5],"out":false}
+{"test":"ToInt32","fn":"toInt32","args":[1e+21],"out":-559939584}
+{"test":"Number.isInteger","fn":"isInteger","args":[1e+21],"out":true}
+{"test":"ToInt32","fn":"toInt32","args":[-1e+21],"out":559939584}
+{"test":"Number.isInteger","fn":"isInteger","args":[-1e+21],"out":true}
+{"test":"ToInt32","fn":"toInt32","args":[9007199254740994],"out":2}
+{"test":"Number.isInteger","fn":"isInteger","args":[9007199254740994],"out":true}
+{"test":"ToInt32","fn":"toInt32","args":[9223372036854778000],"out":2048}
+{"test":"Number.isInteger","fn":"isInteger","args":[9223372036854778000],"out":true}
+{"test":"ToInt32","fn":"toInt32","args":[1e+300],"out":0}
+{"test":"Number.isInteger","fn":"isInteger","args":[1e+300],"out":true}
+{"test":"ToInt32","fn":"toInt32","args":[{"$":"number","value":"NaN"}],"out":0}
+{"test":"Number.isInteger","fn":"isInteger","args":[{"$":"number","value":"NaN"}],"out":false}
+{"test":"ToInt32","fn":"toInt32","args":[{"$":"number","value":"Infinity"}],"out":0}
+{"test":"Number.isInteger","fn":"isInteger","args":[{"$":"number","value":"Infinity"}],"out":false}
+{"test":"ToInt32","fn":"toInt32","args":[{"$":"number","value":"-Infinity"}],"out":0}
+{"test":"Number.isInteger","fn":"isInteger","args":[{"$":"number","value":"-Infinity"}],"out":false}
+{"test":"ToInt32","fn":"toInt32","args":[9007199254740991],"out":-1}
+{"test":"Number.isInteger","fn":"isInteger","args":[9007199254740991],"out":true}
+{"test":"Number","fn":"toNumber","args":["0x10"],"out":16}
+{"test":"Number","fn":"toNumber","args":[" 12 "],"out":12}
+{"test":"Number","fn":"toNumber","args":["1e3"],"out":1000}
+{"test":"Number","fn":"toNumber","args":[""],"out":0}
+{"test":"Number","fn":"toNumber","args":["0b2"],"out":{"$":"number","value":"NaN"}}
+{"test":"Number","fn":"toNumber","args":["0b11"],"out":3}
+{"test":"Number","fn":"toNumber","args":["0o8"],"out":{"$":"number","value":"NaN"}}
+{"test":"Number","fn":"toNumber","args":["Infinity"],"out":{"$":"number","value":"Infinity"}}
+{"test":"Number","fn":"toNumber","args":["-Infinity"],"out":{"$":"number","value":"-Infinity"}}
+{"test":"Number","fn":"toNumber","args":["+0x10"],"out":{"$":"number","value":"NaN"}}
+{"test":"Number","fn":"toNumber","args":["1_0"],"out":{"$":"number","value":"NaN"}}
+{"test":"Number","fn":"toNumber","args":["٣"],"out":{"$":"number","value":"NaN"}}
+{"test":"Number","fn":"toNumber","args":[".5e1"],"out":5}
+{"test":"Number","fn":"toNumber","args":["5."],"out":5}
+{"test":"Number","fn":"toNumber","args":["  7 ﻿"],"out":7}
+{"test":"Number","fn":"toNumber","args":["0X1F"],"out":31}
+{"test":"Number","fn":"toNumber","args":["-0"],"out":{"$":"number","value":"-0"}}
+{"test":"Number","fn":"toNumber","args":["infinity"],"out":{"$":"number","value":"NaN"}}
+{"test":"Number.prototype.toString","fn":"numberToString","args":[1e+21],"out":"1e+21"}
+{"test":"Number.prototype.toString","fn":"numberToString","args":[1e-7],"out":"1e-7"}
+{"test":"Number.prototype.toString","fn":"numberToString","args":[1.23e-18],"out":"1.23e-18"}
+{"test":"Number.prototype.toString","fn":"numberToString","args":[{"$":"number","value":"-0"}],"out":"0"}
+{"test":"Number.prototype.toString","fn":"numberToString","args":[0.30000000000000004],"out":"0.30000000000000004"}
+{"test":"Number.prototype.toString","fn":"numberToString","args":[9007199254740994],"out":"9007199254740994"}
+{"test":"Number.prototype.toString","fn":"numberToString","args":[100],"out":"100"}
+{"test":"Number.prototype.toString","fn":"numberToString","args":[1.5e+300],"out":"1.5e+300"}
+{"test":"Number.prototype.toString","fn":"numberToString","args":[5e-324],"out":"5e-324"}
+{"test":"Number.prototype.toString","fn":"numberToString","args":[123456789012345680000],"out":"123456789012345680000"}
+{"test":"String.prototype.trim","fn":"trim","args":["abc"],"out":"abc"}
+{"test":"String.prototype.trimStart","fn":"trimStart","args":["abc"],"out":"abc"}
+{"test":"String.prototype.trim","fn":"trim","args":["\t a b \n"],"out":"a b"}
+{"test":"String.prototype.trimStart","fn":"trimStart","args":["\t a b \n"],"out":"a b \n"}
+{"test":"String.prototype.trim","fn":"trim","args":["　 x ﻿"],"out":"x"}
+{"test":"String.prototype.trimStart","fn":"trimStart","args":["　 x ﻿"],"out":"x ﻿"}
+{"test":"String.prototype.trim","fn":"trim","args":["᠎x᠎"],"out":"᠎x᠎"}
+{"test":"String.prototype.trimStart","fn":"trimStart","args":["᠎x᠎"],"out":"᠎x᠎"}
+{"test":"String.prototype.trim","fn":"trim","args":["x​"],"out":"x​"}
+{"test":"String.prototype.trimStart","fn":"trimStart","args":["x​"],"out":"x​"}
+{"test":"Object.entries","fn":"entries","args":["object",[["b",1],["2",true],["a","x"],["1",null],["01",0],["4294967295",2],["4294967294",[1]]]],"out":[["1",null],["2",true],["4294967294",[1]],["b",1],["a","x"],["01",0],["4294967295",2]]}
+{"test":"Object.entries","fn":"entries","args":["object",[]],"out":[]}
+{"test":"Object.entries","fn":"entries","args":["value",["x",null,["y"]]],"out":[["0","x"],["1",null],["2",["y"]]]}
+{"test":"Object.entries","fn":"entries","args":["value","a😀"],"out":[["0","a"],["1","\ud83d"],["2","\ude00"]]}
+{"test":"Object.entries","fn":"entries","args":["value",""],"out":[]}
+{"test":"Object.entries","fn":"entries","args":["value",5],"out":[]}
+{"test":"Object.entries","fn":"entries","args":["value",true],"out":[]}
+{"test":"Object.entries","fn":"entries","args":["value",null],"threw":{"$":"error","name":"TypeError","message":"Cannot convert undefined or null to object"}}
+{"test":"Object.entries","fn":"entries","args":["value",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Cannot convert undefined or null to object"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value","x",{"$":"undefined"},"none",{"$":"undefined"}],"out":"\"x\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value","x",{"$":"undefined"},"none",2],"out":"\"x\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value","x",{"$":"undefined"},"none",0],"out":"\"x\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value","x",{"$":"undefined"},"none",-1],"out":"\"x\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value","x",{"$":"undefined"},"none",1.5],"out":"\"x\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value","x",{"$":"undefined"},"none",11],"out":"\"x\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value","x",{"$":"undefined"},"none",{"$":"number","value":"Infinity"}],"out":"\"x\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value","x",{"$":"undefined"},"none",{"$":"number","value":"NaN"}],"out":"\"x\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value","x",{"$":"undefined"},"none","\t"],"out":"\"x\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value","x",{"$":"undefined"},"none",""],"out":"\"x\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value","x",{"$":"undefined"},"none"," ^_^ "],"out":"\"x\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value","x",{"$":"undefined"},"none","12345678901"],"out":"\"x\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value","x",{"$":"undefined"},"none",true],"out":"\"x\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value","x",{"$":"undefined"},"none",null],"out":"\"x\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value","x",{"$":"undefined"},"dropB",{"$":"undefined"}],"out":"\"x\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value","x",{"$":"undefined"},"dropB",2],"out":"\"x\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value","x",{"$":"undefined"},"wrapRoot",{"$":"undefined"}],"out":"{\"wrapped\":\"x\"}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value","x",{"$":"undefined"},"wrapRoot",2],"out":"{\n  \"wrapped\": \"x\"\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value","x",{"$":"undefined"},"numbersAsStrings",{"$":"undefined"}],"out":"\"x\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value","x",{"$":"undefined"},"numbersAsStrings",2],"out":"\"x\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value","x",{"$":"undefined"},"keyed",{"$":"undefined"}],"out":"\"=x\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value","x",{"$":"undefined"},"keyed",2],"out":"\"=x\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value","x",{"$":"undefined"},"undefinedAsNull",{"$":"undefined"}],"out":"\"x\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value","x",{"$":"undefined"},"undefinedAsNull",2],"out":"\"x\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",1e+21,{"$":"undefined"},"none",{"$":"undefined"}],"out":"1e+21"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",1e+21,{"$":"undefined"},"none",2],"out":"1e+21"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",1e+21,{"$":"undefined"},"none",0],"out":"1e+21"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",1e+21,{"$":"undefined"},"none",-1],"out":"1e+21"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",1e+21,{"$":"undefined"},"none",1.5],"out":"1e+21"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",1e+21,{"$":"undefined"},"none",11],"out":"1e+21"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",1e+21,{"$":"undefined"},"none",{"$":"number","value":"Infinity"}],"out":"1e+21"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",1e+21,{"$":"undefined"},"none",{"$":"number","value":"NaN"}],"out":"1e+21"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",1e+21,{"$":"undefined"},"none","\t"],"out":"1e+21"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",1e+21,{"$":"undefined"},"none",""],"out":"1e+21"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",1e+21,{"$":"undefined"},"none"," ^_^ "],"out":"1e+21"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",1e+21,{"$":"undefined"},"none","12345678901"],"out":"1e+21"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",1e+21,{"$":"undefined"},"none",true],"out":"1e+21"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",1e+21,{"$":"undefined"},"none",null],"out":"1e+21"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",1e+21,{"$":"undefined"},"dropB",{"$":"undefined"}],"out":"1e+21"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",1e+21,{"$":"undefined"},"dropB",2],"out":"1e+21"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",1e+21,{"$":"undefined"},"wrapRoot",{"$":"undefined"}],"out":"{\"wrapped\":1e+21}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",1e+21,{"$":"undefined"},"wrapRoot",2],"out":"{\n  \"wrapped\": 1e+21\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",1e+21,{"$":"undefined"},"numbersAsStrings",{"$":"undefined"}],"out":"\"1e+21\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",1e+21,{"$":"undefined"},"numbersAsStrings",2],"out":"\"1e+21\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",1e+21,{"$":"undefined"},"keyed",{"$":"undefined"}],"out":"1e+21"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",1e+21,{"$":"undefined"},"keyed",2],"out":"1e+21"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",1e+21,{"$":"undefined"},"undefinedAsNull",{"$":"undefined"}],"out":"1e+21"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",1e+21,{"$":"undefined"},"undefinedAsNull",2],"out":"1e+21"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"-0"},{"$":"undefined"},"none",{"$":"undefined"}],"out":"0"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"-0"},{"$":"undefined"},"none",2],"out":"0"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"-0"},{"$":"undefined"},"none",0],"out":"0"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"-0"},{"$":"undefined"},"none",-1],"out":"0"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"-0"},{"$":"undefined"},"none",1.5],"out":"0"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"-0"},{"$":"undefined"},"none",11],"out":"0"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"-0"},{"$":"undefined"},"none",{"$":"number","value":"Infinity"}],"out":"0"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"-0"},{"$":"undefined"},"none",{"$":"number","value":"NaN"}],"out":"0"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"-0"},{"$":"undefined"},"none","\t"],"out":"0"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"-0"},{"$":"undefined"},"none",""],"out":"0"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"-0"},{"$":"undefined"},"none"," ^_^ "],"out":"0"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"-0"},{"$":"undefined"},"none","12345678901"],"out":"0"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"-0"},{"$":"undefined"},"none",true],"out":"0"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"-0"},{"$":"undefined"},"none",null],"out":"0"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"-0"},{"$":"undefined"},"dropB",{"$":"undefined"}],"out":"0"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"-0"},{"$":"undefined"},"dropB",2],"out":"0"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"-0"},{"$":"undefined"},"wrapRoot",{"$":"undefined"}],"out":"{\"wrapped\":0}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"-0"},{"$":"undefined"},"wrapRoot",2],"out":"{\n  \"wrapped\": 0\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"-0"},{"$":"undefined"},"numbersAsStrings",{"$":"undefined"}],"out":"\"0\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"-0"},{"$":"undefined"},"numbersAsStrings",2],"out":"\"0\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"-0"},{"$":"undefined"},"keyed",{"$":"undefined"}],"out":"0"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"-0"},{"$":"undefined"},"keyed",2],"out":"0"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"-0"},{"$":"undefined"},"undefinedAsNull",{"$":"undefined"}],"out":"0"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"-0"},{"$":"undefined"},"undefinedAsNull",2],"out":"0"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"NaN"},{"$":"undefined"},"none",{"$":"undefined"}],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"NaN"},{"$":"undefined"},"none",2],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"NaN"},{"$":"undefined"},"none",0],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"NaN"},{"$":"undefined"},"none",-1],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"NaN"},{"$":"undefined"},"none",1.5],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"NaN"},{"$":"undefined"},"none",11],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"NaN"},{"$":"undefined"},"none",{"$":"number","value":"Infinity"}],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"NaN"},{"$":"undefined"},"none",{"$":"number","value":"NaN"}],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"NaN"},{"$":"undefined"},"none","\t"],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"NaN"},{"$":"undefined"},"none",""],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"NaN"},{"$":"undefined"},"none"," ^_^ "],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"NaN"},{"$":"undefined"},"none","12345678901"],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"NaN"},{"$":"undefined"},"none",true],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"NaN"},{"$":"undefined"},"none",null],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"NaN"},{"$":"undefined"},"dropB",{"$":"undefined"}],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"NaN"},{"$":"undefined"},"dropB",2],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"NaN"},{"$":"undefined"},"wrapRoot",{"$":"undefined"}],"out":"{\"wrapped\":null}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"NaN"},{"$":"undefined"},"wrapRoot",2],"out":"{\n  \"wrapped\": null\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"NaN"},{"$":"undefined"},"numbersAsStrings",{"$":"undefined"}],"out":"\"NaN\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"NaN"},{"$":"undefined"},"numbersAsStrings",2],"out":"\"NaN\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"NaN"},{"$":"undefined"},"keyed",{"$":"undefined"}],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"NaN"},{"$":"undefined"},"keyed",2],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"NaN"},{"$":"undefined"},"undefinedAsNull",{"$":"undefined"}],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"NaN"},{"$":"undefined"},"undefinedAsNull",2],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"Infinity"},{"$":"undefined"},"none",{"$":"undefined"}],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"Infinity"},{"$":"undefined"},"none",2],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"Infinity"},{"$":"undefined"},"none",0],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"Infinity"},{"$":"undefined"},"none",-1],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"Infinity"},{"$":"undefined"},"none",1.5],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"Infinity"},{"$":"undefined"},"none",11],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"Infinity"},{"$":"undefined"},"none",{"$":"number","value":"Infinity"}],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"Infinity"},{"$":"undefined"},"none",{"$":"number","value":"NaN"}],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"Infinity"},{"$":"undefined"},"none","\t"],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"Infinity"},{"$":"undefined"},"none",""],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"Infinity"},{"$":"undefined"},"none"," ^_^ "],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"Infinity"},{"$":"undefined"},"none","12345678901"],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"Infinity"},{"$":"undefined"},"none",true],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"Infinity"},{"$":"undefined"},"none",null],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"Infinity"},{"$":"undefined"},"dropB",{"$":"undefined"}],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"Infinity"},{"$":"undefined"},"dropB",2],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"Infinity"},{"$":"undefined"},"wrapRoot",{"$":"undefined"}],"out":"{\"wrapped\":null}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"Infinity"},{"$":"undefined"},"wrapRoot",2],"out":"{\n  \"wrapped\": null\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"Infinity"},{"$":"undefined"},"numbersAsStrings",{"$":"undefined"}],"out":"\"Infinity\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"Infinity"},{"$":"undefined"},"numbersAsStrings",2],"out":"\"Infinity\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"Infinity"},{"$":"undefined"},"keyed",{"$":"undefined"}],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"Infinity"},{"$":"undefined"},"keyed",2],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"Infinity"},{"$":"undefined"},"undefinedAsNull",{"$":"undefined"}],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"Infinity"},{"$":"undefined"},"undefinedAsNull",2],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",null,{"$":"undefined"},"none",{"$":"undefined"}],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",null,{"$":"undefined"},"none",2],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",null,{"$":"undefined"},"none",0],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",null,{"$":"undefined"},"none",-1],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",null,{"$":"undefined"},"none",1.5],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",null,{"$":"undefined"},"none",11],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",null,{"$":"undefined"},"none",{"$":"number","value":"Infinity"}],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",null,{"$":"undefined"},"none",{"$":"number","value":"NaN"}],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",null,{"$":"undefined"},"none","\t"],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",null,{"$":"undefined"},"none",""],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",null,{"$":"undefined"},"none"," ^_^ "],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",null,{"$":"undefined"},"none","12345678901"],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",null,{"$":"undefined"},"none",true],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",null,{"$":"undefined"},"none",null],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",null,{"$":"undefined"},"dropB",{"$":"undefined"}],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",null,{"$":"undefined"},"dropB",2],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",null,{"$":"undefined"},"wrapRoot",{"$":"undefined"}],"out":"{\"wrapped\":null}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",null,{"$":"undefined"},"wrapRoot",2],"out":"{\n  \"wrapped\": null\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",null,{"$":"undefined"},"numbersAsStrings",{"$":"undefined"}],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",null,{"$":"undefined"},"numbersAsStrings",2],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",null,{"$":"undefined"},"keyed",{"$":"undefined"}],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",null,{"$":"undefined"},"keyed",2],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",null,{"$":"undefined"},"undefinedAsNull",{"$":"undefined"}],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",null,{"$":"undefined"},"undefinedAsNull",2],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",true,{"$":"undefined"},"none",{"$":"undefined"}],"out":"true"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",true,{"$":"undefined"},"none",2],"out":"true"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",true,{"$":"undefined"},"none",0],"out":"true"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",true,{"$":"undefined"},"none",-1],"out":"true"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",true,{"$":"undefined"},"none",1.5],"out":"true"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",true,{"$":"undefined"},"none",11],"out":"true"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",true,{"$":"undefined"},"none",{"$":"number","value":"Infinity"}],"out":"true"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",true,{"$":"undefined"},"none",{"$":"number","value":"NaN"}],"out":"true"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",true,{"$":"undefined"},"none","\t"],"out":"true"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",true,{"$":"undefined"},"none",""],"out":"true"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",true,{"$":"undefined"},"none"," ^_^ "],"out":"true"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",true,{"$":"undefined"},"none","12345678901"],"out":"true"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",true,{"$":"undefined"},"none",true],"out":"true"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",true,{"$":"undefined"},"none",null],"out":"true"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",true,{"$":"undefined"},"dropB",{"$":"undefined"}],"out":"true"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",true,{"$":"undefined"},"dropB",2],"out":"true"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",true,{"$":"undefined"},"wrapRoot",{"$":"undefined"}],"out":"{\"wrapped\":true}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",true,{"$":"undefined"},"wrapRoot",2],"out":"{\n  \"wrapped\": true\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",true,{"$":"undefined"},"numbersAsStrings",{"$":"undefined"}],"out":"true"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",true,{"$":"undefined"},"numbersAsStrings",2],"out":"true"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",true,{"$":"undefined"},"keyed",{"$":"undefined"}],"out":"true"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",true,{"$":"undefined"},"keyed",2],"out":"true"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",true,{"$":"undefined"},"undefinedAsNull",{"$":"undefined"}],"out":"true"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",true,{"$":"undefined"},"undefinedAsNull",2],"out":"true"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"undefined"},{"$":"undefined"},"none",{"$":"undefined"}],"out":{"$":"undefined"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"undefined"},{"$":"undefined"},"none",2],"out":{"$":"undefined"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"undefined"},{"$":"undefined"},"none",0],"out":{"$":"undefined"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"undefined"},{"$":"undefined"},"none",-1],"out":{"$":"undefined"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"undefined"},{"$":"undefined"},"none",1.5],"out":{"$":"undefined"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"undefined"},{"$":"undefined"},"none",11],"out":{"$":"undefined"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"undefined"},{"$":"undefined"},"none",{"$":"number","value":"Infinity"}],"out":{"$":"undefined"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"undefined"},{"$":"undefined"},"none",{"$":"number","value":"NaN"}],"out":{"$":"undefined"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"undefined"},{"$":"undefined"},"none","\t"],"out":{"$":"undefined"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"undefined"},{"$":"undefined"},"none",""],"out":{"$":"undefined"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"undefined"},{"$":"undefined"},"none"," ^_^ "],"out":{"$":"undefined"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"undefined"},{"$":"undefined"},"none","12345678901"],"out":{"$":"undefined"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"undefined"},{"$":"undefined"},"none",true],"out":{"$":"undefined"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"undefined"},{"$":"undefined"},"none",null],"out":{"$":"undefined"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"undefined"},{"$":"undefined"},"dropB",{"$":"undefined"}],"out":{"$":"undefined"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"undefined"},{"$":"undefined"},"dropB",2],"out":{"$":"undefined"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"undefined"},{"$":"undefined"},"wrapRoot",{"$":"undefined"}],"out":"{}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"undefined"},{"$":"undefined"},"wrapRoot",2],"out":"{}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"undefined"},{"$":"undefined"},"numbersAsStrings",{"$":"undefined"}],"out":{"$":"undefined"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"undefined"},{"$":"undefined"},"numbersAsStrings",2],"out":{"$":"undefined"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"undefined"},{"$":"undefined"},"keyed",{"$":"undefined"}],"out":{"$":"undefined"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"undefined"},{"$":"undefined"},"keyed",2],"out":{"$":"undefined"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"undefined"},{"$":"undefined"},"undefinedAsNull",{"$":"undefined"}],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"undefined"},{"$":"undefined"},"undefinedAsNull",2],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[1,{"$":"undefined"},null,"a\n \ud800"],{"$":"undefined"},"none",{"$":"undefined"}],"out":"[1,null,null,\"a\\n \\ud800\"]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[1,{"$":"undefined"},null,"a\n \ud800"],{"$":"undefined"},"none",2],"out":"[\n  1,\n  null,\n  null,\n  \"a\\n \\ud800\"\n]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[1,{"$":"undefined"},null,"a\n \ud800"],{"$":"undefined"},"none",0],"out":"[1,null,null,\"a\\n \\ud800\"]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[1,{"$":"undefined"},null,"a\n \ud800"],{"$":"undefined"},"none",-1],"out":"[1,null,null,\"a\\n \\ud800\"]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[1,{"$":"undefined"},null,"a\n \ud800"],{"$":"undefined"},"none",1.5],"out":"[\n 1,\n null,\n null,\n \"a\\n \\ud800\"\n]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[1,{"$":"undefined"},null,"a\n \ud800"],{"$":"undefined"},"none",11],"out":"[\n          1,\n          null,\n          null,\n          \"a\\n \\ud800\"\n]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[1,{"$":"undefined"},null,"a\n \ud800"],{"$":"undefined"},"none",{"$":"number","value":"Infinity"}],"out":"[\n          1,\n          null,\n          null,\n          \"a\\n \\ud800\"\n]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[1,{"$":"undefined"},null,"a\n \ud800"],{"$":"undefined"},"none",{"$":"number","value":"NaN"}],"out":"[1,null,null,\"a\\n \\ud800\"]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[1,{"$":"undefined"},null,"a\n \ud800"],{"$":"undefined"},"none","\t"],"out":"[\n\t1,\n\tnull,\n\tnull,\n\t\"a\\n \\ud800\"\n]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[1,{"$":"undefined"},null,"a\n \ud800"],{"$":"undefined"},"none",""],"out":"[1,null,null,\"a\\n \\ud800\"]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[1,{"$":"undefined"},null,"a\n \ud800"],{"$":"undefined"},"none"," ^_^ "],"out":"[\n ^_^ 1,\n ^_^ null,\n ^_^ null,\n ^_^ \"a\\n \\ud800\"\n]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[1,{"$":"undefined"},null,"a\n \ud800"],{"$":"undefined"},"none","12345678901"],"out":"[\n12345678901,\n1234567890null,\n1234567890null,\n1234567890\"a\\n \\ud800\"\n]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[1,{"$":"undefined"},null,"a\n \ud800"],{"$":"undefined"},"none",true],"out":"[1,null,null,\"a\\n \\ud800\"]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[1,{"$":"undefined"},null,"a\n \ud800"],{"$":"undefined"},"none",null],"out":"[1,null,null,\"a\\n \\ud800\"]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[1,{"$":"undefined"},null,"a\n \ud800"],{"$":"undefined"},"dropB",{"$":"undefined"}],"out":"[1,null,null,\"a\\n \\ud800\"]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[1,{"$":"undefined"},null,"a\n \ud800"],{"$":"undefined"},"dropB",2],"out":"[\n  1,\n  null,\n  null,\n  \"a\\n \\ud800\"\n]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[1,{"$":"undefined"},null,"a\n \ud800"],{"$":"undefined"},"wrapRoot",{"$":"undefined"}],"out":"{\"wrapped\":[1,null,null,\"a\\n \\ud800\"]}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[1,{"$":"undefined"},null,"a\n \ud800"],{"$":"undefined"},"wrapRoot",2],"out":"{\n  \"wrapped\": [\n    1,\n    null,\n    null,\n    \"a\\n \\ud800\"\n  ]\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[1,{"$":"undefined"},null,"a\n \ud800"],{"$":"undefined"},"numbersAsStrings",{"$":"undefined"}],"out":"[\"1\",null,null,\"a\\n \\ud800\"]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[1,{"$":"undefined"},null,"a\n \ud800"],{"$":"undefined"},"numbersAsStrings",2],"out":"[\n  \"1\",\n  null,\n  null,\n  \"a\\n \\ud800\"\n]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[1,{"$":"undefined"},null,"a\n \ud800"],{"$":"undefined"},"keyed",{"$":"undefined"}],"out":"[1,null,null,\"3=a\\n \\ud800\"]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[1,{"$":"undefined"},null,"a\n \ud800"],{"$":"undefined"},"keyed",2],"out":"[\n  1,\n  null,\n  null,\n  \"3=a\\n \\ud800\"\n]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[1,{"$":"undefined"},null,"a\n \ud800"],{"$":"undefined"},"undefinedAsNull",{"$":"undefined"}],"out":"[1,null,null,\"a\\n \\ud800\"]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[1,{"$":"undefined"},null,"a\n \ud800"],{"$":"undefined"},"undefinedAsNull",2],"out":"[\n  1,\n  null,\n  null,\n  \"a\\n \\ud800\"\n]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[],{"$":"undefined"},"none",{"$":"undefined"}],"out":"[]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[],{"$":"undefined"},"none",2],"out":"[]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[],{"$":"undefined"},"none",0],"out":"[]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[],{"$":"undefined"},"none",-1],"out":"[]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[],{"$":"undefined"},"none",1.5],"out":"[]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[],{"$":"undefined"},"none",11],"out":"[]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[],{"$":"undefined"},"none",{"$":"number","value":"Infinity"}],"out":"[]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[],{"$":"undefined"},"none",{"$":"number","value":"NaN"}],"out":"[]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[],{"$":"undefined"},"none","\t"],"out":"[]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[],{"$":"undefined"},"none",""],"out":"[]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[],{"$":"undefined"},"none"," ^_^ "],"out":"[]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[],{"$":"undefined"},"none","12345678901"],"out":"[]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[],{"$":"undefined"},"none",true],"out":"[]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[],{"$":"undefined"},"none",null],"out":"[]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[],{"$":"undefined"},"dropB",{"$":"undefined"}],"out":"[]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[],{"$":"undefined"},"dropB",2],"out":"[]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[],{"$":"undefined"},"wrapRoot",{"$":"undefined"}],"out":"{\"wrapped\":[]}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[],{"$":"undefined"},"wrapRoot",2],"out":"{\n  \"wrapped\": []\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[],{"$":"undefined"},"numbersAsStrings",{"$":"undefined"}],"out":"[]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[],{"$":"undefined"},"numbersAsStrings",2],"out":"[]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[],{"$":"undefined"},"keyed",{"$":"undefined"}],"out":"[]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[],{"$":"undefined"},"keyed",2],"out":"[]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[],{"$":"undefined"},"undefinedAsNull",{"$":"undefined"}],"out":"[]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[],{"$":"undefined"},"undefinedAsNull",2],"out":"[]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{},{"$":"undefined"},"none",{"$":"undefined"}],"out":"{}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{},{"$":"undefined"},"none",2],"out":"{}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{},{"$":"undefined"},"none",0],"out":"{}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{},{"$":"undefined"},"none",-1],"out":"{}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{},{"$":"undefined"},"none",1.5],"out":"{}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{},{"$":"undefined"},"none",11],"out":"{}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{},{"$":"undefined"},"none",{"$":"number","value":"Infinity"}],"out":"{}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{},{"$":"undefined"},"none",{"$":"number","value":"NaN"}],"out":"{}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{},{"$":"undefined"},"none","\t"],"out":"{}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{},{"$":"undefined"},"none",""],"out":"{}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{},{"$":"undefined"},"none"," ^_^ "],"out":"{}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{},{"$":"undefined"},"none","12345678901"],"out":"{}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{},{"$":"undefined"},"none",true],"out":"{}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{},{"$":"undefined"},"none",null],"out":"{}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{},{"$":"undefined"},"dropB",{"$":"undefined"}],"out":"{}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{},{"$":"undefined"},"dropB",2],"out":"{}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{},{"$":"undefined"},"wrapRoot",{"$":"undefined"}],"out":"{\"wrapped\":{}}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{},{"$":"undefined"},"wrapRoot",2],"out":"{\n  \"wrapped\": {}\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{},{"$":"undefined"},"numbersAsStrings",{"$":"undefined"}],"out":"{}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{},{"$":"undefined"},"numbersAsStrings",2],"out":"{}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{},{"$":"undefined"},"keyed",{"$":"undefined"}],"out":"{}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{},{"$":"undefined"},"keyed",2],"out":"{}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{},{"$":"undefined"},"undefinedAsNull",{"$":"undefined"}],"out":"{}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{},{"$":"undefined"},"undefinedAsNull",2],"out":"{}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"a":[],"b":{},"c":[{},[]]},{"$":"undefined"},"none",{"$":"undefined"}],"out":"{\"a\":[],\"b\":{},\"c\":[{},[]]}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"a":[],"b":{},"c":[{},[]]},{"$":"undefined"},"none",2],"out":"{\n  \"a\": [],\n  \"b\": {},\n  \"c\": [\n    {},\n    []\n  ]\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"a":[],"b":{},"c":[{},[]]},{"$":"undefined"},"none",0],"out":"{\"a\":[],\"b\":{},\"c\":[{},[]]}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"a":[],"b":{},"c":[{},[]]},{"$":"undefined"},"none",-1],"out":"{\"a\":[],\"b\":{},\"c\":[{},[]]}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"a":[],"b":{},"c":[{},[]]},{"$":"undefined"},"none",1.5],"out":"{\n \"a\": [],\n \"b\": {},\n \"c\": [\n  {},\n  []\n ]\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"a":[],"b":{},"c":[{},[]]},{"$":"undefined"},"none",11],"out":"{\n          \"a\": [],\n          \"b\": {},\n          \"c\": [\n                    {},\n                    []\n          ]\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"a":[],"b":{},"c":[{},[]]},{"$":"undefined"},"none",{"$":"number","value":"Infinity"}],"out":"{\n          \"a\": [],\n          \"b\": {},\n          \"c\": [\n                    {},\n                    []\n          ]\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"a":[],"b":{},"c":[{},[]]},{"$":"undefined"},"none",{"$":"number","value":"NaN"}],"out":"{\"a\":[],\"b\":{},\"c\":[{},[]]}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"a":[],"b":{},"c":[{},[]]},{"$":"undefined"},"none","\t"],"out":"{\n\t\"a\": [],\n\t\"b\": {},\n\t\"c\": [\n\t\t{},\n\t\t[]\n\t]\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"a":[],"b":{},"c":[{},[]]},{"$":"undefined"},"none",""],"out":"{\"a\":[],\"b\":{},\"c\":[{},[]]}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"a":[],"b":{},"c":[{},[]]},{"$":"undefined"},"none"," ^_^ "],"out":"{\n ^_^ \"a\": [],\n ^_^ \"b\": {},\n ^_^ \"c\": [\n ^_^  ^_^ {},\n ^_^  ^_^ []\n ^_^ ]\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"a":[],"b":{},"c":[{},[]]},{"$":"undefined"},"none","12345678901"],"out":"{\n1234567890\"a\": [],\n1234567890\"b\": {},\n1234567890\"c\": [\n12345678901234567890{},\n12345678901234567890[]\n1234567890]\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"a":[],"b":{},"c":[{},[]]},{"$":"undefined"},"none",true],"out":"{\"a\":[],\"b\":{},\"c\":[{},[]]}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"a":[],"b":{},"c":[{},[]]},{"$":"undefined"},"none",null],"out":"{\"a\":[],\"b\":{},\"c\":[{},[]]}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"a":[],"b":{},"c":[{},[]]},{"$":"undefined"},"dropB",{"$":"undefined"}],"out":"{\"a\":[],\"c\":[{},[]]}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"a":[],"b":{},"c":[{},[]]},{"$":"undefined"},"dropB",2],"out":"{\n  \"a\": [],\n  \"c\": [\n    {},\n    []\n  ]\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"a":[],"b":{},"c":[{},[]]},{"$":"undefined"},"wrapRoot",{"$":"undefined"}],"out":"{\"wrapped\":{\"a\":[],\"b\":{},\"c\":[{},[]]}}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"a":[],"b":{},"c":[{},[]]},{"$":"undefined"},"wrapRoot",2],"out":"{\n  \"wrapped\": {\n    \"a\": [],\n    \"b\": {},\n    \"c\": [\n      {},\n      []\n    ]\n  }\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"a":[],"b":{},"c":[{},[]]},{"$":"undefined"},"numbersAsStrings",{"$":"undefined"}],"out":"{\"a\":[],\"b\":{},\"c\":[{},[]]}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"a":[],"b":{},"c":[{},[]]},{"$":"undefined"},"numbersAsStrings",2],"out":"{\n  \"a\": [],\n  \"b\": {},\n  \"c\": [\n    {},\n    []\n  ]\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"a":[],"b":{},"c":[{},[]]},{"$":"undefined"},"keyed",{"$":"undefined"}],"out":"{\"a\":[],\"b\":{},\"c\":[{},[]]}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"a":[],"b":{},"c":[{},[]]},{"$":"undefined"},"keyed",2],"out":"{\n  \"a\": [],\n  \"b\": {},\n  \"c\": [\n    {},\n    []\n  ]\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"a":[],"b":{},"c":[{},[]]},{"$":"undefined"},"undefinedAsNull",{"$":"undefined"}],"out":"{\"a\":[],\"b\":{},\"c\":[{},[]]}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"a":[],"b":{},"c":[{},[]]},{"$":"undefined"},"undefinedAsNull",2],"out":"{\n  \"a\": [],\n  \"b\": {},\n  \"c\": [\n    {},\n    []\n  ]\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"b":1,"a":{"c":"x","d":[1,{"e":null}]}},{"$":"undefined"},"none",{"$":"undefined"}],"out":"{\"b\":1,\"a\":{\"c\":\"x\",\"d\":[1,{\"e\":null}]}}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"b":1,"a":{"c":"x","d":[1,{"e":null}]}},{"$":"undefined"},"none",2],"out":"{\n  \"b\": 1,\n  \"a\": {\n    \"c\": \"x\",\n    \"d\": [\n      1,\n      {\n        \"e\": null\n      }\n    ]\n  }\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"b":1,"a":{"c":"x","d":[1,{"e":null}]}},{"$":"undefined"},"none",0],"out":"{\"b\":1,\"a\":{\"c\":\"x\",\"d\":[1,{\"e\":null}]}}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"b":1,"a":{"c":"x","d":[1,{"e":null}]}},{"$":"undefined"},"none",-1],"out":"{\"b\":1,\"a\":{\"c\":\"x\",\"d\":[1,{\"e\":null}]}}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"b":1,"a":{"c":"x","d":[1,{"e":null}]}},{"$":"undefined"},"none",1.5],"out":"{\n \"b\": 1,\n \"a\": {\n  \"c\": \"x\",\n  \"d\": [\n   1,\n   {\n    \"e\": null\n   }\n  ]\n }\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"b":1,"a":{"c":"x","d":[1,{"e":null}]}},{"$":"undefined"},"none",11],"out":"{\n          \"b\": 1,\n          \"a\": {\n                    \"c\": \"x\",\n                    \"d\": [\n                              1,\n                              {\n                                        \"e\": null\n                              }\n                    ]\n          }\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"b":1,"a":{"c":"x","d":[1,{"e":null}]}},{"$":"undefined"},"none",{"$":"number","value":"Infinity"}],"out":"{\n          \"b\": 1,\n          \"a\": {\n                    \"c\": \"x\",\n                    \"d\": [\n                              1,\n                              {\n                                        \"e\": null\n                              }\n                    ]\n          }\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"b":1,"a":{"c":"x","d":[1,{"e":null}]}},{"$":"undefined"},"none",{"$":"number","value":"NaN"}],"out":"{\"b\":1,\"a\":{\"c\":\"x\",\"d\":[1,{\"e\":null}]}}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"b":1,"a":{"c":"x","d":[1,{"e":null}]}},{"$":"undefined"},"none","\t"],"out":"{\n\t\"b\": 1,\n\t\"a\": {\n\t\t\"c\": \"x\",\n\t\t\"d\": [\n\t\t\t1,\n\t\t\t{\n\t\t\t\t\"e\": null\n\t\t\t}\n\t\t]\n\t}\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"b":1,"a":{"c":"x","d":[1,{"e":null}]}},{"$":"undefined"},"none",""],"out":"{\"b\":1,\"a\":{\"c\":\"x\",\"d\":[1,{\"e\":null}]}}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"b":1,"a":{"c":"x","d":[1,{"e":null}]}},{"$":"undefined"},"none"," ^_^ "],"out":"{\n ^_^ \"b\": 1,\n ^_^ \"a\": {\n ^_^  ^_^ \"c\": \"x\",\n ^_^  ^_^ \"d\": [\n ^_^  ^_^  ^_^ 1,\n ^_^  ^_^  ^_^ {\n ^_^  ^_^  ^_^  ^_^ \"e\": null\n ^_^  ^_^  ^_^ }\n ^_^  ^_^ ]\n ^_^ }\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"b":1,"a":{"c":"x","d":[1,{"e":null}]}},{"$":"undefined"},"none","12345678901"],"out":"{\n1234567890\"b\": 1,\n1234567890\"a\": {\n12345678901234567890\"c\": \"x\",\n12345678901234567890\"d\": [\n1234567890123456789012345678901,\n123456789012345678901234567890{\n1234567890123456789012345678901234567890\"e\": null\n123456789012345678901234567890}\n12345678901234567890]\n1234567890}\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"b":1,"a":{"c":"x","d":[1,{"e":null}]}},{"$":"undefined"},"none",true],"out":"{\"b\":1,\"a\":{\"c\":\"x\",\"d\":[1,{\"e\":null}]}}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"b":1,"a":{"c":"x","d":[1,{"e":null}]}},{"$":"undefined"},"none",null],"out":"{\"b\":1,\"a\":{\"c\":\"x\",\"d\":[1,{\"e\":null}]}}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"b":1,"a":{"c":"x","d":[1,{"e":null}]}},{"$":"undefined"},"dropB",{"$":"undefined"}],"out":"{\"a\":{\"c\":\"x\",\"d\":[1,{\"e\":null}]}}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"b":1,"a":{"c":"x","d":[1,{"e":null}]}},{"$":"undefined"},"dropB",2],"out":"{\n  \"a\": {\n    \"c\": \"x\",\n    \"d\": [\n      1,\n      {\n        \"e\": null\n      }\n    ]\n  }\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"b":1,"a":{"c":"x","d":[1,{"e":null}]}},{"$":"undefined"},"wrapRoot",{"$":"undefined"}],"out":"{\"wrapped\":{\"b\":1,\"a\":{\"c\":\"x\",\"d\":[1,{\"e\":null}]}}}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"b":1,"a":{"c":"x","d":[1,{"e":null}]}},{"$":"undefined"},"wrapRoot",2],"out":"{\n  \"wrapped\": {\n    \"b\": 1,\n    \"a\": {\n      \"c\": \"x\",\n      \"d\": [\n        1,\n        {\n          \"e\": null\n        }\n      ]\n    }\n  }\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"b":1,"a":{"c":"x","d":[1,{"e":null}]}},{"$":"undefined"},"numbersAsStrings",{"$":"undefined"}],"out":"{\"b\":\"1\",\"a\":{\"c\":\"x\",\"d\":[\"1\",{\"e\":null}]}}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"b":1,"a":{"c":"x","d":[1,{"e":null}]}},{"$":"undefined"},"numbersAsStrings",2],"out":"{\n  \"b\": \"1\",\n  \"a\": {\n    \"c\": \"x\",\n    \"d\": [\n      \"1\",\n      {\n        \"e\": null\n      }\n    ]\n  }\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"b":1,"a":{"c":"x","d":[1,{"e":null}]}},{"$":"undefined"},"keyed",{"$":"undefined"}],"out":"{\"b\":1,\"a\":{\"c\":\"c=x\",\"d\":[1,{\"e\":null}]}}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"b":1,"a":{"c":"x","d":[1,{"e":null}]}},{"$":"undefined"},"keyed",2],"out":"{\n  \"b\": 1,\n  \"a\": {\n    \"c\": \"c=x\",\n    \"d\": [\n      1,\n      {\n        \"e\": null\n      }\n    ]\n  }\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"b":1,"a":{"c":"x","d":[1,{"e":null}]}},{"$":"undefined"},"undefinedAsNull",{"$":"undefined"}],"out":"{\"b\":1,\"a\":{\"c\":\"x\",\"d\":[1,{\"e\":null}]}}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"b":1,"a":{"c":"x","d":[1,{"e":null}]}},{"$":"undefined"},"undefinedAsNull",2],"out":"{\n  \"b\": 1,\n  \"a\": {\n    \"c\": \"x\",\n    \"d\": [\n      1,\n      {\n        \"e\": null\n      }\n    ]\n  }\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["object",[["b",1],["2",true],["a",[1,2]],["u",{"$":"undefined"}],["1",{"x":"y"}]],{"$":"undefined"},"none",{"$":"undefined"}],"out":"{\"1\":{\"x\":\"y\"},\"2\":true,\"b\":1,\"a\":[1,2]}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["object",[["b",1],["2",true],["a",[1,2]],["u",{"$":"undefined"}],["1",{"x":"y"}]],{"$":"undefined"},"none",2],"out":"{\n  \"1\": {\n    \"x\": \"y\"\n  },\n  \"2\": true,\n  \"b\": 1,\n  \"a\": [\n    1,\n    2\n  ]\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["object",[["b",1],["2",true],["a",[1,2]],["u",{"$":"undefined"}],["1",{"x":"y"}]],{"$":"undefined"},"none",0],"out":"{\"1\":{\"x\":\"y\"},\"2\":true,\"b\":1,\"a\":[1,2]}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["object",[["b",1],["2",true],["a",[1,2]],["u",{"$":"undefined"}],["1",{"x":"y"}]],{"$":"undefined"},"none",-1],"out":"{\"1\":{\"x\":\"y\"},\"2\":true,\"b\":1,\"a\":[1,2]}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["object",[["b",1],["2",true],["a",[1,2]],["u",{"$":"undefined"}],["1",{"x":"y"}]],{"$":"undefined"},"none",1.5],"out":"{\n \"1\": {\n  \"x\": \"y\"\n },\n \"2\": true,\n \"b\": 1,\n \"a\": [\n  1,\n  2\n ]\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["object",[["b",1],["2",true],["a",[1,2]],["u",{"$":"undefined"}],["1",{"x":"y"}]],{"$":"undefined"},"none",11],"out":"{\n          \"1\": {\n                    \"x\": \"y\"\n          },\n          \"2\": true,\n          \"b\": 1,\n          \"a\": [\n                    1,\n                    2\n          ]\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["object",[["b",1],["2",true],["a",[1,2]],["u",{"$":"undefined"}],["1",{"x":"y"}]],{"$":"undefined"},"none",{"$":"number","value":"Infinity"}],"out":"{\n          \"1\": {\n                    \"x\": \"y\"\n          },\n          \"2\": true,\n          \"b\": 1,\n          \"a\": [\n                    1,\n                    2\n          ]\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["object",[["b",1],["2",true],["a",[1,2]],["u",{"$":"undefined"}],["1",{"x":"y"}]],{"$":"undefined"},"none",{"$":"number","value":"NaN"}],"out":"{\"1\":{\"x\":\"y\"},\"2\":true,\"b\":1,\"a\":[1,2]}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["object",[["b",1],["2",true],["a",[1,2]],["u",{"$":"undefined"}],["1",{"x":"y"}]],{"$":"undefined"},"none","\t"],"out":"{\n\t\"1\": {\n\t\t\"x\": \"y\"\n\t},\n\t\"2\": true,\n\t\"b\": 1,\n\t\"a\": [\n\t\t1,\n\t\t2\n\t]\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["object",[["b",1],["2",true],["a",[1,2]],["u",{"$":"undefined"}],["1",{"x":"y"}]],{"$":"undefined"},"none",""],"out":"{\"1\":{\"x\":\"y\"},\"2\":true,\"b\":1,\"a\":[1,2]}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["object",[["b",1],["2",true],["a",[1,2]],["u",{"$":"undefined"}],["1",{"x":"y"}]],{"$":"undefined"},"none"," ^_^ "],"out":"{\n ^_^ \"1\": {\n ^_^  ^_^ \"x\": \"y\"\n ^_^ },\n ^_^ \"2\": true,\n ^_^ \"b\": 1,\n ^_^ \"a\": [\n ^_^  ^_^ 1,\n ^_^  ^_^ 2\n ^_^ ]\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["object",[["b",1],["2",true],["a",[1,2]],["u",{"$":"undefined"}],["1",{"x":"y"}]],{"$":"undefined"},"none","12345678901"],"out":"{\n1234567890\"1\": {\n12345678901234567890\"x\": \"y\"\n1234567890},\n1234567890\"2\": true,\n1234567890\"b\": 1,\n1234567890\"a\": [\n123456789012345678901,\n123456789012345678902\n1234567890]\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["object",[["b",1],["2",true],["a",[1,2]],["u",{"$":"undefined"}],["1",{"x":"y"}]],{"$":"undefined"},"none",true],"out":"{\"1\":{\"x\":\"y\"},\"2\":true,\"b\":1,\"a\":[1,2]}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["object",[["b",1],["2",true],["a",[1,2]],["u",{"$":"undefined"}],["1",{"x":"y"}]],{"$":"undefined"},"none",null],"out":"{\"1\":{\"x\":\"y\"},\"2\":true,\"b\":1,\"a\":[1,2]}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["object",[["b",1],["2",true],["a",[1,2]],["u",{"$":"undefined"}],["1",{"x":"y"}]],{"$":"undefined"},"dropB",{"$":"undefined"}],"out":"{\"1\":{\"x\":\"y\"},\"2\":true,\"a\":[1,2]}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["object",[["b",1],["2",true],["a",[1,2]],["u",{"$":"undefined"}],["1",{"x":"y"}]],{"$":"undefined"},"dropB",2],"out":"{\n  \"1\": {\n    \"x\": \"y\"\n  },\n  \"2\": true,\n  \"a\": [\n    1,\n    2\n  ]\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["object",[["b",1],["2",true],["a",[1,2]],["u",{"$":"undefined"}],["1",{"x":"y"}]],{"$":"undefined"},"wrapRoot",{"$":"undefined"}],"out":"{\"wrapped\":{\"1\":{\"x\":\"y\"},\"2\":true,\"b\":1,\"a\":[1,2]}}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["object",[["b",1],["2",true],["a",[1,2]],["u",{"$":"undefined"}],["1",{"x":"y"}]],{"$":"undefined"},"wrapRoot",2],"out":"{\n  \"wrapped\": {\n    \"1\": {\n      \"x\": \"y\"\n    },\n    \"2\": true,\n    \"b\": 1,\n    \"a\": [\n      1,\n      2\n    ]\n  }\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["object",[["b",1],["2",true],["a",[1,2]],["u",{"$":"undefined"}],["1",{"x":"y"}]],{"$":"undefined"},"numbersAsStrings",{"$":"undefined"}],"out":"{\"1\":{\"x\":\"y\"},\"2\":true,\"b\":\"1\",\"a\":[\"1\",\"2\"]}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["object",[["b",1],["2",true],["a",[1,2]],["u",{"$":"undefined"}],["1",{"x":"y"}]],{"$":"undefined"},"numbersAsStrings",2],"out":"{\n  \"1\": {\n    \"x\": \"y\"\n  },\n  \"2\": true,\n  \"b\": \"1\",\n  \"a\": [\n    \"1\",\n    \"2\"\n  ]\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["object",[["b",1],["2",true],["a",[1,2]],["u",{"$":"undefined"}],["1",{"x":"y"}]],{"$":"undefined"},"keyed",{"$":"undefined"}],"out":"{\"1\":{\"x\":\"x=y\"},\"2\":true,\"b\":1,\"a\":[1,2]}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["object",[["b",1],["2",true],["a",[1,2]],["u",{"$":"undefined"}],["1",{"x":"y"}]],{"$":"undefined"},"keyed",2],"out":"{\n  \"1\": {\n    \"x\": \"x=y\"\n  },\n  \"2\": true,\n  \"b\": 1,\n  \"a\": [\n    1,\n    2\n  ]\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["object",[["b",1],["2",true],["a",[1,2]],["u",{"$":"undefined"}],["1",{"x":"y"}]],{"$":"undefined"},"undefinedAsNull",{"$":"undefined"}],"out":"{\"1\":{\"x\":\"y\"},\"2\":true,\"b\":1,\"a\":[1,2],\"u\":null}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["object",[["b",1],["2",true],["a",[1,2]],["u",{"$":"undefined"}],["1",{"x":"y"}]],{"$":"undefined"},"undefinedAsNull",2],"out":"{\n  \"1\": {\n    \"x\": \"y\"\n  },\n  \"2\": true,\n  \"b\": 1,\n  \"a\": [\n    1,\n    2\n  ],\n  \"u\": null\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["sparse",3,[[1,"x"]],"none",{"$":"undefined"}],"out":"[null,\"x\",null]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["sparse",3,[[1,"x"]],"none",2],"out":"[\n  null,\n  \"x\",\n  null\n]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["sparse",3,[[1,"x"]],"none",0],"out":"[null,\"x\",null]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["sparse",3,[[1,"x"]],"none",-1],"out":"[null,\"x\",null]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["sparse",3,[[1,"x"]],"none",1.5],"out":"[\n null,\n \"x\",\n null\n]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["sparse",3,[[1,"x"]],"none",11],"out":"[\n          null,\n          \"x\",\n          null\n]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["sparse",3,[[1,"x"]],"none",{"$":"number","value":"Infinity"}],"out":"[\n          null,\n          \"x\",\n          null\n]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["sparse",3,[[1,"x"]],"none",{"$":"number","value":"NaN"}],"out":"[null,\"x\",null]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["sparse",3,[[1,"x"]],"none","\t"],"out":"[\n\tnull,\n\t\"x\",\n\tnull\n]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["sparse",3,[[1,"x"]],"none",""],"out":"[null,\"x\",null]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["sparse",3,[[1,"x"]],"none"," ^_^ "],"out":"[\n ^_^ null,\n ^_^ \"x\",\n ^_^ null\n]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["sparse",3,[[1,"x"]],"none","12345678901"],"out":"[\n1234567890null,\n1234567890\"x\",\n1234567890null\n]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["sparse",3,[[1,"x"]],"none",true],"out":"[null,\"x\",null]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["sparse",3,[[1,"x"]],"none",null],"out":"[null,\"x\",null]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["sparse",3,[[1,"x"]],"dropB",{"$":"undefined"}],"out":"[null,\"x\",null]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["sparse",3,[[1,"x"]],"dropB",2],"out":"[\n  null,\n  \"x\",\n  null\n]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["sparse",3,[[1,"x"]],"wrapRoot",{"$":"undefined"}],"out":"{\"wrapped\":[null,\"x\",null]}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["sparse",3,[[1,"x"]],"wrapRoot",2],"out":"{\n  \"wrapped\": [\n    null,\n    \"x\",\n    null\n  ]\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["sparse",3,[[1,"x"]],"numbersAsStrings",{"$":"undefined"}],"out":"[null,\"x\",null]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["sparse",3,[[1,"x"]],"numbersAsStrings",2],"out":"[\n  null,\n  \"x\",\n  null\n]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["sparse",3,[[1,"x"]],"keyed",{"$":"undefined"}],"out":"[null,\"1=x\",null]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["sparse",3,[[1,"x"]],"keyed",2],"out":"[\n  null,\n  \"1=x\",\n  null\n]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["sparse",3,[[1,"x"]],"undefinedAsNull",{"$":"undefined"}],"out":"[null,\"x\",null]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["sparse",3,[[1,"x"]],"undefinedAsNull",2],"out":"[\n  null,\n  \"x\",\n  null\n]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["a"],0,"none",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    --- property 'a' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["a"],0,"dropB",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    --- property 'a' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["a"],0,"wrapRoot",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    --- property 'a' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["a"],0,"numbersAsStrings",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    --- property 'a' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["a"],0,"keyed",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    --- property 'a' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["a"],0,"undefinedAsNull",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    --- property 'a' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["a","b","c"],1,"none",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property 'b' -> object with constructor 'Object'\n    --- property 'c' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["a","b","c"],1,"dropB",{"$":"undefined"}],"out":"{\"a\":{}}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["a","b","c"],1,"wrapRoot",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property 'b' -> object with constructor 'Object'\n    --- property 'c' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["a","b","c"],1,"numbersAsStrings",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property 'b' -> object with constructor 'Object'\n    --- property 'c' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["a","b","c"],1,"keyed",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property 'b' -> object with constructor 'Object'\n    --- property 'c' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["a","b","c"],1,"undefinedAsNull",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property 'b' -> object with constructor 'Object'\n    --- property 'c' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",[0,0,0,0],0,"none",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Array'\n    |     index 0 -> object with constructor 'Array'\n    |     index 0 -> object with constructor 'Array'\n    |     index 0 -> object with constructor 'Array'\n    --- index 0 closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",[0,0,0,0],0,"dropB",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Array'\n    |     index 0 -> object with constructor 'Array'\n    |     index 0 -> object with constructor 'Array'\n    |     index 0 -> object with constructor 'Array'\n    --- index 0 closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",[0,0,0,0],0,"wrapRoot",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Array'\n    |     index 0 -> object with constructor 'Array'\n    |     index 0 -> object with constructor 'Array'\n    |     index 0 -> object with constructor 'Array'\n    --- index 0 closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",[0,0,0,0],0,"numbersAsStrings",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Array'\n    |     index 0 -> object with constructor 'Array'\n    |     index 0 -> object with constructor 'Array'\n    |     index 0 -> object with constructor 'Array'\n    --- index 0 closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",[0,0,0,0],0,"keyed",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Array'\n    |     index 0 -> object with constructor 'Array'\n    |     index 0 -> object with constructor 'Array'\n    |     index 0 -> object with constructor 'Array'\n    --- index 0 closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",[0,0,0,0],0,"undefinedAsNull",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Array'\n    |     index 0 -> object with constructor 'Array'\n    |     index 0 -> object with constructor 'Array'\n    |     index 0 -> object with constructor 'Array'\n    --- index 0 closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["q",0],1,"none",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Array'\n    --- index 0 closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["q",0],1,"dropB",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Array'\n    --- index 0 closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["q",0],1,"wrapRoot",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Array'\n    --- index 0 closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["q",0],1,"numbersAsStrings",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Array'\n    --- index 0 closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["q",0],1,"keyed",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Array'\n    --- index 0 closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["q",0],1,"undefinedAsNull",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Array'\n    --- index 0 closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["k","k","k","z"],0,"none",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    --- property 'z' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["k","k","k","z"],0,"dropB",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    --- property 'z' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["k","k","k","z"],0,"wrapRoot",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    --- property 'z' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["k","k","k","z"],0,"numbersAsStrings",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    --- property 'z' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["k","k","k","z"],0,"keyed",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    --- property 'z' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["k","k","k","z"],0,"undefinedAsNull",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    --- property 'z' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["k","k","k","k","z"],0,"none",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    |     ...\n    |     property 'k' -> object with constructor 'Object'\n    --- property 'z' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["k","k","k","k","z"],0,"dropB",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    |     ...\n    |     property 'k' -> object with constructor 'Object'\n    --- property 'z' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["k","k","k","k","z"],0,"wrapRoot",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    |     ...\n    |     property 'k' -> object with constructor 'Object'\n    --- property 'z' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["k","k","k","k","z"],0,"numbersAsStrings",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    |     ...\n    |     property 'k' -> object with constructor 'Object'\n    --- property 'z' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["k","k","k","k","z"],0,"keyed",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    |     ...\n    |     property 'k' -> object with constructor 'Object'\n    --- property 'z' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["k","k","k","k","z"],0,"undefinedAsNull",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    |     ...\n    |     property 'k' -> object with constructor 'Object'\n    --- property 'z' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["2","x"],0,"none",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property '2' -> object with constructor 'Object'\n    --- property 'x' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["2","x"],0,"dropB",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property '2' -> object with constructor 'Object'\n    --- property 'x' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["2","x"],0,"wrapRoot",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property '2' -> object with constructor 'Object'\n    --- property 'x' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["2","x"],0,"numbersAsStrings",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property '2' -> object with constructor 'Object'\n    --- property 'x' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["2","x"],0,"keyed",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property '2' -> object with constructor 'Object'\n    --- property 'x' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["2","x"],0,"undefinedAsNull",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property '2' -> object with constructor 'Object'\n    --- property 'x' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["b","","c"],1,"none",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     <anonymous> -> object with constructor 'Object'\n    --- property 'c' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["b","","c"],1,"dropB",{"$":"undefined"}],"out":"{}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["b","","c"],1,"wrapRoot",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     <anonymous> -> object with constructor 'Object'\n    |     property 'wrapped' -> object with constructor 'Object'\n    --- property 'c' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["b","","c"],1,"numbersAsStrings",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     <anonymous> -> object with constructor 'Object'\n    --- property 'c' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["b","","c"],1,"keyed",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     <anonymous> -> object with constructor 'Object'\n    --- property 'c' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["b","","c"],1,"undefinedAsNull",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     <anonymous> -> object with constructor 'Object'\n    --- property 'c' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["k0","k1","k2","k3","k4","k5",""],2,"none",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property 'k2' -> object with constructor 'Object'\n    |     property 'k3' -> object with constructor 'Object'\n    |     ...\n    |     property 'k5' -> object with constructor 'Object'\n    --- <anonymous> closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["k0","k1","k2","k3","k4","k5",""],2,"dropB",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property 'k2' -> object with constructor 'Object'\n    |     property 'k3' -> object with constructor 'Object'\n    |     ...\n    |     property 'k5' -> object with constructor 'Object'\n    --- <anonymous> closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["k0","k1","k2","k3","k4","k5",""],2,"wrapRoot",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property 'k2' -> object with constructor 'Object'\n    |     property 'k3' -> object with constructor 'Object'\n    |     ...\n    |     <anonymous> -> object with constructor 'Object'\n    --- property 'wrapped' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["k0","k1","k2","k3","k4","k5",""],2,"numbersAsStrings",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property 'k2' -> object with constructor 'Object'\n    |     property 'k3' -> object with constructor 'Object'\n    |     ...\n    |     property 'k5' -> object with constructor 'Object'\n    --- <anonymous> closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["k0","k1","k2","k3","k4","k5",""],2,"keyed",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property 'k2' -> object with constructor 'Object'\n    |     property 'k3' -> object with constructor 'Object'\n    |     ...\n    |     property 'k5' -> object with constructor 'Object'\n    --- <anonymous> closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["k0","k1","k2","k3","k4","k5",""],2,"undefinedAsNull",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property 'k2' -> object with constructor 'Object'\n    |     property 'k3' -> object with constructor 'Object'\n    |     ...\n    |     property 'k5' -> object with constructor 'Object'\n    --- <anonymous> closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["01",1],0,"none",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property '01' -> object with constructor 'Array'\n    --- index 1 closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["01",1],0,"dropB",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property '01' -> object with constructor 'Array'\n    --- index 1 closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["01",1],0,"wrapRoot",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property '01' -> object with constructor 'Array'\n    --- index 1 closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["01",1],0,"numbersAsStrings",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property '01' -> object with constructor 'Array'\n    --- index 1 closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["01",1],0,"keyed",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property '01' -> object with constructor 'Array'\n    --- index 1 closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["01",1],0,"undefinedAsNull",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property '01' -> object with constructor 'Array'\n    --- index 1 closes the circle"}}
+{"test":"Date.prototype.toISOString","fn":"toISOString","args":[0],"out":"1970-01-01T00:00:00.000Z"}
+{"test":"TimeClip","fn":"timeClip","args":[0],"out":0}
+{"test":"Date.prototype.toISOString","fn":"toISOString","args":[{"$":"number","value":"-0"}],"out":"1970-01-01T00:00:00.000Z"}
+{"test":"TimeClip","fn":"timeClip","args":[{"$":"number","value":"-0"}],"out":0}
+{"test":"Date.prototype.toISOString","fn":"toISOString","args":[-1],"out":"1969-12-31T23:59:59.999Z"}
+{"test":"TimeClip","fn":"timeClip","args":[-1],"out":-1}
+{"test":"Date.prototype.toISOString","fn":"toISOString","args":[1.5],"out":"1970-01-01T00:00:00.001Z"}
+{"test":"TimeClip","fn":"timeClip","args":[1.5],"out":1}
+{"test":"Date.prototype.toISOString","fn":"toISOString","args":[-1.5],"out":"1969-12-31T23:59:59.999Z"}
+{"test":"TimeClip","fn":"timeClip","args":[-1.5],"out":-1}
+{"test":"Date.prototype.toISOString","fn":"toISOString","args":[1791462896789],"out":"2026-10-08T12:34:56.789Z"}
+{"test":"TimeClip","fn":"timeClip","args":[1791462896789],"out":1791462896789}
+{"test":"Date.prototype.toISOString","fn":"toISOString","args":[253402300799999],"out":"9999-12-31T23:59:59.999Z"}
+{"test":"TimeClip","fn":"timeClip","args":[253402300799999],"out":253402300799999}
+{"test":"Date.prototype.toISOString","fn":"toISOString","args":[253402300800000],"out":"+010000-01-01T00:00:00.000Z"}
+{"test":"TimeClip","fn":"timeClip","args":[253402300800000],"out":253402300800000}
+{"test":"Date.prototype.toISOString","fn":"toISOString","args":[-62167219200000],"out":"0000-01-01T00:00:00.000Z"}
+{"test":"TimeClip","fn":"timeClip","args":[-62167219200000],"out":-62167219200000}
+{"test":"Date.prototype.toISOString","fn":"toISOString","args":[-62167219200001],"out":"-000001-12-31T23:59:59.999Z"}
+{"test":"TimeClip","fn":"timeClip","args":[-62167219200001],"out":-62167219200001}
+{"test":"Date.prototype.toISOString","fn":"toISOString","args":[8640000000000000],"out":"+275760-09-13T00:00:00.000Z"}
+{"test":"TimeClip","fn":"timeClip","args":[8640000000000000],"out":8640000000000000}
+{"test":"Date.prototype.toISOString","fn":"toISOString","args":[-8640000000000000],"out":"-271821-04-20T00:00:00.000Z"}
+{"test":"TimeClip","fn":"timeClip","args":[-8640000000000000],"out":-8640000000000000}
+{"test":"Date.prototype.toISOString","fn":"toISOString","args":[8640000000000001],"threw":{"$":"error","name":"RangeError","message":"Invalid time value"}}
+{"test":"TimeClip","fn":"timeClip","args":[8640000000000001],"out":{"$":"number","value":"NaN"}}
+{"test":"Date.prototype.toISOString","fn":"toISOString","args":[{"$":"number","value":"NaN"}],"threw":{"$":"error","name":"RangeError","message":"Invalid time value"}}
+{"test":"TimeClip","fn":"timeClip","args":[{"$":"number","value":"NaN"}],"out":{"$":"number","value":"NaN"}}
+{"test":"Date.prototype.toISOString","fn":"toISOString","args":[{"$":"number","value":"Infinity"}],"threw":{"$":"error","name":"RangeError","message":"Invalid time value"}}
+{"test":"TimeClip","fn":"timeClip","args":[{"$":"number","value":"Infinity"}],"out":{"$":"number","value":"NaN"}}
+{"test":"TimeClip","fn":"timeClip","args":[0.999],"out":0}
+{"test":"TimeClip","fn":"timeClip","args":[-0.5],"out":0}
+{"test":"TimeClip","fn":"timeClip","args":[1000000000000000.5],"out":1000000000000000}
+{"test":"TimeClip","fn":"timeClip","args":[-8640000000000001],"out":{"$":"number","value":"NaN"}}
+{"test":"TimeClip","fn":"timeClip","args":[1791462896789.75],"out":1791462896789}
+{"test":"Date.UTC","fn":"utc","args":[2020,0,1,0,0,0,0],"out":1577836800000}
+{"test":"Date.UTC","fn":"utc","args":[99,11,31,23,59,59,999],"out":946684799999}
+{"test":"Date.UTC","fn":"utc","args":[0,0,1,0,0,0,0],"out":-2208988800000}
+{"test":"Date.UTC","fn":"utc","args":[100,0,1,0,0,0,0],"out":-59011459200000}
+{"test":"Date.UTC","fn":"utc","args":[2020,1,30,0,0,0,0],"out":1583020800000}
+{"test":"Date.UTC","fn":"utc","args":[2020,13,1,0,0,0,0],"out":1612137600000}
+{"test":"Date.UTC","fn":"utc","args":[2020,-1,1,0,0,0,0],"out":1575158400000}
+{"test":"Date.UTC","fn":"utc","args":[275760,8,13,0,0,0,0],"out":8640000000000000}
+{"test":"Date.UTC","fn":"utc","args":[275760,8,13,0,0,0,1],"out":{"$":"number","value":"NaN"}}
+{"test":"Date.UTC","fn":"utc","args":[-271821,3,20,0,0,0,0],"out":-8640000000000000}
+{"test":"Date.UTC","fn":"utc","args":[-271821,3,19,23,59,59,999],"out":{"$":"number","value":"NaN"}}
+{"test":"Date.UTC","fn":"utc","args":[1970,0,0,24,0,0,0],"out":0}
+{"test":"encodeURIComponent","fn":"encodeURIComponent","args":["a b"],"out":"a%20b"}
+{"test":"encodeURIComponent","fn":"encodeURIComponent","args":["-_.!~*'()"],"out":"-_.!~*'()"}
+{"test":"encodeURIComponent","fn":"encodeURIComponent","args":["é"],"out":"%C3%A9"}
+{"test":"encodeURIComponent","fn":"encodeURIComponent","args":["😀"],"out":"%F0%9F%98%80"}
+{"test":"encodeURIComponent","fn":"encodeURIComponent","args":["\ud83d"],"threw":{"$":"error","name":"URIError","message":"URI malformed"}}
+{"test":"encodeURIComponent","fn":"encodeURIComponent","args":["\ude00x"],"threw":{"$":"error","name":"URIError","message":"URI malformed"}}
+{"test":"encodeURIComponent","fn":"encodeURIComponent","args":["#?&=/:@+$,;"],"out":"%23%3F%26%3D%2F%3A%40%2B%24%2C%3B"}
+{"test":"encodeURIComponent","fn":"encodeURIComponent","args":["%"],"out":"%25"}
+{"test":"decodeURIComponent","fn":"decodeURIComponent","args":["%20"],"out":" "}
+{"test":"decodeURIComponent","fn":"decodeURIComponent","args":["%E9"],"threw":{"$":"error","name":"URIError","message":"URI malformed"}}
+{"test":"decodeURIComponent","fn":"decodeURIComponent","args":["%C3%A9"],"out":"é"}
+{"test":"decodeURIComponent","fn":"decodeURIComponent","args":["%"],"threw":{"$":"error","name":"URIError","message":"URI malformed"}}
+{"test":"decodeURIComponent","fn":"decodeURIComponent","args":["%zz"],"threw":{"$":"error","name":"URIError","message":"URI malformed"}}
+{"test":"decodeURIComponent","fn":"decodeURIComponent","args":["%C3"],"threw":{"$":"error","name":"URIError","message":"URI malformed"}}
+{"test":"decodeURIComponent","fn":"decodeURIComponent","args":["%F0%9F%98%80"],"out":"😀"}
+{"test":"decodeURIComponent","fn":"decodeURIComponent","args":["%ED%A0%80"],"threw":{"$":"error","name":"URIError","message":"URI malformed"}}
+{"test":"decodeURIComponent","fn":"decodeURIComponent","args":["a%2fb"],"out":"a/b"}
+{"test":"decodeURIComponent","fn":"decodeURIComponent","args":["%3"],"threw":{"$":"error","name":"URIError","message":"URI malformed"}}
+{"test":"decodeURIComponent","fn":"decodeURIComponent","args":["%c3%a9"],"out":"é"}
+{"test":"decodeURI","fn":"decodeURI","args":["%2F%41"],"out":"%2FA"}
+{"test":"decodeURI","fn":"decodeURI","args":["/a%20b/%C3%A9"],"out":"/a b/é"}
+{"test":"decodeURI","fn":"decodeURI","args":["%E2%82%AC%23x"],"out":"€%23x"}
+{"test":"decodeURI","fn":"decodeURI","args":["%25"],"out":"%"}
+{"test":"decodeURI","fn":"decodeURI","args":["a%2Fb%3Fc%40d"],"out":"a%2Fb%3Fc%40d"}
+{"test":"decodeURI","fn":"decodeURI","args":["%F0%9F%98%80"],"out":"😀"}
+{"test":"decodeURI","fn":"decodeURI","args":["%"],"threw":{"$":"error","name":"URIError","message":"URI malformed"}}
+{"test":"decodeURI","fn":"decodeURI","args":["%C3"],"threw":{"$":"error","name":"URIError","message":"URI malformed"}}
+{"test":"decodeURI","fn":"decodeURI","args":["%C3%28"],"threw":{"$":"error","name":"URIError","message":"URI malformed"}}
+{"test":"decodeURI","fn":"decodeURI","args":["%ED%A0%80"],"threw":{"$":"error","name":"URIError","message":"URI malformed"}}
+{"test":"decodeURI","fn":"decodeURI","args":["%80"],"threw":{"$":"error","name":"URIError","message":"URI malformed"}}
+{"test":"decodeURI","fn":"decodeURI","args":["%41%2"],"threw":{"$":"error","name":"URIError","message":"URI malformed"}}
+{"test":"decodeURI","fn":"decodeURI","args":["%G1"],"threw":{"$":"error","name":"URIError","message":"URI malformed"}}
+{"test":"decodeURI","fn":"decodeURI","args":["%3B%2C%26%3D%2B%24"],"out":"%3B%2C%26%3D%2B%24"}
+{"test":"String.prototype.replace","fn":"replace","args":["abcabc","b",false,"[$&]"],"out":"a[b]cabc"}
+{"test":"String.prototype.replace","fn":"replace","args":["abcabc","b",true,"[$&]"],"out":"a[b]ca[b]c"}
+{"test":"String.prototype.replace","fn":"replace","args":["abc","(b)",false,"$1$1"],"out":"abbc"}
+{"test":"String.prototype.replace","fn":"replace","args":["abc","(b)",false,"$$"],"out":"a$c"}
+{"test":"String.prototype.replace","fn":"replace","args":["abc","(b)",false,"$`"],"out":"aac"}
+{"test":"String.prototype.replace","fn":"replace","args":["abc","(b)",false,"$'"],"out":"acc"}
+{"test":"String.prototype.replace","fn":"replace","args":["abc","(b)",false,"$0"],"out":"a$0c"}
+{"test":"String.prototype.replace","fn":"replace","args":["abc","(b)",false,"$2"],"out":"a$2c"}
+{"test":"String.prototype.replace","fn":"replace","args":["abc","(b)",false,"$01"],"out":"abc"}
+{"test":"String.prototype.replace","fn":"replace","args":["abc","(b)",false,"$10"],"out":"ab0c"}
+{"test":"String.prototype.replace","fn":"replace","args":["abc","(b)",false,"$"],"out":"a$c"}
+{"test":"String.prototype.replace","fn":"replace","args":["abc","(b)(c)?",false,"<$2>"],"out":"a<c>"}
+{"test":"String.prototype.replace","fn":"replace","args":["abcdefghijk","(a)(b)(c)(d)(e)(f)(g)(h)(i)(j)(k)",false,"$11-$10-$1"],"out":"k-j-a"}
+{"test":"String.prototype.replace","fn":"replace","args":["abc","(?<n>b)",false,"$<n>"],"out":"abc"}
+{"test":"String.prototype.replace","fn":"replace","args":["abc","b",false,"$<n>"],"out":"a$<n>c"}
+{"test":"String.prototype.replace","fn":"replace","args":["aaa","a*?",true,"-"],"out":"-a-a-a-"}
+{"test":"String.prototype.replace","fn":"replace","args":["abc","",true,"-"],"out":"-a-b-c-"}
+{"test":"String.prototype.replace","fn":"replace","args":["abc","(b)",false,"$1٣"],"out":"ab٣c"}
+{"test":"RegExp","fn":"match","args":["a(","a"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /a(/: Unterminated group"}}
+{"test":"RegExp","fn":"match","args":["[",""],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /[/: Unterminated character class"}}
+{"test":"RegExp","fn":"match","args":["(?<n>a)\\k<n>","aa"],"out":["aa","a"]}
+{"test":"RegExp","fn":"match","args":["\\k<n>","k<n>"],"out":["k<n>"]}
+{"test":"RegExp","fn":"match","args":["a{2,1}","aa"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /a{2,1}/: numbers out of order in {} quantifier"}}
+{"test":"RegExp","fn":"match","args":["a{,2}","a{,2}"],"out":["a{,2}"]}
+{"test":"RegExp","fn":"match","args":["\\p{L}","p{L}"],"out":["p{L}"]}
+{"test":"RegExp","fn":"match","args":["(?=a)*b","b"],"out":["b"]}
+{"test":"RegExp","fn":"match","args":["[\\d-z]","-"],"out":["-"]}
+{"test":"RegExp","fn":"match","args":["."," "],"out":null}
+{"test":"RegExp","fn":"match","args":[".",""],"out":[""]}
+{"test":"RegExp","fn":"match","args":["\\s","﻿"],"out":["﻿"]}
+{"test":"RegExp","fn":"match","args":["\\s","᠎"],"out":null}
+{"test":"RegExp","fn":"match","args":["\\bx","éx"],"out":["x"]}
+{"test":"RegExp","fn":"match","args":["\\w","é"],"out":null}
+{"test":"RegExp","fn":"match","args":["[^]","\n"],"out":["\n"]}
+{"test":"RegExp","fn":"match","args":["[]","a"],"out":null}
+{"test":"RegExp","fn":"match","args":["\\cJ","\n"],"out":["\n"]}
+{"test":"RegExp","fn":"match","args":["\\c1","\\c1"],"out":["\\c1"]}
+{"test":"RegExp","fn":"match","args":["\\8","8"],"out":["8"]}
+{"test":"RegExp","fn":"match","args":["(a)\\1","aa"],"out":["aa","a"]}
+{"test":"RegExp","fn":"match","args":["\\1(a)","a"],"out":["a","a"]}
+{"test":"RegExp","fn":"match","args":["\\0","\u0000"],"out":["\u0000"]}
+{"test":"RegExp","fn":"match","args":["\\u{41}","uuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu"],"out":["uuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu"]}
+{"test":"RegExp","fn":"match","args":["\\x4","x4"],"out":["x4"]}
+{"test":"RegExp","fn":"match","args":["$^",""],"out":[""]}
+{"test":"RegExp","fn":"match","args":["a|","b"],"out":[""]}
+{"test":"RegExp","fn":"match","args":["(?:)","x"],"out":[""]}
+{"test":"RegExp","fn":"match","args":["\\/","/"],"out":["/"]}
+{"test":"RegExp","fn":"match","args":["[\\b]","\b"],"out":["\b"]}
+{"test":"RegExp","fn":"match","args":["^\\S+$","a b"],"out":null}
+{"test":"RegExp","fn":"match","args":["a{1}?","a"],"out":["a"]}
+{"test":"RegExp","fn":"match","args":["(?!a)?","a"],"out":[""]}
+{"test":"RegExp","fn":"match","args":["\\D\\W","-."],"out":["-."]}
+{"test":"RegExp","fn":"match","args":["x*","xxx"],"out":["xxx"]}
+{"test":"RegExp","fn":"match","args":["[a-\\d]","-"],"out":["-"]}
+{"test":"RegExp","fn":"match","args":["\\-","-"],"out":["-"]}
+{"test":"RegExp","fn":"match","args":["(?<a>.)(?<b>.)","xy"],"out":["xy","x","y"]}
+{"test":"RegExp","fn":"match","args":["(?<a>x)|(?<a>y)","y"],"out":["y",{"$":"undefined"},"y"]}
+{"test":"RegExp","fn":"match","args":["{2,1}",""],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /{2,1}/: Nothing to repeat"}}
+{"test":"RegExp","fn":"match","args":["(?=a){2,1}",""],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?=a){2,1}/: numbers out of order in {} quantifier"}}
+{"test":"RegExp","fn":"match","args":["(?<=a){1}",""],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?<=a){1}/: Invalid quantifier"}}
+{"test":"RegExp","fn":"match","args":["(?=a){","a{"],"out":null}
+{"test":"RegExp","fn":"match","args":["(?<=a){","a{"],"out":["{"]}
+{"test":"RegExp","fn":"match","args":["x{1}{2}",""],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /x{1}{2}/: Nothing to repeat"}}
+{"test":"RegExp","fn":"match","args":["(?i:a)","A"],"out":["A"]}
+{"test":"RegExp","fn":"match","args":["(?-:a)",""],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?-:a)/: Invalid flag group"}}
+{"test":"RegExp","fn":"match","args":["(?ii:a)",""],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?ii:a)/: Repeated flag in flag group"}}
+{"test":"RegExp","fn":"match","args":["(?--:a)",""],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?--:a)/: Multiple dashes in flag group"}}
+{"test":"RegExp","fn":"match","args":["(?i",""],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?i/: Invalid group"}}
+{"test":"RegExp","fn":"match","args":["(?I:a)",""],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?I:a)/: Invalid group"}}
+{"test":"RegExp","fn":"match","args":["(?i-m)",""],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?i-m)/: Invalid group"}}
+{"test":"RegExp","fn":"match","args":["(?<m>a)\\k<n>",""],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?<m>a)\\k<n>/: Invalid named capture referenced"}}
+{"test":"RegExp","fn":"match","args":["(?<m>a)\\k",""],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?<m>a)\\k/: Invalid named reference"}}
+{"test":"RegExp","fn":"match","args":["(?<m>a)\\k<",""],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?<m>a)\\k</: Invalid capture group name"}}
+{"test":"RegExp","fn":"match","args":["(?<1a>x)",""],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?<1a>x)/: Invalid capture group name"}}
+{"test":"RegExp","fn":"match","args":["(?<>x)",""],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?<>x)/: Invalid capture group name"}}
+{"test":"RegExp","fn":"match","args":["(?<a-b>x)",""],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?<a-b>x)/: Invalid capture group name"}}
+{"test":"RegExp","fn":"match","args":["(?<a>x)\\k<b>(",""],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?<a>x)\\k<b>(/: Unterminated group"}}
+{"test":"RegExp","fn":"match","args":["[\\k<a>](?<a>x)",""],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /[\\k<a>](?<a>x)/: Invalid escape"}}
+{"test":"RegExp","fn":"match","args":["[\\k]","k"],"out":["k"]}
+{"test":"RegExp","fn":"match","args":["(?<a>.)\\k<a>","xx"],"out":["xx","x"]}
+{"test":"RegExp","fn":"match","args":["\\k<a>(?<a>x)","x"],"out":["x","x"]}
+{"test":"RegExp","fn":"match","args":["(?<a>x\\k<a>)","x"],"out":["x","x"]}
+{"test":"RegExp","fn":"match","args":["\\-","-","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\-/u: Invalid escape"}}
+{"test":"RegExp","fn":"match","args":["\\,",",","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\,/u: Invalid escape"}}
+{"test":"RegExp","fn":"match","args":["\\#","#","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\#/u: Invalid escape"}}
+{"test":"RegExp","fn":"match","args":["\\ "," ","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\ /u: Invalid escape"}}
+{"test":"RegExp","fn":"match","args":["\\!","!","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\!/u: Invalid escape"}}
+{"test":"RegExp","fn":"match","args":["\\/","/","u"],"out":["/"]}
+{"test":"RegExp","fn":"match","args":["\\.","a.b","u"],"out":["."]}
+{"test":"RegExp","fn":"match","args":["\\{","{","u"],"out":["{"]}
+{"test":"RegExp","fn":"match","args":["[\\-]","-","u"],"out":["-"]}
+{"test":"RegExp","fn":"match","args":["[\\,]",",","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /[\\,]/u: Invalid escape"}}
+{"test":"RegExp","fn":"match","args":["[\\!]","!","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /[\\!]/u: Invalid escape"}}
+{"test":"RegExp","fn":"match","args":["\\c1","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\c1/u: Invalid Unicode escape"}}
+{"test":"RegExp","fn":"match","args":["\\c","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\c/u: Invalid Unicode escape"}}
+{"test":"RegExp","fn":"match","args":["\\x4","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\x4/u: Invalid escape"}}
+{"test":"RegExp","fn":"match","args":["\\x","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\x/u: Invalid escape"}}
+{"test":"RegExp","fn":"match","args":["[\\x]","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /[\\x]/u: Invalid escape"}}
+{"test":"RegExp","fn":"match","args":["\\u12","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\u12/u: Invalid Unicode escape"}}
+{"test":"RegExp","fn":"match","args":["[\\u12]","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /[\\u12]/u: Invalid Unicode escape"}}
+{"test":"RegExp","fn":"match","args":["\\u{1F600}","😀","u"],"out":["😀"]}
+{"test":"RegExp","fn":"match","args":["\\u{110000}","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\u{110000}/u: Invalid Unicode escape"}}
+{"test":"RegExp","fn":"match","args":["\\u{}","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\u{}/u: Invalid Unicode escape"}}
+{"test":"RegExp","fn":"match","args":["\\u{1F600","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\u{1F600/u: Invalid Unicode escape"}}
+{"test":"RegExp","fn":"match","args":["\\u{0}","\u0000","u"],"out":["\u0000"]}
+{"test":"RegExp","fn":"match","args":["\\1","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\1/u: Invalid escape"}}
+{"test":"RegExp","fn":"match","args":["\\8","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\8/u: Invalid escape"}}
+{"test":"RegExp","fn":"match","args":["\\9","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\9/u: Invalid escape"}}
+{"test":"RegExp","fn":"match","args":["(a)\\1","aa","u"],"out":["aa","a"]}
+{"test":"RegExp","fn":"match","args":["(a)\\2","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(a)\\2/u: Invalid escape"}}
+{"test":"RegExp","fn":"match","args":["\\0","\u0000","u"],"out":["\u0000"]}
+{"test":"RegExp","fn":"match","args":["\\00","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\00/u: Invalid decimal escape"}}
+{"test":"RegExp","fn":"match","args":["\\07","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\07/u: Invalid decimal escape"}}
+{"test":"RegExp","fn":"match","args":["[\\0]","\u0000","u"],"out":["\u0000"]}
+{"test":"RegExp","fn":"match","args":["[\\00]","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /[\\00]/u: Invalid decimal escape"}}
+{"test":"RegExp","fn":"match","args":["[\\1]","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /[\\1]/u: Invalid decimal escape"}}
+{"test":"RegExp","fn":"match","args":["[\\8]","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /[\\8]/u: Invalid escape"}}
+{"test":"RegExp","fn":"match","args":["{","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /{/u: Lone quantifier brackets"}}
+{"test":"RegExp","fn":"match","args":["}","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /}/u: Lone quantifier brackets"}}
+{"test":"RegExp","fn":"match","args":["]","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /]/u: Lone quantifier brackets"}}
+{"test":"RegExp","fn":"match","args":["a{1","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /a{1/u: Incomplete quantifier"}}
+{"test":"RegExp","fn":"match","args":["a{,2}","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /a{,2}/u: Incomplete quantifier"}}
+{"test":"RegExp","fn":"match","args":["a{","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /a{/u: Incomplete quantifier"}}
+{"test":"RegExp","fn":"match","args":["a{1,","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /a{1,/u: Incomplete quantifier"}}
+{"test":"RegExp","fn":"match","args":["a{1,2","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /a{1,2/u: Incomplete quantifier"}}
+{"test":"RegExp","fn":"match","args":["{1}","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /{1}/u: Nothing to repeat"}}
+{"test":"RegExp","fn":"match","args":["x{1}","xx","u"],"out":["x"]}
+{"test":"RegExp","fn":"match","args":["a{2,1}","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /a{2,1}/u: numbers out of order in {} quantifier"}}
+{"test":"RegExp","fn":"match","args":["*","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /*/u: Nothing to repeat"}}
+{"test":"RegExp","fn":"match","args":["a|*","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /a|*/u: Nothing to repeat"}}
+{"test":"RegExp","fn":"match","args":["^*","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /^*/u: Nothing to repeat"}}
+{"test":"RegExp","fn":"match","args":["$*","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /$*/u: Nothing to repeat"}}
+{"test":"RegExp","fn":"match","args":["\\b*","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\b*/u: Nothing to repeat"}}
+{"test":"RegExp","fn":"match","args":["\\b+","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\b+/u: Nothing to repeat"}}
+{"test":"RegExp","fn":"match","args":["(*)","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(*)/u: Nothing to repeat"}}
+{"test":"RegExp","fn":"match","args":["a**","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /a**/u: Nothing to repeat"}}
+{"test":"RegExp","fn":"match","args":["(?=a)*","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?=a)*/u: Invalid quantifier"}}
+{"test":"RegExp","fn":"match","args":["(?!a)?","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?!a)?/u: Invalid quantifier"}}
+{"test":"RegExp","fn":"match","args":["(?<=a)*","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?<=a)*/u: Invalid quantifier"}}
+{"test":"RegExp","fn":"match","args":["(?<!a)?","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?<!a)?/u: Invalid quantifier"}}
+{"test":"RegExp","fn":"match","args":["[\\d-z]","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /[\\d-z]/u: Invalid character class"}}
+{"test":"RegExp","fn":"match","args":["[a-\\d]","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /[a-\\d]/u: Invalid character class"}}
+{"test":"RegExp","fn":"match","args":["[\\p{L}-z]","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /[\\p{L}-z]/u: Invalid character class"}}
+{"test":"RegExp","fn":"match","args":["[\\w-]","-","u"],"out":["-"]}
+{"test":"RegExp","fn":"match","args":["[-\\w]","w","u"],"out":["w"]}
+{"test":"RegExp","fn":"match","args":["[a-]","-","u"],"out":["-"]}
+{"test":"RegExp","fn":"match","args":["[b-a]","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /[b-a]/u: Range out of order in character class"}}
+{"test":"RegExp","fn":"match","args":["[","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /[/u: Unterminated character class"}}
+{"test":"RegExp","fn":"match","args":["[a","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /[a/u: Unterminated character class"}}
+{"test":"RegExp","fn":"match","args":["[\\]","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /[\\]/u: Unterminated character class"}}
+{"test":"RegExp","fn":"match","args":["a)","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /a)/u: Unmatched ')'"}}
+{"test":"RegExp","fn":"match","args":["(a","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(a/u: Unterminated group"}}
+{"test":"RegExp","fn":"match","args":["(?:a","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?:a/u: Unterminated group"}}
+{"test":"RegExp","fn":"match","args":["(?<n>a","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?<n>a/u: Unterminated group"}}
+{"test":"RegExp","fn":"match","args":["(?=a","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?=a/u: Unterminated group"}}
+{"test":"RegExp","fn":"match","args":["\\","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\/u: \\ at end of pattern"}}
+{"test":"RegExp","fn":"match","args":["\\k<n>","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\k<n>/u: Invalid named capture referenced"}}
+{"test":"RegExp","fn":"match","args":["\\k","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\k/u: Invalid named reference"}}
+{"test":"RegExp","fn":"match","args":["(?<n>a)\\k<n>","aa","u"],"out":["aa","a"]}
+{"test":"RegExp","fn":"match","args":["(?x)","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?x)/u: Invalid group"}}
+{"test":"RegExp","fn":"match","args":["(?<a>x)|(?<a>y)","y","u"],"out":["y",{"$":"undefined"},"y"]}
+{"test":"RegExp","fn":"match","args":["\\p{L}","é","u"],"out":["é"]}
+{"test":"RegExp","fn":"match","args":["\\P{L}","a1","u"],"out":["1"]}
+{"test":"RegExp","fn":"match","args":["\\p{Lu}","aB","u"],"out":["B"]}
+{"test":"RegExp","fn":"match","args":["\\p{gc=Lu}","aB","u"],"out":["B"]}
+{"test":"RegExp","fn":"match","args":["\\p{General_Category=Lu}","aB","u"],"out":["B"]}
+{"test":"RegExp","fn":"match","args":["\\p{Lu}*","AB","u"],"out":["AB"]}
+{"test":"RegExp","fn":"match","args":["\\p{Letter}","a","u"],"out":["a"]}
+{"test":"RegExp","fn":"match","args":["\\p{Script=Greek}","a","u"],"out":null}
+{"test":"RegExp","fn":"match","args":["\\p{ASCII}","a","u"],"out":["a"]}
+{"test":"RegExp","fn":"match","args":["\\p{Foo}","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\p{Foo}/u: Invalid property name"}}
+{"test":"RegExp","fn":"match","args":["\\p","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\p/u: Invalid property name"}}
+{"test":"RegExp","fn":"match","args":["\\P","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\P/u: Invalid property name"}}
+{"test":"RegExp","fn":"match","args":["\\p{","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\p{/u: Invalid property name"}}
+{"test":"RegExp","fn":"match","args":["\\p{L","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\p{L/u: Invalid property name"}}
+{"test":"RegExp","fn":"match","args":["[\\p]","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /[\\p]/u: Invalid property name in character class"}}
+{"test":"RegExp","fn":"match","args":["[\\p{L}\\p{Nl}]","1Ⅰ","u"],"out":["Ⅰ"]}
+{"test":"RegExp","fn":"match","args":["[^\\p{Z}\\p{C}]"," x","u"],"out":["x"]}
+{"test":"RegExp","fn":"match","args":["[\\x00-\\x7f]","éa","u"],"out":["a"]}
+{"test":"RegExp","fn":"match","args":["[\\t\\r\\n\\v\\f]","a\u000b","u"],"out":["\u000b"]}
+{"test":"RegExp","fn":"match","args":["\\b","a","u"],"out":[""]}
+{"test":"RegExp","fn":"match","args":["[\\b]","\b","u"],"out":["\b"]}
+{"test":"RegExp","fn":"match","args":["\\B","ab","u"],"out":[""]}
+{"test":"RegExp","fn":"match","args":["[\\B]","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /[\\B]/u: Invalid escape"}}
+{"test":"RegExp","fn":"match","args":["[\\c_]","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /[\\c_]/u: Invalid Unicode escape"}}
+{"test":"RegExp","fn":"match","args":["[\\c]","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /[\\c]/u: Invalid Unicode escape"}}
+{"test":"RegExp","fn":"match","args":[".","😀","u"],"out":["😀"]}
+{"test":"RegExp","fn":"match","args":["^.$","😀","u"],"out":["😀"]}
+{"test":"RegExp","fn":"match","args":["^[\\p{L}]$","😀","u"],"out":null}
+{"test":"RegExp","fn":"match","args":["[^/]*?","ab","u"],"out":[""]}
+{"test":"RegExp","fn":"match","args":["(?:a|b)","b","u"],"out":["b"]}
+{"test":"RegExp","fn":"match","args":["\\d\\w\\s","1a ","u"],"out":["1a "]}
+{"test":"RegExp","fn":"match","args":["[\\s]"," ","u"],"out":[" "]}
+{"test":"RegExp","fn":"match","args":["\\a","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\a/u: Invalid escape"}}
+{"test":"RegExp","fn":"match","args":["\\e","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\e/u: Invalid escape"}}
+{"test":"RegExp","fn":"match","args":["\\_","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\_/u: Invalid escape"}}
+{"test":"RegExp","fn":"match","args":["\\$","$","u"],"out":["$"]}
+{"test":"RegExp","fn":"match","args":["\\^","^","u"],"out":["^"]}
+{"test":"RegExp","fn":"match","args":["\\|","|","u"],"out":["|"]}
+{"test":"RegExp","fn":"match","args":["\\(","(","u"],"out":["("]}
+{"test":"RegExp","fn":"match","args":["\\)",")","u"],"out":[")"]}
+{"test":"RegExp","fn":"match","args":["\\[","[","u"],"out":["["]}
+{"test":"RegExp","fn":"match","args":["\\]","]","u"],"out":["]"]}
+{"test":"RegExp","fn":"match","args":["\\}","}","u"],"out":["}"]}
+{"test":"RegExp","fn":"match","args":["\\*","*","u"],"out":["*"]}
+{"test":"RegExp","fn":"match","args":["\\+","+","u"],"out":["+"]}
+{"test":"RegExp","fn":"match","args":["\\?","?","u"],"out":["?"]}
+{"test":"RegExp","fn":"match","args":["\\\\","\\","u"],"out":["\\"]}
+{"test":"RegExp","fn":"match","args":["[\\]]","]","u"],"out":["]"]}
+{"test":"RegExp","fn":"match","args":["[\\[]","[","u"],"out":["["]}
+{"test":"RegExp","fn":"match","args":["[\\\\]","\\","u"],"out":["\\"]}
+{"test":"RegExp","fn":"match","args":["[\\^]","^","u"],"out":["^"]}
+{"test":"RegExp","fn":"match","args":["[\\$]","$","u"],"out":["$"]}
+{"test":"RegExp","fn":"match","args":["[\\/]","/","u"],"out":["/"]}
+{"test":"RegExp","fn":"match","args":["[\\.]",".","u"],"out":["."]}
+{"test":"RegExp","fn":"match","args":["[\\{]","{","u"],"out":["{"]}
+{"test":"RegExp","fn":"match","args":["[\\|]","|","u"],"out":["|"]}
+{"test":"RegExp","fn":"match","args":["[\\-a]","-","u"],"out":["-"]}
+{"test":"RegExp","fn":"match","args":["\\-x","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\-x/u: Invalid escape"}}
+{"test":"RegExp","fn":"match","args":["[\\u{1F600}-\\u{1F602}]","😁","u"],"out":["😁"]}
+{"test":"RegExp","fn":"match","args":["[\\uD83D\\uDE00-\\uD83D\\uDE02]","😁","u"],"out":["😁"]}
+{"test":"RegExp","fn":"match","args":["\\uD83D\\uDE00*","😀😀","u"],"out":["😀😀"]}
+{"test":"RegExp","fn":"match","args":["^(?!\\.)[\\p{L}\\p{Nl}][^/]*?x$","ab😀x","u"],"out":["ab😀x"]}
+{"test":"RegExp","fn":"match","args":["^(?!\\.)[\\p{L}\\p{Nl}][^/]*?\\-x$","ab-x","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /^(?!\\.)[\\p{L}\\p{Nl}][^/]*?\\-x$/u: Invalid escape"}}
+{"test":"RegExp","fn":"match","args":["^(?!\\.)[^/]*?\\.js$","a.js","u"],"out":["a.js"]}
+{"test":"RegExp","fn":"match","args":["^(?!\\.)([\\p{L}]|[^\\p{Z}\\p{C}])$",".","u"],"out":null}
+{"test":"RegExp","fn":"match","args":["{2,1}","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /{2,1}/u: Nothing to repeat"}}
+{"test":"RegExp","fn":"match","args":["(?=a){2,1}","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?=a){2,1}/u: numbers out of order in {} quantifier"}}
+{"test":"RegExp","fn":"match","args":["(?<=a){2,1}","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?<=a){2,1}/u: numbers out of order in {} quantifier"}}
+{"test":"RegExp","fn":"match","args":["(?=a){1}","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?=a){1}/u: Invalid quantifier"}}
+{"test":"RegExp","fn":"match","args":["(?=){","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?=){/u: Incomplete quantifier"}}
+{"test":"RegExp","fn":"match","args":["(?<=){ ","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?<=){ /u: Incomplete quantifier"}}
+{"test":"RegExp","fn":"match","args":["^{2,1}","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /^{2,1}/u: Nothing to repeat"}}
+{"test":"RegExp","fn":"match","args":["({1})","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /({1})/u: Nothing to repeat"}}
+{"test":"RegExp","fn":"match","args":["\\b{1}","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\b{1}/u: Nothing to repeat"}}
+{"test":"RegExp","fn":"match","args":["\\b{1","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\b{1/u: Lone quantifier brackets"}}
+{"test":"RegExp","fn":"match","args":["^{","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /^{/u: Lone quantifier brackets"}}
+{"test":"RegExp","fn":"match","args":["x{1}{2}","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /x{1}{2}/u: Nothing to repeat"}}
+{"test":"RegExp","fn":"match","args":["(?=a)?","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?=a)?/u: Invalid quantifier"}}
+{"test":"RegExp","fn":"match","args":["\\k<n>(","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\k<n>(/u: Unterminated group"}}
+{"test":"RegExp","fn":"match","args":["\\k<n>{","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\k<n>{/u: Incomplete quantifier"}}
+{"test":"RegExp","fn":"match","args":["\\k<n>(?<m>a)","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\k<n>(?<m>a)/u: Invalid named capture referenced"}}
+{"test":"RegExp","fn":"match","args":["(?<m>a)\\k<n>","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?<m>a)\\k<n>/u: Invalid named capture referenced"}}
+{"test":"RegExp","fn":"match","args":["\\k<n>*","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\k<n>*/u: Invalid named capture referenced"}}
+{"test":"RegExp","fn":"match","args":["\\k<1>","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\k<1>/u: Invalid capture group name"}}
+{"test":"RegExp","fn":"match","args":["\\k<n","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\k<n/u: Invalid capture group name"}}
+{"test":"RegExp","fn":"match","args":["\\k<n>)","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\k<n>)/u: Unmatched ')'"}}
+{"test":"RegExp","fn":"match","args":["\\k<n>[","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\k<n>[/u: Unterminated character class"}}
+{"test":"RegExp","fn":"match","args":["(?<a>x)\\k<b>(","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?<a>x)\\k<b>(/u: Unterminated group"}}
+{"test":"RegExp","fn":"match","args":["(?<a>.)\\k<a>","xx","u"],"out":["xx","x"]}
+{"test":"RegExp","fn":"match","args":["(?-i-s:a)","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?-i-s:a)/u: Multiple dashes in flag group"}}
+{"test":"RegExp","fn":"match","args":["(?i-:a)","a","u"],"out":["a"]}
+{"test":"RegExp","fn":"match","args":["(?i","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?i/u: Invalid group"}}
+{"test":"RegExp","fn":"match","args":["(?-)","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?-)/u: Invalid group"}}
+{"test":"RegExp","fn":"match","args":["(?<1a>x)","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?<1a>x)/u: Invalid capture group name"}}
+{"test":"RegExp","fn":"match","args":["(?<a","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?<a/u: Invalid capture group name"}}
+{"test":"RegExp","fn":"match","args":["[\\S]","😀","u"],"out":["😀"]}
+{"test":"RegExp","fn":"match","args":["[\\s\\S]","😀b","u"],"out":["😀"]}
+{"test":"RegExp","fn":"match","args":["[^\\S]","😀","u"],"out":null}
+{"test":"RegExp","fn":"match","args":["\\S","😀","u"],"out":["😀"]}
+{"test":"RegExp","fn":"match","args":["[^\\s]","😀","u"],"out":["😀"]}
+{"test":"RegExp","fn":"match","args":["[\\S\\d]","😀","u"],"out":["😀"]}
+{"test":"RegExp","fn":"match","args":["\\S+","a😀 ","u"],"out":["a😀"]}

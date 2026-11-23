@@ -1457,6 +1457,39 @@ class MavenParserTest implements RewriteTest {
             );
         }
 
+        @DisplayName("a profile deactivated with `-P !id` is inactive even though it activates itself")
+        @Test
+        void deactivatedProfileIsNotActive() {
+            rewriteRun(
+              recipeSpec -> recipeSpec
+                .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext()))
+                .parser(MavenParser.builder().activeProfiles("!active-profile-2")),
+              mavenProject("c",
+                pomXml(
+                  parent
+                )
+              ),
+              pomXml(
+                child, spec -> spec.afterRecipe(pomXml -> {
+                      Map<String, List<ResolvedDependency>> deps =
+                        pomXml.getMarkers()
+                          .findFirst(MavenResolutionResult.class)
+                          .orElseThrow()
+                          .getDependencies()
+                          .get(Scope.Compile)
+                          .stream()
+                          .collect(groupingBy(ResolvedDependency::getArtifactId));
+
+                      assertThat(deps)
+                        .hasEntrySatisfying("slf4j-api", rds -> assertThat(rds)
+                          .singleElement().extracting(ResolvedDependency::getVersion).isEqualTo("2.0.9"))
+                        .doesNotContainKey("commons-io");
+                  }
+                )
+              )
+            );
+        }
+
         @Test
         void settingsActiveProfiles() {
             var mavenCtx = MavenExecutionContextView.view(new InMemoryExecutionContext(t -> {
@@ -1473,6 +1506,7 @@ class MavenParserTest implements RewriteTest {
                 """
             ), mavenCtx);
             mavenCtx.setMavenSettings(settings);
+            MavenCentralMirrorExtension.withMavenCentralMirror(mavenCtx);
 
             rewriteRun(
               recipeSpec -> recipeSpec.executionContext(mavenCtx),
@@ -2779,7 +2813,7 @@ class MavenParserTest implements RewriteTest {
     }
 
     @Test
-    void notInheritedPluginFromParent() {
+    void notInheritedPluginsApplyOnlyToTheDeclaringPom() {
         rewriteRun(
           mavenProject("a",
             pomXml(
@@ -2794,10 +2828,11 @@ class MavenParserTest implements RewriteTest {
                       <artifactId>a</artifactId>
                   </project>
                 """,
-              spec -> spec.afterRecipe(pomXml ->
-                assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom().getPlugins())
-                  .isEmpty()
-              )
+              spec -> spec.afterRecipe(pomXml -> {
+                  ResolvedPom pom = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom();
+                  assertThat(pom.getPlugins()).isEmpty();
+                  assertThat(pom.getPluginManagement()).isEmpty();
+              })
             )
           ),
           mavenProject("b",
@@ -2811,6 +2846,15 @@ class MavenParserTest implements RewriteTest {
                         <packaging>pom</packaging>
 
                         <build>
+                          <pluginManagement>
+                              <plugins>
+                                  <plugin>
+                                      <inherited>false</inherited>
+                                      <artifactId>maven-surefire-plugin</artifactId>
+                                      <version>3.2.5</version>
+                                  </plugin>
+                              </plugins>
+                          </pluginManagement>
                           <plugins>
                               <plugin>
                                   <inherited>false</inherited>
@@ -2823,7 +2867,12 @@ class MavenParserTest implements RewriteTest {
                           </plugins>
                         </build>
                     </project>
-                """
+                """,
+              spec -> spec.afterRecipe(pomXml -> {
+                  ResolvedPom pom = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom();
+                  assertThat(pom.getPlugins()).extracting(Plugin::getArtifactId).containsExactly("maven-compiler-plugin");
+                  assertThat(pom.getPluginManagement()).extracting(Plugin::getArtifactId).containsExactly("maven-surefire-plugin");
+              })
             )
           )
         );
@@ -3259,6 +3308,68 @@ class MavenParserTest implements RewriteTest {
         );
     }
 
+    @Test
+    void runtimeScopedDirectDependencyIsNotOnProvidedClasspath() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <dependencies>
+                  <dependency>
+                    <groupId>com.fasterxml.jackson.core</groupId>
+                    <artifactId>jackson-core</artifactId>
+                    <version>2.15.0</version>
+                    <scope>runtime</scope>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            spec -> spec.afterRecipe(pomXml -> {
+                MavenResolutionResult resolution = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                assertThat(resolution.findDependencies("com.fasterxml.jackson.core", "jackson-core", Scope.Runtime)).isNotEmpty();
+                assertThat(resolution.findDependencies("com.fasterxml.jackson.core", "jackson-core", Scope.Test)).isNotEmpty();
+                assertThat(resolution.findDependencies("com.fasterxml.jackson.core", "jackson-core", Scope.Compile)).isEmpty();
+                assertThat(resolution.findDependencies("com.fasterxml.jackson.core", "jackson-core", Scope.Provided)).isEmpty();
+            })
+          )
+        );
+    }
+
+    @Test
+    void transitiveRuntimeScopedDependencyIsNotOnProvidedClasspath() {
+        // org.openrewrite:rewrite-maven declares com.github.ben-manes.caffeine:caffeine with
+        // <scope>runtime</scope> in its own pom; it should not leak onto the compile-time
+        // "provided" classpath of a project that merely compile-depends on rewrite-maven.
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <dependencies>
+                  <dependency>
+                    <groupId>org.openrewrite</groupId>
+                    <artifactId>rewrite-maven</artifactId>
+                    <version>8.81.0</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            spec -> spec.afterRecipe(pomXml -> {
+                MavenResolutionResult resolution = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                assertThat(resolution.findDependencies("com.github.ben-manes.caffeine", "caffeine", Scope.Runtime)).isNotEmpty();
+                assertThat(resolution.findDependencies("com.github.ben-manes.caffeine", "caffeine", Scope.Provided)).isEmpty();
+            })
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/4093")
     @Test
     void circularImportDependency() {
@@ -3500,7 +3611,7 @@ class MavenParserTest implements RewriteTest {
                 spec -> spec.afterRecipe(pomXml -> {
                     ResolvedPom pom = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom();
                     assertThat(pom.getVersion()).isEqualTo("1.2.3");
-                    assertThat(pom.getRequestedDependencies().get(0).getVersion()).isEqualTo("${project.version}");
+                    assertThat(pom.getRequestedDependencies().getFirst().getVersion()).isEqualTo("${project.version}");
                     assertThat(pom.getValue("${project.version}")).isEqualTo("1.2.3");
                 })
               )
@@ -3676,7 +3787,7 @@ class MavenParserTest implements RewriteTest {
           // Suppress test framework's usual error handler because we expect an error resolving coherence
           spec -> spec.executionContext(new InMemoryExecutionContext(throwable -> {
             }))
-            .typeValidationOptions(TypeValidation.none()),
+            .typeValidationOptions(TypeValidation.all().dependencyModel(false)),
           mavenProject("a",
             pomXml("""
                 <project>
@@ -3736,7 +3847,7 @@ class MavenParserTest implements RewriteTest {
           // Suppress test framework's usual error handler because we expect an error resolving coherence
           spec -> spec.executionContext(new InMemoryExecutionContext(throwable -> {
             }))
-            .typeValidationOptions(TypeValidation.none()),
+            .typeValidationOptions(TypeValidation.all().dependencyModel(false)),
           mavenProject("x",
             pomXml("""
                 <project>
@@ -3832,6 +3943,30 @@ class MavenParserTest implements RewriteTest {
                 </dependencies>
               </project>
               """
+          )
+        );
+    }
+
+    @Test
+    void projectPropertyTakesPrecedenceOverJvmDefinedProperty() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>app</artifactId>
+                <version>1.0-SNAPSHOT</version>
+                <properties>
+                  <java.version>11</java.version>
+                </properties>
+              </project>
+              """,
+            spec -> spec.afterRecipe(p -> {
+                  var pom = p.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom();
+                  assertThat(pom.getValue("${java.version}")).isEqualTo("11");
+                  assertThat(pom.getValue("${java.home}")).isEqualTo(System.getProperty("java.home"));
+              }
+            )
           )
         );
     }

@@ -18,8 +18,11 @@ package org.openrewrite.xml.format;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.xml.XmlIsoVisitor;
+import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Misc;
 import org.openrewrite.xml.tree.Xml;
+
+import java.util.List;
 
 public class LineBreaksVisitor<P> extends XmlIsoVisitor<P> {
     @Nullable
@@ -35,8 +38,23 @@ public class LineBreaksVisitor<P> extends XmlIsoVisitor<P> {
 
     @Override
     public Xml.Comment visitComment(Xml.Comment comment, P p) {
+        if (isTrailingComment(comment)) {
+            return super.visitComment(comment, p);
+        }
         return keepMaximumLines(minimumLines(super.visitComment(comment, p),
                 isFirstMisc(comment) ? 0 : 1), 2);
+    }
+
+    private boolean isTrailingComment(Xml.Comment comment) {
+        if (comment.getPrefix().contains("\n")) {
+            return false;
+        }
+        Object parent = getCursor().getParentTreeCursor().getValue();
+        if (!(parent instanceof Xml.Tag)) {
+            return false;
+        }
+        List<? extends Content> content = ((Xml.Tag) parent).getContent();
+        return content != null && !content.isEmpty() && content.get(0) != comment;
     }
 
     @Override

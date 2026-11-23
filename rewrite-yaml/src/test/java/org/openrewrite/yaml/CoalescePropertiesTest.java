@@ -376,4 +376,90 @@ class CoalescePropertiesTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void coalescesMappingSiblingOfBlockScalar() {
+        rewriteRun(
+          yaml(
+            """
+              outer:
+                inner:
+                  java_opts: >-
+                    -Da=1
+                    -Db=2
+                  after: tail
+              """,
+            """
+              outer.inner:
+                java_opts: >-
+                  -Da=1
+                  -Db=2
+                after: tail
+              """
+          )
+        );
+    }
+
+    @Test
+    void coalescesLoneBlockScalar() {
+        rewriteRun(
+          yaml(
+            """
+              outer:
+                inner: |
+                  line one
+                  line two
+              """,
+            """
+              outer.inner: |
+                line one
+                line two
+              """
+          )
+        );
+    }
+
+    @Test
+    void coalescesDeeplyNestedBlockScalar() {
+        rewriteRun(
+          yaml(
+            """
+              outer:
+                inner:
+                  details:
+                    script: |
+                      echo hello
+              """,
+            """
+              outer.inner.details.script: |
+                echo hello
+              """
+          )
+        );
+    }
+
+    @Test
+    void coalescesBlockScalarPreservingCrlfBodyLineEndings() {
+        rewriteRun(
+          yaml(
+            "outer:\r\n  inner: |\r\n    line one\r\n    line two\r\n",
+            "outer.inner: |\r\n  line one\r\n  line two\r\n"
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9511")
+    @Test
+    void aliasOfBlockMappingAnchor() {
+        rewriteRun(
+          yaml(
+            """
+              base: &base
+                a: 1
+              job:
+                vars: *base
+              """
+          )
+        );
+    }
 }

@@ -20,8 +20,8 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.scala.Assertions.scala;
 
-public class MemberReferenceTest implements RewriteTest {
-    
+class MemberReferenceTest implements RewriteTest {
+
     @Test
     void simpleMemberReference() {
         rewriteRun(
@@ -36,7 +36,7 @@ public class MemberReferenceTest implements RewriteTest {
             )
         );
     }
-    
+
     @Test
     void memberReferenceOnObject() {
         rewriteRun(
@@ -50,7 +50,20 @@ public class MemberReferenceTest implements RewriteTest {
             )
         );
     }
-    
+
+    @Test
+    void memberReferenceAfterMethodInvocationWithoutWhitespaceBeforeUnderscore() {
+        rewriteRun(
+            scala(
+                """
+                class Test {
+                  def events = find()_
+                }
+                """
+            )
+        );
+    }
+
     @Test
     void staticMemberReference() {
         rewriteRun(
@@ -67,7 +80,7 @@ public class MemberReferenceTest implements RewriteTest {
             )
         );
     }
-    
+
     @Test
     void memberReferenceAsArgument() {
         rewriteRun(
@@ -83,7 +96,7 @@ public class MemberReferenceTest implements RewriteTest {
             )
         );
     }
-    
+
     @Test
     void constructorReference() {
         rewriteRun(
@@ -98,7 +111,7 @@ public class MemberReferenceTest implements RewriteTest {
             )
         );
     }
-    
+
     @Test
     void partiallyAppliedFunction() {
         rewriteRun(
@@ -113,7 +126,7 @@ public class MemberReferenceTest implements RewriteTest {
             )
         );
     }
-    
+
     @Test
     void memberReferenceWithTypeParameters() {
         rewriteRun(
@@ -128,7 +141,7 @@ public class MemberReferenceTest implements RewriteTest {
             )
         );
     }
-    
+
     @Test
     void memberReferenceInHigherOrderFunction() {
         rewriteRun(

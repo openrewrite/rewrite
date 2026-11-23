@@ -14,7 +14,7 @@
 
 """Tests for placeholder replacement visitor."""
 
-from uuid import uuid4
+from rewrite import random_id
 
 from rewrite.java import tree as j
 from rewrite.java.support_types import JLeftPadded, Space
@@ -26,7 +26,7 @@ from rewrite.python.template.replacement import PlaceholderReplacementVisitor
 
 
 def _ident(name):
-    return j.Identifier(uuid4(), Space.EMPTY, Markers.EMPTY, [], name, None, None)
+    return j.Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], name, None, None)
 
 
 class TestPlaceholderReplacement:
@@ -147,7 +147,7 @@ class TestMethodInvocationReplacement:
 def _make_binary(left, op, right):
     """Helper to construct a j.Binary node."""
     return j.Binary(
-        uuid4(), Space.EMPTY, Markers.EMPTY,
+        random_id(), Space.EMPTY, Markers.EMPTY,
         left,
         JLeftPadded(Space([], ' '), op, Markers.EMPTY),
         right,
@@ -158,7 +158,7 @@ def _make_binary(left, op, right):
 def _make_py_binary(left, op, right):
     """Helper to construct a py.Binary node."""
     return py.Binary(
-        uuid4(), Space.EMPTY, Markers.EMPTY,
+        random_id(), Space.EMPTY, Markers.EMPTY,
         left,
         JLeftPadded(Space([], ' '), op, Markers.EMPTY),
         None,   # negation
@@ -192,22 +192,6 @@ class TestAutoParenthesization:
         inner = result.right.tree
         assert isinstance(inner, j.Binary)
         assert inner.operator == j.Binary.Type.Or
-
-    def test_and_operand_in_and_no_parens(self):
-        """{a} and {b} with b=(x and y) should NOT add parens (same precedence)."""
-        tree = TemplateEngine.get_template_tree(
-            "{a} and {b}", {'a': capture('a'), 'b': capture('b')}
-        )
-        and_expr = _make_binary(_ident('x'), j.Binary.Type.And, _ident('y'))
-        visitor = PlaceholderReplacementVisitor({
-            'a': _ident('a'),
-            'b': and_expr,
-        })
-        result = visitor.visit(tree, None)
-
-        assert isinstance(result, j.Binary)
-        # Right operand should NOT be wrapped (same precedence)
-        assert isinstance(result.right, j.Binary)
 
     def test_or_operand_in_left_of_and_gets_parens(self):
         """{a} and {b} with a=(p or q) should produce (p or q) and b."""
@@ -362,7 +346,7 @@ class TestBlockStatementPlaceholder:
             "if True:\n    {body}", {'body': capture('body')}
         )
         return_stmt = j.Return(
-            uuid4(), Space([], '    '), Markers.EMPTY, _ident('result')
+            random_id(), Space([], '    '), Markers.EMPTY, _ident('result')
         )
         visitor = PlaceholderReplacementVisitor({'body': return_stmt})
         result = visitor.visit(tree, None)

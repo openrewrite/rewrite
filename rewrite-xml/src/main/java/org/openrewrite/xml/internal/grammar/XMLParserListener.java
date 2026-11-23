@@ -143,6 +143,16 @@ public interface XMLParserListener extends ParseTreeListener {
 	 */
 	void exitElement(XMLParser.ElementContext ctx);
 	/**
+	 * Enter a parse tree produced by {@link XMLParser#voidClose}.
+	 * @param ctx the parse tree
+	 */
+	void enterVoidClose(XMLParser.VoidCloseContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link XMLParser#voidClose}.
+	 * @param ctx the parse tree
+	 */
+	void exitVoidClose(XMLParser.VoidCloseContext ctx);
+	/**
 	 * Enter a parse tree produced by {@link XMLParser#jspdirective}.
 	 * @param ctx the parse tree
 	 */

@@ -22,6 +22,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.*;
+import org.openrewrite.semver.ExactVersion;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.ChangeTagValueVisitor;
@@ -133,14 +134,88 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
         return new MavenIsoVisitor<ExecutionContext>() {
             @Nullable
             final VersionComparator versionComparator = newVersion != null ? Semver.validate(newVersion, versionPattern).getValue() : null;
-            @Nullable
-            private Collection<String> availableVersions;
+            private final Map<String, List<String>> availableVersionsByArtifact = new HashMap<>();
             private Set<String> safeVersionPlaceholdersToChange = new HashSet<>();
+            // The resolved version of each entry this pass changed, by tag id, and the ids of those it renamed.
+            private Map<UUID, @Nullable String> changedVersions = new HashMap<>();
+            private Set<UUID> renamed = new HashSet<>();
 
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
                 safeVersionPlaceholdersToChange = getSafeVersionPlaceholdersToChange(oldGroupId, oldArtifactId, ctx);
-                return super.visitDocument(document, ctx);
+                changedVersions = new HashMap<>();
+                renamed = new HashSet<>();
+                Xml.Document d = super.visitDocument(document, ctx);
+                if (changedVersions.isEmpty()) {
+                    return d;
+                }
+                // Removed before the model update and the redundant-version pass run, so that neither sees two
+                // managed entries for the same coordinates.
+                for (Xml.Tag superseded : supersededEntries(d)) {
+                    d = (Xml.Document) new RemoveContentVisitor<>(superseded, true, true).visitNonNull(d, ctx);
+                }
+                return d;
+            }
+
+            /**
+             * The entries to remove so that each management key this pass changed has one entry per
+             * dependencyManagement block, or none when an entry managed elsewhere replaces them all. The one kept is the
+             * entry already at those coordinates, or else the first, unless another one replaces it by version.
+             */
+            private List<Xml.Tag> supersededEntries(Xml.Document document) {
+                List<Xml.Tag> blocks = new ArrayList<>();
+                document.getRoot().getChild("dependencyManagement").flatMap(dm -> dm.getChild("dependencies")).ifPresent(blocks::add);
+                document.getRoot().getChild("profiles").ifPresent(profiles -> {
+                    for (Xml.Tag profile : profiles.getChildren("profile")) {
+                        profile.getChild("dependencyManagement").flatMap(dm -> dm.getChild("dependencies")).ifPresent(blocks::add);
+                    }
+                });
+                ResolvedPom pom = getResolutionResult().getPom();
+                List<Xml.Tag> superseded = new ArrayList<>();
+                for (Xml.Tag block : blocks) {
+                    Map<GroupArtifactClassifierType, List<Xml.Tag>> byKey = new LinkedHashMap<>();
+                    List<Xml.Tag> dependencies = block.getChildren("dependency");
+                    if (dependencies.stream().noneMatch(d -> changedVersions.containsKey(d.getId()))) {
+                        continue;
+                    }
+                    for (Xml.Tag dependency : dependencies) {
+                        byKey.computeIfAbsent(managementKey(pom, dependency), k -> new ArrayList<>()).add(dependency);
+                    }
+                    for (Map.Entry<GroupArtifactClassifierType, List<Xml.Tag>> group : byKey.entrySet()) {
+                        List<Xml.Tag> entries = group.getValue();
+                        if (entries.stream().noneMatch(e -> changedVersions.containsKey(e.getId()))) {
+                            continue;
+                        }
+                        Xml.Tag kept = entries.stream().filter(e -> !renamed.contains(e.getId())).findFirst().orElse(null);
+                        if (kept == null) {
+                            // Any entry left in this block overrides the one managed elsewhere, so that entry replaces
+                            // the renamed ones only if it can replace each of them. Otherwise one it cannot replace is kept.
+                            kept = entries.stream().filter(e -> !checkIfNewDependencyPresent(
+                                    group.getKey().getGroupId(), group.getKey().getArtifactId(), newVersion, e)).findFirst().orElse(null);
+                            if (kept == null) {
+                                superseded.addAll(entries);
+                                continue;
+                            }
+                        }
+                        for (Xml.Tag entry : entries) {
+                            if (entry != kept && replacesKept(version(pom, entry), version(pom, kept))) {
+                                kept = entry;
+                            }
+                        }
+                        for (Xml.Tag entry : entries) {
+                            if (entry != kept) {
+                                superseded.add(entry);
+                            }
+                        }
+                    }
+                }
+                return superseded;
+            }
+
+            private @Nullable String version(ResolvedPom pom, Xml.Tag entry) {
+                String changedVersion = changedVersions.get(entry.getId());
+                return changedVersion != null || renamed.contains(entry.getId()) ? changedVersion :
+                        pom.getValue(entry.getChildValue("version").orElse(null));
             }
 
             @Override
@@ -160,20 +235,16 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                     if (newArtifactId != null) {
                         t = (Xml.Tag) new ChangeTagValueVisitor<>(t.getChild("artifactId").orElse(null), newArtifactId).visitNonNull(t, ctx);
                     }
+                    String renamedVersion = null;
+                    ResolvedPom pom = getResolutionResult().getPom();
+                    String changedGroupId = pom.getValue(t.getChildValue("groupId").orElse(newGroupId != null ? newGroupId : oldGroupId));
+                    String changedArtifactId = pom.getValue(t.getChildValue("artifactId").orElse(newArtifactId != null ? newArtifactId : oldArtifactId));
                     if (newVersion != null) {
                         try {
                             Optional<Xml.Tag> versionTag = t.getChild("version");
                             if (versionTag.isPresent()) {
-                                ResolvedPom pom = getResolutionResult().getPom();
-                                String resolvedGroupId = t.getChildValue("groupId").orElse(newGroupId != null ? newGroupId : oldGroupId);
-                                String resolvedArtifactId = t.getChildValue("artifactId").orElse(newArtifactId != null ? newArtifactId : oldArtifactId);
-                                if (resolvedArtifactId.contains("${")) {
-                                    resolvedArtifactId = ResolvedPom.placeholderHelper.replacePlaceholders(resolvedArtifactId, pom.getProperties()::get);
-                                }
-                                if (resolvedGroupId.contains("${")) {
-                                    resolvedGroupId = ResolvedPom.placeholderHelper.replacePlaceholders(resolvedGroupId, pom.getProperties()::get);
-                                }
-                                String resolvedNewVersion = resolveSemverVersion(ctx, resolvedGroupId, resolvedArtifactId, pom.getValue(versionTag.get().getValue().orElse(null)));
+                                String resolvedNewVersion = resolveSemverVersion(ctx, changedGroupId, changedArtifactId, pom.getValue(versionTag.get().getValue().orElse(null)));
+                                renamedVersion = resolvedNewVersion;
                                 String versionTagValue = t.getChildValue("version").orElse(null);
                                 if (versionTagValue == null || !safeVersionPlaceholdersToChange.contains(versionTagValue)) {
                                     t = (Xml.Tag) new ChangeTagValueVisitor<>(versionTag.get(), resolvedNewVersion).visitNonNull(t, ctx);
@@ -190,28 +261,74 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                     }
                     if (t != tag) {
                         maybeUpdateModel();
-                        doAfterVisit(new RemoveRedundantDependencyVersions(null, null, null, null).getVisitor());
-                        String effectiveGroupId = newGroupId != null ? newGroupId : tag.getChildValue("groupId").orElse(null);
-                        String effectiveArtifactId = newArtifactId != null ? newArtifactId : tag.getChildValue("artifactId").orElse(null);
-                        if (checkIfNewDependencyPresent(effectiveGroupId, effectiveArtifactId, newVersion)) {
-                            doAfterVisit(new RemoveContentVisitor<>(t, true, true));
-                            maybeUpdateModel();
+                        doAfterVisit(isManagedDependencyImportTag(oldGroupId, oldArtifactId) ?
+                                RemoveRedundantDependencyVersions.versionsManagedByBom(changedGroupId, changedArtifactId, null) :
+                                new RemoveRedundantDependencyVersions(changedGroupId, changedArtifactId, null, null).getVisitor());
+                        changedVersions.put(t.getId(), renamedVersion);
+                        if (!managementKey(pom, t).equals(managementKey(pom, tag))) {
+                            renamed.add(t.getId());
                         }
                     }
                 }
                 return t;
             }
 
-            private boolean checkIfNewDependencyPresent(@Nullable String groupId, @Nullable String artifactId, @Nullable String version) {
-                if ((groupId == null) || (artifactId == null)) {
+            private GroupArtifactClassifierType managementKey(ResolvedPom pom, Xml.Tag dependency) {
+                return new GroupArtifactClassifierType(
+                        pom.getValue(dependency.getChildValue("groupId").orElse(null)),
+                        pom.getValue(dependency.getChildValue("artifactId").orElse(null)),
+                        pom.getValue(dependency.getChildValue("classifier").orElse(null)),
+                        pom.getValue(dependency.getChildValue("type").orElse("jar")));
+            }
+
+            /**
+             * An entry replaces the kept one only when its version is exact and the kept one has no version or a lower
+             * exact one. An exact new version counts even when it is not published. A selector that matched nothing
+             * published keeps the kept entry, as does a kept version that is a range or placeholder.
+             *
+             * @param version the resolved new version of an entry this pass changed, or else the entry's own version.
+             *                Null when that version is unknown, as for a renamed entry when the recipe has no new version.
+             */
+            private boolean replacesKept(@Nullable String version, @Nullable String keptVersion) {
+                if (!isExact(version)) {
                     return false;
                 }
-                ResolvedManagedDependency managedDependency = findManagedDependency(groupId, artifactId);
-                if (managedDependency != null) {
-                    return compareVersions(version, managedDependency.getVersion());
-                } else {
+                return keptVersion == null ||
+                       isExact(keptVersion) &&
+                       new Version(version).compareTo(new Version(keptVersion)) > 0;
+            }
+
+            private boolean isExact(@Nullable String version) {
+                if (version == null || version.contains("${")) {
                     return false;
                 }
+                Validated<VersionComparator> comparator = Semver.validate(version, null);
+                return comparator.isValid() && comparator.getValue() instanceof ExactVersion;
+            }
+
+            private boolean checkIfNewDependencyPresent(@Nullable String groupId, @Nullable String artifactId, @Nullable String version, Xml.Tag changed) {
+                if (groupId == null || artifactId == null) {
+                    return false;
+                }
+                ResolvedPom pom = getResolutionResult().getPom();
+                ResolvedManagedDependency existing = pom.getManagedDependency(groupId, artifactId,
+                        pom.getValue(changed.getChildValue("type").orElse(null)),
+                        pom.getValue(changed.getChildValue("classifier").orElse(null)));
+                if (existing == null) {
+                    return false;
+                }
+                // Subject to compareVersions below, an entry in this pom's top-level dependencyManagement replaces
+                // the renamed one whatever else the renamed one declares, since a pom must not manage the same
+                // coordinates twice. Any other existing entry replaces it only if both declare the same scope and
+                // the renamed one declares no tags beyond groupId, artifactId, version, type, classifier and scope.
+                if (!pom.getRequested().getDependencyManagement().contains(existing.getRequested())) {
+                    String scope = pom.getValue(changed.getChildValue("scope").orElse(null));
+                    if (!RemoveRedundantDependencyVersions.declaresOnlyCoordinatesVersionAndScope(changed) ||
+                        (scope == null ? null : Scope.fromName(scope)) != existing.getScope()) {
+                        return false;
+                    }
+                }
+                return compareVersions(version, existing.getVersion());
             }
 
             private Set<String> getSafeVersionPlaceholdersToChange(String groupId, String artifactId, ExecutionContext ctx) {
@@ -234,7 +351,7 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                     return true;
                 }
                 if ((versionComparator != null) && (foundVersion != null)) {
-                    return versionComparator.isValid(targetVersion, foundVersion);
+                    return versionComparator.isValid(foundVersion, foundVersion);
                 } else {
                     return targetVersion.equals(foundVersion);
                 }
@@ -246,15 +363,18 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                     return newVersion;
                 }
                 String finalCurrentVersion = currentVersion != null ? currentVersion : newVersion;
-                if (availableVersions == null) {
-                    availableVersions = new ArrayList<>();
+                String key = groupId + ':' + artifactId;
+                List<String> versions = availableVersionsByArtifact.get(key);
+                if (versions == null) {
                     MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx));
-                    for (String v : mavenMetadata.getVersioning().getVersions()) {
-                        if (versionComparator.isValid(finalCurrentVersion, v)) {
-                            availableVersions.add(v);
-                        }
+                    versions = mavenMetadata.getVersioning().getVersions();
+                    availableVersionsByArtifact.put(key, versions);
+                }
+                List<String> availableVersions = new ArrayList<>();
+                for (String v : versions) {
+                    if (versionComparator.isValid(finalCurrentVersion, v)) {
+                        availableVersions.add(v);
                     }
-
                 }
                 return availableVersions.isEmpty() ? newVersion : max(availableVersions, versionComparator);
             }

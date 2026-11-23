@@ -22,6 +22,8 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 
+import java.util.List;
+
 @RequiredArgsConstructor
 class RpcVisitor extends TreeVisitor<Tree, ExecutionContext> {
     private final RewriteRpc rpc;
@@ -29,7 +31,13 @@ class RpcVisitor extends TreeVisitor<Tree, ExecutionContext> {
 
     @Override
     public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
-        return rpc.getLanguages().contains(sourceFile.getClass().getName());
+        List<String> languages = rpc.getLanguages();
+        for (Class<?> c = sourceFile.getClass(); c != null; c = c.getSuperclass()) {
+            if (languages.contains(c.getName())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override

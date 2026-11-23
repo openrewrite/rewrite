@@ -39,6 +39,7 @@ public class ObjectMappers {
                 .constructorDetector(ConstructorDetector.USE_PROPERTIES_BASED)
                 .build()
                 .registerModule(new ParameterNamesModule())
+                .registerModule(new BackwardCompatibleObjectIdModule())
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
         TypeFactory tf = TypeFactory.defaultInstance().withClassLoader(cl);
         m.setTypeFactory(tf);

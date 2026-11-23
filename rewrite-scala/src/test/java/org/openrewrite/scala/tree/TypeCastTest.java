@@ -135,4 +135,42 @@ class TypeCastTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void chainedAsInstanceOfOnNewLine() {
+        rewriteRun(
+          scala(
+            """
+            val hudiSchemaAsStruct = something.dataType
+              .asInstanceOf[StructType]
+            """
+          )
+        );
+    }
+
+    @Test
+    void castAsFirstOfMultipleArguments() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              def getValue(acc: CountAccumulator): MyPojo = {
+                new MyPojo(acc.f0.asInstanceOf[Int], acc.f0.asInstanceOf[Int])
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void castToFunctionType() {
+        rewriteRun(
+          scala(
+            """
+            val f = x.asInstanceOf[A => B]
+            """
+          )
+        );
+    }
 }

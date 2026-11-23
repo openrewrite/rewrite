@@ -19,6 +19,16 @@ import * as os from 'os';
 import * as crypto from 'crypto';
 import {execSync} from 'child_process';
 
+function isProcessAlive(pid: number): boolean {
+    try {
+        process.kill(pid, 0);
+        return true;
+    } catch (error: any) {
+        // ESRCH: no such process. EPERM: process exists but is owned by another user.
+        return error.code === 'EPERM';
+    }
+}
+
 interface BaseWorkspaceOptions {
     /**
      * Optional target directory. If provided, creates workspace in this directory
@@ -219,6 +229,7 @@ export class DependencyWorkspace {
                     // Write package files
                     writePackageFiles(targetDir);
 
+                    this.markUsed(cachedWorkspaceDir);
                     return targetDir;
                 } catch (symlinkError) {
                     // Symlink failed (e.g., cross-device, permissions) - fall through to npm install
@@ -247,6 +258,7 @@ export class DependencyWorkspace {
         // Check cache
         const cached = this.cache.get(hash);
         if (cached && fs.existsSync(cached) && this.isWorkspaceValid(cached, depsForValidation)) {
+            this.markUsed(cached);
             return cached;
         }
 
@@ -256,6 +268,7 @@ export class DependencyWorkspace {
         // Check if valid workspace already exists on disk (cross-VM reuse)
         if (fs.existsSync(workspaceDir) && this.isWorkspaceValid(workspaceDir, depsForValidation)) {
             this.cache.set(hash, workspaceDir);
+            this.markUsed(workspaceDir);
             return workspaceDir;
         }
 
@@ -381,6 +394,19 @@ export class DependencyWorkspace {
     }
 
     /**
+     * Marks a workspace used now, so that a cleanup ages it from its last use rather than from its install, and never
+     * deletes one a test run or a recipe has just used.
+     */
+    private static markUsed(workspaceDir: string): void {
+        try {
+            const now = new Date();
+            fs.utimesSync(workspaceDir, now, now);
+        } catch {
+            // At worst, a cleanup deletes it once it is a day old, and it is installed again.
+        }
+    }
+
+    /**
      * Checks if a workspace is valid (has node_modules and matching package.json).
      * Handles both real node_modules directories and symlinks to cached workspaces.
      *
@@ -434,6 +460,15 @@ export class DependencyWorkspace {
                         return false;
                     }
                 }
+
+                // And installed: a workspace whose node_modules has lost a package, as a deletion cut short leaves
+                // one, would otherwise be reused without it, and nothing it declares would be type attributed. Its
+                // devDependencies are not asked for, which npm leaves out under NODE_ENV=production.
+                for (const name of Object.keys(packageJsonContent.dependencies ?? {})) {
+                    if (!fs.existsSync(path.join(nodeModules, name, 'package.json'))) {
+                        return false;
+                    }
+                }
             } catch (error) {
                 return false;
             }
@@ -444,11 +479,12 @@ export class DependencyWorkspace {
 
     /**
      * Cleans up old workspace directories.
-     * Removes workspaces older than the specified age.
+     * Removes workspaces unused for longer than the specified age, each moved out of its key's way before it is
+     * deleted, so that a deletion cut short leaves a temporary directory rather than part of a workspace.
      * Also removes all temporary directories (*.tmp-*) regardless of age,
      * as these indicate incomplete/crashed operations.
      *
-     * @param maxAgeMs Maximum age in milliseconds (default: 24 hours)
+     * @param maxAgeMs Maximum age in milliseconds since a workspace was last used (default: 24 hours)
      */
     static cleanupOldWorkspaces(maxAgeMs: number = 24 * 60 * 60 * 1000): void {
         if (!fs.existsSync(this.WORKSPACE_BASE)) {
@@ -465,8 +501,25 @@ export class DependencyWorkspace {
 
             const workspaceDir = path.join(this.WORKSPACE_BASE, entry.name);
 
-            // Always clean up temporary directories (incomplete operations)
-            if (entry.name.includes('.tmp-')) {
+            // Temporary directories are named `<key>.tmp-<pid>-...`. Only reap one
+            // whose owning process is gone — otherwise a shutdown here would delete
+            // another live process's install cwd mid-run (npm then exits 7). Names
+            // without a parseable pid fall back to age-based reaping.
+            const tmpIdx = entry.name.indexOf('.tmp-');
+            if (tmpIdx >= 0) {
+                const ownerPid = parseInt(entry.name.substring(tmpIdx + 5).split('-')[0], 10);
+                if (!isNaN(ownerPid) && isProcessAlive(ownerPid)) {
+                    continue;
+                }
+                if (isNaN(ownerPid)) {
+                    try {
+                        if (now - fs.statSync(workspaceDir).mtimeMs <= maxAgeMs) {
+                            continue;
+                        }
+                    } catch (error) {
+                        // fall through to deletion
+                    }
+                }
                 try {
                     fs.rmSync(workspaceDir, {recursive: true, force: true});
                 } catch (error) {
@@ -481,7 +534,12 @@ export class DependencyWorkspace {
                 const age = now - stats.mtimeMs;
 
                 if (age > maxAgeMs) {
-                    fs.rmSync(workspaceDir, {recursive: true, force: true});
+                    // Out of its key's way in one rename, then deleted: a process looking the workspace up finds it
+                    // whole or not at all. A deletion cut short, as when the RPC server is killed while it shuts
+                    // down, then leaves a temporary directory of a process that has gone, which the next cleanup
+                    // removes, rather than a workspace that has lost part of its node_modules and still looks valid.
+                    const deleting = `${workspaceDir}.tmp-${process.pid}-${Date.now()}-deleting`;
+                    fs.renameSync(workspaceDir, deleting);
                     // Remove from cache
                     for (const [hash, dir] of this.cache.entries()) {
                         if (dir === workspaceDir) {
@@ -489,6 +547,7 @@ export class DependencyWorkspace {
                             break;
                         }
                     }
+                    fs.rmSync(deleting, {recursive: true, force: true});
                 }
             } catch (error) {
                 // Ignore errors, workspace might be in use

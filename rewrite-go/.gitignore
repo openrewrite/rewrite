@@ -1,1 +1,2 @@
-rewrite/test-classpath.txt
+/rpc
+/vendor

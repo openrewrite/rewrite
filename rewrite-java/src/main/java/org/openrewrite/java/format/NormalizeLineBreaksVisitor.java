@@ -18,14 +18,12 @@ package org.openrewrite.java.format;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.ToBeRemoved;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.JavadocVisitor;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.style.NamedStyles;
-import org.openrewrite.style.Style;
 import org.openrewrite.style.StyleHelper;
 
 import java.util.List;
@@ -52,7 +50,7 @@ public class NormalizeLineBreaksVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     public NormalizeLineBreaksVisitor(List<NamedStyles> styles, JavaSourceFile cu, @Nullable Tree stopAfter) {
-        this(getStyle(GeneralFormatStyle.class, styles, () -> autodetectGeneralFormatStyle(cu)), stopAfter);
+        this(StyleHelper.getStyle(GeneralFormatStyle.class, styles, (Supplier<GeneralFormatStyle>) () -> autodetectGeneralFormatStyle(cu)), stopAfter);
     }
 
     public NormalizeLineBreaksVisitor(GeneralFormatStyle style, @Nullable Tree stopAfter) {
@@ -93,14 +91,5 @@ public class NormalizeLineBreaksVisitor<P> extends JavaIsoVisitor<P> {
             return (J) tree;
         }
         return super.visit(tree, p);
-    }
-
-    @ToBeRemoved(after = "2026-03-01", reason = "Replace me with org.openrewrite.style.StyleHelper.getStyle now available in parent runtime")
-    private static <S extends Style> S getStyle(Class<S> styleClass, List<NamedStyles> styles, Supplier<S> defaultStyle) {
-        S style = NamedStyles.merge(styleClass, styles);
-        if (style != null) {
-            return StyleHelper.merge(defaultStyle.get(), style);
-        }
-        return defaultStyle.get();
     }
 }

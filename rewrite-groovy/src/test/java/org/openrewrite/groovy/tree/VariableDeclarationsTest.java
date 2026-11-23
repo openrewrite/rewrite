@@ -31,7 +31,6 @@ import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.groovy.Assertions.groovy;
 
-@SuppressWarnings({"GroovyUnusedAssignment", "DataFlowIssue", "GrUnnecessaryDefModifier"})
 class VariableDeclarationsTest implements RewriteTest {
 
     @Test
@@ -112,6 +111,18 @@ class VariableDeclarationsTest implements RewriteTest {
     }
 
     @Test
+    void diamondOperatorOnUnresolvedImportedType() {
+        rewriteRun(
+          groovy(
+            """
+              import a.b.Foo
+              def x = new Foo<>()
+              """
+          )
+        );
+    }
+
+    @Test
     void singleTypeMultipleVariableDeclaration() {
         rewriteRun(
           groovy("def a = 1, b = 1")
@@ -122,6 +133,20 @@ class VariableDeclarationsTest implements RewriteTest {
     void multipleTypeMultipleVariableDeclaration() {
         rewriteRun(
           groovy("def a = 1, b = 's'")
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/7463")
+    @Test
+    void multipleVariableFieldDeclaration() {
+        rewriteRun(
+          groovy(
+            """
+              class A {
+                  final String first, second
+              }
+              """
+          )
         );
     }
 
@@ -203,6 +228,102 @@ class VariableDeclarationsTest implements RewriteTest {
           groovy(
             """
               def defaultPublicStaticFinal = 0
+              """
+          )
+        );
+    }
+
+    @Test
+    void typeParameterAsLocalVariableType() {
+        rewriteRun(
+          groovy(
+            """
+              class TaskRunner<E> {
+                  void run() {
+                      E task = null
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void typeParameterAsLocalVariableTypeFromMethodCall() {
+        rewriteRun(
+          groovy(
+            """
+              class TaskRunner<E> {
+                  java.util.concurrent.BlockingQueue<E> queue
+                  void run() {
+                      E task = queue.take()
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9869")
+    @Test
+    void aDeclaredTypeWhoseInitializerInfersMoreTypeArguments() {
+        rewriteRun(
+          groovy(
+            """
+              import java.util.concurrent.ConcurrentHashMap
+
+              def m() {
+                Set<Thread> t = ConcurrentHashMap.newKeySet()
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9869")
+    @Test
+    void followedByAClosure() {
+        rewriteRun(
+          groovy(
+            """
+              import java.util.concurrent.ConcurrentHashMap
+
+              def m() {
+                Set<Thread> t = ConcurrentHashMap.newKeySet()
+                foo { R r -> }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9869")
+    @Test
+    void nestedTypeArgumentsBesideIt() {
+        rewriteRun(
+          groovy(
+            """
+              import java.util.concurrent.ConcurrentHashMap
+
+              def m() {
+                Map<String, List<Integer>> t = new HashMap<>()
+                Set<Thread> s = ConcurrentHashMap.newKeySet()
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9869")
+    @Test
+    void ordinaryDeclarations() {
+        rewriteRun(
+          groovy(
+            """
+              def m() {
+                List<String> a = []
+                Map<String, Integer> b = [:]
+              }
               """
           )
         );

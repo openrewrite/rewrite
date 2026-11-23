@@ -19,6 +19,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.java.internal.JavaTypeCache;
+import org.openrewrite.java.internal.JavaTypeFactory;
 
 import java.lang.reflect.Constructor;
 import java.net.URI;
@@ -83,13 +84,13 @@ public class Java21Parser implements JavaParser {
                 Class<?> parserImplementation = Class.forName("org.openrewrite.java.isolated.ReloadableJava21Parser", true, moduleClassLoader);
 
                 Constructor<?> parserConstructor = parserImplementation
-                        .getDeclaredConstructor(Boolean.TYPE, Collection.class, Collection.class, Collection.class, Charset.class,
-                                Collection.class, JavaTypeCache.class);
+                        .getDeclaredConstructor(Boolean.TYPE, Boolean.TYPE, Collection.class, Collection.class, Collection.class, Charset.class,
+                                Collection.class, JavaTypeCache.class, JavaTypeFactory.class);
 
                 parserConstructor.setAccessible(true);
 
                 JavaParser delegate = (JavaParser) parserConstructor
-                        .newInstance(logCompilationWarningsAndErrors, resolvedClasspath(), classBytesClasspath, dependsOn, charset, styles, javaTypeCache);
+                        .newInstance(logCompilationWarningsAndErrors, typeAttribution, resolvedClasspath(), classBytesClasspath, dependsOn, charset, styles, resolvedTypeCache(), resolvedTypeFactory());
 
                 return new Java21Parser(delegate);
             } catch (Exception e) {

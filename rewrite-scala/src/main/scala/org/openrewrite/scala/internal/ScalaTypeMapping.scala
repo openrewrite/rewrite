@@ -15,43 +15,70 @@
  */
 package org.openrewrite.scala.internal
 
-import dotty.tools.dotc.ast.{tpd, Trees}
+import dotty.tools.dotc.ast.{tpd, untpd, Trees}
 import dotty.tools.dotc.core.Constants
+import dotty.tools.dotc.core.NameKinds.DefaultGetterName
+import dotty.tools.dotc.core.Names.Name
+import dotty.tools.dotc.core.StdNames.nme
 import dotty.tools.dotc.core.Contexts.*
 import dotty.tools.dotc.core.Flags
 import dotty.tools.dotc.core.Symbols
 import dotty.tools.dotc.core.Symbols.Symbol
+import dotty.tools.dotc.core.TypeOps
 import dotty.tools.dotc.core.Types.*
 import dotty.tools.dotc.util.Spans
 
-import org.openrewrite.java.internal.JavaTypeCache
+import org.openrewrite.java.internal.JavaTypeFactory
 import org.openrewrite.java.tree.{Flag, JavaType, TypeUtils}
+import org.openrewrite.scala.tree.Union
 
 import java.util
-import java.util.{ArrayList, Collections}
+import java.util.{ArrayList, Collections, IdentityHashMap}
 import scala.collection.mutable
+import scala.jdk.CollectionConverters.*
+import scala.util.control.NonFatal
+
+/**
+ * What a selector of an import or export imports.
+ *
+ * @param symbolType the imported definition: the class for a type or an object, the variable
+ *                   for a value, the method for a method, unknown when it can't be resolved
+ * @param nameType   the type of the imported name, as for a reference to it
+ * @param isImplicit whether the import brings an implicit or given definition into scope
+ */
+final case class Imported(symbolType: JavaType, nameType: JavaType, isImplicit: Boolean)
 
 /**
  * Maps Dotty compiler types to OpenRewrite's JavaType model.
  *
- * Uses two lookup strategies:
+ * Nodes of the untyped tree are first looked up in [[TypedNodes]], which holds the typed tree
+ * the typer produced from each of them. For nodes the typer didn't record, there are two
+ * further lookup strategies:
  * 1. Span-based: maps source position → typed tree node for direct type extraction.
- *    Uses start position as primary key (end positions may differ between untpd/tpd).
+ *    Typed nodes spanning exactly the untpd node's source range are preferred; nodes
+ *    the typer marks synthetic (e.g. the `Apply` of an infix operation) still cover
+ *    the right source range, so they are kept as a lower-priority match.
  * 2. Name-based: maps symbol name → Symbol for fallback when spans don't match.
  *
  * Both maps are built from the typed tree using Dotty's TreeTraverser.
  */
-class ScalaTypeMapping(typeCache: JavaTypeCache, typedTree: tpd.Tree)(using ctx: Context) {
+class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree,
+                       typedNodes: TypedNodes = TypedNodes.empty)(using ctx: Context) {
 
   private val signatureBuilder = new ScalaTypeSignatureBuilder
   private val unknown: JavaType = JavaType.Unknown.getInstance()
 
-  // Span-based lookup: start position → typed tree nodes (multiple nodes may share a start position)
-  // Uses start position only — end positions may differ between untpd and tpd trees
+  // Span-based lookup: start position → typed tree nodes in pre-order (multiple nodes may share a start position)
   private val spanMap: mutable.Map[Int, mutable.ListBuffer[tpd.Tree]] = mutable.Map.empty
 
   // Name-based lookup: symbol name → Symbol (fallback)
   private val symbolsByName: mutable.Map[String, Symbol] = mutable.Map.empty
+
+  // Implicit conversions the typer inserted, by the tree they convert
+  private val conversions = new IdentityHashMap[tpd.Tree, tpd.Apply]()
+
+  // Implicit arguments the typer inserted, by the innermost node of the untyped tree whose typing they are part of
+  private val implicitArguments = new IdentityHashMap[untpd.Tree, ArrayList[tpd.Tree]]()
 
   // Build both maps via a single traversal
   buildMaps()
@@ -59,33 +86,387 @@ class ScalaTypeMapping(typeCache: JavaTypeCache, typedTree: tpd.Tree)(using ctx:
   private def buildMaps(): Unit = {
     try {
       val traverser = new tpd.TreeTraverser {
+        private var owner: untpd.Tree = null
+
         override def traverse(tree: tpd.Tree)(using Context): Unit = {
+          val enclosingOwner = owner
+          typedNodes.ownerOf(tree).foreach(owner = _)
+
           // Index by start position for span lookup
-          if (tree.span.exists && !tree.span.isZeroExtent && !tree.span.isSynthetic) {
+          if (tree.span.exists && !tree.span.isZeroExtent && !tree.isInstanceOf[Trees.InferredTypeTree[?]]) {
             spanMap.getOrElseUpdate(tree.span.start, mutable.ListBuffer.empty) += tree
+          }
+
+          tree match {
+            case app @ Trees.Apply(fn, List(arg)) if isInsertedConversion(app, fn, arg) => conversions.put(arg, app)
+            case _ =>
+          }
+          tree match {
+            case Trees.Apply(fn, args) if owner != null && isInsertedImplicitApplication(fn, args) =>
+              implicitArguments.computeIfAbsent(owner, _ => new ArrayList()).addAll(args.asJava)
+            // The traversal skips the call of an inline method like `summon`, which holds its implicit arguments
+            case Trees.Inlined(Trees.Apply(fn, args), _, _) if owner != null && isInsertedImplicitApplication(fn, args) =>
+              implicitArguments.computeIfAbsent(owner, _ => new ArrayList()).addAll(args.asJava)
+            case _ =>
           }
 
           // Index by name for name-based fallback
           try {
             val sym = tree.symbol
-            if (sym != null && sym.exists && sym.name != null) {
+            if (sym != null && sym.exists && sym.name != null && !isErrorSymbol(sym) && !sym.is(Flags.Package)) {
               val name = sym.name.toString
               if (name.nonEmpty && name != "<none>" && name != "<empty>") {
                 symbolsByName.put(name, sym)
               }
             }
           } catch {
-            case _: Throwable =>
+            case NonFatal(_) =>
           }
 
           traverseChildren(tree)
+          owner = enclosingOwner
         }
       }
       traverser.traverse(typedTree)
     } catch {
-      case _: Throwable => // If traversal fails, maps stay empty; types will be null
+      case NonFatal(_) => // If traversal fails, maps stay empty; types will be null
     }
   }
+
+  /**
+   * The typer inserts a conversion as a call spanning just the converted tree, which
+   * tells it apart from a call of the same method the author wrote.
+   */
+  private def isInsertedConversion(app: tpd.Apply, fn: tpd.Tree, arg: tpd.Tree): Boolean =
+    try {
+      app.span.exists && arg.span.exists &&
+        app.span.start == arg.span.start && app.span.end == arg.span.end && {
+        val sym = fn.symbol
+        sym.exists && sym.is(Flags.Method) && !sym.isConstructor &&
+          (sym.isOneOf(Flags.GivenOrImplicit) || sym.name == nme.apply && sym.owner.derivesFrom(ctx.definitions.ConversionClass))
+      }
+    } catch {
+      case NonFatal(_) => false
+    }
+
+  /**
+   * The typer passes implicit arguments by applying the tree that takes them to arguments it
+   * found by implicit search, which it positions at the end of that tree, not spanning any source.
+   */
+  private def isInsertedImplicitApplication(fn: tpd.Tree, args: List[tpd.Tree]): Boolean =
+    try {
+      args.nonEmpty && args.forall(arg => !arg.span.exists || arg.span.isZeroExtent) && (fn.tpe.widen match {
+        case mt: MethodType => mt.isImplicitMethod
+        case _ => false
+      })
+    } catch {
+      case NonFatal(_) => false
+    }
+
+  // --- Node-based lookup ---
+
+  /** The type of the node as typed on its own, before any adaptation to its context. */
+  def typeOf(tree: untpd.Tree): Option[JavaType] =
+    typedNodes.get(tree).flatMap(node => Option(expressionType(resolved(node))))
+
+  /**
+   * The node typed on its own, with the alternative of an overloaded method it refers to
+   * resolved. The typer picks the alternative while adapting the reference to its context.
+   */
+  private def resolved(node: TypedNode): tpd.Tree = {
+    val own = node.own
+    if ((node.adapted eq own) || !isOverloaded(own)) own
+    else {
+      var found: tpd.Tree = null
+      try {
+        new tpd.TreeTraverser {
+          override def traverse(tree: tpd.Tree)(using Context): Unit =
+            if (found == null) {
+              if (tree.getClass == own.getClass && tree.span == own.span && !isOverloaded(tree)) found = tree
+              else traverseChildren(tree)
+            }
+        }.traverse(node.adapted)
+      } catch {
+        case NonFatal(_) =>
+      }
+      if (found != null) found else own
+    }
+  }
+
+  private def isOverloaded(tree: tpd.Tree): Boolean =
+    try tree.tpe match {
+      case ref: TermRef => ref.denot.isOverloaded
+      case _ => false
+    } catch {
+      case NonFatal(_) => false
+    }
+
+  /**
+   * The method a call, method reference or method definition refers to. A call that doesn't
+   * type-check has none, even if the compiler resolved the name of the method it calls.
+   */
+  def methodTypeOf(tree: untpd.Tree): Option[JavaType.Method] =
+    typedNodes.get(tree).flatMap { node =>
+      if (isIllTypedCall(tree, node)) Some(null)
+      else {
+        val call = resolved(node)
+        calledSymbol(call).filterNot(isErrorSymbol).map(sym => try invokedMethodType(sym, call) catch { case NonFatal(_) => null })
+      }
+    }
+
+  /**
+   * The method a call or reference invokes, with its parameter and result types instantiated
+   * for the type arguments and the prefix of the call, as `immutable.Set[Int]` for `Set(1, 2)`.
+   */
+  private def invokedMethodType(sym: Symbol, call: tpd.Tree): JavaType.Method =
+    instantiatedInfo(sym, call) match {
+      case Some(info) => mapMethodType(sym, info)
+      case None => mapMethodType(sym)
+    }
+
+  private def instantiatedInfo(sym: Symbol, tree: tpd.Tree): Option[Type] = tree match {
+    case Trees.Apply(fn, _) => instantiatedInfo(sym, fn)
+    case Trees.Block(_, expr) => instantiatedInfo(sym, expr)
+    case Trees.Typed(expr, _) => instantiatedInfo(sym, expr)
+    case _: Trees.TypeApply[?] | _: Trees.Select[?] | _: Trees.Ident[?] if tree.symbol == sym =>
+      tree.tpe.widenSingleton match {
+        case info: (MethodType | ExprType) if !info.isError => Some(info)
+        case value: ValueType if !value.isError && isParameterless(sym) => Some(ExprType(value))
+        case _ => None
+      }
+    case _ => None
+  }
+
+  /**
+   * The method a reference calls without an argument list, as `xs.reverse`, `"abc".length` or
+   * `xs.sum` do, with its types instantiated as the typer applied it. Doesn't hold for a method
+   * the typer eta-expanded instead. The method type is null when it can't be mapped.
+   */
+  def argumentlessCallOf(tree: untpd.Tree): Option[JavaType.Method] =
+    typedNodes.get(tree).flatMap { node =>
+      val reference = resolved(node)
+      val sym = try reference.symbol catch { case NonFatal(_) => Symbols.NoSymbol }
+      val isCall = try {
+        sym != null && sym.exists && sym.is(Flags.Method) && !sym.isConstructor && !isErrorSymbol(sym) &&
+          !isClosure(node.adapted) && callableWithoutArguments(sym.info)
+      } catch {
+        case NonFatal(_) => false
+      }
+      if (!isCall) None
+      else Some(try {
+        instantiatedInfo(sym, node.adapted).orElse(instantiatedInfo(sym, reference)) match {
+          case Some(info) => mapMethodType(sym, info)
+          case None => mapMethodType(sym)
+        }
+      } catch {
+        case NonFatal(_) => null
+      })
+    }
+
+  private def callableWithoutArguments(info: Type): Boolean = info.stripPoly match {
+    case mt: MethodType => (mt.paramInfos.isEmpty || mt.isImplicitMethod) && callableWithoutArguments(mt.resultType)
+    case _ => true
+  }
+
+  private def isParameterless(sym: Symbol): Boolean =
+    sym.is(Flags.Method) && !takesParameters(sym.info)
+
+  private def takesParameters(info: Type): Boolean = info.stripPoly.isInstanceOf[MethodType]
+
+  /**
+   * Whether the node refers to a method taking parameters, so that applying it calls the method
+   * rather than the `apply` of its result. This holds even when the application doesn't type-check.
+   */
+  def refersToMethodWithParameters(tree: untpd.Tree): Boolean =
+    typedNodes.get(tree).exists { node =>
+      try node.own.tpe match {
+        case ref: TermRef =>
+          val alternatives = ref.denot.alternatives
+          alternatives.nonEmpty && alternatives.forall(d => d.symbol.is(Flags.Method) && takesParameters(d.info))
+        case _ => false
+      } catch {
+        case NonFatal(_) => false
+      }
+    }
+
+  /** The parameter that the named argument `name` of the call is passed to. */
+  def parameterOf(call: untpd.Tree, name: String): Option[JavaType.Variable] =
+    typedNodes.get(call)
+      .flatMap(node => calledSymbol(application(resolved(node))))
+      .flatMap(method => method.paramSymss.flatten.find(p => p.isTerm && p.name.toString == name))
+      .flatMap(parameter => Option(try mapVariableType(parameter) catch { case NonFatal(_) => null }))
+
+  /** Named arguments passed out of order are lifted into a block that ends with the call itself. */
+  private def application(tree: tpd.Tree): tpd.Tree = tree match {
+    case Trees.Block(_, expr) => application(expr)
+    case Trees.Typed(expr, _) => application(expr)
+    case _ => tree
+  }
+
+  /** The variable a definition or reference refers to, if it refers to a variable. */
+  def variableTypeOf(tree: untpd.Tree): Option[JavaType.Variable] =
+    typedNodes.get(tree).flatMap { node =>
+      val sym = try resolved(node).symbol catch { case NonFatal(_) => null }
+      if (sym == null || !sym.exists) None
+      else Some(if (isField(sym)) try mapVariableType(sym) catch { case NonFatal(_) => null } else null)
+    }
+
+  /** The implicit conversion the typer applied to the node's value, if any. */
+  def implicitConversionOf(tree: untpd.Tree): Option[(JavaType.Method, JavaType)] =
+    typedNodes.get(tree).flatMap { node =>
+      Option(conversions.get(node.adapted)).orElse(Option(conversions.get(node.own)))
+    }.map { conversion =>
+      val sym = conversion.fun.symbol
+      (if (isErrorSymbol(sym)) null else try mapMethodType(sym) catch { case NonFatal(_) => null }, expressionType(conversion))
+    }
+
+  /** The definitions the typer passed as implicit arguments while typing the node, if any. */
+  def implicitArgumentsOf(tree: untpd.Tree): Option[util.List[JavaType]] =
+    Option(implicitArguments.get(tree)).map { args =>
+      val definitions = new ArrayList[JavaType]()
+      args.forEach(arg => implicitDefinition(arg).foreach(definitions.add))
+      definitions
+    }.filterNot(_.isEmpty)
+
+  private def implicitDefinition(arg: tpd.Tree): Option[JavaType] = arg match {
+    case Trees.Typed(expr, _) => implicitDefinition(expr)
+    case Trees.TypeApply(fn, _) => implicitDefinition(fn)
+    case Trees.Apply(fn, _) => implicitDefinition(fn)
+    case Trees.Block(_, expr) => implicitDefinition(expr)
+    case Trees.Inlined(call, _, expansion) => implicitDefinition(if (call.isEmpty) expansion else call)
+    case _ =>
+      try {
+        val sym = arg.symbol
+        if (sym == null || !sym.exists || isErrorSymbol(sym) || sym.name.is(DefaultGetterName)) None
+        else if (isVariable(sym)) Option(mapVariableType(sym))
+        else if (sym.is(Flags.Method)) Option(mapMethodType(sym))
+        else None
+      } catch {
+        case NonFatal(_) => None
+      }
+  }
+
+  /**
+   * What the selector of an import or export imports. A name that is both a type and an
+   * object, such as a class and its companion, is attributed as the type.
+   */
+  def importedOf(tree: untpd.Tree, name: Name): Option[Imported] =
+    typedNodes.get(tree).map(_.own).collect {
+      case imp: Trees.ImportOrExport[?] => imported(imp.expr.asInstanceOf[tpd.Tree], name)
+    }
+
+  /**
+   * Whether an import or export selects term members of a class or object, rather than members of a package
+   * or a value, or a type nested in the class or object.
+   */
+  def selectsMembersOfType(tree: untpd.Tree): Boolean =
+    typedNodes.get(tree).map(_.own).exists {
+      case imp: Trees.ImportOrExport[?] =>
+        try {
+          val qualifier = imp.expr.asInstanceOf[tpd.Tree]
+          val sym = qualifier.symbol
+          sym != null && sym.exists && !isErrorSymbol(sym) && !sym.is(Flags.Package) &&
+            (sym.is(Flags.Module) || sym.isClass) &&
+            imp.selectors.forall(sel => sel.isWildcard || !qualifier.tpe.member(sel.imported.name.toTypeName).exists)
+        } catch {
+          case NonFatal(_) => false
+        }
+      case _ => false
+    }
+
+  private def imported(qualifier: tpd.Tree, name: Name): Imported =
+    try {
+      val prefix = qualifier.tpe
+      if (prefix == null || prefix.isError) return Imported(unknown, unknown, isImplicit = false)
+      val typeSym = prefix.member(name.toTypeName).symbol
+      val terms = prefix.member(name.toTermName).alternatives.map(_.symbol).filter(sym => sym.exists && !isErrorSymbol(sym))
+      val isImplicit = terms.exists(_.isOneOf(Flags.GivenOrImplicit))
+      val value = terms.find(isVariable)
+      if (typeSym.exists && !isErrorSymbol(typeSym)) {
+        val tpe = mapType(typeSym.typeRef)
+        Imported(tpe, tpe, isImplicit)
+      } else value match {
+        case Some(module) if module.is(Flags.Module) =>
+          val tpe = mapType(module.termRef)
+          Imported(tpe, tpe, isImplicit)
+        case Some(field) =>
+          val variable = mapVariableType(field)
+          Imported(variable, variable.getType, isImplicit)
+        case None => terms.find(_.is(Flags.Method)) match {
+          case Some(method) =>
+            val methodType = mapMethodType(method)
+            Imported(methodType, methodType, isImplicit)
+          case None if terms.exists(_.is(Flags.Package)) => Imported(null, null, isImplicit = false)
+          case None => Imported(unknown, unknown, isImplicit = false)
+        }
+      }
+    } catch {
+      case NonFatal(_) => Imported(null, null, isImplicit = false)
+    }
+
+  /** The method and resulting function type, if the typer eta-expanded the method the node refers to. */
+  def etaExpansionOf(tree: untpd.Tree): Option[(JavaType.Method, JavaType)] =
+    typedNodes.get(tree).filter(node => (node.adapted ne node.own) && isClosure(node.adapted)).flatMap { node =>
+      calledSymbol(resolved(node)).filterNot(isErrorSymbol).map { sym =>
+        (try mapMethodType(sym) catch { case NonFatal(_) => null }, expressionType(node.adapted))
+      }
+    }
+
+  private def isClosure(tree: tpd.Tree): Boolean = tree match {
+    case Trees.Block(List(_: Trees.DefDef[?]), _: Trees.Closure[?]) => true
+    case Trees.Block(List(_: Trees.DefDef[?]), Trees.Typed(_: Trees.Closure[?], _)) => true
+    case Trees.Typed(expr, _) => isClosure(expr)
+    case _ => false
+  }
+
+  /**
+   * Whether the call itself fails to type-check: the method can't be resolved or applied,
+   * or an argument doesn't conform to the parameter it is passed to. A call with an argument
+   * that doesn't type-check itself, typically for a missing dependency, can't be judged.
+   */
+  private def isIllTypedCall(tree: untpd.Tree, node: TypedNode): Boolean = {
+    val arguments: List[untpd.Tree] = tree match {
+      case app: untpd.Apply => app.args
+      case infix: untpd.InfixOp => List(infix.right)
+      case _: untpd.TypeApply => Nil
+      case _ => return false
+    }
+    def flatten(arg: untpd.Tree): List[untpd.Tree] = arg match {
+      case Trees.NamedArg(_, value) => flatten(value)
+      case untpd.Parens(inner) => flatten(inner)
+      case untpd.Tuple(elems) => elems.flatMap(flatten)
+      case _ => List(arg)
+    }
+    val typedArguments = arguments.flatMap(flatten).flatMap(typedNodes.get)
+    if (typedArguments.exists(a => isErrorType(a.own))) false
+    else isErrorType(node.own) || typedArguments.exists(a => isErrorType(a.adapted)) ||
+      hasNonConformingTypeArguments(node.own)
+  }
+
+  /**
+   * Whether a type argument of the call is of the wrong kind or out of the bounds of its type
+   * parameter. The typer leaves these checks to a later phase, so they are repeated here.
+   */
+  private def hasNonConformingTypeArguments(call: tpd.Tree): Boolean =
+    typeApplication(application(call)).exists { case Trees.TypeApply(fn, args) =>
+      try fn.tpe.widen match {
+        case poly: PolyType if args.size == poly.paramInfos.size && !args.exists(isErrorType) =>
+          args.lazyZip(poly.paramInfos).exists((arg, bounds) => !bounds.isLambdaSub && !arg.tpe.hasSimpleKind) ||
+            TypeOps.boundsViolations(args, poly.paramInfos, _.substParams(poly, _), NoType).nonEmpty
+        case _ => false
+      } catch {
+        case NonFatal(_) => false
+      }
+    }
+
+  private def typeApplication(tree: tpd.Tree): Option[tpd.TypeApply] = tree match {
+    case ta: Trees.TypeApply[?] => Some(ta.asInstanceOf[tpd.TypeApply])
+    case Trees.Apply(fn, _) => typeApplication(fn)
+    case _ => None
+  }
+
+  private def isErrorType(tree: tpd.Tree): Boolean =
+    try tree.tpe.isError catch { case NonFatal(_) => false }
 
   // --- Public API ---
 
@@ -95,21 +476,65 @@ class ScalaTypeMapping(typeCache: JavaTypeCache, typedTree: tpd.Tree)(using ctx:
    */
   def typeFor(span: Spans.Span): JavaType = {
     if (!span.exists) return null
-    spanMap.get(span.start) match {
-      case Some(trees) =>
-        // Try each node at this position, preferring one with matching end span
-        val exact = trees.find(t => t.span.end == span.end)
-        val tree = exact.getOrElse(trees.last)
-        try {
-          val tpe = tree.tpe
-          if (tpe == null || tpe == NoType) null
-          else mapType(tpe)
-        } catch {
-          case _: Throwable => null
-        }
-      case None => null
-    }
+    val exact = exactlyAt(span).filterNot(t => isLambdaScaffolding(t) || isVarargsScaffolding(t))
+    exact.find(!_.span.isSynthetic).orElse(exact.headOption)
+      .orElse(spanMap.get(span.start).flatMap(_.filterNot(_.span.isSynthetic).lastOption))
+      .map(expressionType)
+      .orNull
   }
+
+  /** Look up the function type of a lambda, whose span the typer shares between the closure and its body. */
+  def closureTypeFor(span: Spans.Span): JavaType = {
+    if (!span.exists) return null
+    exactlyAt(span).collectFirst {
+      case b @ Trees.Block(_, _: Trees.Closure[?]) => b
+      case c: Trees.Closure[?] => c
+    }.map(expressionType).getOrElse(typeFor(span))
+  }
+
+  private def expressionType(tree: tpd.Tree): JavaType =
+    try {
+      val tpe = tree.tpe
+      if (tpe == null || tpe == NoType || isPackage(tree.symbol)) null
+      else mapType(tpe)
+    } catch {
+      case NonFatal(_) => null
+    }
+
+  /** Typed nodes whose span covers exactly the given source range, outermost first. */
+  private def exactlyAt(span: Spans.Span): List[tpd.Tree] =
+    spanMap.get(span.start) match {
+      case Some(trees) => trees.iterator.filter(_.span.end == span.end).toList
+      case None => Nil
+    }
+
+  /** The `Block(DefDef($anonfun), Closure)` encoding of a lambda shares the lambda's span with its body. */
+  private def isLambdaScaffolding(tree: tpd.Tree): Boolean = tree match {
+    case _: Trees.Closure[?] | _: Trees.DefDef[?] => true
+    case Trees.Block(_, _: Trees.Closure[?]) => true
+    case _ => false
+  }
+
+  /** Repeated arguments are wrapped in synthetic `Typed(SeqLiteral(...))` nodes spanning the argument. */
+  private def isVarargsScaffolding(tree: tpd.Tree): Boolean =
+    tree.span.isSynthetic && (tree.isInstanceOf[Trees.Typed[?]] || tree.isInstanceOf[Trees.SeqLiteral[?]])
+
+  private def isPackage(sym: Symbol): Boolean =
+    sym != null && sym.exists && sym.is(Flags.Package)
+
+  /**
+   * Unresolved references are typed with error symbols: synthetic artifacts whose info is an
+   * `ErrorType`, owned by whatever scope the lookup failed in (often the root package).
+   */
+  private def isErrorSymbol(sym: Symbol): Boolean =
+    try {
+      sym.isAllOf(Flags.SyntheticArtifact) && (sym.info match {
+        case TypeAlias(alias) => alias.isError
+        case info => info.isError
+      })
+    } catch {
+      case NonFatal(_) => true
+    }
 
   /** Look up JavaType by identifier name (fallback for when spans don't match). */
   def typeForName(name: String): JavaType = {
@@ -118,88 +543,108 @@ class ScalaTypeMapping(typeCache: JavaTypeCache, typedTree: tpd.Tree)(using ctx:
       case Some(sym) =>
         try {
           val tpe = sym.info
-          if (tpe == null || tpe == NoType) null
-          else mapType(tpe)
+          val mapped = if (tpe == null || tpe == NoType) null else mapType(tpe)
+          if (mapped == null || mapped.isInstanceOf[JavaType.Unknown]) typeForPredefAlias(name)
+          else mapped
         } catch {
-          case _: Throwable => null
+          case NonFatal(_) => typeForPredefAlias(name)
         }
-      case None => null
+      case None => typeForPredefAlias(name)
     }
   }
 
-  /** Look up JavaType.Method by span start position. */
+  private def typeForPredefAlias(name: String): JavaType = name match {
+    case "String" => JavaType.ShallowClass.build("java.lang.String")
+    case "Int" => JavaType.Primitive.Int
+    case "Long" => JavaType.Primitive.Long
+    case "Short" => JavaType.Primitive.Short
+    case "Byte" => JavaType.Primitive.Byte
+    case "Char" => JavaType.Primitive.Char
+    case "Float" => JavaType.Primitive.Float
+    case "Double" => JavaType.Primitive.Double
+    case "Boolean" => JavaType.Primitive.Boolean
+    case "Unit" => JavaType.Primitive.Void
+    case "Any" | "AnyRef" => JavaType.ShallowClass.build("java.lang.Object")
+    case "Null" => JavaType.Primitive.Null
+    case "Nothing" => JavaType.ShallowClass.build("scala.Nothing")
+    case _ => null
+  }
+
+  /** Look up JavaType.Method of the call spanning the given source range. */
   def methodTypeFor(span: Spans.Span): JavaType.Method = {
     if (!span.exists) return null
-    spanMap.get(span.start) match {
-      case Some(trees) =>
-        // Search all nodes at this position for a method
-        // Use index-based loop to avoid NonLocalReturnControl from return-in-foreach
-        var i = 0
-        while (i < trees.size) {
-          val tree = trees(i)
-          try {
-            val sym = tree.symbol
-            if (sym != null && sym.exists && (sym.is(Flags.Method) || sym.isConstructor)) {
-              return mapMethodType(sym)
-            }
-            // For Apply nodes, the method symbol is on the fun subtree
-            tree match {
-              case Trees.Apply(fun, _) =>
-                val funSym = fun.asInstanceOf[tpd.Tree].symbol
-                if (funSym != null && funSym.exists) return mapMethodType(funSym)
-              case Trees.Select(_, _) =>
-                if (sym != null && sym.exists && sym.is(Flags.Method)) return mapMethodType(sym)
-              case _ =>
-            }
-          } catch {
-            case _: scala.runtime.NonLocalReturnControl[?] => throw new RuntimeException("unexpected")
-            case _: Throwable =>
-          }
-          i += 1
-        }
-        null
-      case None => null
+    // Calls in a chain such as `a.b(x).c(y)` all start where `a` does, so only nodes
+    // ending within the requested range may answer; otherwise an inner call would
+    // pick up the method type of an enclosing one.
+    val exact = exactlyAt(span)
+    val candidates =
+      if (exact.nonEmpty) exact
+      else spanMap.get(span.start).map(_.iterator.filter(_.span.end <= span.end).toList).getOrElse(Nil)
+    candidates.iterator.flatMap(call => calledSymbol(call).map(_ -> call)).nextOption() match {
+      case Some((sym, call)) if !isErrorSymbol(sym) =>
+        try invokedMethodType(sym, call) catch { case NonFatal(_) => null }
+      case _ => null
     }
   }
+
+  private def calledSymbol(tree: tpd.Tree): Option[Symbol] =
+    try {
+      val sym = tree.symbol
+      if (sym != null && sym.exists && (sym.is(Flags.Method) || sym.isConstructor)) Some(sym)
+      else tree match {
+        case Trees.Apply(fun, _) =>
+          val funSym = fun.asInstanceOf[tpd.Tree].symbol
+          if (funSym != null && funSym.exists) Some(funSym) else None
+        case _ => None
+      }
+    } catch {
+      case NonFatal(_) => None
+    }
 
   /** Look up JavaType.Method by name (fallback). */
   def methodTypeForName(name: String): JavaType.Method = {
     if (name == null || name.isEmpty) return null
     symbolsByName.get(name) match {
-      case Some(sym) if sym.is(Flags.Method) || sym.isConstructor =>
-        try { mapMethodType(sym) } catch { case _: Throwable => null }
+      case Some(sym) if (sym.is(Flags.Method) || sym.isConstructor) && !isErrorSymbol(sym) =>
+        try { mapMethodType(sym) } catch { case NonFatal(_) => null }
       case _ => null
     }
   }
 
-  /** Look up JavaType.Variable by span start position. */
+  /** Look up JavaType.Variable of the definition or reference spanning exactly the given source range. */
   def variableTypeFor(span: Spans.Span): JavaType.Variable = {
     if (!span.exists) return null
-    spanMap.get(span.start) match {
-      case Some(trees) =>
-        var i = 0
-        while (i < trees.size) {
-          try {
-            val sym = trees(i).symbol
-            if (sym != null && sym.exists && !sym.is(Flags.Method) && !sym.isClass) {
-              return mapVariableType(sym)
-            }
-          } catch {
-            case _: Throwable =>
-          }
-          i += 1
-        }
-        null
-      case None => null
+    val exact = exactlyAt(span)
+    val referenced = exact.filterNot(_.span.isSynthetic) ++ exact.filter(_.span.isSynthetic)
+    referenced.iterator.map(t => try t.symbol catch { case NonFatal(_) => null })
+      .find(sym => sym != null && sym.exists) match {
+      case Some(sym) if isField(sym) =>
+        try mapVariableType(sym) catch { case NonFatal(_) => null }
+      case _ => null
     }
   }
 
-  /** Look up JavaType.Variable by name (fallback). */
-  def variableTypeForName(name: String): JavaType.Variable = {
+  private def isVariable(sym: Symbol): Boolean =
+    sym.isTerm && !sym.is(Flags.Method) && !sym.is(Flags.Package) && !isErrorSymbol(sym)
+
+  /**
+   * An object is referenced by name like a class, and so is the module holding a Java class's statics.
+   * Like `System` in Java's `System.out`, such a name has no field type.
+   */
+  private def isField(sym: Symbol): Boolean = isVariable(sym) && !sym.is(Flags.Module)
+
+  /**
+   * Look up JavaType.Variable by name (fallback), preferring the variable of that name defined where the tree starts:
+   * a pattern binder `v` in `case v: Int` has no typed node of its own span, only the `Bind` that also covers `: Int`.
+   */
+  def variableTypeForName(name: String, span: Spans.Span): JavaType.Variable = {
     if (name == null || name.isEmpty) return null
-    symbolsByName.get(name) match {
-      case Some(sym) if !sym.is(Flags.Method) && !sym.isClass =>
-        try { mapVariableType(sym) } catch { case _: Throwable => null }
+    val definedHere = if (!span.exists) None else spanMap.get(span.start).flatMap(_.iterator
+      .map(t => try t.symbol catch { case NonFatal(_) => null })
+      .find(sym => sym != null && sym.exists && isVariable(sym) && sym.name.toString == name))
+    definedHere.orElse(symbolsByName.get(name)) match {
+      case Some(sym) if !sym.isClass && isField(sym) =>
+        try { mapVariableType(sym) } catch { case NonFatal(_) => null }
       case _ => null
     }
   }
@@ -212,51 +657,75 @@ class ScalaTypeMapping(typeCache: JavaTypeCache, typedTree: tpd.Tree)(using ctx:
       if (sym.exists) mapType(sym.typeRef)
       else null
     } catch {
-      case _: Throwable => null
+      case NonFatal(_) => null
     }
   }
 
   // --- Core type mapping ---
 
-  def mapType(tpe: Type): JavaType = {
-    if (tpe == null || tpe == NoType) return null
+  /** What each type of this file mapped to. Dotty shares one instance among equal types, so most types recur. */
+  private val mappedTypes = new java.util.IdentityHashMap[Type, JavaType]()
 
-    val sig = signatureBuilder.signature(tpe)
-    val existing: JavaType = typeCache.get(sig)
-    if (existing != null) return existing
+  def mapType(tpe: Type): JavaType = {
+    if (tpe == null) return null
+    var mapped = mappedTypes.get(tpe)
+    if (mapped == null) {
+      mapped = mapTypeOnce(tpe)
+      if (mapped != null) mappedTypes.put(tpe, mapped)
+    }
+    mapped
+  }
+
+  private def mapTypeOnce(tpe: Type): JavaType = {
+    if (tpe == NoType || denotesPackage(tpe)) return null
+
+    lazy val sig = signatureBuilder.signature(tpe)
 
     try {
       tpe.dealias match {
         case ct: ConstantType => mapConstantType(ct)
         case tr: TypeRef => mapTypeRef(tr, sig)
-        case tmr: TermRef => mapTermRef(tmr, sig)
+        case tmr: TermRef => mapTermRef(tmr)
+        case tt: ThisType => mapType(tt.tref)
+        case et: ExprType => mapType(et.resultType)
+        case at: AppliedType if at.isRepeatedParam => mapType(at.translateFromRepeated(toArray = false))
         case at: AppliedType => mapAppliedType(at, sig)
         case tp: TypeParamRef => mapGenericTypeVariable(tp, sig)
         case tb: TypeBounds => mapTypeBounds(tb, sig)
         case at: AndType => mapType(at.tp1)
-        case _: OrType => unknown
+        case ot: OrType => mapUnionType(ot, sig)
         case ci: ClassInfo =>
           // Use the class symbol's TypeRef signature to be consistent with TypeRef-based lookups.
           // This prevents creating duplicate JavaType.Class instances for the same type.
-          val rawFqn = ci.cls.fullName.toString
-          val fqn = if (rawFqn.endsWith("$")) rawFqn.dropRight(1) else rawFqn
-          val normalizedFqn = fqn match {
-            case "scala.Any" | "scala.AnyRef" => "java.lang.Object"
-            case other => other
-          }
-          val normalizedSig = normalizedFqn
-          val existingNorm: JavaType = typeCache.get(normalizedSig)
-          if (existingNorm != null && existingNorm.isInstanceOf[JavaType.FullyQualified])
-            existingNorm.asInstanceOf[JavaType.FullyQualified]
-          else
-            mapClassType(ci.cls, normalizedFqn, normalizedSig)
+          mapClassType(ci.cls, signatureBuilder.classFqn(ci.cls))
         case mt: MethodType => mapMethodResultType(mt)
         case pt: PolyType => mapMethodResultType(pt.resultType)
+        // An alias of a type constructor, such as `scala.List` for `[A] =>> immutable.List[A]`, names the
+        // constructor's raw class, which is how Java types the class name of a parameterized type. In
+        // `[F[_], X] =>> F[X]` the constructor is the lambda's own parameter, which names no class.
+        case lambda: HKTypeLambda => lambda.resType match {
+          case at: AppliedType if !at.tycon.isInstanceOf[TypeParamRef] => mapType(at.tycon)
+          case _ => unknown
+        }
         case _ => unknown
       }
     } catch {
-      case _: Throwable => unknown
+      case NonFatal(_) => unknown
     }
+  }
+
+  /** A package is not a type in the Java type model. */
+  private def denotesPackage(tpe: Type): Boolean = tpe match {
+    case _: NamedType | _: ThisType | _: ClassInfo =>
+      try isPackage(tpe.typeSymbol) || isPackage(tpe.termSymbol) catch { case NonFatal(_) => false }
+    case _ => false
+  }
+
+  private def mapUnionType(ot: OrType, sig: String): JavaType = signatureBuilder.unionMembers(ot) match {
+    case Nil => mapType(ctx.definitions.NothingType)
+    case (_, only) :: Nil => mapType(only)
+    case members => typeFactory.computeMultiCatch(sig, (union: Union) =>
+      union.unsafeSet(members.map(m => Option(mapType(m._2)).getOrElse(unknown)).asJava))
   }
 
   /** Map a MethodType to its result type (for expressions that are method calls). */
@@ -277,16 +746,16 @@ class ScalaTypeMapping(typeCache: JavaTypeCache, typedTree: tpd.Tree)(using ctx:
       case Constants.LongTag => JavaType.Primitive.Long
       case Constants.FloatTag => JavaType.Primitive.Float
       case Constants.DoubleTag => JavaType.Primitive.Double
-      case Constants.StringTag => JavaType.ShallowClass.build("java.lang.String")
       case Constants.NullTag => JavaType.Primitive.Null
       case Constants.UnitTag => JavaType.Primitive.Void
       case _ => mapType(ct.underlying)
     }
   }
 
-  private def mapTypeRef(tr: TypeRef, sig: String): JavaType = {
+  private def mapTypeRef(tr: TypeRef, sig: => String): JavaType = {
     val sym = tr.symbol
     if (!sym.exists) return unknown
+    if (sym.isTypeParam) return mapTypeVariable(sym.name.toString, tr.underlying, sig)
 
     val fqn = sym.fullName.toString
 
@@ -300,20 +769,15 @@ class ScalaTypeMapping(typeCache: JavaTypeCache, typedTree: tpd.Tree)(using ctx:
       case "scala.Double" => return JavaType.Primitive.Double
       case "scala.Boolean" => return JavaType.Primitive.Boolean
       case "scala.Unit" => return JavaType.Primitive.Void
+      case "scala.Null" => return JavaType.Primitive.Null
+      case "scala.Matchable" => return mapType(ctx.definitions.ObjectType)
       case _ =>
     }
 
-    // Strip trailing $ from Scala companion object names (e.g., Collections$ → Collections)
-    val baseFqn = if (fqn.endsWith("$")) fqn.dropRight(1) else fqn
-    val javaFqn = baseFqn match {
-      case "scala.Any" | "scala.AnyRef" => "java.lang.Object"
-      case other => other
-    }
-
-    mapClassType(sym, javaFqn, sig)
+    mapClassType(sym, signatureBuilder.classFqn(sym))
   }
 
-  private def mapTermRef(tmr: TermRef, sig: String): JavaType = {
+  private def mapTermRef(tmr: TermRef): JavaType = {
     val sym = tmr.symbol
     if (!sym.exists) return unknown
     val underlying = tmr.underlying
@@ -322,247 +786,272 @@ class ScalaTypeMapping(typeCache: JavaTypeCache, typedTree: tpd.Tree)(using ctx:
   }
 
   private def mapAppliedType(at: AppliedType, sig: String): JavaType = {
-    val pt = new JavaType.Parameterized(null, null, null)
-    typeCache.put(sig, pt)
+    if (at.tycon.typeSymbol == ctx.definitions.ArrayClass) return mapArrayType(at, sig)
 
     val baseType = mapType(at.tycon) match {
-      case fq: JavaType.FullyQualified => fq
       case p: JavaType.Parameterized => p.getType
+      case fq: JavaType.FullyQualified => fq
+      case typeConstructor: JavaType.GenericTypeVariable => return typeConstructor
       case _ => return unknown
     }
 
-    val typeArgs = new ArrayList[JavaType]()
-    at.args.foreach { arg =>
-      val mapped = mapType(arg)
-      typeArgs.add(if (mapped != null) mapped else unknown)
-    }
-
-    pt.unsafeSet(baseType, typeArgs)
+    typeFactory.computeParameterized(sig, (pt: JavaType.Parameterized) => {
+      val typeArgs = new ArrayList[JavaType]()
+      at.args.foreach { arg =>
+        val mapped = mapType(arg)
+        typeArgs.add(if (mapped != null) mapped else unknown)
+      }
+      pt.unsafeSet(baseType, typeArgs)
+    })
   }
 
-  private def mapGenericTypeVariable(tp: TypeParamRef, sig: String): JavaType = {
-    val name = tp.paramName.toString
-    val variance = JavaType.GenericTypeVariable.Variance.INVARIANT
-    val gtv = new JavaType.GenericTypeVariable(null, name, variance, null)
-    typeCache.put(sig, gtv)
+  private def mapArrayType(at: AppliedType, sig: String): JavaType =
+    typeFactory.arrayFor(sig, () => {
+      val elemType = mapType(at.args.head)
+      new JavaType.Array(null, if (elemType != null) elemType else unknown, null)
+    })
 
-    var bounds: ArrayList[JavaType] = null
-    var resolvedVariance = variance
+  private def mapGenericTypeVariable(tp: TypeParamRef, sig: String): JavaType =
+    mapTypeVariable(tp.paramName.toString, tp.underlying, sig)
 
-    tp.underlying match {
-      case tb: TypeBounds =>
-        if (!(tb.hi =:= ctx.definitions.AnyType)) {
-          bounds = new ArrayList[JavaType]()
-          val mapped = mapType(tb.hi)
-          if (mapped != null) bounds.add(mapped)
-          resolvedVariance = JavaType.GenericTypeVariable.Variance.COVARIANT
+  private def mapTypeVariable(name: String, underlying: Type, sig: String): JavaType = {
+    typeFactory.computeGenericTypeVariable(sig, name, JavaType.GenericTypeVariable.Variance.INVARIANT,
+      (gtv: JavaType.GenericTypeVariable) => {
+        var bounds: ArrayList[JavaType] = null
+        var resolvedVariance = JavaType.GenericTypeVariable.Variance.INVARIANT
+
+        underlying match {
+          case tb: TypeBounds =>
+            val hi = signatureBuilder.upperBoundOfKind(tb.hi)
+            if (!signatureBuilder.isAny(hi)) {
+              bounds = new ArrayList[JavaType]()
+              val mapped = mapType(hi)
+              if (mapped != null) bounds.add(mapped)
+              resolvedVariance = JavaType.GenericTypeVariable.Variance.COVARIANT
+            }
+          case _ =>
         }
-      case _ =>
-    }
 
-    gtv.unsafeSet(name, resolvedVariance, bounds)
+        gtv.unsafeSet(name, resolvedVariance, bounds)
+      })
   }
 
   private def mapTypeBounds(tb: TypeBounds, sig: String): JavaType = {
-    val gtv = new JavaType.GenericTypeVariable(null, "?",
-      JavaType.GenericTypeVariable.Variance.INVARIANT, null)
-    typeCache.put(sig, gtv)
+    typeFactory.computeGenericTypeVariable(sig, "?", JavaType.GenericTypeVariable.Variance.INVARIANT,
+      (gtv: JavaType.GenericTypeVariable) => {
+        var bounds: ArrayList[JavaType] = null
+        var variance = JavaType.GenericTypeVariable.Variance.INVARIANT
 
-    var bounds: ArrayList[JavaType] = null
-    var variance = JavaType.GenericTypeVariable.Variance.INVARIANT
+        if (!signatureBuilder.isAny(tb.hi)) {
+          bounds = new ArrayList[JavaType]()
+          bounds.add(mapType(tb.hi))
+          variance = JavaType.GenericTypeVariable.Variance.COVARIANT
+        } else if (!signatureBuilder.isNothing(tb.lo)) {
+          bounds = new ArrayList[JavaType]()
+          bounds.add(mapType(tb.lo))
+          variance = JavaType.GenericTypeVariable.Variance.CONTRAVARIANT
+        }
 
-    if (!(tb.hi =:= ctx.definitions.AnyType)) {
-      bounds = new ArrayList[JavaType]()
-      bounds.add(mapType(tb.hi))
-      variance = JavaType.GenericTypeVariable.Variance.COVARIANT
-    } else if (!(tb.lo =:= ctx.definitions.NothingType)) {
-      bounds = new ArrayList[JavaType]()
-      bounds.add(mapType(tb.lo))
-      variance = JavaType.GenericTypeVariable.Variance.CONTRAVARIANT
-    }
-
-    gtv.unsafeSet("?", variance, bounds)
+        gtv.unsafeSet("?", variance, bounds)
+      })
   }
 
-  def mapClassType(sym: Symbol, fqn: String, sig: String): JavaType.FullyQualified = {
-    val existing: JavaType = typeCache.get(sig)
-    if (existing != null && existing.isInstanceOf[JavaType.FullyQualified])
-      return existing.asInstanceOf[JavaType.FullyQualified]
+  def mapClassType(symbol: Symbol, fqn: String): JavaType.FullyQualified = {
+    // `scala.Any` shares this key but is abstract, so `java.lang.Object` is described by Dotty's `Object`.
+    val isObject = fqn == "java.lang.Object"
+    val sym = if (isObject) ctx.definitions.ObjectClass else javaClassOfStatics(symbol)
+    typeFactory.computeClass(fqn, 0L, JavaType.FullyQualified.Kind.Class, (clazz: JavaType.Class) => {
+      // Only a class the cache lacks pays for its flags and kind. They are set before the members,
+      // which may lead back to this class and read its kind.
+      val kind = if (sym.is(Flags.JavaAnnotation)) JavaType.FullyQualified.Kind.Annotation
+      else if (sym.is(Flags.Trait)) JavaType.FullyQualified.Kind.Interface
+      else if (sym.is(Flags.Enum)) JavaType.FullyQualified.Kind.Enum
+      else JavaType.FullyQualified.Kind.Class
+      clazz.unsafeSet(mapFlags(sym) & Flag.VALID_CLASS_FLAGS, kind, fqn, null, null, null, null, null, null, null)
 
-    // Use ShallowClass for library types to avoid deep recursive type hierarchies
-    // that cause StackOverflowError in recipes like ChangeType.
-    // Source-defined classes (those with a sourceFile) get full population.
-    val isSourceDefined = try {
-      val src = sym.source
-      src != null && src.exists && !sym.is(Flags.JavaDefined) && src.name.endsWith(".scala")
-    } catch {
-      case _: Throwable => false
-    }
-
-    if (!isSourceDefined) {
-      val shallow = JavaType.ShallowClass.build(fqn)
-      typeCache.put(sig, shallow)
-      return shallow
-    }
-
-    val kind = if (sym.is(Flags.Trait)) JavaType.FullyQualified.Kind.Interface
-    else if (sym.is(Flags.Enum)) JavaType.FullyQualified.Kind.Enum
-    else JavaType.FullyQualified.Kind.Class
-
-    val flagsBits = mapFlags(sym)
-
-    val clazz = new JavaType.Class(null, flagsBits, fqn, kind,
-      null, null, null, null, null, null, null)
-    typeCache.put(sig, clazz)
-
-    // For source-defined classes, populate members and methods (but use ShallowClass for supertypes)
-    val supertype: JavaType.FullyQualified = try {
-      val parentTypes = sym.info match {
-        case ci: ClassInfo => ci.parents
-        case _ => Nil
-      }
-      parentTypes.headOption.flatMap { pt =>
-        Option(TypeUtils.asFullyQualified(mapType(pt)))
-      }.orNull
-    } catch {
-      case _: Throwable => null
-    }
-
-    val interfaces: util.List[JavaType.FullyQualified] = try {
-      val parentTypes = sym.info match {
-        case ci: ClassInfo => ci.parents.drop(1)
-        case _ => Nil
-      }
-      if (parentTypes.nonEmpty) {
-        val ifaces = new ArrayList[JavaType.FullyQualified]()
-        parentTypes.foreach { pt =>
-          val mapped = TypeUtils.asFullyQualified(mapType(pt))
-          if (mapped != null) ifaces.add(mapped)
+      val parentTypes = if (isObject) Nil else try {
+        sym.info match {
+          case ci: ClassInfo => ci.parents
+          case _ => Nil
         }
-        ifaces
-      } else null
-    } catch {
-      case _: Throwable => null
-    }
-
-    // Populate methods
-    val methods: util.List[JavaType.Method] = try {
-      val decls = sym.info match {
-        case ci: ClassInfo => ci.decls.toList
-        case _ => Nil
+      } catch {
+        case NonFatal(_) => Nil
       }
-      val methodSyms = decls.filter(s => s.is(Flags.Method) && !s.isConstructor && !s.name.toString.startsWith("$"))
-      if (methodSyms.nonEmpty) {
-        val ms = new ArrayList[JavaType.Method]()
-        methodSyms.foreach { m =>
-          try { ms.add(mapMethodType(m)) } catch { case _: Throwable => }
-        }
-        ms
-      } else null
-    } catch {
-      case _: Throwable => null
-    }
 
-    // Populate fields
-    val members: util.List[JavaType.Variable] = try {
-      val decls = sym.info match {
-        case ci: ClassInfo => ci.decls.toList
-        case _ => Nil
+      val supertype: JavaType.FullyQualified = try {
+        parentTypes.headOption.flatMap(pt => Option(TypeUtils.asFullyQualified(mapType(pt)))).orNull
+      } catch {
+        case NonFatal(_) => null
       }
-      val fieldSyms = decls.filter(s => !s.is(Flags.Method) && !s.isClass && !s.name.toString.startsWith("$"))
-      if (fieldSyms.nonEmpty) {
-        val fs = new ArrayList[JavaType.Variable]()
-        fieldSyms.foreach { f =>
-          try { fs.add(mapVariableType(f)) } catch { case _: Throwable => }
-        }
-        fs
-      } else null
-    } catch {
-      case _: Throwable => null
-    }
 
-    clazz.unsafeSet(null, supertype, null, null, interfaces, members, methods)
+      val interfaces: util.List[JavaType.FullyQualified] = try {
+        val interfaceTypes = parentTypes.drop(1)
+        if (interfaceTypes.nonEmpty) {
+          val ifaces = new ArrayList[JavaType.FullyQualified]()
+          interfaceTypes.foreach { pt =>
+            val mapped = TypeUtils.asFullyQualified(mapType(pt))
+            if (mapped != null) ifaces.add(mapped)
+          }
+          ifaces
+        } else null
+      } catch {
+        case NonFatal(_) => null
+      }
+
+      val decls = try {
+        if (isObject) objectDeclarations else declarationsOf(sym)
+      } catch {
+        case NonFatal(_) => Nil
+      }
+
+      val methods: util.List[JavaType.Method] = try {
+        val methodSyms = decls.filter(s => s.is(Flags.Method) && !s.isConstructor)
+        if (methodSyms.nonEmpty) {
+          val ms = new ArrayList[JavaType.Method]()
+          methodSyms.foreach { m =>
+            try { ms.add(mapMethodType(m)) } catch { case NonFatal(_) => }
+          }
+          ms
+        } else null
+      } catch {
+        case NonFatal(_) => null
+      }
+
+      val members: util.List[JavaType.Variable] = try {
+        val fieldSyms = decls.filter(s => s.isTerm && !s.is(Flags.Method))
+        if (fieldSyms.nonEmpty) {
+          val fs = new ArrayList[JavaType.Variable]()
+          fieldSyms.foreach { f =>
+            try { fs.add(mapVariableType(f)) } catch { case NonFatal(_) => }
+          }
+          fs
+        } else null
+      } catch {
+        case NonFatal(_) => null
+      }
+
+      val typeParameters: util.List[JavaType] = try {
+        val tparams = sym.typeParams
+        if (tparams.nonEmpty) {
+          val tps = new ArrayList[JavaType](tparams.size)
+          tparams.foreach(tp => tps.add(mapType(tp.typeRef)))
+          tps
+        } else null
+      } catch {
+        case NonFatal(_) => null
+      }
+
+      clazz.unsafeSet(typeParameters, supertype, null, null, interfaces, members, methods)
+    })
   }
+
+  private def declarationsOf(cls: Symbol): List[Symbol] = cls.info match {
+    case ci: ClassInfo => ci.decls.toList.filterNot(_.name.toString.startsWith("$"))
+    case _ => Nil
+  }
+
+  /**
+   * `scala.Any` and `java.lang.Object` both map to `java.lang.Object`, which lists the methods its class file declares.
+   * Dotty declares `toString` and `getClass` of those on `Any` and the rest on `Object`. Both declare `equals` and
+   * `hashCode`, and the class lists `Object`'s.
+   */
+  private def objectDeclarations: List[Symbol] = {
+    val classFileMethods =
+      Set("getClass", "hashCode", "equals", "clone", "toString", "notify", "notifyAll", "wait", "finalize")
+    val own = declarationsOf(ctx.definitions.ObjectClass)
+    (own ++ declarationsOf(ctx.definitions.AnyClass).filterNot(m => own.exists(_.name == m.name)))
+      .filter(m => classFileMethods.contains(m.name.toString))
+  }
+
+  /** Java statics live on a module class `X$` that shares its key with the Java class `X`, so `X` describes it. */
+  private def javaClassOfStatics(sym: Symbol): Symbol =
+    if (sym.is(Flags.JavaDefined) && sym.is(Flags.ModuleClass) && sym.companionClass.exists) sym.companionClass
+    else sym
 
   // --- Method and Variable type mapping ---
 
-  def mapMethodType(sym: Symbol): JavaType.Method = {
-    if (sym == null || !sym.exists) return null
+  def mapMethodType(sym: Symbol): JavaType.Method =
+    if (sym == null || !sym.exists) null else mapMethodType(sym, sym.info)
 
-    val sig = signatureBuilder.methodSignature(sym)
-    val existing: JavaType.Method = typeCache.get(sig)
-    if (existing != null) return existing
-
-    val name = if (sym.isConstructor) "<constructor>" else sym.name.toString
-    val flagsBits = mapFlags(sym)
-
-    var paramNames: util.List[String] = null
-    var paramTypes: util.List[JavaType] = null
-
-    sym.info match {
-      case mt: MethodType =>
-        paramNames = new ArrayList[String]()
-        paramTypes = new ArrayList[JavaType]()
-        mt.paramNames.foreach(n => paramNames.add(n.toString))
-        mt.paramInfos.foreach(pt => paramTypes.add(mapType(pt)))
-      case pt: PolyType =>
-        pt.resultType match {
-          case mt: MethodType =>
-            paramNames = new ArrayList[String]()
-            paramTypes = new ArrayList[JavaType]()
-            mt.paramNames.foreach(n => paramNames.add(n.toString))
-            mt.paramInfos.foreach(pt2 => paramTypes.add(mapType(pt2)))
-          case _ =>
+  /** Map the method with the given parameter and result types, as instantiated at a call. */
+  private def mapMethodType(sym: Symbol, info: Type): JavaType.Method = {
+    val sig = signatureBuilder.methodSignature(sym, info)
+    typeFactory.methodFor(sig,
+      () => {
+        val name = if (sym.isConstructor) "<constructor>" else sym.name.toString
+        val paramNames: Array[String] = info.stripPoly match {
+          case mt: MethodType => mt.paramNames.iterator.map(_.toString).toArray
+          case _ => null
         }
-      case _ =>
-    }
+        new JavaType.Method(null, mapFlags(sym), null, name, null, paramNames, null, null, null, null, null)
+      },
+      (method: JavaType.Method) => {
+        val paramTypes: util.List[JavaType] = info.stripPoly match {
+          case mt: MethodType =>
+            val pts = new ArrayList[JavaType]()
+            mt.paramInfos.foreach(pt => pts.add(mapType(signatureBuilder.parameterType(sym, pt))))
+            pts
+          case _ => null
+        }
 
-    val method = new JavaType.Method(
-      null, flagsBits, null, name, null, paramNames, null, null, null, null, null
-    )
-    typeCache.put(sig, method)
+        val declaringType = try {
+          TypeUtils.asFullyQualified(mapType(sym.owner.info))
+        } catch {
+          case NonFatal(_) => null
+        }
+        val returnType = mapType(info.finalResultType)
 
-    val declaringType = try {
-      TypeUtils.asFullyQualified(mapType(sym.owner.info))
-    } catch {
-      case _: Throwable => null
-    }
-    val returnType = mapType(sym.info.finalResultType)
-
-    method.unsafeSet(declaringType, returnType, paramTypes, null, null)
+        method.unsafeSet(declaringType, returnType, paramTypes, null, null)
+      })
   }
 
   def mapVariableType(sym: Symbol): JavaType.Variable = {
     if (sym == null || !sym.exists) return null
 
     val sig = signatureBuilder.variableSignature(sym)
-    val existing: JavaType.Variable = typeCache.get(sig)
-    if (existing != null) return existing
+    typeFactory.variableFor(sig, () => {
+      val variable = new JavaType.Variable(null, mapFlags(sym), sym.name.toString, null, null, null)
+      val ownerType = try { variableOwner(sym) } catch { case NonFatal(_) => unknown }
+      val varType = try { mapType(signatureBuilder.parameterType(sym.owner, sym.info)) } catch { case NonFatal(_) => unknown }
+      variable.unsafeSet(ownerType, varType, null.asInstanceOf[java.util.List[JavaType.FullyQualified]])
+      variable
+    })
+  }
 
-    val flagsBits = mapFlags(sym)
-    val variable = new JavaType.Variable(null, flagsBits, sym.name.toString, null, null, null)
-    typeCache.put(sig, variable)
+  /**
+   * Parameters and locals are owned by their method, as in Java. Lambdas and the
+   * right-hand side of a local `val` introduce owners of their own, which are skipped.
+   * A local of a statement in a class or object body is owned by that body's initializer.
+   */
+  private def variableOwner(sym: Symbol): JavaType = {
+    var owner = sym.owner
+    while (owner.exists && (owner.isAnonymousFunction ||
+      (owner.isTerm && !owner.isLocalDummy && !owner.is(Flags.Method) && !owner.is(Flags.Module)))) {
+      owner = owner.owner
+    }
+    if (owner.is(Flags.Method)) mapMethodType(owner)
+    else if (owner.isLocalDummy) mapInitializerType(TypeUtils.asFullyQualified(mapType(owner.owner.info)))
+    else mapType(owner.info)
+  }
 
-    val ownerType = try { mapType(sym.owner.info) } catch { case _: Throwable => unknown }
-    val varType = try { mapType(sym.info) } catch { case _: Throwable => unknown }
-    val emptyAnnotations: Array[JavaType.FullyQualified] = Array.empty
-    variable.unsafeSet(ownerType, varType, emptyAnnotations)
+  /** Matches the Java parsers' owner for a local of an initializer block: a method with no name, a void return and no parameters. */
+  private def mapInitializerType(fq: JavaType.FullyQualified): JavaType.Method = {
+    val sig = fq.getFullyQualifiedName + "{name=,return=void,parameters=[]}"
+    typeFactory.methodFor(sig,
+      () => new JavaType.Method(null, 0L, fq, "", JavaType.Primitive.Void,
+        null.asInstanceOf[Array[String]], null, null, null, null, null),
+      (_: JavaType.Method) => ())
   }
 
   /** Create a constructor method type for a given class type. */
   def mapConstructorType(fq: JavaType.FullyQualified): JavaType.Method = {
     val sig = fq.getFullyQualifiedName + "{name=<constructor>,return=" + fq.getFullyQualifiedName + ",parameters=[]}"
-    val existing: JavaType.Method = typeCache.get(sig)
-    if (existing != null) return existing
-
-    val paramNames: java.util.List[String] = java.util.Collections.emptyList()
-    val paramTypes: java.util.List[JavaType] = java.util.Collections.emptyList()
-    val method = new JavaType.Method(
-      null, Flag.Public.getBitMask, null, "<constructor>", null,
-      paramNames, null, null, null, null, null
-    )
-    typeCache.put(sig, method)
-    method.unsafeSet(fq, fq, paramTypes, null, null)
+    typeFactory.methodFor(sig,
+      () => new JavaType.Method(null, Flag.Public.getBitMask, null, "<constructor>",
+        null, null.asInstanceOf[Array[String]], null, null, null, null, null),
+      (method: JavaType.Method) => {
+        method.unsafeSet(fq, fq, java.util.Collections.emptyList[JavaType](), null, null)
+      })
   }
 
   // --- Helpers ---
@@ -573,9 +1062,32 @@ class ScalaTypeMapping(typeCache: JavaTypeCache, typedTree: tpd.Tree)(using ctx:
     else if (sym.is(Flags.Protected)) bits |= Flag.Protected.getBitMask
     else bits |= Flag.Public.getBitMask
 
-    if (sym.is(Flags.Abstract)) bits |= Flag.Abstract.getBitMask
+    // javac marks every interface abstract. Dotty marks an abstract class `Abstract` and an abstract member `Deferred`.
+    if (sym.is(Flags.Trait)) bits |= Flag.Interface.getBitMask | Flag.Abstract.getBitMask
+    if (sym.is(Flags.Abstract) || sym.isTerm && sym.is(Flags.Deferred)) bits |= Flag.Abstract.getBitMask
+    if (isInterfaceMethod(sym)) {
+      bits |= Flag.Abstract.getBitMask
+      if (!sym.is(Flags.Deferred)) bits |= Flag.Default.getBitMask
+    }
     if (sym.is(Flags.Final) || sym.is(Flags.Module)) bits |= Flag.Final.getBitMask
     if (sym.isStatic) bits |= Flag.Static.getBitMask
+    if (sym.isTerm && isVarargs(sym.info)) bits |= Flag.Varargs.getBitMask
     bits
+  }
+
+  /**
+   * Scala compiles a non-private trait method to a JVM interface method.
+   * javac marks one abstract, and default too if it has a body.
+   */
+  private def isInterfaceMethod(sym: Symbol): Boolean =
+    sym.is(Flags.Method) && sym.owner.is(Flags.Trait) && !sym.is(Flags.Private)
+
+  /**
+   * Whether this is the type of a method whose last parameter is repeated, or of a repeated parameter.
+   * A method's type gives a repeated parameter as `<repeated>[T]`; the parameter itself is a `Seq[T] @Repeated`.
+   */
+  private def isVarargs(info: Type): Boolean = info.stripPoly match {
+    case mt: MethodType => mt.paramInfos.lastOption.exists(_.isRepeatedParam)
+    case tpe => tpe.isRepeatedParam || tpe.hasAnnotation(ctx.definitions.RepeatedAnnot)
   }
 }

@@ -45,6 +45,7 @@ import static java.util.Collections.emptyList;
 @RequiredArgsConstructor
 public class GradleDependencies implements Trait<J.MethodInvocation> {
     private static final MethodMatcher DEPENDENCY_DSL_MATCHER = new MethodMatcher("org.gradle.api.Project dependencies(..)", true);
+    private static final MethodMatcher KOTLIN_DEPENDENCY_DSL_MATCHER = new MethodMatcher("org.gradle.kotlin.dsl.ProjectExtensionsKt dependencies(..)");
 
     @Getter
     private final Cursor cursor;
@@ -82,7 +83,11 @@ public class GradleDependencies implements Trait<J.MethodInvocation> {
         if (arguments.isEmpty()) {
             return null;
         }
-        Cursor newCursor = new Cursor(this.cursor.getParent(), getTree().withArguments(arguments));
+        J.MethodInvocation newTree = getTree().withArguments(arguments);
+        if (getTree() == newTree) {
+            return this;
+        }
+        Cursor newCursor = new Cursor(this.cursor.getParent(), newTree);
 
         return new GradleDependencies(newCursor);
     }
@@ -122,7 +127,8 @@ public class GradleDependencies implements Trait<J.MethodInvocation> {
                 }
 
                 GradleProject gradleProject = getGradleProject(cursor);
-                if (gradleProject == null && !(DEPENDENCY_DSL_MATCHER.matches(methodInvocation))) {
+                if (gradleProject == null && !DEPENDENCY_DSL_MATCHER.matches(methodInvocation) &&
+                    !KOTLIN_DEPENDENCY_DSL_MATCHER.matches(methodInvocation)) {
                     return null;
                 }
 

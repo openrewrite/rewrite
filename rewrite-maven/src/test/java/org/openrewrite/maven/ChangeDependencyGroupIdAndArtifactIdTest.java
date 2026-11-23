@@ -17,17 +17,19 @@ package org.openrewrite.maven;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.Validated;
 import org.openrewrite.java.ChangePackage;
+import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.marker.JavaSourceSet;
-import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
-import java.util.List;
-import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.*;
@@ -279,7 +281,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/4514")
     @Test
-    void shouldAddNewIfDependencyAlreadyExistsInOlderVersion() {
+    void shouldUpgradeExistingInPlaceIfDependencyAlreadyExistsInOlderVersion() {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
             "javax.activation",
@@ -322,10 +324,377 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                           <artifactId>jakarta.activation-api</artifactId>
                           <version>1.2.2</version>
                       </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-migrate-java/pull/1153")
+    @Test
+    void shouldNotLeaveDuplicateWhenExistingNewDependencyIsAtLowerVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "jakarta.jws",
+            "jakarta.jws-api",
+            "jakarta.xml.ws",
+            "jakarta.xml.ws-api",
+            "4.0.0",
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.example</groupId>
+                  <artifactId>demo</artifactId>
+                  <version>0.0.1-SNAPSHOT</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>jakarta.jws</groupId>
+                          <artifactId>jakarta.jws-api</artifactId>
+                          <version>3.0.0</version>
+                      </dependency>
+                      <dependency>
+                          <groupId>jakarta.xml.ws</groupId>
+                          <artifactId>jakarta.xml.ws-api</artifactId>
+                          <version>3.0.1</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.example</groupId>
+                  <artifactId>demo</artifactId>
+                  <version>0.0.1-SNAPSHOT</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>jakarta.xml.ws</groupId>
+                          <artifactId>jakarta.xml.ws-api</artifactId>
+                          <version>4.0.0</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void shouldNotDeduplicateWhenClassifierDiffers() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "javax.activation",
+            "javax.activation-api",
+            "jakarta.activation",
+            "jakarta.activation-api",
+            "1.2.2",
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>javax.activation</groupId>
+                          <artifactId>javax.activation-api</artifactId>
+                          <version>1.2.0</version>
+                      </dependency>
                       <dependency>
                           <groupId>jakarta.activation</groupId>
                           <artifactId>jakarta.activation-api</artifactId>
                           <version>1.2.1</version>
+                          <classifier>sources</classifier>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>jakarta.activation</groupId>
+                          <artifactId>jakarta.activation-api</artifactId>
+                          <version>1.2.2</version>
+                      </dependency>
+                      <dependency>
+                          <groupId>jakarta.activation</groupId>
+                          <artifactId>jakarta.activation-api</artifactId>
+                          <version>1.2.1</version>
+                          <classifier>sources</classifier>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void shouldDeduplicateWhenOnlyArtifactIdChanges() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "org.junit.jupiter",
+            "junit-jupiter-api",
+            null,
+            "junit-jupiter-engine",
+            "5.9.0",
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.example</groupId>
+                  <artifactId>demo</artifactId>
+                  <version>0.0.1-SNAPSHOT</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.junit.jupiter</groupId>
+                          <artifactId>junit-jupiter-api</artifactId>
+                          <version>5.8.2</version>
+                      </dependency>
+                      <dependency>
+                          <groupId>org.junit.jupiter</groupId>
+                          <artifactId>junit-jupiter-engine</artifactId>
+                          <version>5.8.2</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.example</groupId>
+                  <artifactId>demo</artifactId>
+                  <version>0.0.1-SNAPSHOT</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.junit.jupiter</groupId>
+                          <artifactId>junit-jupiter-engine</artifactId>
+                          <version>5.9.0</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void shouldDeduplicateWhenExistingNewDependencyHasWiderScope() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "jakarta.jws",
+            "jakarta.jws-api",
+            "jakarta.xml.ws",
+            "jakarta.xml.ws-api",
+            "4.0.0",
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.example</groupId>
+                  <artifactId>demo</artifactId>
+                  <version>0.0.1-SNAPSHOT</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>jakarta.xml.ws</groupId>
+                          <artifactId>jakarta.xml.ws-api</artifactId>
+                          <version>3.0.1</version>
+                      </dependency>
+                      <dependency>
+                          <groupId>jakarta.jws</groupId>
+                          <artifactId>jakarta.jws-api</artifactId>
+                          <version>3.0.0</version>
+                          <scope>test</scope>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.example</groupId>
+                  <artifactId>demo</artifactId>
+                  <version>0.0.1-SNAPSHOT</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>jakarta.xml.ws</groupId>
+                          <artifactId>jakarta.xml.ws-api</artifactId>
+                          <version>4.0.0</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void shouldWidenScopeWhenDeduplicatingIntoNarrowerScope() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "jakarta.jws",
+            "jakarta.jws-api",
+            "jakarta.xml.ws",
+            "jakarta.xml.ws-api",
+            "4.0.0",
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.example</groupId>
+                  <artifactId>demo</artifactId>
+                  <version>0.0.1-SNAPSHOT</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>jakarta.xml.ws</groupId>
+                          <artifactId>jakarta.xml.ws-api</artifactId>
+                          <version>3.0.1</version>
+                          <scope>test</scope>
+                      </dependency>
+                      <dependency>
+                          <groupId>jakarta.jws</groupId>
+                          <artifactId>jakarta.jws-api</artifactId>
+                          <version>3.0.0</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.example</groupId>
+                  <artifactId>demo</artifactId>
+                  <version>0.0.1-SNAPSHOT</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>jakarta.xml.ws</groupId>
+                          <artifactId>jakarta.xml.ws-api</artifactId>
+                          <version>4.0.0</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void shouldDeduplicateProvidedAndRuntimeIntoCompile() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "jakarta.jws",
+            "jakarta.jws-api",
+            "jakarta.xml.ws",
+            "jakarta.xml.ws-api",
+            "4.0.0",
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.example</groupId>
+                  <artifactId>demo</artifactId>
+                  <version>0.0.1-SNAPSHOT</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>jakarta.xml.ws</groupId>
+                          <artifactId>jakarta.xml.ws-api</artifactId>
+                          <version>3.0.1</version>
+                          <scope>provided</scope>
+                      </dependency>
+                      <dependency>
+                          <groupId>jakarta.jws</groupId>
+                          <artifactId>jakarta.jws-api</artifactId>
+                          <version>3.0.0</version>
+                          <scope>runtime</scope>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.example</groupId>
+                  <artifactId>demo</artifactId>
+                  <version>0.0.1-SNAPSHOT</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>jakarta.xml.ws</groupId>
+                          <artifactId>jakarta.xml.ws-api</artifactId>
+                          <version>4.0.0</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void shouldKeepWiderScopeWhenDeduplicatingTestIntoProvided() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "jakarta.jws",
+            "jakarta.jws-api",
+            "jakarta.xml.ws",
+            "jakarta.xml.ws-api",
+            "4.0.0",
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.example</groupId>
+                  <artifactId>demo</artifactId>
+                  <version>0.0.1-SNAPSHOT</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>jakarta.xml.ws</groupId>
+                          <artifactId>jakarta.xml.ws-api</artifactId>
+                          <version>3.0.1</version>
+                          <scope>provided</scope>
+                      </dependency>
+                      <dependency>
+                          <groupId>jakarta.jws</groupId>
+                          <artifactId>jakarta.jws-api</artifactId>
+                          <version>3.0.0</version>
+                          <scope>test</scope>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.example</groupId>
+                  <artifactId>demo</artifactId>
+                  <version>0.0.1-SNAPSHOT</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>jakarta.xml.ws</groupId>
+                          <artifactId>jakarta.xml.ws-api</artifactId>
+                          <version>4.0.0</version>
+                          <scope>provided</scope>
                       </dependency>
                   </dependencies>
               </project>
@@ -1502,6 +1871,101 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/8145")
+    @Test
+    void providedDependencyManagedByLocalParentDoesNotGetExplicitVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "javax.servlet", "javax.servlet-api",
+            "jakarta.servlet", "jakarta.servlet-api",
+            "5.0.x", null)),
+          mavenProject("parent",
+            pomXml(
+              """
+                <project>
+                    <groupId>com.example</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1.0-SNAPSHOT</version>
+                    <packaging>pom</packaging>
+                    <modules>
+                        <module>child</module>
+                    </modules>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>javax.servlet</groupId>
+                                <artifactId>javax.servlet-api</artifactId>
+                                <version>4.0.0</version>
+                                <scope>provided</scope>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+                """,
+              """
+                <project>
+                    <groupId>com.example</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1.0-SNAPSHOT</version>
+                    <packaging>pom</packaging>
+                    <modules>
+                        <module>child</module>
+                    </modules>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>jakarta.servlet</groupId>
+                                <artifactId>jakarta.servlet-api</artifactId>
+                                <version>5.0.0</version>
+                                <scope>provided</scope>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+                """
+            ),
+            mavenProject("child",
+              pomXml(
+                """
+                  <project>
+                      <parent>
+                          <groupId>com.example</groupId>
+                          <artifactId>parent</artifactId>
+                          <version>1.0-SNAPSHOT</version>
+                      </parent>
+                      <artifactId>child</artifactId>
+                      <dependencies>
+                          <dependency>
+                              <groupId>javax.servlet</groupId>
+                              <artifactId>javax.servlet-api</artifactId>
+                              <scope>provided</scope>
+                          </dependency>
+                      </dependencies>
+                  </project>
+                  """,
+                """
+                  <project>
+                      <parent>
+                          <groupId>com.example</groupId>
+                          <artifactId>parent</artifactId>
+                          <version>1.0-SNAPSHOT</version>
+                      </parent>
+                      <artifactId>child</artifactId>
+                      <dependencies>
+                          <dependency>
+                              <groupId>jakarta.servlet</groupId>
+                              <artifactId>jakarta.servlet-api</artifactId>
+                              <scope>provided</scope>
+                          </dependency>
+                      </dependencies>
+                  </project>
+                  """
+              )
+            )
+          )
+        );
+    }
+
     @Test
     void latestPatch() {
         rewriteRun(
@@ -1991,6 +2455,142 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
         );
     }
 
+    @Test
+    void leavePluginDependenciesWhenDisabled() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "org.liquibase", "liquibase-core", "org.springframework.boot", "spring-boot-starter-liquibase",
+            "4.0.0", null, null, null, false
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.example</groupId>
+                  <artifactId>example</artifactId>
+                  <version>1.0</version>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.liquibase</groupId>
+                              <artifactId>liquibase-maven-plugin</artifactId>
+                              <version>4.24.0</version>
+                              <dependencies>
+                                  <dependency>
+                                      <groupId>org.liquibase</groupId>
+                                      <artifactId>liquibase-core</artifactId>
+                                      <version>4.24.0</version>
+                                  </dependency>
+                              </dependencies>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeApplicationDependencyButPreserveProfilePluginManagement() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "org.liquibase", "liquibase-core", "org.springframework.boot", "spring-boot-starter-liquibase",
+            "4.0.0", null, null, null, false
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.example</groupId>
+                  <artifactId>example</artifactId>
+                  <version>1.0</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.liquibase</groupId>
+                          <artifactId>liquibase-core</artifactId>
+                          <version>4.24.0</version>
+                      </dependency>
+                  </dependencies>
+                  <profiles>
+                      <profile>
+                          <id>migration</id>
+                          <build>
+                              <pluginManagement>
+                                  <plugins>
+                                      <plugin>
+                                          <groupId>org.liquibase</groupId>
+                                          <artifactId>liquibase-maven-plugin</artifactId>
+                                          <version>4.24.0</version>
+                                          <dependencies>
+                                              <dependency>
+                                                  <groupId>org.liquibase</groupId>
+                                                  <artifactId>liquibase-core</artifactId>
+                                                  <version>4.24.0</version>
+                                                  <exclusions>
+                                                      <exclusion>
+                                                          <groupId>org.liquibase</groupId>
+                                                          <artifactId>liquibase-core</artifactId>
+                                                      </exclusion>
+                                                  </exclusions>
+                                              </dependency>
+                                          </dependencies>
+                                      </plugin>
+                                  </plugins>
+                              </pluginManagement>
+                          </build>
+                      </profile>
+                  </profiles>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.example</groupId>
+                  <artifactId>example</artifactId>
+                  <version>1.0</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.springframework.boot</groupId>
+                          <artifactId>spring-boot-starter-liquibase</artifactId>
+                          <version>4.0.0</version>
+                      </dependency>
+                  </dependencies>
+                  <profiles>
+                      <profile>
+                          <id>migration</id>
+                          <build>
+                              <pluginManagement>
+                                  <plugins>
+                                      <plugin>
+                                          <groupId>org.liquibase</groupId>
+                                          <artifactId>liquibase-maven-plugin</artifactId>
+                                          <version>4.24.0</version>
+                                          <dependencies>
+                                              <dependency>
+                                                  <groupId>org.liquibase</groupId>
+                                                  <artifactId>liquibase-core</artifactId>
+                                                  <version>4.24.0</version>
+                                                  <exclusions>
+                                                      <exclusion>
+                                                          <groupId>org.liquibase</groupId>
+                                                          <artifactId>liquibase-core</artifactId>
+                                                      </exclusion>
+                                                  </exclusions>
+                                              </dependency>
+                                          </dependencies>
+                                      </plugin>
+                                  </plugins>
+                              </pluginManagement>
+                          </build>
+                      </profile>
+                  </profiles>
+              </project>
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/4779")
     @Test
     void changePluginDependencyGroupIdAndArtifactId() {
@@ -2174,6 +2774,89 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"build", "pluginManagement", "profile", "profilePluginManagement", "buildAlias", "profileAlias"})
+    void preserveVersionPropertyUsedByBuildPlugin(String location) {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "org.liquibase", "liquibase-core", "org.springframework.boot",
+            "spring-boot-starter-liquibase", "4.0.0", null)),
+          pomXml(
+            pluginVersionPropertyLocation("""
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <properties>
+                      <liquibase.version>3.9.0</liquibase.version>
+                  </properties>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.liquibase</groupId>
+                          <artifactId>liquibase-core</artifactId>
+                          <version>${liquibase.version}</version>
+                      </dependency>
+                  </dependencies>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.liquibase</groupId>
+                              <artifactId>liquibase-maven-plugin</artifactId>
+                              <version>${liquibase.version}</version>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """, location),
+            pluginVersionPropertyLocation("""
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <properties>
+                      <liquibase.version>3.9.0</liquibase.version>
+                  </properties>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.springframework.boot</groupId>
+                          <artifactId>spring-boot-starter-liquibase</artifactId>
+                          <version>4.0.0</version>
+                      </dependency>
+                  </dependencies>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.liquibase</groupId>
+                              <artifactId>liquibase-maven-plugin</artifactId>
+                              <version>${liquibase.version}</version>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """, location)
+          )
+        );
+    }
+
+    private static String pluginVersionPropertyLocation(String pom, String location) {
+        if (location.equals("pluginManagement") || location.equals("profilePluginManagement")) {
+            pom = pom.replace("<plugins>", "<pluginManagement><plugins>")
+              .replace("</plugins>", "</plugins></pluginManagement>");
+        }
+        if (location.endsWith("Alias")) {
+            pom = pom.replace("</liquibase.version>", "</liquibase.version><plugin.version>${liquibase.version}</plugin.version>")
+              .replace("<artifactId>liquibase-maven-plugin</artifactId>\n                <version>${liquibase.version}</version>",
+                "<artifactId>liquibase-maven-plugin</artifactId>\n                <version>${plugin.version}</version>");
+        }
+        if (location.equals("profile") || location.equals("profilePluginManagement") || location.equals("profileAlias")) {
+            pom = pom.replace("<build>", "<profiles><profile><id>migration</id><build>")
+              .replace("</build>", "</build></profile></profiles>");
+        }
+        return pom;
     }
 
     @Test
@@ -3545,9 +4228,9 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
         );
     }
 
-    @Disabled("JavaSourceSetUpdater JAR download is currently disabled; classpath is no longer mutated mid-run")
     @Test
-    void updatesJavaSourceSetMarkerOnJavaFiles() {
+    void marksProjectDirtyAfterChangingDependencyCoordinates() {
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
             "javax.activation",
@@ -3558,27 +4241,10 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
             null,
             false,
             false
-          )),
+          )).executionContext(ctx),
           mavenProject("project",
             srcMainJava(
-              java(
-                "class A {}",
-                "class A {}",
-                s -> s.afterRecipe(cu -> {
-                    JavaSourceSet jss = cu.getMarkers().findFirst(JavaSourceSet.class).orElseThrow();
-                    Map<String, List<JavaType.FullyQualified>> gavToTypes = jss.getGavToTypes();
-                    // Old dependency types should be removed
-                    assertThat(gavToTypes.keySet())
-                      .noneMatch(k -> k.startsWith("javax.activation:javax.activation-api:"));
-                    // New dependency types should be present
-                    assertThat(gavToTypes.keySet())
-                      .anyMatch(k -> k.startsWith("jakarta.activation:jakarta.activation-api:"));
-                    // Classpath should contain types from the new dependency
-                    assertThat(jss.getClasspath())
-                      .extracting(JavaType.FullyQualified::getFullyQualifiedName)
-                      .anyMatch(fqn -> fqn.startsWith("jakarta.activation."));
-                })
-              )
+              java("class A {}")
             ),
             pomXml(
               """
@@ -3614,118 +4280,18 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
             )
           )
         );
+
+        Set<String> dirty = JavaSourceSet.dirtyProjects(ctx);
+        assertThat(dirty)
+            .as("Dependency mutation should mark the project dirty so downstream ambiguity-sensitive recipes take the safe path")
+            .isNotNull()
+            .contains("project");
     }
 
-    @Test
-    void javaSourceSetUnchangedWhenModuleDoesNotHaveDependency() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
-            "javax.activation",
-            "javax.activation-api",
-            "jakarta.activation",
-            "jakarta.activation-api",
-            "2.0.1",
-            null,
-            false,
-            false
-          )),
-          mavenProject("project",
-            srcMainJava(
-              java(
-                "class A {}",
-                s -> s.afterRecipe(cu -> {
-                    JavaSourceSet jss = cu.getMarkers().findFirst(JavaSourceSet.class).orElseThrow();
-                    // Module doesn't have the dependency, so no jakarta types should appear
-                    assertThat(jss.getGavToTypes().keySet())
-                      .noneMatch(k -> k.contains("jakarta.activation"));
-                })
-              )
-            ),
-            pomXml(
-              """
-                <project>
-                    <modelVersion>4.0.0</modelVersion>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <dependencies>
-                        <dependency>
-                            <groupId>com.google.guava</groupId>
-                            <artifactId>guava</artifactId>
-                            <version>29.0-jre</version>
-                        </dependency>
-                    </dependencies>
-                </project>
-                """
-            )
-          )
-        );
-    }
 
-    @Test
-    void javaSourceSetGracefulWhenDownloadFails() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
-            "javax.activation",
-            "javax.activation-api",
-            "com.doesnotexist",
-            "doesnotexist",
-            null,
-            null,
-            false,
-            false
-          )),
-          mavenProject("project",
-            srcMainJava(
-              java(
-                "class A {}",
-                s -> s.afterRecipe(cu -> {
-                    // Should not throw even though the new dependency JAR can't be downloaded
-                    JavaSourceSet jss = cu.getMarkers().findFirst(JavaSourceSet.class).orElseThrow();
-                    assertThat(jss).isNotNull();
-                })
-              )
-            ),
-            pomXml(
-              """
-                <project>
-                    <modelVersion>4.0.0</modelVersion>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <dependencies>
-                        <dependency>
-                            <groupId>javax.activation</groupId>
-                            <artifactId>javax.activation-api</artifactId>
-                            <version>1.2.0</version>
-                        </dependency>
-                    </dependencies>
-                </project>
-                """,
-              """
-                <project>
-                    <modelVersion>4.0.0</modelVersion>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <dependencies>
-                        <!--~~(Unable to download POM: com.doesnotexist:doesnotexist:1.2.0. Tried repositories:
-                https://repo.maven.apache.org/maven2: HTTP 404)~~>--><dependency>
-                            <groupId>com.doesnotexist</groupId>
-                            <artifactId>doesnotexist</artifactId>
-                            <version>1.2.0</version>
-                        </dependency>
-                    </dependencies>
-                </project>
-                """
-            )
-          )
-        );
-    }
-
-    @Disabled("JavaSourceSetUpdater JAR download is currently disabled; classpath is no longer mutated mid-run")
     @Test
     void composedWithChangePackageUpdatesImports() {
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
         rewriteRun(
           spec -> spec.recipes(
             new ChangeDependencyGroupIdAndArtifactId(
@@ -3739,7 +4305,17 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
               false
             ),
             new ChangePackage("javax.activation", "jakarta.activation", true)
-          ),
+          ).executionContext(ctx)
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+              """
+                package javax.activation;
+                public class DataHandler {}
+                """,
+              """
+                package javax.activation;
+                public class MimeType {}
+                """
+            )),
           mavenProject("project",
             srcMainJava(
               java(
@@ -3760,14 +4336,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                       DataHandler handler;
                       MimeType type;
                   }
-                  """,
-                s -> s.afterRecipe(cu -> {
-                    JavaSourceSet jss = cu.getMarkers().findFirst(JavaSourceSet.class).orElseThrow();
-                    // New dependency types should be present on classpath
-                    assertThat(jss.getClasspath())
-                      .extracting(JavaType.FullyQualified::getFullyQualifiedName)
-                      .anyMatch(fqn -> fqn.startsWith("jakarta.activation."));
-                })
+                  """
               )
             ),
             pomXml(
@@ -3804,6 +4373,12 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
             )
           )
         );
+
+        Set<String> dirty = JavaSourceSet.dirtyProjects(ctx);
+        assertThat(dirty)
+            .as("Composed run should leave the project marked dirty for any downstream ambiguity-sensitive recipe")
+            .isNotNull()
+            .contains("project");
     }
 
     @Test
@@ -3814,7 +4389,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
             "junit",
             "org.junit.jupiter",
             "junit-jupiter",
-            "5.x",
+            "5.14.3",
             null,
             false,
             false
@@ -3836,18 +4411,62 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   </dependencies>
               </project>
               """,
+            spec -> spec.after(actual -> assertThat(actual)
+              .containsPattern("<groupId>org\\.junit\\.jupiter</groupId>\\s*<artifactId>junit-jupiter</artifactId>\\s*<version>5\\.\\d+(\\.\\d+)?</version>")
+              .doesNotContain("<groupId>junit</groupId>")
+              .actual())
+          )
+        );
+    }
+
+    @Test
+    void globSkipsDependenciesWhoseNewCoordinatesDoNotResolve() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "org.hibernate",
+            "hibernate-*",
+            "org.hibernate.orm",
+            null,
+            "6.0.x",
+            null
+          )),
+          pomXml(
             """
               <project>
                   <modelVersion>4.0.0</modelVersion>
-                  <groupId>com.example</groupId>
+                  <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
-                  <version>1.0.0</version>
+                  <version>1</version>
                   <dependencies>
                       <dependency>
-                          <groupId>org.junit.jupiter</groupId>
-                          <artifactId>junit-jupiter</artifactId>
-                          <version>5.14.3</version>
-                          <scope>test</scope>
+                          <groupId>org.hibernate</groupId>
+                          <artifactId>hibernate-core</artifactId>
+                          <version>5.6.15.Final</version>
+                      </dependency>
+                      <dependency>
+                          <groupId>org.hibernate</groupId>
+                          <artifactId>hibernate-search-orm</artifactId>
+                          <version>5.11.12.Final</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.hibernate.orm</groupId>
+                          <artifactId>hibernate-core</artifactId>
+                          <version>6.0.2.Final</version>
+                      </dependency>
+                      <dependency>
+                          <groupId>org.hibernate</groupId>
+                          <artifactId>hibernate-search-orm</artifactId>
+                          <version>5.11.12.Final</version>
                       </dependency>
                   </dependencies>
               </project>
@@ -3856,4 +4475,62 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
         );
     }
 
+    @Test
+    void globSkipsDependencyWithParentVersionPropertyWhoseNewCoordinatesDoNotResolve() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "org.hibernate",
+            "hibernate-*",
+            "org.hibernate.orm",
+            null,
+            "6.0.x",
+            null
+          )),
+          mavenProject("project",
+            //language=xml
+            pomXml(
+              """
+                <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>parent-project</artifactId>
+                  <version>1</version>
+                  <properties>
+                    <search.version>5.11.12.Final</search.version>
+                  </properties>
+                  <modules>
+                    <module>sub-project</module>
+                  </modules>
+                </project>
+                """,
+              spec -> spec.path("pom.xml")
+            ),
+            mavenProject("sub-project",
+              //language=xml
+              pomXml(
+                """
+                  <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>sub-project</artifactId>
+                    <version>1</version>
+                    <parent>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>parent-project</artifactId>
+                      <version>1</version>
+                      <relativePath>../pom.xml</relativePath>
+                    </parent>
+                    <dependencies>
+                      <dependency>
+                        <groupId>org.hibernate</groupId>
+                        <artifactId>hibernate-search-orm</artifactId>
+                        <version>${search.version}</version>
+                      </dependency>
+                    </dependencies>
+                  </project>
+                  """,
+                spec -> spec.path("sub-project/pom.xml")
+              )
+            )
+          )
+        );
+    }
 }

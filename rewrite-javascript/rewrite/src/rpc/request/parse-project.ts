@@ -20,7 +20,8 @@ import {randomId, UUID} from "../../uuid";
 import {SourceFile} from "../../tree";
 import {Parsers} from "../../parser";
 import {withMetrics} from "./metrics";
-import {replaceMarkerByKind} from "../../markers";
+import {Marker, replaceMarkerByKind} from "../../markers";
+import {setLastParsedProject} from "./last-parsed-project";
 
 /**
  * Response item with object ID and source file type for proper deserialization.
@@ -54,7 +55,11 @@ export class ParseProject {
          * If not specified, paths are relative to projectPath.
          * Use this when parsing a subdirectory but wanting paths relative to the repository root.
          */
-        private readonly relativeTo?: string
+        private readonly relativeTo?: string,
+        /**
+         * Parser options, as on the `Parse` request.
+         */
+        private readonly options?: { [key: string]: string }
     ) {}
 
     static handle(
@@ -71,20 +76,20 @@ export class ParseProject {
                     context.target = request.projectPath;
 
                     // Dynamic import to break circular dependency
-                    const {DEFAULT_EXCLUSIONS, ProjectParser} = await import("../../javascript/index.js");
+                    const {ProjectParser} = await import("../../javascript/index.js");
 
                     const projectPath = path.resolve(request.projectPath);
-                    const exclusions = request.exclusions ?? DEFAULT_EXCLUSIONS;
+                    setLastParsedProject(projectPath);
                     // Use relativeTo if specified, otherwise default to projectPath
                     const relativeTo = request.relativeTo ? path.resolve(request.relativeTo) : projectPath;
 
-                    // Use ProjectParser for file discovery and Prettier detection
-                    const projectParser = new ProjectParser(projectPath, {exclusions});
+                    // Undefined when unset, so the parser can match exclusions to its discovery mode.
+                    const projectParser = new ProjectParser(projectPath, {exclusions: request.exclusions});
                     const discovered = await projectParser.discoverFiles();
                     const prettierLoader = await projectParser.createPrettierLoader();
 
                     const resultItems: ParseProjectResponseItem[] = [];
-                    const ctx = new ExecutionContext();
+                    const ctx = new ExecutionContext({...request.options});
 
                     // Parse package.json files (these get NodeResolutionResult markers)
                     if (discovered.packageJsonFiles.length > 0) {
@@ -172,64 +177,65 @@ export class ParseProject {
                             relativeTo
                         });
 
-                        // Check if Prettier is available
-                        const detection = await prettierLoader.detectPrettier();
-
-                        if (detection.available) {
-                            // Prettier is available: add per-file PrettierStyle markers
-                            const generator = parser.parse(...discovered.jsFiles);
-
+                        const prettierMarkers = new Map<string, Marker>();
+                        for (const filePath of discovered.jsFiles) {
+                            const marker = await prettierLoader.getConfigMarker(filePath);
+                            if (marker) {
+                                prettierMarkers.set(filePath, marker);
+                            }
+                        }
+                        const generator = parser.parse(...discovered.jsFiles);
+                        if (prettierMarkers.size === discovered.jsFiles.length) {
                             for (const filePath of discovered.jsFiles) {
+                                const marker = prettierMarkers.get(filePath)!;
                                 const id = randomId();
                                 localObjects.set(id, async (id: string) => {
                                     const sourceFile: SourceFile = (await generator.next()).value;
-                                    // Add PrettierStyle marker if Prettier is available
-                                    const prettierMarker = await prettierLoader.getConfigMarker(filePath);
                                     return {
                                         ...sourceFile,
                                         id,
-                                        markers: prettierMarker
-                                            ? replaceMarkerByKind(sourceFile.markers, prettierMarker)
-                                            : sourceFile.markers
+                                        markers: replaceMarkerByKind(sourceFile.markers, marker)
                                     };
                                 });
                                 resultItems.push({
                                     id,
-                                    sourceFileType: "org.openrewrite.javascript.tree.JS$CompilationUnit", // break cycle
+                                    sourceFileType: "org.openrewrite.javascript.tree.JS$CompilationUnit",
                                     sourcePath: path.relative(relativeTo, filePath)
                                 });
                             }
                         } else {
-                            // Prettier is NOT available: auto-detect styles from parsed files
-                            // Parse all files first to sample them
                             const parsedFiles: {id: string, sourceFile: SourceFile, filePath: string}[] = [];
                             let fileIndex = 0;
-                            for await (const sourceFile of parser.parse(...discovered.jsFiles)) {
-                                const id = randomId();
-                                parsedFiles.push({id, sourceFile, filePath: discovered.jsFiles[fileIndex++]});
+                            for await (const sourceFile of generator) {
+                                parsedFiles.push({id: randomId(), sourceFile, filePath: discovered.jsFiles[fileIndex++]});
                             }
-
-                            // Sample all parsed files and build Autodetect marker using ProjectParser helper
                             const autodetectMarker = await projectParser.buildAutodetectMarker(
-                                parsedFiles.map(p => p.sourceFile)
+                                parsedFiles.filter(p => !prettierMarkers.has(p.filePath)).map(p => p.sourceFile)
                             );
-
-                            // Store thunks that add the Autodetect marker
                             for (const {id, sourceFile, filePath} of parsedFiles) {
-                                localObjects.set(id, async (newId: string) => {
-                                    return {
-                                        ...sourceFile,
-                                        id: newId,
-                                        markers: replaceMarkerByKind(sourceFile.markers, autodetectMarker)
-                                    };
-                                });
+                                localObjects.set(id, async (newId: string) => ({
+                                    ...sourceFile,
+                                    id: newId,
+                                    markers: replaceMarkerByKind(sourceFile.markers, prettierMarkers.get(filePath) ?? autodetectMarker)
+                                }));
                                 resultItems.push({
                                     id,
-                                    sourceFileType: "org.openrewrite.javascript.tree.JS$CompilationUnit", // break cycle
+                                    sourceFileType: "org.openrewrite.javascript.tree.JS$CompilationUnit",
                                     sourcePath: path.relative(relativeTo, filePath)
                                 });
                             }
                         }
+                    }
+
+                    // Unparseable JS/TS files (currently: too large) are recorded as
+                    // Quarks. The Java side builds the Quark locally from sourcePath,
+                    // so no GetObject round-trip and no content crosses the wire.
+                    for (const filePath of discovered.unparseableFiles) {
+                        resultItems.push({
+                            id: randomId(),
+                            sourceFileType: "org.openrewrite.quark.Quark", // break cycle
+                            sourcePath: path.relative(relativeTo, filePath)
+                        });
                     }
 
                     // Parse other YAML files

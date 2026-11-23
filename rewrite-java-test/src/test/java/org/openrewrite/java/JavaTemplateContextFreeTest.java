@@ -25,11 +25,15 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
@@ -166,12 +170,13 @@ class JavaTemplateContextFreeTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
-                  if ("o".equals(multiVariable.getVariables().getFirst().getSimpleName())) {
+                  if ("o".equals(multiVariable.getVariables().getFirst().getSimpleName()) &&
+                      !(multiVariable.getTypeExpression() instanceof J.Identifier id && "var".equals(id.getSimpleName()))) {
                       return JavaTemplate.apply("var o = #{any()};", getCursor(), multiVariable.getCoordinates().replace(), multiVariable.getVariables().getFirst().getInitializer());
                   }
                   return multiVariable;
               }
-          })).cycles(1).expectedCyclesThatMakeChanges(1),
+          })),
           java(
             """
               import java.util.Optional;
@@ -198,7 +203,9 @@ class JavaTemplateContextFreeTest implements RewriteTest {
     @Test
     void contextFreeTypeParameterConflictNames() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+          // the template merges the method's and the class's type variables of the same name
+          spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build())
+            .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
                   if ("printf".equals(method.getSimpleName())) {
@@ -209,7 +216,7 @@ class JavaTemplateContextFreeTest implements RewriteTest {
                   }
                   return super.visitMethodInvocation(method, executionContext);
               }
-          })).cycles(1).expectedCyclesThatMakeChanges(1),
+          })),
           java(
             """
               class Test<T extends Number> {
@@ -243,7 +250,7 @@ class JavaTemplateContextFreeTest implements RewriteTest {
                   }
                   return super.visitMethodInvocation(method, executionContext);
               }
-          })).cycles(1).expectedCyclesThatMakeChanges(1),
+          })),
           java(
             """
               class Test<T extends Number> {
@@ -272,12 +279,13 @@ class JavaTemplateContextFreeTest implements RewriteTest {
             .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
-                  if ("o".equals(multiVariable.getVariables().getFirst().getSimpleName())) {
+                  if ("o".equals(multiVariable.getVariables().getFirst().getSimpleName()) &&
+                      !(multiVariable.getTypeExpression() instanceof J.Identifier id && "var".equals(id.getSimpleName()))) {
                       return JavaTemplate.apply("var o = #{any()};", getCursor(), multiVariable.getCoordinates().replace(), multiVariable.getVariables().getFirst().getInitializer());
                   }
                   return multiVariable;
               }
-          })).cycles(1).expectedCyclesThatMakeChanges(1),
+          })),
           java(
             """
               import java.util.Map;
@@ -306,16 +314,19 @@ class JavaTemplateContextFreeTest implements RewriteTest {
     @Test
     void contextFreeSequenceTypeParameters() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().logCompilationWarningsAndErrors(true))
+          // the template types an argument by the position it is moved from
+          spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build())
+            .parser(JavaParser.fromJavaVersion().logCompilationWarningsAndErrors(true))
             .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
-                  if ("o".equals(multiVariable.getVariables().getFirst().getSimpleName())) {
+                  if ("o".equals(multiVariable.getVariables().getFirst().getSimpleName()) &&
+                      !(multiVariable.getTypeExpression() instanceof J.Identifier id && "var".equals(id.getSimpleName()))) {
                       return JavaTemplate.apply("var o = #{any()};", getCursor(), multiVariable.getCoordinates().replace(), multiVariable.getVariables().getFirst().getInitializer());
                   }
                   return multiVariable;
               }
-          })).cycles(1).expectedCyclesThatMakeChanges(1),
+          })),
           java(
             """
               import java.util.Comparator;
@@ -350,12 +361,13 @@ class JavaTemplateContextFreeTest implements RewriteTest {
             .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
-                  if ("o".equals(multiVariable.getVariables().getFirst().getSimpleName())) {
+                  if ("o".equals(multiVariable.getVariables().getFirst().getSimpleName()) &&
+                      !(multiVariable.getTypeExpression() instanceof J.Identifier id && "var".equals(id.getSimpleName()))) {
                       return JavaTemplate.apply("var o = #{any()};", getCursor(), multiVariable.getCoordinates().replace(), multiVariable.getVariables().getFirst().getInitializer());
                   }
                   return multiVariable;
               }
-          })).cycles(1).expectedCyclesThatMakeChanges(1),
+          })),
           java(
             """
               import java.io.Serializable;
@@ -381,5 +393,284 @@ class JavaTemplateContextFreeTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Test
+    void insertBeforeNonVoidExpressionStatements() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
+                  J.Block b = super.visitBlock(block, ctx);
+                  if (!(getCursor().getParentTreeCursor().getValue() instanceof J.MethodDeclaration) ||
+                      b.getStatements().size() != 3) {
+                      return b;
+                  }
+                  for (int i = 0; i < block.getStatements().size(); i++) {
+                      b = JavaTemplate.apply("int before#{} = 0;", new Cursor(getCursor().getParentOrThrow(), b),
+                        block.getStatements().get(i).getCoordinates().before(), i);
+                  }
+                  return b;
+              }
+          })),
+          java(
+            """
+              import java.util.List;
+
+              class Test {
+                  int i;
+                  void m(List<String> list) {
+                      list.add("a");
+                      new StringBuilder();
+                      i++;
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+
+              class Test {
+                  int i;
+                  void m(List<String> list) {
+                      int before0 = 0;
+                      list.add("a");
+                      int before1 = 0;
+                      new StringBuilder();
+                      int before2 = 0;
+                      i++;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void insertAfterExplicitConstructorInvocation() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
+                  J.Block b = super.visitBlock(block, ctx);
+                  if (b.getStatements().size() == 1 && b.getStatements().getFirst() instanceof J.MethodInvocation superCall &&
+                      "super".equals(superCall.getSimpleName())) {
+                      return JavaTemplate.apply("String copy = #{any(java.lang.String)};", getCursor(),
+                        superCall.getCoordinates().after(), superCall.getArguments().getFirst());
+                  }
+                  return b;
+              }
+          })),
+          java(
+            """
+              class Parent {
+                  Parent(String s) {
+                  }
+              }
+              class Child extends Parent {
+                  Child(String s) {
+                      super(s);
+                  }
+              }
+              """,
+            """
+              class Parent {
+                  Parent(String s) {
+                  }
+              }
+              class Child extends Parent {
+                  Child(String s) {
+                      super(s);
+                      String copy = s;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void conditionalTakesTheTypeOfItsBranches() {
+        rewriteRun(
+          spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(true).build())
+            .recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if ("orDefault".equals(method.getSimpleName())) {
+                      Expression s = method.getArguments().getFirst();
+                      return JavaTemplate.apply("#{any(String)} == null ? \"default\" : #{any(String)}",
+                        getCursor(), method.getCoordinates().replace(), s, s);
+                  }
+                  return super.visitMethodInvocation(method, ctx);
+              }
+          })),
+          java(
+            """
+              class Test {
+                  String orDefault(String s) {
+                      return s;
+                  }
+
+                  void m(String s) {
+                      String r = orDefault(s);
+                  }
+              }
+              """,
+            """
+              class Test {
+                  String orDefault(String s) {
+                      return s;
+                  }
+
+                  void m(String s) {
+                      String r = s == null ? "default" : s;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void explicitObjectBindTypeIsTheTarget() {
+        List<String> stubs = new ArrayList<>();
+        rewriteRun(
+          spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(true).build())
+            .recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if ("orDefault".equals(method.getSimpleName())) {
+                      Expression s = method.getArguments().getFirst();
+                      return JavaTemplate.builder("#{any(String)} == null ? \"default\" : #{any(String)}")
+                        .bindType("Object")
+                        .doBeforeParseTemplate(stubs::add)
+                        .build()
+                        .apply(getCursor(), method.getCoordinates().replace(), s, s);
+                  }
+                  return super.visitMethodInvocation(method, ctx);
+              }
+          })),
+          java(
+            """
+              class Test {
+                  String orDefault(String s) {
+                      return s;
+                  }
+
+                  void m(String s) {
+                      Object r = orDefault(s);
+                  }
+              }
+              """,
+            """
+              class Test {
+                  String orDefault(String s) {
+                      return s;
+                  }
+
+                  void m(String s) {
+                      Object r = s == null ? "default" : s;
+                  }
+              }
+              """
+          )
+        );
+        assertThat(stubs).anySatisfy(stub -> assertThat(stub).contains("Object o ="));
+    }
+
+    @Test
+    void nullLiteralTemplate() {
+        rewriteRun(
+          spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(true).build())
+            .recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if ("orDefault".equals(method.getSimpleName())) {
+                      return JavaTemplate.apply("null", getCursor(), method.getCoordinates().replace());
+                  }
+                  return super.visitMethodInvocation(method, ctx);
+              }
+          })),
+          java(
+            """
+              class Test {
+                  String orDefault(String s) {
+                      return s;
+                  }
+
+                  void m(String s) {
+                      String r = orDefault(s);
+                  }
+              }
+              """,
+            """
+              class Test {
+                  String orDefault(String s) {
+                      return s;
+                  }
+
+                  void m(String s) {
+                      String r = null;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void explicitObjectBindTypeDoesNotTypeALambda() {
+        J.CompilationUnit cu = JavaParser.fromJavaVersion().build()
+          .parse(
+            """
+              class Test {
+                  Runnable r = () -> {};
+              }
+              """
+          )
+          .map(J.CompilationUnit.class::cast)
+          .findFirst()
+          .orElseThrow();
+
+        assertThatThrownBy(() -> new JavaVisitor<Integer>() {
+            @Override
+            public J visitLambda(J.Lambda lambda, Integer p) {
+                return JavaTemplate.builder("() -> System.out.println()").bindType("Object").build()
+                  .apply(getCursor(), lambda.getCoordinates().replace());
+            }
+        }.visit(cu, 0))
+          .rootCause()
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("bindType");
+    }
+
+    @Test
+    void insertingTemplateThatGeneratesNoStatementFailsLoudly() {
+        J.CompilationUnit cu = JavaParser.fromJavaVersion().build()
+          .parse(
+            """
+              class Test {
+                  void m() {
+                      System.out.println();
+                  }
+              }
+              """
+          )
+          .map(J.CompilationUnit.class::cast)
+          .findFirst()
+          .orElseThrow();
+
+        assertThatThrownBy(() -> new JavaIsoVisitor<Integer>() {
+            @Override
+            public J.Block visitBlock(J.Block block, Integer p) {
+                if (getCursor().getParentTreeCursor().getValue() instanceof J.MethodDeclaration) {
+                    return JavaTemplate.apply("/* not a statement */", getCursor(),
+                      block.getStatements().getFirst().getCoordinates().before());
+                }
+                return super.visitBlock(block, p);
+            }
+        }.visit(cu, 0))
+          .rootCause()
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("generated none");
     }
 }

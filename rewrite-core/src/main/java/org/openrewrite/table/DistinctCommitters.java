@@ -16,6 +16,7 @@
 package org.openrewrite.table;
 
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Column;
 import org.openrewrite.DataTable;
 import org.openrewrite.Recipe;
@@ -39,7 +40,9 @@ public class DistinctCommitters extends DataTable<DistinctCommitters.Row> {
         String email;
 
         @Column(displayName = "Last commit",
-                description = "The date of this committer's last commit.")
+                description = "The date of this committer's last commit. " +
+                              "Null when only committer identities were collected, without per-day commit detail.")
+        @Nullable
         LocalDate lastCommit;
 
         @Column(displayName = "Number of commits",

@@ -164,3 +164,22 @@ func TestParseStructGroupedFields(t *testing.T) {
 		`),
 	)
 }
+
+// A cycle through a type alias makes go/types itself panic rather than
+// report an error. Type attribution is best-effort, so the LST must
+// still come out intact.
+func TestParseRecursiveTypeAlias(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			import "unsafe"
+
+			type _ A
+
+			type A = T
+
+			type T [unsafe.Sizeof(A{})]int
+		`),
+	)
+}

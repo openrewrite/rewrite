@@ -15,7 +15,9 @@
  */
 package org.openrewrite.golang.rpc;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -35,6 +37,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import static org.openrewrite.golang.Assertions.go;
@@ -66,7 +69,6 @@ class GolangRecipeIntegTest implements RewriteTest {
     @Override
     public void defaults(org.openrewrite.test.RecipeSpec spec) {
         spec.typeValidationOptions(TypeValidation.builder()
-          .allowNonWhitespaceInWhitespace(true)
           .identifiers(false)
           .methodInvocations(false)
           .build());
@@ -88,7 +90,7 @@ class GolangRecipeIntegTest implements RewriteTest {
                   }
                   return ident;
               }
-          })).expectedCyclesThatMakeChanges(1).cycles(1),
+          })),
           go(
             """
               package main
@@ -105,6 +107,149 @@ class GolangRecipeIntegTest implements RewriteTest {
               \tvar flag = true
               \t_ = flag
               }
+              """
+          )
+        );
+    }
+
+    /**
+     * A {@code JavaVisitor} walking {@code J.Switch#getCases()} may cast each
+     * statement to {@code J.Case} — the contract every parser but Go honours
+     * (this is exactly what {@code MinimumSwitchCases} does). Go's {@code select}
+     * is not a Java {@code switch}: it maps to {@code Go.Select}, whose clauses
+     * are {@code Go.CommClause}. Before {@code Go.Select} existed, {@code select}
+     * was a {@code J.Switch} full of {@code Go.CommClause}, so this recipe threw
+     * {@code ClassCastException: Go$CommClause cannot be cast to J$Case}. The
+     * regular {@code switch} in the same file must still be visited and yield
+     * {@code J.Case} unharmed.
+     */
+    @Test
+    void switchVisitorNeverSeesSelectClauses() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new org.openrewrite.java.JavaIsoVisitor<>() {
+              @Override
+              public J.Switch visitSwitch(J.Switch switch_, org.openrewrite.ExecutionContext ctx) {
+                  for (org.openrewrite.java.tree.Statement s : switch_.getCases().getStatements()) {
+                      J.Case c = (J.Case) s;
+                      c.getCaseLabels();
+                  }
+                  return super.visitSwitch(switch_, ctx);
+              }
+          })),
+          go(
+            """
+              package main
+
+              func f(c chan int, d chan int, x int) {
+              \tselect {
+              \tcase v := <-c:
+              \t\t_ = v
+              \tcase d <- 1:
+              \tdefault:
+              \t}
+              \tswitch x {
+              \tcase 1:
+              \tdefault:
+              \t}
+              }
+              """
+          )
+        );
+    }
+
+    /**
+     * Renames an identifier declared inside a grouped {@code const ( ... )}
+     * block. This only works if the grouped declarations (modeled as
+     * Go.DeclarationBlock) round-trip their inner specs to the Java side —
+     * before DeclarationBlock existed the group's contents were not
+     * serialized, so a Java recipe could not see or rename {@code x}.
+     */
+    @Test
+    void renameVarInsideGroupedBlock() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new org.openrewrite.java.JavaIsoVisitor<>() {
+              @Override
+              public J.Identifier visitIdentifier(J.Identifier ident, org.openrewrite.ExecutionContext ctx) {
+                  if ("x".equals(ident.getSimpleName())) {
+                      return ident.withSimpleName("flag");
+                  }
+                  return ident;
+              }
+          })),
+          go(
+            """
+              package main
+
+              const (
+              \tx = 1
+              \ty = 2
+              )
+              """,
+            """
+              package main
+
+              const (
+              \tflag = 1
+              \ty = 2
+              )
+              """
+          )
+        );
+    }
+
+    @Test
+    void renameInsideMultiAssignment() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new org.openrewrite.java.JavaIsoVisitor<>() {
+              @Override
+              public J.Identifier visitIdentifier(J.Identifier ident, org.openrewrite.ExecutionContext ctx) {
+                  if ("x".equals(ident.getSimpleName())) {
+                      return ident.withSimpleName("flag");
+                  }
+                  return ident;
+              }
+          })),
+          go(
+            """
+              package main
+
+              func f() {
+              \tvar x, y int
+              \tx, y = y, x
+              }
+              """,
+            """
+              package main
+
+              func f() {
+              \tvar flag, y int
+              \tflag, y = y, flag
+              }
+              """
+          )
+        );
+    }
+
+    /**
+     * Grouped {@code var ( ... )} / {@code const ( ... )} blocks survive a
+     * full Java RPC round-trip with no changes (idempotent print).
+     */
+    @Test
+    void groupedDeclarationBlockRoundTrip() {
+        rewriteRun(
+          go(
+            """
+              package main
+
+              var (
+              \ta int
+              \tb = 2
+              )
+
+              const (
+              \tc = 3
+              \td = 4
+              )
               """
           )
         );
@@ -144,6 +289,7 @@ class GolangRecipeIntegTest implements RewriteTest {
         String source = "package main\n\nfunc f() {\n\tvar x = true\n\t_ = x\n}\n";
         SourceFile cu = GolangParser.builder().build()
                 .parse(source).findFirst().orElseThrow();
+        UUID originalId = cu.getId();
 
         // Reset Go RPC state to simulate a fresh session (like CLI's mod run)
         rpc.reset();
@@ -152,6 +298,7 @@ class GolangRecipeIntegTest implements RewriteTest {
         Tree result = recipe.getVisitor().visit(cu, new InMemoryExecutionContext());
         assertThat(result).isNotNull().isInstanceOf(SourceFile.class);
         assertThat(result).isNotSameAs(cu);
+        assertThat(((SourceFile) result).getId()).isEqualTo(originalId);
         String printed = rpc.print((SourceFile) result);
         assertThat(printed).contains("var flag = true").contains("_ = flag");
     }
@@ -174,14 +321,119 @@ class GolangRecipeIntegTest implements RewriteTest {
 
         // Reset to simulate fresh session, then install recipes (like CLI does)
         rpc.reset();
-        rpc.installRecipes(
-                new java.io.File("/Users/jonathan/Projects/github/moderneinc/recipes-go/recipes-code-quality"));
+        java.io.File recipesPath = resolveRecipesGoPath();
+        Assumptions.assumeTrue(recipesPath != null,
+                "recipes-go checkout not found; set -Drecipes.go.path=<path> or RECIPES_GO_PATH env to enable");
+        rpc.installRecipes(recipesPath);
 
         var recipe = rpc.prepareRecipe("org.openrewrite.golang.test.RenameXToFlag");
         Tree result = recipe.getVisitor().visit(cu, new InMemoryExecutionContext());
         assertThat(result).isNotNull().isInstanceOf(SourceFile.class);
         String printed = rpc.print((SourceFile) result);
         assertThat(printed).contains("var flag = true").contains("_ = flag");
+    }
+
+    @Test
+    void selfReferencingMethodSurvivesAddRoundtrip() {
+        GoRewriteRpc rpc = GoRewriteRpc.getOrStart();
+        String source = """
+          package main
+
+          type Counter struct {
+          \tvalue int
+          }
+
+          func (c *Counter) Inc(x int) {
+          }
+          """;
+        SourceFile cu = GolangParser.builder().build()
+          .parse(source).findFirst().orElseThrow();
+
+        // Force ADD path on Java→Go: Go has no baseline for this tree, so the
+        // entire JavaType graph (incl. the Counter ↔ Inc self-cycle) is sent
+        // as ADD, triggering the receive-side ref cache on the Go side.
+        rpc.reset();
+        var recipe = rpc.prepareRecipe("org.openrewrite.golang.test.RenameXToFlag");
+        Tree result = recipe.getVisitor().visit(cu, new InMemoryExecutionContext());
+
+        // Before the fix, this throws
+        // `IllegalArgumentException: No enum constant ... JavaType.FullyQualified.Kind.`
+        // when Java deserializes the returned tree.
+        assertThat(result).isNotNull().isInstanceOf(SourceFile.class);
+    }
+
+    /**
+     * A Java recipe that iterates {@code J.MethodDeclaration#getModifiers()} —
+     * exactly what {@code ModifierOrder} does — must not NPE on a Go function.
+     * Go functions have no modifiers, but {@code J.MethodDeclaration#modifiers}
+     * is a non-null Java contract; before the fix the Go sender emitted the
+     * modifiers list as a nil slice, which deserialized to {@code null} on the
+     * Java side and threw {@code NullPointerException: Cannot invoke
+     * "java.util.List.iterator()" because "modifiers" is null}.
+     */
+    @Test
+    void iteratingModifiersDoesNotNpe() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new org.openrewrite.java.JavaIsoVisitor<>() {
+              @Override
+              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, org.openrewrite.ExecutionContext ctx) {
+                  for (J.Modifier modifier : method.getModifiers()) {
+                      assertThat(modifier).isNotNull();
+                  }
+                  return super.visitMethodDeclaration(method, ctx);
+              }
+          })),
+          go(
+            """
+              package main
+
+              func hello() {
+              }
+              """
+          )
+        );
+    }
+
+    /**
+     * Reproduces the reported EmptyBlock/Go corruption root cause: a Java recipe
+     * that mutates a {@code J.Binary} operator ({@code ==} -> {@code !=}) must
+     * round-trip through the Go RPC print path. If the operator change is dropped,
+     * the source prints unchanged (== stays ==).
+     */
+    @Test
+    void flipBinaryOperatorRoundTrips() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new org.openrewrite.java.JavaIsoVisitor<>() {
+              @Override
+              public J.Binary visitBinary(J.Binary binary, org.openrewrite.ExecutionContext ctx) {
+                  J.Binary b = super.visitBinary(binary, ctx);
+                  if (b.getOperator() == J.Binary.Type.Equal) {
+                      return b.withOperator(J.Binary.Type.NotEqual);
+                  }
+                  return b;
+              }
+          })),
+          go(
+            """
+              package main
+
+              func test() {
+              \tif err == nil {
+              \t\thandle(err)
+              \t}
+              }
+              """,
+            """
+              package main
+
+              func test() {
+              \tif err != nil {
+              \t\thandle(err)
+              \t}
+              }
+              """
+          )
+        );
     }
 
     @Test
@@ -195,7 +447,7 @@ class GolangRecipeIntegTest implements RewriteTest {
                   }
                   return ident;
               }
-          })).expectedCyclesThatMakeChanges(1).cycles(1),
+          })),
           go(
             """
               package main
@@ -228,7 +480,7 @@ class GolangRecipeIntegTest implements RewriteTest {
                   }
                   return m;
               }
-          })).expectedCyclesThatMakeChanges(1).cycles(1),
+          })),
           go(
             """
               package main
@@ -271,8 +523,8 @@ class GolangRecipeIntegTest implements RewriteTest {
 
               import "fmt"
 
-              func main() {/*~~>*/
-              \tfmt.Println("hello")
+              func main() {
+              \t/*~~>*/fmt.Println("hello")
               }
               """
           )
@@ -342,7 +594,7 @@ class GolangRecipeIntegTest implements RewriteTest {
                   }
                   return ident;
               }
-          })).expectedCyclesThatMakeChanges(1).cycles(1),
+          })),
           go(
             """
               package main
@@ -353,14 +605,76 @@ class GolangRecipeIntegTest implements RewriteTest {
             """
               package main
 
-              import (
-              \t"net/http"
-              )
+              import "net/http"
 
               func world() {
               }
               """
           )
         );
+    }
+
+    /**
+     * Locate a local recipes-code-quality checkout for the full-CLI-path test.
+     * Resolution order: -Drecipes.go.path system property, RECIPES_GO_PATH env
+     * var, then a sibling lookup walking up from the current working dir.
+     * Returns null if none found OR if its go.mod replace points at a
+     * rewrite-go directory that doesn't exist on this machine — caller skips.
+     */
+    private static java.io.@Nullable File resolveRecipesGoPath() {
+        java.io.File candidate = locateRecipesGoPath();
+        return candidate != null && replaceTargetExists(candidate) ? candidate : null;
+    }
+
+    private static java.io.@Nullable File locateRecipesGoPath() {
+        String prop = System.getProperty("recipes.go.path");
+        if (prop == null || prop.isEmpty()) {
+            prop = System.getenv("RECIPES_GO_PATH");
+        }
+        if (prop != null && !prop.isEmpty()) {
+            java.io.File f = new java.io.File(prop);
+            return f.isDirectory() ? f : null;
+        }
+        java.io.File cur = new java.io.File(System.getProperty("user.dir")).getAbsoluteFile();
+        while (cur != null) {
+            for (String rel : new String[]{
+                    "moderneinc/recipes-go/.worktrees/golang/recipes-code-quality",
+                    "recipes-go/recipes-code-quality"
+            }) {
+                java.io.File c = new java.io.File(cur, rel);
+                if (c.isDirectory()) {
+                    return c;
+                }
+            }
+            cur = cur.getParentFile();
+        }
+        return null;
+    }
+
+    /**
+     * Confirm that the rewrite-go directory referenced by the recipes-go
+     * go.mod replace actually exists on this machine. Worktree layouts can
+     * cause the relative replace to point at a non-existent path; in that
+     * case the install would fail mid-`go mod tidy` with a confusing error.
+     */
+    private static boolean replaceTargetExists(java.io.File recipesGoDir) {
+        try {
+            java.nio.file.Path goMod = recipesGoDir.toPath().resolve("go.mod");
+            for (String line : java.nio.file.Files.readAllLines(goMod)) {
+                String t = line.trim();
+                if (!t.startsWith("replace ")) continue;
+                int arrow = t.indexOf("=>");
+                if (arrow < 0) continue;
+                String target = t.substring(arrow + 2).trim();
+                if (target.contains("@")) continue;
+                java.nio.file.Path resolved = recipesGoDir.toPath().resolve(target).normalize();
+                if (target.contains("rewrite-go") && !java.nio.file.Files.isDirectory(resolved)) {
+                    return false;
+                }
+            }
+            return true;
+        } catch (java.io.IOException e) {
+            return false;
+        }
     }
 }

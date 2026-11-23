@@ -20,13 +20,8 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.java.marker.JavaProject;
-import org.openrewrite.java.marker.JavaSourceSet;
-import org.openrewrite.java.tree.JavaSourceFile;
-import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.*;
-import org.openrewrite.maven.utilities.JavaSourceSetUpdater;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.AddToTagVisitor;
@@ -103,12 +98,23 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
     @Nullable
     Boolean changeManagedDependency;
 
+    @Option(displayName = "Change plugin dependencies",
+            description = "Also change dependencies declared inside Maven plugins. Defaults to true.",
+            required = false)
+    @Nullable
+    Boolean changePluginDependencies;
+
     public ChangeDependencyGroupIdAndArtifactId(String oldGroupId, String oldArtifactId, @Nullable String newGroupId, @Nullable String newArtifactId, @Nullable String newVersion, @Nullable String versionPattern) {
         this(oldGroupId, oldArtifactId, newGroupId, newArtifactId, newVersion, versionPattern, false, true);
     }
 
-    @JsonCreator
     public ChangeDependencyGroupIdAndArtifactId(String oldGroupId, String oldArtifactId, @Nullable String newGroupId, @Nullable String newArtifactId, @Nullable String newVersion, @Nullable String versionPattern, @Nullable Boolean overrideManagedVersion, @Nullable Boolean changeManagedDependency) {
+        this(oldGroupId, oldArtifactId, newGroupId, newArtifactId, newVersion, versionPattern, overrideManagedVersion, changeManagedDependency, null);
+    }
+
+    @JsonCreator
+    public ChangeDependencyGroupIdAndArtifactId(String oldGroupId, String oldArtifactId, @Nullable String newGroupId, @Nullable String newArtifactId, @Nullable String newVersion, @Nullable String versionPattern, @Nullable Boolean overrideManagedVersion, @Nullable Boolean changeManagedDependency, @Nullable Boolean changePluginDependencies) {
+        this.changePluginDependencies = changePluginDependencies;
         this.oldGroupId = oldGroupId;
         this.oldArtifactId = oldArtifactId;
         this.newGroupId = newGroupId;
@@ -161,68 +167,6 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
 
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(Accumulator acc) {
-        TreeVisitor<?, ExecutionContext> mavenScanner = getMavenScanner(acc);
-        @Nullable VersionComparator scannerVersionComparator = newVersion != null ?
-                Semver.validate(newVersion, versionPattern).getValue() : null;
-
-        // Wrap to also scan pom.xml files for modules that have the old dependency
-        return new TreeVisitor<Tree, ExecutionContext>() {
-            @Override
-            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
-                return sourceFile instanceof Xml.Document || sourceFile instanceof JavaSourceFile;
-            }
-
-            @Override
-            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                if (!(tree instanceof SourceFile)) {
-                    return tree;
-                }
-                SourceFile sf = (SourceFile) tree;
-                if (sf instanceof Xml.Document && mavenScanner.isAcceptable(sf, ctx)) {
-                    mavenScanner.visit(tree, ctx);
-                    // Also check if this pom has the old dependency
-                    sf.getMarkers().findFirst(MavenResolutionResult.class).ifPresent(mrr -> {
-                        List<ResolvedDependency> deps = mrr.findDependencies(oldGroupId, oldArtifactId, null);
-                        if (!deps.isEmpty()) {
-                            sf.getMarkers().findFirst(JavaProject.class).ifPresent(jp -> {
-                                acc.getModulesWithOldDependency().put(jp, deps.get(0));
-                                acc.getModuleRepositories().put(jp, mrr.getPom().getRepositories());
-                                // Resolve the new version for JavaSourceSet updates
-                                if (newVersion != null) {
-                                    String effectiveGroupId = newGroupId != null ? newGroupId : deps.get(0).getGroupId();
-                                    String effectiveArtifactId = newArtifactId != null ? newArtifactId : deps.get(0).getArtifactId();
-                                    try {
-                                        MavenMetadata metadata = metadataFailures.insertRows(ctx, () ->
-                                                new MavenPomDownloader(mrr.getProjectPoms(), ctx, mrr.getMavenSettings(), mrr.getActiveProfiles())
-                                                        .downloadMetadata(new GroupArtifactVersion(effectiveGroupId, effectiveArtifactId, null), null, mrr.getPom().getRepositories()));
-                                        String resolved = newVersion;
-                                        if (scannerVersionComparator != null) {
-                                            List<String> available = new ArrayList<>();
-                                            for (String v : metadata.getVersioning().getVersions()) {
-                                                if (scannerVersionComparator.isValid(deps.get(0).getVersion(), v)) {
-                                                    available.add(v);
-                                                }
-                                            }
-                                            if (!available.isEmpty()) {
-                                                resolved = max(available, scannerVersionComparator);
-                                            }
-                                        }
-                                        acc.getResolvedNewVersions().put(jp, resolved);
-                                    } catch (Exception e) {
-                                        // Version resolution failure is not fatal for JavaSourceSet updates
-                                    }
-                                }
-                            });
-                        }
-                    });
-                }
-                // Java files are no-op in scanner
-                return tree;
-            }
-        };
-    }
-
-    private TreeVisitor<?, ExecutionContext> getMavenScanner(Accumulator acc) {
         if (newVersion == null) {
             return TreeVisitor.noop();
         }
@@ -235,6 +179,9 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
 
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                if (Boolean.FALSE.equals(changePluginDependencies) && isPluginDependencyTag()) {
+                    return tag;
+                }
                 if (!isDependencyTag(oldGroupId, oldArtifactId) &&
                         !isPluginDependencyTag(oldGroupId, oldArtifactId) &&
                         !isAnnotationProcessorPathTag(oldGroupId, oldArtifactId)) {
@@ -259,6 +206,9 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                     String resolvedVersion = resolveSemverVersion(ctx, groupId, artifactId, currentVersion);
                     storeParentPomProperty(getResolutionResult().getParent(), propertyName, resolvedVersion, acc);
                 } catch (MavenDownloadingException e) {
+                    if (isGlobPattern()) {
+                        return super.visitTag(tag, ctx);
+                    }
                     return e.warn(tag);
                 }
                 return super.visitTag(tag, ctx);
@@ -268,10 +218,6 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                 MavenResolutionResult result = getResolutionResult();
                 ResolvedPom resolvedPom = result.getPom();
                 Pom requestedPom = resolvedPom.getRequested();
-                // Pom fields default to emptyList() via @Builder.Default, but deserialization can leave them null
-                if (requestedPom.getDependencies() == null) {
-                    return Collections.emptySet();
-                }
                 Set<String> relevantProperties = requestedPom.getDependencies().stream()
                         .filter(d -> isProperty(d.getVersion()) &&
                                 matchesGlob(resolvedPom.getValue(d.getGroupId()), groupId) &&
@@ -325,95 +271,25 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator acc) {
-        MavenVisitor<ExecutionContext> mavenVisitor = getMavenVisitor(acc);
-
-        if (acc.getModulesWithOldDependency().isEmpty()) {
-            // No modules have the old dependency; skip Java file processing
-            return mavenVisitor;
-        }
-
-        return new TreeVisitor<Tree, ExecutionContext>() {
-            @Nullable
-            private JavaSourceSetUpdater updater;
-            private final Map<String, JavaSourceSet> updatedSourceSets = new HashMap<>();
-
-            @Override
-            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
-                return mavenVisitor.isAcceptable(sourceFile, ctx) || sourceFile instanceof JavaSourceFile;
-            }
-
-            @Override
-            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                if (!(tree instanceof SourceFile)) {
-                    return tree;
-                }
-                SourceFile sf = (SourceFile) tree;
-                if (mavenVisitor.isAcceptable(sf, ctx)) {
-                    return mavenVisitor.visit(tree, ctx);
-                }
-                if (sf instanceof JavaSourceFile) {
-                    return updateJavaSourceSet(sf, ctx);
-                }
-                return tree;
-            }
-
-            private SourceFile updateJavaSourceSet(SourceFile sf, ExecutionContext ctx) {
-                Optional<JavaProject> maybeJp = sf.getMarkers().findFirst(JavaProject.class);
-                if (!maybeJp.isPresent()) {
-                    return sf;
-                }
-                ResolvedDependency oldDep = acc.getModulesWithOldDependency().get(maybeJp.get());
-                if (oldDep == null) {
-                    return sf;
-                }
-                if (updater == null) {
-                    updater = new JavaSourceSetUpdater(ctx);
-                }
-                JavaProject jp = maybeJp.get();
-                return JavaSourceSet.updateOnSourceFile(sf, updatedSourceSets, sourceSet -> {
-                    String effectiveNewGroupId = newGroupId != null ? newGroupId : oldDep.getGroupId();
-                    String effectiveNewArtifactId = newArtifactId != null ? newArtifactId : oldDep.getArtifactId();
-                    String resolvedVersion = acc.getResolvedNewVersions().get(jp);
-                    String effectiveVersion = resolvedVersion != null ? resolvedVersion : oldDep.getVersion();
-                    ResolvedGroupArtifactVersion newGav = new ResolvedGroupArtifactVersion(
-                            oldDep.getGav().getRepository(),
-                            effectiveNewGroupId, effectiveNewArtifactId, effectiveVersion, null);
-                    ResolvedDependency newDep = oldDep
-                            .withGav(newGav)
-                            .withRepository(findRemoteRepository(jp));
-                    return updater.changeDependency(sourceSet, oldDep, newDep);
-                });
-            }
-
-            private MavenRepository findRemoteRepository(JavaProject jp) {
-                List<MavenRepository> repos = acc.getModuleRepositories().get(jp);
-                if (repos != null) {
-                    for (MavenRepository repo : repos) {
-                        String uri = repo.getUri();
-                        if (uri != null && (uri.startsWith("http://") || uri.startsWith("https://"))) {
-                            return repo;
-                        }
-                    }
-                }
-                return MavenRepository.MAVEN_CENTRAL;
-            }
-        };
-    }
-
-    private MavenVisitor<ExecutionContext> getMavenVisitor(Accumulator acc) {
         return new MavenVisitor<ExecutionContext>() {
             @Nullable
             final VersionComparator versionComparator = newVersion != null ? Semver.validate(newVersion, versionPattern).getValue() : null;
-            @Nullable
-            private Collection<String> availableVersions;
-            private boolean isNewDependencyPresent;
+            private final Map<String, List<String>> availableVersionsByArtifact = new HashMap<>();
             private Set<String> safeVersionPlaceholdersToChange = new HashSet<>();
+            private final String effectiveNewGroupId = renamedGroupId(oldGroupId);
+            private final String effectiveNewArtifactId = renamedArtifactId(oldArtifactId);
+            private final boolean dedupeEnabled = !effectiveNewGroupId.equals(oldGroupId) || !effectiveNewArtifactId.equals(oldArtifactId);
+            private List<ResolvedDependency> existingNewDirectDependencies = new ArrayList<>();
+            private List<ResolvedDependency> existingOldDirectDependencies = new ArrayList<>();
             private final boolean configuredToOverrideManagedVersion = overrideManagedVersion != null && overrideManagedVersion; // False by default
             private final boolean configuredToChangeManagedDependency = changeManagedDependency == null || changeManagedDependency;  // True by default
 
             @Override
             public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
-                isNewDependencyPresent = checkIfNewDependencyPresent(newGroupId, newArtifactId, newVersion);
+                if (dedupeEnabled) {
+                    existingNewDirectDependencies = directDependencies(effectiveNewGroupId, effectiveNewArtifactId);
+                    existingOldDirectDependencies = directDependencies(oldGroupId, oldArtifactId);
+                }
                 safeVersionPlaceholdersToChange = getSafeVersionPlaceholdersToChange(oldGroupId, oldArtifactId, ctx);
                 if (configuredToChangeManagedDependency) {
                     doAfterVisit(new ChangeManagedDependencyGroupIdAndArtifactId(
@@ -424,11 +300,12 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                 }
                 // Add sibling exclusions for the new coordinates alongside existing old exclusions
                 if (newGroupId != null || newArtifactId != null) {
-                    String effectiveNewGroupId = newGroupId != null ? newGroupId : oldGroupId;
-                    String effectiveNewArtifactId = newArtifactId != null ? newArtifactId : oldArtifactId;
                     doAfterVisit(new MavenVisitor<ExecutionContext>() {
                         @Override
                         public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                            if (Boolean.FALSE.equals(changePluginDependencies) && isPluginDependencyTag()) {
+                                return tag;
+                            }
                             Xml.Tag t = (Xml.Tag) super.visitTag(tag, ctx);
                             if (!"exclusions".equals(t.getName())) {
                                 return t;
@@ -460,6 +337,9 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
 
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                if (Boolean.FALSE.equals(changePluginDependencies) && isPluginDependencyTag()) {
+                    return tag;
+                }
                 Xml.Tag t = (Xml.Tag) super.visitTag(tag, ctx);
 
                 // Update version properties in parent POMs based on scanner results
@@ -480,15 +360,25 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                 }
 
                 boolean isOldDependencyTag = isDependencyTag(oldGroupId, oldArtifactId);
-                if (isOldDependencyTag && isNewDependencyPresent) {
+                boolean isNewDependencyTag = dedupeEnabled && isDependencyTag(effectiveNewGroupId, effectiveNewArtifactId);
+                if (isOldDependencyTag && !isNewDependencyTag && renamedOldTagWouldDuplicate(t)) {
                     doAfterVisit(new RemoveContentVisitor<>(tag, true, true));
                     maybeUpdateModel();
                     return t;
                 }
+                Scope survivingScope = isNewDependencyTag ? scopeOfSurvivorOfRemovedOldDependency(t) : null;
+                boolean isSurvivingNewDependencyTag = survivingScope != null && newVersion != null;
+                if (survivingScope != null && survivingScope != scopeOf(t)) {
+                    Xml.Tag scopeTag = t.getChild("scope").orElseThrow(NoSuchElementException::new);
+                    t = (Xml.Tag) (survivingScope == Scope.Compile ?
+                            new RemoveContentVisitor<>(scopeTag, false, true).visitNonNull(t, ctx) :
+                            new ChangeTagValueVisitor<>(scopeTag, survivingScope.name().toLowerCase()).visitNonNull(t, ctx));
+                    maybeUpdateModel();
+                }
                 boolean isPluginDependency = isPluginDependencyTag(oldGroupId, oldArtifactId);
                 boolean isAnnotationProcessorPath = isAnnotationProcessorPathTag(oldGroupId, oldArtifactId);
                 boolean deferUpdate = false;
-                if (isOldDependencyTag || isPluginDependency || isAnnotationProcessorPath) {
+                if (isOldDependencyTag || isPluginDependency || isAnnotationProcessorPath || isSurvivingNewDependencyTag) {
                     if (newVersion != null) {
                         String currentVersionValue = t.getChildValue("version").orElse(null);
                         if (isImplicitlyDefinedVersionProperty(currentVersionValue)) {
@@ -520,7 +410,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                             boolean versionTagPresent = versionTag.isPresent();
                             // dependencyManagement does not apply to plugin dependencies or annotation processor paths
                             boolean oldDependencyDefinedManaged = isOldDependencyTag && canAffectManagedDependency(getResolutionResult(), scope, oldGroupId, oldArtifactId);
-                            boolean newDependencyManaged = isOldDependencyTag && isDependencyManaged(scope, groupId, artifactId);
+                            boolean newDependencyManaged = (isOldDependencyTag || isSurvivingNewDependencyTag) && isDependencyManaged(scope, groupId, artifactId);
                             if (versionTagPresent) {
                                 // If the previous dependency had a version but the new artifact is managed, removed the version tag.
                                 if (!configuredToOverrideManagedVersion && newDependencyManaged || (oldDependencyDefinedManaged && configuredToChangeManagedDependency)) {
@@ -559,46 +449,113 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                 return t;
             }
 
-            private boolean checkIfNewDependencyPresent(@Nullable String groupId, @Nullable String artifactId, @Nullable String version) {
-                if ((groupId == null) || (artifactId == null)) {
-                    return false;
+            private List<ResolvedDependency> directDependencies(String groupId, String artifactId) {
+                List<ResolvedDependency> direct = new ArrayList<>();
+                for (ResolvedDependency rd : findDependencies(groupId, artifactId)) {
+                    if (rd.isDirect()) {
+                        direct.add(rd);
+                    }
                 }
-                List<ResolvedDependency> dependencies = findDependencies(groupId, artifactId);
-                return dependencies.stream()
-                        .filter(ResolvedDependency::isDirect)
-                        .anyMatch(rd -> version == null ||
-                                versionComparator != null && versionComparator.compare(null, version, rd.getVersion()) <= 0);
+                return direct;
             }
 
-            private boolean isDependencyManaged(Scope scope, String groupId, String artifactId) {
-                MavenResolutionResult result = getResolutionResult();
-
-                List<ResolvedManagedDependency> managedDependencies = result.getPom().getDependencyManagement();
-                if (managedDependencies == null) {
-                    return false;
-                }
-
-                for (ResolvedManagedDependency managedDependency : managedDependencies) {
-                    if (groupId.equals(managedDependency.getGroupId()) && artifactId.equals(managedDependency.getArtifactId())) {
-                        return scope.isInClasspathOf(managedDependency.getScope());
+            private boolean renamedOldTagWouldDuplicate(Xml.Tag oldTag) {
+                String groupId = renamedGroupId(oldTag.getChildValue("groupId").orElse(null));
+                String artifactId = renamedArtifactId(oldTag.getChildValue("artifactId").orElse(null));
+                for (ResolvedDependency rd : existingNewDirectDependencies) {
+                    if (Objects.equals(groupId, rd.getGroupId()) &&
+                            Objects.equals(artifactId, rd.getArtifactId()) &&
+                            sameClassifierAndType(oldTag, rd) &&
+                            widestScope(scopeOf(oldTag), scopeOf(rd)) != null) {
+                        return true;
                     }
                 }
                 return false;
             }
 
+            // Maven requires groupId:artifactId:type:classifier to be unique whatever the scope, so the survivor
+            // takes on the widest scope of the declarations folded into it
+            private @Nullable Scope scopeOfSurvivorOfRemovedOldDependency(Xml.Tag newTag) {
+                String newTagGroupId = newTag.getChildValue("groupId").orElse(null);
+                String newTagArtifactId = newTag.getChildValue("artifactId").orElse(null);
+                Scope survivingScope = null;
+                for (ResolvedDependency rd : existingOldDirectDependencies) {
+                    if (Objects.equals(newTagGroupId, renamedGroupId(rd.getGroupId())) &&
+                            Objects.equals(newTagArtifactId, renamedArtifactId(rd.getArtifactId())) &&
+                            sameClassifierAndType(newTag, rd)) {
+                        Scope widest = widestScope(survivingScope == null ? scopeOf(newTag) : survivingScope, scopeOf(rd));
+                        if (widest != null) {
+                            survivingScope = widest;
+                        }
+                    }
+                }
+                return survivingScope;
+            }
+
+            private boolean sameClassifierAndType(Xml.Tag tag, ResolvedDependency rd) {
+                return Objects.equals(emptyToNull(tag.getChildValue("classifier").orElse(null)), emptyToNull(rd.getClassifier())) &&
+                        tag.getChildValue("type").orElse("jar").equals(rd.getType());
+            }
+
+            private Scope scopeOf(Xml.Tag tag) {
+                return Scope.fromName(tag.getChildValue("scope").orElse(null));
+            }
+
+            private Scope scopeOf(ResolvedDependency rd) {
+                return Scope.fromName(rd.getRequested().getScope());
+            }
+
+            private @Nullable Scope widestScope(Scope a, Scope b) {
+                if (a == b) {
+                    return a;
+                }
+                List<Scope> classpathScopes = Arrays.asList(Scope.Compile, Scope.Provided, Scope.Runtime, Scope.Test);
+                if (!classpathScopes.contains(a) || !classpathScopes.contains(b)) {
+                    return null;
+                }
+                if (a == Scope.Test) {
+                    return b;
+                }
+                // provided and runtime only overlap on the test classpath
+                return b == Scope.Test ? a : Scope.Compile;
+            }
+
+            private @Nullable String renamedGroupId(@Nullable String fallback) {
+                return newGroupId != null ? newGroupId : fallback;
+            }
+
+            private @Nullable String renamedArtifactId(@Nullable String fallback) {
+                return newArtifactId != null ? newArtifactId : fallback;
+            }
+
+            private @Nullable String emptyToNull(@Nullable String value) {
+                return isBlank(value) ? null : value;
+            }
+
+            private boolean isDependencyManaged(Scope scope, String groupId, String artifactId) {
+                MavenResolutionResult result = getResolutionResult();
+                for (ResolvedManagedDependency managedDependency : result.getPom().getDependencyManagement()) {
+                    if (groupId.equals(managedDependency.getGroupId()) && artifactId.equals(managedDependency.getArtifactId())) {
+                        return scopeIsManagedBy(scope, managedDependency.getScope());
+                    }
+                }
+                return false;
+            }
+
+            // A managed version applies whenever coordinates match regardless of scope, so an identical scope
+            // qualifies; isInClasspathOf alone wrongly returns false for provided/provided and test/test.
+            private boolean scopeIsManagedBy(Scope dependencyScope, @Nullable Scope managedScope) {
+                return managedScope == null || dependencyScope == managedScope || dependencyScope.isInClasspathOf(managedScope);
+            }
+
             private boolean canAffectManagedDependency(MavenResolutionResult result, Scope scope, String groupId, String artifactId) {
-                // We're only going to be able to effect managed dependencies that are either direct or are brought in as direct via a local parent
+                // We're only going to be able to affect managed dependencies that are either direct or are brought in as direct via a local parent
                 // `ChangeManagedDependencyGroupIdAndArtifactId` cannot manipulate BOM imported managed dependencies nor direct dependencies from remote parents
                 Pom requestedPom = result.getPom().getRequested();
-
-                List<ManagedDependency> managedDependencies = requestedPom.getDependencyManagement();
-                if (managedDependencies == null) {
-                    return false;
-                }
-                for (ManagedDependency requestedManagedDependency : managedDependencies) {
+                for (ManagedDependency requestedManagedDependency : requestedPom.getDependencyManagement()) {
                     if (matchesGlob(requestedManagedDependency.getGroupId(), groupId) && matchesGlob(requestedManagedDependency.getArtifactId(), artifactId)) {
                         if (requestedManagedDependency instanceof ManagedDependency.Defined) {
-                            return scope.isInClasspathOf(Scope.fromName(((ManagedDependency.Defined) requestedManagedDependency).getScope()));
+                            return scopeIsManagedBy(scope, Scope.fromName(((ManagedDependency.Defined) requestedManagedDependency).getScope()));
                         }
                     }
                 }
@@ -612,10 +569,6 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                 MavenResolutionResult result = getResolutionResult();
                 ResolvedPom resolvedPom = result.getPom();
                 Pom requestedPom = resolvedPom.getRequested();
-                // Pom fields default to emptyList() via @Builder.Default, but deserialization can leave them null
-                if (requestedPom.getDependencies() == null) {
-                    return Collections.emptySet();
-                }
                 Set<String> relevantProperties = requestedPom.getDependencies().stream()
                         .filter(d -> isProperty(d.getVersion()) &&
                                 matchesGlob(resolvedPom.getValue(d.getGroupId()), groupId) &&
@@ -641,15 +594,18 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                     return newVersion;
                 }
                 String finalCurrentVersion = currentVersion != null ? currentVersion : newVersion;
-                if (availableVersions == null) {
-                    availableVersions = new ArrayList<>();
+                String key = groupId + ':' + artifactId;
+                List<String> versions = availableVersionsByArtifact.get(key);
+                if (versions == null) {
                     MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx));
-                    for (String v : mavenMetadata.getVersioning().getVersions()) {
-                        if (versionComparator.isValid(finalCurrentVersion, v)) {
-                            availableVersions.add(v);
-                        }
+                    versions = mavenMetadata.getVersioning().getVersions();
+                    availableVersionsByArtifact.put(key, versions);
+                }
+                List<String> availableVersions = new ArrayList<>();
+                for (String v : versions) {
+                    if (versionComparator.isValid(finalCurrentVersion, v)) {
+                        availableVersions.add(v);
                     }
-
                 }
                 return availableVersions.isEmpty() ? newVersion : max(availableVersions, versionComparator);
             }
@@ -659,9 +615,6 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
     @Value
     public static class Accumulator {
         Set<PomProperty> pomProperties = new HashSet<>();
-        Map<JavaProject, ResolvedDependency> modulesWithOldDependency = new HashMap<>();
-        Map<JavaProject, List<MavenRepository>> moduleRepositories = new HashMap<>();
-        Map<JavaProject, String> resolvedNewVersions = new HashMap<>();
     }
 
     @Value

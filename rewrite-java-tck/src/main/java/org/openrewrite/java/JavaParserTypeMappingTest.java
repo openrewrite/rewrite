@@ -16,10 +16,13 @@
 package org.openrewrite.java;
 
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.JavaType.Parameterized;
@@ -27,11 +30,16 @@ import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
+import javax.tools.ToolProvider;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
@@ -41,14 +49,19 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 @SuppressWarnings({"ConstantConditions", "PatternVariableCanBeUsed", "StatementWithEmptyBody"})
 class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
 
-    @Language("java")
-    private final String goat = StringUtils.readFully(JavaParserTypeMappingTest.class.getResourceAsStream("/JavaTypeGoat.java"));
+    // Every test reads the same compilation unit, so none may change its types, as `unsafeSet` would.
+    private static J.@Nullable CompilationUnit goatCu;
 
-    private final J.CompilationUnit goatCu = JavaParser.fromJavaVersion().build()
-      .parse(goat)
-      .findFirst()
-      .map(J.CompilationUnit.class::cast)
-      .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"));
+    private static J.CompilationUnit goatCu() {
+        if (goatCu == null) {
+            goatCu = JavaParser.fromJavaVersion().build()
+              .parse(StringUtils.readFully(JavaParserTypeMappingTest.class.getResourceAsStream("/JavaTypeGoat.java")))
+              .findFirst()
+              .map(J.CompilationUnit.class::cast)
+              .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"));
+        }
+        return goatCu;
+    }
 
     @Override
     public JavaType.FullyQualified classType(String fqn) {
@@ -62,7 +75,7 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
                 }
                 return super.visitClassDeclaration(classDecl, o);
             }
-        }.visit(goatCu, 0);
+        }.visit(goatCu(), 0);
         return type.get();
     }
 
@@ -142,6 +155,93 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
         );
     }
 
+    @Test
+    void boundedCapturedWildcardMapsToQuestionMark() {
+        // Inferring `wrap`'s type variable from a bounded wildcard argument involves capture conversion
+        // (`List<CAP of (? extends Number)>`). javac names a captured wildcard "<captured wildcard>",
+        // which is not valid Java. Whether the capture reaches the type mapper depends on the JDK: modern
+        // javac upward-projects it back to a `?` wildcard, while older builders leave the capture in place,
+        // where the mapper must normalize it. Either way the LST must never surface "<captured wildcard>".
+        rewriteRun(
+          java(
+            """
+              import java.util.List;
+
+              class Test {
+                  static <T> List<T> wrap(List<T> list) {
+                      return list;
+                  }
+
+                  void test(List<? extends Number> list) {
+                      Object o = wrap(list);
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                AtomicReference<JavaType> wrapInvocationType = new AtomicReference<>();
+                new JavaIsoVisitor<Integer>() {
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                        if ("wrap".equals(method.getSimpleName())) {
+                            wrapInvocationType.set(method.getType());
+                        }
+                        return super.visitMethodInvocation(method, p);
+                    }
+                }.visit(cu, 0);
+                Parameterized list = asParameterized(wrapInvocationType.get());
+                assertThat(list.getTypeParameters().get(0).toString())
+                  .isEqualTo("Generic{? extends java.lang.Number}")
+                  .doesNotContain("captured wildcard");
+            })
+          )
+        );
+    }
+
+    @Test
+    void capturedWildcardKeepsItsBounds() {
+        // javac captures the wildcard of a variable read as an argument or a receiver
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  static class Box<T extends Number> {
+                      T get() {
+                          return null;
+                      }
+                  }
+
+                  static <T> int frequency(Iterable<T> iterable, T value) {
+                      return 0;
+                  }
+
+                  int test(Iterable<? super String> values, String value, Box<?> box) {
+                      box.get();
+                      return frequency(values, value);
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                AtomicReference<JavaType> argumentType = new AtomicReference<>();
+                AtomicReference<JavaType> receiverBoundType = new AtomicReference<>();
+                new JavaIsoVisitor<Integer>() {
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                        if ("frequency".equals(method.getSimpleName())) {
+                            argumentType.set(method.getArguments().get(0).getType());
+                        } else {
+                            receiverBoundType.set(method.getType());
+                        }
+                        return super.visitMethodInvocation(method, p);
+                    }
+                }.visit(cu, 0);
+                assertThat(argumentType.get()).hasToString("java.lang.Iterable<Generic{? super java.lang.String}>");
+
+                assertThat(receiverBoundType.get()).hasToString("Generic{? extends java.lang.Number}");
+            })
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1762")
     @MinimumJava11
     @Test
@@ -180,7 +280,7 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
     @Test
     void methodInvocationOnUnknownType() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).methodDeclarations(false).constructorInvocations(false).build()),
+          spec -> spec.typeValidationOptions(TypeValidation.all().identifiers(false).methodDeclarations(false)),
           java(
             """
               import java.util.ArrayList;
@@ -207,6 +307,40 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
                   }
               }
               """
+          )
+        );
+    }
+
+    @Test
+    void initializerBlockLocalIsOwnedByTheInitializer() {
+        rewriteRun(
+          java(
+            """
+              class C {
+                  { int block = 1; block++; }
+                  static { int sblock = 1; sblock++; }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                List<J.Identifier> locals = new ArrayList<>();
+                new JavaIsoVisitor<List<J.Identifier>>() {
+                    @Override
+                    public J.Identifier visitIdentifier(J.Identifier identifier, List<J.Identifier> found) {
+                        if (identifier.getSimpleName().endsWith("block")) {
+                            found.add(identifier);
+                        }
+                        return identifier;
+                    }
+                }.visit(cu, locals);
+
+                assertThat(locals).hasSize(4).allSatisfy(local ->
+                  assertThat(local.getFieldType().getOwner()).isInstanceOfSatisfying(JavaType.Method.class, owner -> {
+                      assertThat(owner.getDeclaringType().getFullyQualifiedName()).isEqualTo("C");
+                      assertThat(owner.getName()).isEmpty();
+                      assertThat(owner.getReturnType()).isEqualTo(JavaType.Primitive.Void);
+                      assertThat(owner.getParameterTypes()).isEmpty();
+                  }));
+            })
           )
         );
     }
@@ -396,5 +530,191 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
                 })
           )
         );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-testing-frameworks/issues/1061")
+    @MinimumJava11
+    @Test
+    void methodInvocationTypeBoundWhenArgumentTypeUnresolvable() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.all().identifiers(false)),
+          java(
+            """
+              import static java.util.Objects.requireNonNull;
+              class MyTest {
+                  void test() {
+                      requireNonNull(UnknownType.unknownMethod());
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                AtomicBoolean asserted = new AtomicBoolean(false);
+                new JavaIsoVisitor<Integer>() {
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer n) {
+                        if ("requireNonNull".equals(method.getSimpleName())) {
+                            assertThat(method.getMethodType()).isNotNull();
+                            assertThat(method.getMethodType().getName()).isEqualTo("requireNonNull");
+                            assertThat(method.getMethodType().getDeclaringType().getFullyQualifiedName())
+                                    .isEqualTo("java.util.Objects");
+                            asserted.set(true);
+                        }
+                        return super.visitMethodInvocation(method, n);
+                    }
+                }.visit(cu, 0);
+                assertThat(asserted.get()).isTrue();
+            })
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/pull/8318")
+    @MinimumJava25
+    @Test
+    void methodInvocationTypeResolvedFromRecoveredInvocationTypeWhenArgumentTypeUnresolvable() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.all().identifiers(false)),
+          java(
+            """
+              import static java.util.Objects.requireNonNull;
+              class MyTest {
+                  void test() {
+                      requireNonNull(UnknownType.unknownMethod());
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                AtomicBoolean asserted = new AtomicBoolean(false);
+                new JavaIsoVisitor<Integer>() {
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer n) {
+                        if ("requireNonNull".equals(method.getSimpleName())) {
+                            JavaType.Method methodType = method.getMethodType();
+                            assertThat(methodType).isNotNull();
+                            assertThat(TypeUtils.asFullyQualified(methodType.getReturnType()).getFullyQualifiedName())
+                                    .isEqualTo("java.lang.Object");
+                            assertThat(methodType.getParameterTypes()).hasSize(1);
+                            assertThat(TypeUtils.asFullyQualified(methodType.getParameterTypes().get(0)).getFullyQualifiedName())
+                                    .isEqualTo("java.lang.Object");
+                            asserted.set(true);
+                        }
+                        return super.visitMethodInvocation(method, n);
+                    }
+                }.visit(cu, 0);
+                assertThat(asserted.get()).isTrue();
+            })
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/pull/8318")
+    @MinimumJava11
+    @Test
+    void methodInvocationTypeBoundOnOverloadedCalleeWithUnresolvableArgument() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.all().identifiers(false)),
+          java(
+            """
+              class MyTest {
+                  Object test() {
+                      return String.valueOf(UnknownType.unknownMethod());
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                AtomicBoolean asserted = new AtomicBoolean(false);
+                new JavaIsoVisitor<Integer>() {
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer n) {
+                        if ("valueOf".equals(method.getSimpleName())) {
+                            // With an unresolvable argument, overload resolution cannot pick a
+                            // principled winner; we bind javac's recovery candidate rather than
+                            // leaving the method type null, so only name and declaring type are
+                            // stable across JDKs.
+                            assertThat(method.getMethodType()).isNotNull();
+                            assertThat(method.getMethodType().getName()).isEqualTo("valueOf");
+                            assertThat(method.getMethodType().getDeclaringType().getFullyQualifiedName())
+                                    .isEqualTo("java.lang.String");
+                            asserted.set(true);
+                        }
+                        return super.visitMethodInvocation(method, n);
+                    }
+                }.visit(cu, 0);
+                assertThat(asserted.get()).isTrue();
+            })
+          )
+        );
+    }
+
+    @TempDir
+    Path fixtureClasses;
+
+    @Test
+    void kindOfClasspathTypesFollowsTheirClassFileFlags() throws Exception {
+        JavaType.Class holder = parseClasspathHolder("""
+          package fixture;
+          public class Holder {
+              public Ann ann() { return null; }
+              public Iface iface() { return null; }
+              public Enm enm() { return null; }
+              public Cls cls() { return null; }
+              public Outer<String>.Inner inner() { return null; }
+          }
+          @interface Ann {}
+          interface Iface {}
+          enum Enm {}
+          class Cls {}
+          class Outer<T> { class Inner {} }
+          """);
+
+        assertThat(returnTypeOf(holder, "ann").getKind()).isEqualTo(JavaType.FullyQualified.Kind.Annotation);
+        assertThat(returnTypeOf(holder, "iface").getKind()).isEqualTo(JavaType.FullyQualified.Kind.Interface);
+        assertThat(returnTypeOf(holder, "enm").getKind()).isEqualTo(JavaType.FullyQualified.Kind.Enum);
+        assertThat(returnTypeOf(holder, "cls").getKind()).isEqualTo(JavaType.FullyQualified.Kind.Class);
+        assertThat(returnTypeOf(holder, "iface").getFlags()).contains(Flag.Interface, Flag.Abstract);
+
+        JavaType.FullyQualified innerOwner = returnTypeOf(holder, "inner").getOwningClass();
+        assertThat(innerOwner).isInstanceOf(JavaType.Parameterized.class);
+        assertThat(innerOwner.getFullyQualifiedName()).isEqualTo("fixture.Outer");
+    }
+
+    @MinimumJava17
+    @Test
+    void kindOfClasspathRecordFollowsItsClassFileFlags() throws Exception {
+        JavaType.Class holder = parseClasspathHolder("""
+          package fixture;
+          public class Holder {
+              public Rec rec() { return null; }
+          }
+          record Rec() {}
+          """);
+
+        assertThat(returnTypeOf(holder, "rec").getKind()).isEqualTo(JavaType.FullyQualified.Kind.Record);
+    }
+
+    private JavaType.Class parseClasspathHolder(@Language("java") String fixture) throws Exception {
+        Path source = fixtureClasses.resolve("Holder.java");
+        Files.write(source, fixture.getBytes(StandardCharsets.UTF_8));
+        int exit = ToolProvider.getSystemJavaCompiler().run(null, null, null,
+          "-d", fixtureClasses.toString(), source.toString());
+        assertThat(exit).isZero();
+
+        // The source uses only Holder, so the other fixture types are reached through Holder's member signatures.
+        J.CompilationUnit cu = JavaParser.fromJavaVersion().classpath(singletonList(fixtureClasses)).build()
+          .parse("class A { fixture.Holder h; }")
+          .findFirst()
+          .map(J.CompilationUnit.class::cast)
+          .orElseThrow(() -> new IllegalStateException("Could not parse the Holder use"));
+        J.VariableDeclarations field =
+          (J.VariableDeclarations) cu.getClasses().get(0).getBody().getStatements().get(0);
+        return (JavaType.Class) field.getType();
+    }
+
+    private static JavaType.Class returnTypeOf(JavaType.Class type, String methodName) {
+        return (JavaType.Class) type.getMethods().stream()
+          .filter(m -> m.getName().equals(methodName))
+          .findFirst()
+          .orElseThrow(() -> new IllegalStateException("No method " + methodName))
+          .getReturnType();
     }
 }

@@ -42,13 +42,13 @@ public class HasTypeOnClasspathSourceSet<P> extends JavaIsoVisitor<P> {
                     .filter(sourceSet -> {
                         for (JavaType.FullyQualified classpath : sourceSet.getClasspath()) {
                             if (TypeUtils.isOfClassType(classpath, fullyQualifiedTypeName)) {
-                                return false;
+                                return true;
                             }
                         }
-                        return true;
+                        return false;
                     })
-                    .map(sourceSet -> cu)
-                    .orElse(SearchResult.found(cu));
+                    .map(sourceSet -> SearchResult.found(cu))
+                    .orElse(cu);
         }
         return super.visit(tree, p);
     }

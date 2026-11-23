@@ -76,6 +76,43 @@ public static class Preconditions
     public static ITreeVisitor<ExecutionContext> And(
         params Recipe[] recipes)
     {
-        return new AndVisitor(recipes.Select(x => x.GetVisitor()).ToArray());
+        return new AndVisitor(recipes.Select(AsPrecondition).ToArray());
     }
+
+    /// <summary>
+    /// Combines multiple precondition visitors with OR semantics. The combined
+    /// precondition matches if any visitor matches (modifies the tree). Mirrors
+    /// Java's <c>org.openrewrite.Preconditions.or</c>.
+    /// </summary>
+    public static ITreeVisitor<ExecutionContext> Or(
+        params ITreeVisitor<ExecutionContext>[] visitors)
+    {
+        if (visitors.Length < 2)
+        {
+            throw new ArgumentException("Preconditions.Or requires at least two operands", nameof(visitors));
+        }
+        return new OrVisitor(visitors);
+    }
+
+    public static ITreeVisitor<ExecutionContext> Or(this ITreeVisitor<ExecutionContext> first, params ITreeVisitor<ExecutionContext>[] others)
+    {
+        return Or(others.Prepend(first).ToArray());
+    }
+
+    public static ITreeVisitor<ExecutionContext> Or(
+        params Recipe[] recipes)
+    {
+        if (recipes.Length < 2)
+        {
+            throw new ArgumentException("Preconditions.Or requires at least two operands", nameof(recipes));
+        }
+        return new OrVisitor(recipes.Select(AsPrecondition).ToArray());
+    }
+
+    /// <summary>
+    /// The visitor that gates on <paramref name="recipe"/>. A recipe that delegates to Java gates as a
+    /// <see cref="RecipeRef"/> to that Java recipe, which the host can evaluate.
+    /// </summary>
+    internal static ITreeVisitor<ExecutionContext> AsPrecondition(Recipe recipe) =>
+        recipe is IDelegatesTo del ? new RecipeRef(del.JavaRecipeName, del.Options) : recipe.GetVisitor();
 }

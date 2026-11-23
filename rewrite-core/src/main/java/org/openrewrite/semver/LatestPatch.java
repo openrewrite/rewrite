@@ -55,8 +55,16 @@ public class LatestPatch implements VersionComparator {
 
     private static String buildTildeRange(String currentVersion) {
         String major = Semver.majorVersion(currentVersion);
-        String minor = Semver.minorVersion(currentVersion);
-        return StringUtils.isNumeric(minor) ? "~" + major + "." + minor : "~" + major;
+        String minor = Semver.versionSegment(currentVersion, 1);
+        if (StringUtils.isNumeric(minor)) {
+            return "~" + major + "." + minor;
+        }
+        if (minor != null && XRange.isWildcard(minor)) {
+            // A wildcard minor (e.g. "2.x", "2.+") allows any minor within the major.
+            return "~" + major;
+        }
+        // An absent or non-numeric minor (e.g. "1", "1.Final") stays within the patch range.
+        return "~" + major + ".0";
     }
 
     public static Validated<LatestPatch> build(String toVersion, @Nullable String metadataPattern) {

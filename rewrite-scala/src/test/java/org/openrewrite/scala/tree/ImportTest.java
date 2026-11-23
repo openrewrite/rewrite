@@ -16,11 +16,58 @@
 package org.openrewrite.scala.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.scala.ScalaIsoVisitor;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.scala.Assertions.scala;
 
 class ImportTest implements RewriteTest {
+
+    @Test
+    void importOfMembersOfAnObjectOrClassIsStatic() {
+        rewriteRun(
+          scala(
+            """
+              import scala.collection.JavaConverters._
+              import scala.concurrent.ExecutionContext.Implicits.global
+              import java.lang.System.out
+              import java.util.UUID
+              import scala.collection.mutable
+              import scala.math.max
+              import java.util.Map.Entry
+              import java.util.UUID, scala.util.Properties.versionString
+              object A {
+                val config = new Object
+                import config._
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> assertThat(new ScalaIsoVisitor<List<String>>() {
+                @Override
+                public J.Import visitImport(J.Import i, List<String> imports) {
+                    imports.add(i.getQualid().getSimpleName() + (i.isStatic() ? " static " + i.getTypeName() : ""));
+                    return i;
+                }
+            }.reduce(cu, new ArrayList<>()))
+              .containsExactly(
+                "_ static scala.collection.JavaConverters$_",
+                "global static scala.concurrent.ExecutionContext$Implicits",
+                "out static java.lang.System",
+                "UUID",
+                "mutable",
+                "max",
+                "Entry",
+                "UUID",
+                "versionString static scala.util.Properties",
+                "_"
+              ))
+          )
+        );
+    }
 
     @Test
     void singleImport() {
@@ -32,7 +79,18 @@ class ImportTest implements RewriteTest {
           )
         );
     }
-    
+
+    @Test
+    void importExtraSpaceAfterKeyword() {
+        rewriteRun(
+          scala(
+            """
+            import  scala.collection.mutable
+            """
+          )
+        );
+    }
+
     @Test
     void singleImportNoNewline() {
         // Test import without trailing newline (from SingleImportDebugTest)
@@ -115,11 +173,296 @@ class ImportTest implements RewriteTest {
           scala(
             """
             package com.example
-            
+
             import scala.collection.mutable
             import java.util.List
-            
+
             val x = 42
+            """
+          )
+        );
+    }
+
+    @Test
+    void scala3AliasKeyword() {
+        rewriteRun(
+          scala(
+            """
+            import java.io.{File as JFile}
+            """
+          )
+        );
+    }
+
+    @Test
+    void givenSelector() {
+        rewriteRun(
+          scala(
+            """
+            import a.b.{given}
+            """
+          )
+        );
+    }
+
+    @Test
+    void givenWithTypeSelector() {
+        rewriteRun(
+          scala(
+            """
+            import a.b.{given Ordering[Int]}
+            """
+          )
+        );
+    }
+
+    @Test
+    void mixedSelectorsIncludingGiven() {
+        rewriteRun(
+          scala(
+            """
+            import a.b.{c, d => D, given Foo, *}
+            """
+          )
+        );
+    }
+
+    @Test
+    void importInsideClass() {
+        rewriteRun(
+          scala(
+            """
+            class C {
+              import scala.util._
+              val x = 1
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void braceImportFollowedByClass() {
+        rewriteRun(
+          scala(
+            """
+            package com.example
+
+            import a.b.{c, d}
+
+            class X {
+              val y = 1
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void braceImportInterleavedWithPlainImports() {
+        rewriteRun(
+          scala(
+            """
+            package com.example
+
+            import a.b
+            import c.d.{e, f}
+            import g.h
+            """
+          )
+        );
+    }
+
+    @Test
+    void multipleNamedSelectorsRealWorld() {
+        rewriteRun(
+          scala(
+            """
+            import com.a.b.{Inspection, InspectionContext, Inspector, Levels}
+            """
+          )
+        );
+    }
+
+    @Test
+    void hidingAliasUnderscore() {
+        // Classic Scala idiom: import everything from Predef except `println`.
+        rewriteRun(
+          scala(
+            """
+            import scala.Predef.{println => _, _}
+            """
+          )
+        );
+    }
+
+    @Test
+    void hidingAliasAsUnderscore() {
+        // Scala 3 spelling of the same idiom.
+        rewriteRun(
+          scala(
+            """
+            import scala.Predef.{println as _, *}
+            """
+          )
+        );
+    }
+
+    @Test
+    void givenWithParameterizedType() {
+        rewriteRun(
+          scala(
+            """
+            import a.b.{given Conversion[Int, String]}
+            """
+          )
+        );
+    }
+
+    @Test
+    void backtickedSelector() {
+        rewriteRun(
+          scala(
+            """
+            import a.b.{`weird name`, c}
+            """
+          )
+        );
+    }
+
+    @Test
+    void backtickedQualifier() {
+        rewriteRun(
+          scala(
+            """
+            import a.`weird name`.c
+            """
+          )
+        );
+    }
+
+    @Test
+    void scala3AliasKeywordWithoutBraces() {
+        rewriteRun(
+          scala(
+            """
+            import a.b.c.X as Y
+            """
+          )
+        );
+    }
+
+    @Test
+    void rootPrefix() {
+        rewriteRun(
+          scala(
+            """
+            import _root_.scala.collection.mutable
+            """
+          )
+        );
+    }
+
+    @Test
+    void semicolonAfterImportInsideClass() {
+        rewriteRun(
+          scala(
+            """
+            class C { import scala.math._; val x = 1 }
+            """
+          )
+        );
+    }
+
+    @Test
+    void commentBetweenSelectorNameAndAs() {
+        rewriteRun(
+          scala(
+            """
+            import a.b.{X /* hi */ as Y}
+            """
+          )
+        );
+    }
+
+    @Test
+    void wildcardGivenWithoutBraces() {
+        // Imports all givens from a.b — Scala 3 shorthand.
+        rewriteRun(
+          scala(
+            """
+            import a.b.given
+            """
+          )
+        );
+    }
+
+    @Test
+    void commentInsideBraceSelectors() {
+        rewriteRun(
+          scala(
+            """
+            import a.b.{c /* the c */, d}
+            """
+          )
+        );
+    }
+
+    @Test
+    void importInsideMethodBody() {
+        rewriteRun(
+          scala(
+            """
+            def foo(): Int =
+              import scala.math._
+              max(1, 2)
+            """
+          )
+        );
+    }
+
+    @Test
+    void commaContinuationBrace() {
+        rewriteRun(
+          scala(
+            """
+            import a.{x}, b.{y}
+            """
+          )
+        );
+    }
+
+    @Test
+    void commaContinuationSimpleAndBrace() {
+        rewriteRun(
+          scala(
+            """
+            import a._, b.{x, y}
+            """
+          )
+        );
+    }
+
+    @Test
+    void commaContinuationBraceWithAlias() {
+        rewriteRun(
+          scala(
+            """
+            import a.{x => X}, b.{y as Y}
+            """
+          )
+        );
+    }
+
+    @Test
+    void importAfterStatement() {
+        // Scala allows imports to appear after other top-level statements.
+        rewriteRun(
+          scala(
+            """
+            class A { val x = 1 }
+            import scala.collection.mutable
+            class B { val y = 2 }
             """
           )
         );

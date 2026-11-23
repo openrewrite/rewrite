@@ -326,7 +326,7 @@ class TypeTableAnnotationSerializationTest {
     }
 
     @Test
-    void testAnnotationValueCollector() {
+    void annotationValueCollector() {
         // Create a list to collect the annotations
         List<String> collectedAnnotations = new ArrayList<>();
 
@@ -355,7 +355,7 @@ class TypeTableAnnotationSerializationTest {
     }
 
     @Test
-    void testAnnotationValueCollectorWithAttributes() {
+    void annotationValueCollectorWithAttributes() {
         // Create a list to collect the annotations
         List<String> collectedAnnotations = new ArrayList<>();
 
@@ -393,7 +393,7 @@ class TypeTableAnnotationSerializationTest {
     }
 
     @Test
-    void testAnnotationValueCollectorWithNestedAnnotation() {
+    void annotationValueCollectorWithNestedAnnotation() {
         // Create a list to collect the annotations
         List<String> collectedAnnotations = new ArrayList<>();
 
@@ -435,7 +435,7 @@ class TypeTableAnnotationSerializationTest {
     }
 
     @Test
-    void testAnnotationValueCollectorWithArray() {
+    void annotationValueCollectorWithArray() {
         // Create a list to collect the annotations
         List<String> collectedAnnotations = new ArrayList<>();
 
@@ -508,7 +508,7 @@ class TypeTableAnnotationSerializationTest {
     }
 
     @Test
-    void testParserErrorPositioning() {
+    void parserErrorPositioning() {
         // Test malformed annotation - missing closing parenthesis
         assertThatThrownBy(() -> AnnotationDeserializer.parseAnnotation("@Lorg/springframework/retry/annotation/Backoff;("))
           .isInstanceOf(IllegalArgumentException.class)

@@ -18,16 +18,16 @@ ChangeType recipe for Python that delegates to Java's ChangeType.
 This recipe changes type references from one fully qualified name to another,
 handling all the complexities of type attribution and imports.
 """
-from dataclasses import field
-from typing import Any, Optional
+from dataclasses import dataclass, field
 
-from rewrite import ExecutionContext, Recipe, TreeVisitor, option
+from rewrite import Recipe, option
 from rewrite.decorators import categorize
 from rewrite.marketplace import Python
-from rewrite.rpc.java_recipe import prepare_java_recipe, JavaRecipeVisitor, PreparedJavaRecipe
+from rewrite.rpc.rpc_recipe import RpcRecipe
 
 
 @categorize(Python)
+@dataclass
 class ChangeType(Recipe):
     """
     Change a type reference from one fully qualified name to another.
@@ -45,35 +45,24 @@ class ChangeType(Recipe):
         )
     """
 
-    old_fully_qualified_type_name: str = field(metadata=option(
+    old_fully_qualified_type_name: str = field(default="", metadata=option(
         display_name="Old fully-qualified type name",
         description="Fully-qualified class name of the original type.",
         example="ast.Num"
     ))
 
-    new_fully_qualified_type_name: str = field(metadata=option(
+    new_fully_qualified_type_name: str = field(default="", metadata=option(
         display_name="New fully-qualified type name",
         description="Fully-qualified class name of the replacement type.",
         example="ast.Constant"
     ))
 
-    ignore_definition: bool = field(metadata=option(
+    ignore_definition: bool = field(default=False, metadata=option(
         display_name="Ignore type definition",
         description="When set to True, the definition of the old type will be left untouched. "
                     "This is useful when you're renaming the type itself.",
         required=False
     ))
-
-    def __init__(
-        self,
-        old_fully_qualified_type_name: str = "",
-        new_fully_qualified_type_name: str = "",
-        ignore_definition: bool = False
-    ):
-        self.old_fully_qualified_type_name = old_fully_qualified_type_name
-        self.new_fully_qualified_type_name = new_fully_qualified_type_name
-        self.ignore_definition = ignore_definition
-        self._prepared_recipe: Optional[PreparedJavaRecipe] = None
 
     @property
     def name(self) -> str:
@@ -87,16 +76,10 @@ class ChangeType(Recipe):
     def description(self) -> str:
         return "Change a type reference from one fully qualified name to another."
 
-    def editor(self) -> TreeVisitor[Any, ExecutionContext]:
-        # Prepare the Java recipe if not already done
-        if self._prepared_recipe is None:
-            self._prepared_recipe = prepare_java_recipe(
-                "org.openrewrite.java.ChangeType",
-                {
-                    "oldFullyQualifiedTypeName": self.old_fully_qualified_type_name,
-                    "newFullyQualifiedTypeName": self.new_fully_qualified_type_name,
-                    "ignoreDefinition": self.ignore_definition
-                }
-            )
-
-        return JavaRecipeVisitor(self._prepared_recipe)
+    def recipe_list(self) -> list[Recipe]:
+        return [RpcRecipe(
+            "org.openrewrite.java.ChangeType",
+            oldFullyQualifiedTypeName=self.old_fully_qualified_type_name,
+            newFullyQualifiedTypeName=self.new_fully_qualified_type_name,
+            ignoreDefinition=self.ignore_definition,
+        )]

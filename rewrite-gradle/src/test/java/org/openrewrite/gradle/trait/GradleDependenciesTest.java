@@ -18,14 +18,22 @@ package org.openrewrite.gradle.trait;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.Parser;
+import org.openrewrite.SourceFile;
+import org.openrewrite.gradle.GradleParser;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.trait.Trait;
 
+import java.nio.file.Path;
+import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 
@@ -49,6 +57,45 @@ class GradleDependenciesTest implements RewriteTest {
                   return mi;
               }
           }));
+    }
+
+    @Test
+    void noNewTraitInstanceWhenNothingIsRemoved() {
+        AtomicReference<GradleDependencies> input = new AtomicReference<>();
+        AtomicReference<GradleDependencies> output = new AtomicReference<>();
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  var mi = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
+                  new GradleDependencies.Matcher().get(mi, getCursor().getParent()).ifPresent(deps -> {
+                      input.set(deps);
+                      // Try to remove a dependency that is not present, so nothing should change.
+                      output.set(deps.removeDependency("com.example", "does-not-exist"));
+                  });
+                  return mi;
+              }
+          })),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  implementation 'org.apache.commons:commons-lang3:3.17.0'
+              }
+              """
+          )
+        );
+
+        assertThat(input.get()).isNotNull();
+        // When no statement is removed, no new trait (or underlying tree) should be allocated.
+        assertThat(output.get())
+          .as("removeDependency should return the same instance when nothing changes")
+          .isSameAs(input.get());
     }
 
     @DocumentExample
@@ -896,5 +943,22 @@ class GradleDependenciesTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Test
+    void kotlinDependenciesBlockWithoutGradleProject() {
+        SourceFile buildGradleKts = GradleParser.builder().build().parseInputs(
+            List.of(Parser.Input.fromString(Path.of("build.gradle.kts"), """
+              dependencies {
+                  implementation("org.apache.commons:commons-lang3:3.17.0")
+              }
+              """)), null, new InMemoryExecutionContext(Throwable::printStackTrace))
+          .findFirst().orElseThrow();
+        AtomicReference<GradleDependencies> found = new AtomicReference<>();
+        new GradleDependencies.Matcher().asVisitor(deps -> {
+            found.set(deps);
+            return deps.getTree();
+        }).visit(buildGradleKts, 0);
+        assertThat(found.get()).isNotNull();
     }
 }

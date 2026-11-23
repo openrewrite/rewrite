@@ -25,20 +25,30 @@ import org.codehaus.groovy.control.*;
 import org.codehaus.groovy.control.io.InputStreamReaderSource;
 import org.codehaus.groovy.control.messages.WarningMessage;
 import org.codehaus.groovy.transform.stc.StaticTypeCheckingVisitor;
+import org.codehaus.groovy.transform.stc.TypeCheckingExtension;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.groovy.internal.NegativeCachingGroovyClassLoader;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.internal.DefaultJavaTypeFactory;
+import org.openrewrite.java.internal.HashMapJavaTypeCache;
 import org.openrewrite.java.internal.JavaTypeCache;
+import org.openrewrite.java.internal.JavaTypeFactory;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
+import java.io.BufferedReader;
+import java.io.Closeable;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
@@ -60,7 +70,9 @@ public class GroovyParser implements Parser {
 
     private final boolean logCompilationWarningsAndErrors;
     private final JavaTypeCache typeCache;
+    private final JavaTypeFactory typeFactory;
     private final List<Consumer<CompilerConfiguration>> compilerCustomizers;
+    private final List<Function<StaticTypeCheckingVisitor, TypeCheckingExtension>> typeCheckingExtensions;
 
     @Override
     public Stream<SourceFile> parse(@Language("groovy") String... sources) {
@@ -109,11 +121,25 @@ public class GroovyParser implements Parser {
             compilerCustomizer.accept(configuration);
         }
 
+        // Build both loaders once and reuse them across every source in this batch:
+        //  - transformLoader is classpath-free; it only discovers (and lets us disable) global AST
+        //    transformations. Carrying the compile classpath here would make CompilationUnit rescan it for
+        //    transforms once per source file — pure overhead, since the parser never runs them.
+        //  - classLoader carries the compile classpath and is what Groovy resolves types against. A fresh loader
+        //    per file would re-resolve the same classpath types from scratch every time; sharing one warms the
+        //    JVM's per-loader class table once. Safe because parsing stops at CANONICALIZATION and never defines
+        //    classes into the loader. NegativeCachingGroovyClassLoader additionally skips re-scanning the
+        //    classpath for the many never-resolving lookups Groovy's resolver makes.
+        // Both outlive the lazily-consumed stream, so they are closed in its onClose handler (GC otherwise).
+        GroovyClassLoader transformLoader = new GroovyClassLoader(getClass().getClassLoader());
+        disableGlobalAstTransformations(configuration, transformLoader);
+        GroovyClassLoader classLoader = new NegativeCachingGroovyClassLoader(getClass().getClassLoader(), configuration);
+
         ParsingExecutionContextView pctx = ParsingExecutionContextView.view(ctx);
         return StreamSupport.stream(sources.spliterator(), false)
                 .map(input -> {
                     ParseWarningCollector errorCollector = new ParseWarningCollector(configuration, this);
-                    try (GroovyClassLoader classLoader = new GroovyClassLoader(getClass().getClassLoader(), configuration, true)) {
+                    try {
                         SourceUnit unit = new SourceUnit(
                                 "doesntmatter",
                                 new InputStreamReaderSource(input.getSource(ctx), configuration),
@@ -123,8 +149,15 @@ public class GroovyParser implements Parser {
                         );
 
                         pctx.getParsingListener().startedParsing(input);
-                        CompilationUnit compUnit = new LessAstTransformationsCompilationUnit(configuration, null, classLoader, classLoader);
+                        CompilationUnit compUnit = new LessAstTransformationsCompilationUnit(configuration, null, classLoader, transformLoader);
                         compUnit.addSource(unit);
+                        compUnit.compile(Phases.CONVERSION);
+                        // An error collected by CONVERSION is a syntax error. Groovy 4's parser throws on it, but
+                        // Groovy 2.5's leaves a truncated AST. Errors from later phases, such as an unresolved
+                        // class, stay ParseWarnings.
+                        if (errorCollector.hasErrors()) {
+                            throw new MultipleCompilationErrorsException(errorCollector);
+                        }
                         compUnit.compile(Phases.CANONICALIZATION);
                         ModuleNode ast = unit.getAST();
 
@@ -132,8 +165,14 @@ public class GroovyParser implements Parser {
                             try {
                                 StaticTypeCheckingVisitor staticTypeCheckingVisitor = new StaticTypeCheckingVisitor(unit, aClass);
                                 staticTypeCheckingVisitor.setCompilationUnit(compUnit);
+                                staticTypeCheckingVisitor.addTypeCheckingExtension(new StaticImportTypeCheckingExtension(staticTypeCheckingVisitor));
+                                for (Function<StaticTypeCheckingVisitor, TypeCheckingExtension> extension : typeCheckingExtensions) {
+                                    staticTypeCheckingVisitor.addTypeCheckingExtension(extension.apply(staticTypeCheckingVisitor));
+                                }
                                 staticTypeCheckingVisitor.visitClass(aClass);
-                            } catch (NoClassDefFoundError ignored) {
+                            } catch (NoClassDefFoundError | NullPointerException ignored) {
+                                // Static type checking is best-effort; skip enrichment when Groovy fails internally
+                                // (e.g., NPE in inferDiamondType when diamond is used with an unresolved imported class).
                             }
                         }
 
@@ -144,6 +183,7 @@ public class GroovyParser implements Parser {
                                 compiled.getInput().getFileAttributes(),
                                 compiled.getInput().getSource(ctx),
                                 typeCache,
+                                typeFactory,
                                 ctx
                         );
                         G.CompilationUnit gcu = mappingVisitor.visit(compiled.getSourceUnit(), compiled.getModule());
@@ -170,13 +210,69 @@ public class GroovyParser implements Parser {
                             }
                         }
                     }
+                })
+                .onClose(() -> {
+                    closeQuietly(classLoader);
+                    closeQuietly(transformLoader);
                 });
+    }
+
+    private static void closeQuietly(Closeable closeable) {
+        try {
+            closeable.close();
+        } catch (IOException ignored) {
+            // Best-effort: the loaders hold only classpath JAR handles, which GC releases otherwise.
+        }
+    }
+
+    private static final String AST_TRANSFORMATION_SERVICE = "META-INF/services/org.codehaus.groovy.transform.ASTTransformation";
+
+    /**
+     * OpenRewrite parses Groovy only to build a source-faithful LST; it never executes the parsed code. Global
+     * AST transformations rewrite the AST <em>away</em> from the original source text, which desynchronizes the
+     * position-based {@link GroovyParserVisitor} and surfaces as "Failed to parse ... at cursor position N".
+     * Since they serve no purpose for parsing, disable every one the parser can discover so the same source
+     * always produces the same LST.
+     * <p>
+     * Discovery uses {@code transformLoader}, the classpath-free loader the per-source compilation units are
+     * given (see {@link #parseInputs}), so only transformations on the runtime classpath (e.g. groovy-core's
+     * {@code @Grab}) are found and disabled — exactly the set {@link CompilationUnit} would otherwise register.
+     * Local annotation-driven transformations (e.g. {@code @Builder}) are unaffected, and names already
+     * configured by a compiler customizer are preserved.
+     */
+    private void disableGlobalAstTransformations(CompilerConfiguration configuration, GroovyClassLoader transformLoader) {
+        Set<String> disabled = configuration.getDisabledGlobalASTTransformations() == null ?
+                new HashSet<>() : new HashSet<>(configuration.getDisabledGlobalASTTransformations());
+        try {
+            Enumeration<URL> services = transformLoader.getResources(AST_TRANSFORMATION_SERVICE);
+            while (services.hasMoreElements()) {
+                try (BufferedReader reader = new BufferedReader(new InputStreamReader(services.nextElement().openStream(), StandardCharsets.UTF_8))) {
+                    for (String line = reader.readLine(); line != null; line = reader.readLine()) {
+                        int comment = line.indexOf('#');
+                        String name = (comment >= 0 ? line.substring(0, comment) : line).trim();
+                        if (!name.isEmpty()) {
+                            disabled.add(name);
+                        }
+                    }
+                }
+            }
+        } catch (IOException ignored) {
+            // If discovery fails, fall back to whatever was already configured; never worse than before.
+        }
+        configuration.setDisabledGlobalASTTransformations(disabled);
     }
 
     @Override
     public boolean accept(Path path) {
         return path.toString().endsWith(".groovy") ||
-               path.toFile().getName().startsWith("Jenkinsfile");
+               isJenkinsfile(path.toFile().getName());
+    }
+
+    private static boolean isJenkinsfile(String fileName) {
+        String jenkinsfile = "Jenkinsfile";
+        return fileName.startsWith(jenkinsfile) &&
+               (fileName.length() == jenkinsfile.length() ||
+                !Character.isLetterOrDigit(fileName.charAt(jenkinsfile.length())));
     }
 
     @Override
@@ -208,9 +304,15 @@ public class GroovyParser implements Parser {
         protected Collection<String> artifactNames = emptyList();
 
         private JavaTypeCache typeCache = new JavaTypeCache();
+        private boolean typeCacheConfigured;
+
+        @Nullable
+        private JavaTypeFactory typeFactory;
+
         private boolean logCompilationWarningsAndErrors = false;
-        private final List<NamedStyles> styles = new ArrayList<>();
-        private final List<Consumer<CompilerConfiguration>> compilerCustomizers = new ArrayList<>();
+        private List<NamedStyles> styles = new ArrayList<>();
+        private List<Consumer<CompilerConfiguration>> compilerCustomizers = new ArrayList<>();
+        private List<Function<StaticTypeCheckingVisitor, TypeCheckingExtension>> typeCheckingExtensions = new ArrayList<>();
 
         public Builder() {
             super(G.CompilationUnit.class);
@@ -221,9 +323,12 @@ public class GroovyParser implements Parser {
             this.classpath = base.classpath;
             this.artifactNames = base.artifactNames;
             this.typeCache = base.typeCache;
+            this.typeCacheConfigured = base.typeCacheConfigured;
+            this.typeFactory = base.typeFactory;
             this.logCompilationWarningsAndErrors = base.logCompilationWarningsAndErrors;
             this.styles.addAll(base.styles);
             this.compilerCustomizers.addAll(base.compilerCustomizers);
+            this.typeCheckingExtensions.addAll(base.typeCheckingExtensions);
         }
 
         public Builder logCompilationWarningsAndErrors(boolean logCompilationWarningsAndErrors) {
@@ -262,9 +367,22 @@ public class GroovyParser implements Parser {
             return this;
         }
 
+        /**
+         * @deprecated Configure a {@link JavaTypeFactory} via {@link #typeFactory} instead.
+         * The cache becomes an implementation detail of the default
+         * {@link DefaultJavaTypeFactory}.
+         */
+        @Deprecated
         @SuppressWarnings("unused")
         public Builder typeCache(JavaTypeCache typeCache) {
             this.typeCache = typeCache;
+            this.typeCacheConfigured = true;
+            return this;
+        }
+
+        @SuppressWarnings("unused")
+        public Builder typeFactory(JavaTypeFactory typeFactory) {
+            this.typeFactory = typeFactory;
             return this;
         }
 
@@ -287,6 +405,15 @@ public class GroovyParser implements Parser {
             return this;
         }
 
+        /**
+         * Extensions to the type checker that attributes types, such as one that knows a DSL's closure delegates.
+         */
+        @SafeVarargs
+        public final GroovyParser.Builder typeCheckingExtensions(Function<StaticTypeCheckingVisitor, TypeCheckingExtension>... typeCheckingExtensions) {
+            this.typeCheckingExtensions.addAll(Arrays.asList(typeCheckingExtensions));
+            return this;
+        }
+
         private @Nullable Collection<Path> resolvedClasspath() {
             if (artifactNames != null && !artifactNames.isEmpty()) {
                 classpath = JavaParser.dependenciesFromClasspath(artifactNames.toArray(new String[0]));
@@ -297,7 +424,13 @@ public class GroovyParser implements Parser {
 
         @Override
         public GroovyParser build() {
-            return new GroovyParser(resolvedClasspath(), logCompilationWarningsAndErrors, typeCache, compilerCustomizers);
+            Collection<Path> cp = resolvedClasspath();
+            typeCache = HashMapJavaTypeCache.forParser(typeCache, typeCacheConfigured || typeFactory != null);
+            JavaTypeFactory factory = typeFactory;
+            if (factory == null) {
+                factory = new DefaultJavaTypeFactory(typeCache);
+            }
+            return new GroovyParser(cp, logCompilationWarningsAndErrors, typeCache, factory, compilerCustomizers, typeCheckingExtensions);
         }
 
         @Override
@@ -309,6 +442,9 @@ public class GroovyParser implements Parser {
         public GroovyParser.Builder clone() {
             GroovyParser.Builder clone = (GroovyParser.Builder) super.clone();
             clone.typeCache = this.typeCache.clone();
+            clone.styles = new ArrayList<>(this.styles);
+            clone.compilerCustomizers = new ArrayList<>(this.compilerCustomizers);
+            clone.typeCheckingExtensions = new ArrayList<>(this.typeCheckingExtensions);
             return clone;
         }
     }

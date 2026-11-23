@@ -1264,4 +1264,130 @@ class UnnecessaryParenthesesTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-static-analysis/issues/219")
+    @Test
+    void keepLineBreaksWhenUnwrappingMethodArguments() {
+        rewriteRun(
+          //language=java
+          java(
+            """
+              class Test {
+                void f(StringBuilder sb, String s) {
+                  sb.append(
+                    (s.trim())
+                  );
+                  sb.append((
+                    s.trim()
+                  ));
+                  sb.insert(
+                    0,
+                    (s.trim())
+                  );
+                }
+              }
+              """,
+            """
+              class Test {
+                void f(StringBuilder sb, String s) {
+                  sb.append(
+                    s.trim()
+                  );
+                  sb.append(
+                    s.trim()
+                  );
+                  sb.insert(
+                    0,
+                    s.trim()
+                  );
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-static-analysis/issues/219")
+    @Test
+    void doNotDoubleLineBreaksWhenUnwrappingMethodArguments() {
+        rewriteRun(
+          //language=java
+          java(
+            """
+              class Test {
+                void f(StringBuilder sb, String s) {
+                  sb.append(
+                    (
+                      s.trim()
+                    )
+                  );
+                }
+              }
+              """,
+            """
+              class Test {
+                void f(StringBuilder sb, String s) {
+                  sb.append(
+                    s.trim()
+                  );
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-static-analysis/issues/219")
+    @Test
+    void keepCommentsWhenUnwrappingMethodArguments() {
+        rewriteRun(
+          //language=java
+          java(
+            """
+              class Test {
+                void f(StringBuilder sb, String s) {
+                  sb.append(
+                    (s.trim() /* inner */) // outer
+                  );
+                }
+              }
+              """,
+            """
+              class Test {
+                void f(StringBuilder sb, String s) {
+                  sb.append(
+                    s.trim() /* inner */ // outer
+                  );
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-static-analysis/issues/219")
+    @Test
+    void doNotAddBlankLineWhenUnwrappingMethodInvocationSelect() {
+        rewriteRun(
+          //language=java
+          java(
+            """
+              class Test {
+                void f(String s) {
+                  (
+                    s.trim()
+                  ).length();
+                }
+              }
+              """,
+            """
+              class Test {
+                void f(String s) {
+                  s.trim().length();
+                }
+              }
+              """
+          )
+        );
+    }
 }

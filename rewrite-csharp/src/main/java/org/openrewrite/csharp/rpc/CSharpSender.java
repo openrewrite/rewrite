@@ -19,14 +19,13 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.csharp.CSharpVisitor;
 import org.openrewrite.csharp.tree.Cs;
-import org.openrewrite.csharp.tree.CsDocCommentRawComment;
+import org.openrewrite.csharp.tree.CsDocComment;
 import org.openrewrite.csharp.tree.Linq;
 import org.openrewrite.java.internal.rpc.JavaSender;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.rpc.RpcSendQueue;
 
-import java.util.List;
-
+import static org.openrewrite.java.internal.rpc.JavaSender.spaceRef;
 import static org.openrewrite.rpc.Reference.asRef;
 import static org.openrewrite.rpc.Reference.getValueNonNull;
 
@@ -49,8 +48,8 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
     @Override
     public J preVisit(J j, RpcSendQueue q) {
         q.getAndSend(j, Tree::getId);
-        q.getAndSend(j, J::getPrefix, space -> visitSpace(space, q));
-        q.getAndSend(j, Tree::getMarkers);
+        q.getAndSend(j, x -> spaceRef(x.getPrefix()), space -> visitSpace(getValueNonNull(space), q));
+        q.getAndSend(j, mk -> asRef(mk.getMarkers()));
 
         return j;
     }
@@ -66,7 +65,7 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
         q.getAndSendList(cu, c -> c.getPadding().getUsings(), el -> el.getElement().getId(), el -> visitRightPadded(el, q));
         q.getAndSendList(cu, Cs.CompilationUnit::getAttributeLists, Tree::getId, el -> visit(el, q));
         q.getAndSendList(cu, c -> c.getPadding().getMembers(), stmt -> stmt.getElement().getId(), stmt -> visitRightPadded(stmt, q));
-        q.getAndSend(cu, Cs.CompilationUnit::getEof, space -> visitSpace(space, q));
+        q.getAndSend(cu, x -> spaceRef(x.getEof()), space -> visitSpace(getValueNonNull(space), q));
         return cu;
     }
 
@@ -143,6 +142,7 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
 
     @Override
     public J visitPragmaChecksumDirective(Cs.PragmaChecksumDirective pragmaChecksumDirective, RpcSendQueue q) {
+        q.getAndSend(pragmaChecksumDirective, x -> spaceRef(x.getKeywordSpacing()), space -> visitSpace(getValueNonNull(space), q));
         q.getAndSend(pragmaChecksumDirective, Cs.PragmaChecksumDirective::getArguments);
         return pragmaChecksumDirective;
     }
@@ -153,6 +153,7 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
         q.getAndSend(nullableDirective, Cs.NullableDirective::getTarget);
         q.getAndSend(nullableDirective, Cs.NullableDirective::getHashSpacing);
         q.getAndSend(nullableDirective, Cs.NullableDirective::getTrailingComment);
+        q.getAndSend(nullableDirective, Cs.NullableDirective::getKeywordSpacing);
         return nullableDirective;
     }
 
@@ -187,6 +188,8 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
     @Override
     public J visitPragmaWarningDirective(Cs.PragmaWarningDirective pragmaWarningDirective, RpcSendQueue q) {
         q.getAndSend(pragmaWarningDirective, Cs.PragmaWarningDirective::getAction);
+        q.getAndSend(pragmaWarningDirective, x -> spaceRef(x.getKeywordSpacing()), space -> visitSpace(getValueNonNull(space), q));
+        q.getAndSend(pragmaWarningDirective, x -> spaceRef(x.getActionSpacing()), space -> visitSpace(getValueNonNull(space), q));
         q.getAndSendList(pragmaWarningDirective, p -> p.getPadding().getWarningCodes(), el -> el.getElement().getId(), el -> visitRightPadded(el, q));
         return pragmaWarningDirective;
     }
@@ -304,7 +307,7 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
         q.getAndSendList(namespaceDeclaration, n -> n.getPadding().getExterns(), el -> el.getElement().getId(), el -> visitRightPadded(el, q));
         q.getAndSendList(namespaceDeclaration, n -> n.getPadding().getUsings(), el -> el.getElement().getId(), el -> visitRightPadded(el, q));
         q.getAndSendList(namespaceDeclaration, n -> n.getPadding().getMembers(), el -> el.getElement().getId(), el -> visitRightPadded(el, q));
-        q.getAndSend(namespaceDeclaration, Cs.NamespaceDeclaration::getEnd, space -> visitSpace(space, q));
+        q.getAndSend(namespaceDeclaration, x -> spaceRef(x.getEnd()), space -> visitSpace(getValueNonNull(space), q));
         return namespaceDeclaration;
     }
 
@@ -339,7 +342,9 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
     @Override
     public J visitInterpolation(Cs.Interpolation interpolation, RpcSendQueue q) {
         q.getAndSend(interpolation, i -> i.getPadding().getExpression(), el -> visitRightPadded(el, q));
+        q.getAndSend(interpolation, x -> spaceRef(x.getAlignmentBefore()), space -> visitSpace(getValueNonNull(space), q));
         q.getAndSend(interpolation, i -> i.getPadding().getAlignment(), el -> visitRightPadded(el, q));
+        q.getAndSend(interpolation, x -> spaceRef(x.getFormatBefore()), space -> visitSpace(getValueNonNull(space), q));
         q.getAndSend(interpolation, i -> i.getPadding().getFormat(), el -> visitRightPadded(el, q));
         return interpolation;
     }
@@ -360,6 +365,7 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
     public J visitUsingDirective(Cs.UsingDirective usingDirective, RpcSendQueue q) {
         q.getAndSend(usingDirective, u -> u.getPadding().getGlobal(), el -> visitRightPadded(el, q));
         q.getAndSend(usingDirective, u -> u.getPadding().getStatic(), el -> visitLeftPadded(el, q));
+        q.getAndSend(usingDirective, u -> u.getPadding().getUnsafe(), el -> visitLeftPadded(el, q));
         q.getAndSend(usingDirective, u -> u.getPadding().getAlias(), el -> visitRightPadded(el, q));
         q.getAndSend(usingDirective, Cs.UsingDirective::getNamespaceOrType, el -> visit(el, q));
         return usingDirective;
@@ -389,7 +395,7 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
 
     @Override
     public J visitUsingStatement(Cs.UsingStatement usingStatement, RpcSendQueue q) {
-        q.getAndSend(usingStatement, u -> u.getPadding().getExpression(), el -> visitLeftPadded(el, q));
+        q.getAndSend(usingStatement, Cs.UsingStatement::getExpression, el -> visit(el, q));
         q.getAndSend(usingStatement, Cs.UsingStatement::getStatement, el -> visit(el, q));
         return usingStatement;
     }
@@ -511,9 +517,16 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
 
     @Override
     public J visitSizeOf(Cs.SizeOf sizeOf, RpcSendQueue q) {
-        q.getAndSend(sizeOf, Cs.SizeOf::getExpression, el -> visit(el, q));
+        q.getAndSend(sizeOf, Cs.SizeOf::getClazz, el -> visit(el, q));
         q.getAndSend(sizeOf, s -> asRef(s.getType()), type -> visitType(getValueNonNull(type), q));
         return sizeOf;
+    }
+
+    @Override
+    public J visitTypeOf(Cs.TypeOf typeOf, RpcSendQueue q) {
+        q.getAndSend(typeOf, Cs.TypeOf::getClazz, el -> visit(el, q));
+        q.getAndSend(typeOf, t -> asRef(t.getType()), type -> visitType(getValueNonNull(type), q));
+        return typeOf;
     }
 
     @Override
@@ -727,6 +740,7 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
         q.getAndSend(conversionOperatorDeclaration, c -> c.getPadding().getParameters(), el -> visitContainer(el, q));
         q.getAndSend(conversionOperatorDeclaration, c -> c.getPadding().getExpressionBody(), el -> visitLeftPadded(el, q));
         q.getAndSend(conversionOperatorDeclaration, Cs.ConversionOperatorDeclaration::getBody, el -> visit(el, q));
+        q.getAndSend(conversionOperatorDeclaration, el -> asRef(el.getMethodType()), el -> visitType(getValueNonNull(el), q));
         return conversionOperatorDeclaration;
     }
 
@@ -876,25 +890,25 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
                     c -> {
                         if (c instanceof TextComment) {
                             return ((TextComment) c).getText() + c.getSuffix();
-                        } else if (c instanceof CsDocCommentRawComment) {
-                            return ((CsDocCommentRawComment) c).getText() + c.getSuffix();
+                        } else if (c instanceof CsDocComment.DocComment) {
+                            // A structured doc comment is a proper tree, so it is keyed by its id
+                            // (like Javadoc.DocComment on the Java side) and decomposed over RPC.
+                            return ((CsDocComment.DocComment) c).getId();
                         }
                         throw new IllegalArgumentException("Unexpected comment type " + c.getClass().getName());
                     },
                     c -> {
-                        if (c instanceof TextComment) {
+                        if (c instanceof CsDocComment.DocComment) {
+                            new CsDocCommentSender(delegate).visit((CsDocComment.DocComment) c, q);
+                        } else if (c instanceof TextComment) {
                             TextComment tc = (TextComment) c;
                             q.getAndSend(tc, TextComment::isMultiline);
                             q.getAndSend(tc, TextComment::getText);
-                        } else if (c instanceof CsDocCommentRawComment) {
-                            CsDocCommentRawComment dc = (CsDocCommentRawComment) c;
-                            q.getAndSend(dc, CsDocCommentRawComment::isMultiline);
-                            q.getAndSend(dc, CsDocCommentRawComment::getText);
+                            q.getAndSend(c, Comment::getSuffix);
+                            q.getAndSend(c, mk -> asRef(mk.getMarkers()));
                         } else {
                             throw new IllegalArgumentException("Unexpected comment type " + c.getClass().getName());
                         }
-                        q.getAndSend(c, Comment::getSuffix);
-                        q.getAndSend(c, Comment::getMarkers);
                     });
             q.getAndSend(space, Space::getWhitespace);
         }

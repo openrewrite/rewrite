@@ -9,7 +9,6 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.SearchResult;
@@ -24,6 +23,7 @@ import org.openrewrite.trait.SimpleTraitMatcher;
 
 import java.util.*;
 
+import static java.util.Collections.singletonMap;
 import static org.openrewrite.internal.ListUtils.concat;
 
 @Value
@@ -59,7 +59,7 @@ public class PyProjectFile implements PythonDependencyFile {
                 }
                 return literal;
             }
-        }.visitNonNull(doc, upgrades, cursor);
+        }.visitNonNull(doc, upgrades, cursor.getParentOrThrow());
         if (result != doc) {
             PythonResolutionResult updatedMarker = PythonDependencyFile.updateResolvedVersions(marker, upgrades);
             result = result.withMarkers(result.getMarkers().setByType(updatedMarker));
@@ -140,7 +140,7 @@ public class PyProjectFile implements PythonDependencyFile {
 
                 return a.getPadding().withValues(newPadded);
             }
-        }.visitNonNull(doc, normalizedNames, cursor);
+        }.visitNonNull(doc, normalizedNames, cursor.getParentOrThrow());
         if (result != doc) {
             return new PyProjectFile(new Cursor(cursor.getParentOrThrow(), result), marker);
         }
@@ -173,7 +173,7 @@ public class PyProjectFile implements PythonDependencyFile {
                 String newSpec = buildChangedSpec(spec, depName, newPackageName, newVersion);
                 return literal.withSource("\"" + newSpec + "\"").withValue(newSpec);
             }
-        }.visitNonNull(doc, 0, cursor);
+        }.visitNonNull(doc, 0, cursor.getParentOrThrow());
         if (result != doc) {
             return new PyProjectFile(new Cursor(cursor.getParentOrThrow(), result), marker);
         }
@@ -237,10 +237,10 @@ public class PyProjectFile implements PythonDependencyFile {
                     current.marker, entry.getKey(), scope, null);
             if (existing == null) {
                 current = current.withAddedDependencies(
-                        Collections.singletonMap(entry.getKey(), entry.getValue()), scope, null);
+                        singletonMap(entry.getKey(), entry.getValue()), scope, null);
             } else {
                 current = current.withUpgradedVersions(
-                        Collections.singletonMap(entry.getKey(), entry.getValue()), scope, null);
+                        singletonMap(entry.getKey(), entry.getValue()), scope, null);
             }
         }
         return current;
@@ -305,18 +305,16 @@ public class PyProjectFile implements PythonDependencyFile {
                 if (!PyProjectHelper.isInsidePdmOverridesTable(getCursor())) {
                     return kv;
                 }
-                if (!(kv.getKey() instanceof Toml.Identifier)) {
-                    return kv;
-                }
-                String keyName = ((Toml.Identifier) kv.getKey()).getName();
-                if (!PythonResolutionResult.normalizeName(keyName).equals(normalizedName)) {
+                String keyName = PyProjectHelper.extractKeyName(kv);
+                if (keyName == null || !PythonResolutionResult.normalizeName(keyName).equals(normalizedName)) {
                     return kv;
                 }
                 if (!(kv.getValue() instanceof Toml.Literal)) {
                     return kv;
                 }
                 Toml.Literal literal = (Toml.Literal) kv.getValue();
-                if (normalizedVersion.equals(literal.getValue())) {
+                if (normalizedVersion.equals(literal.getValue()) || literal.getValue() instanceof String &&
+                        PyProjectHelper.startsAtOrAbove((String) literal.getValue(), normalizedVersion)) {
                     return kv;
                 }
                 return kv.withValue(literal.withSource("\"" + normalizedVersion + "\"").withValue(normalizedVersion));
@@ -407,16 +405,11 @@ public class PyProjectFile implements PythonDependencyFile {
                 }
                 return literal;
             }
-        }.visitNonNull(doc, packageMessages, cursor);
+        }.visitNonNull(doc, packageMessages, cursor.getParentOrThrow());
         if (result != doc) {
             return new PyProjectFile(new Cursor(cursor.getParentOrThrow(), result), marker);
         }
         return this;
-    }
-
-    @Override
-    public SourceFile afterModification(ExecutionContext ctx) {
-        return PyProjectHelper.regenerateLockAndRefreshMarker((Toml.Document) getTree(), ctx);
     }
 
     private static boolean isInsideTargetArray(Cursor cursor, @Nullable String scope, @Nullable String groupName) {

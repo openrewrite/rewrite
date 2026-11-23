@@ -31,7 +31,10 @@ import org.openrewrite.toml.TomlVisitor;
 import org.openrewrite.toml.tree.Toml;
 
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import static java.util.Collections.*;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -49,7 +52,7 @@ class PythonDependencyFileTest implements RewriteTest {
           randomId(), "test-project", "1.0.0", null, null,
           ".", null, null,
           emptyList(), dependencies,
-          Collections.emptyMap(), Collections.emptyMap(),
+          emptyMap(), emptyMap(),
           emptyList(), emptyList(),
           resolved, null, null
         );
@@ -159,6 +162,25 @@ class PythonDependencyFileTest implements RewriteTest {
             assertThat(updated.getResolvedDependencies()).hasSize(2);
             assertThat(updated.getResolvedDependencies().get(0).getVersion()).isEqualTo("2.31.0");
             assertThat(updated.getResolvedDependencies().get(1).getVersion()).isEqualTo("2.0.0");
+        }
+
+        @Test
+        void relinksGraphAndDeclaredPointersAfterUpdate() {
+            ResolvedDependency certifi = new ResolvedDependency("certifi", "2024.2.2", null, null);
+            ResolvedDependency requests = new ResolvedDependency("requests", "2.28.0", null,
+              singletonList(certifi));
+            Dependency declared = new Dependency("requests", ">=2.28.0", null, null, requests);
+            PythonResolutionResult marker = createMarker(singletonList(declared), Arrays.asList(requests, certifi));
+
+            Map<String, String> updates = Map.of("requests", "2.31.0", "certifi", "2025.1.31");
+            PythonResolutionResult updated = PythonDependencyFile.updateResolvedVersions(marker, updates);
+
+            ResolvedDependency newRequests = updated.getResolvedDependency("requests");
+            ResolvedDependency newCertifi = updated.getResolvedDependency("certifi");
+            assertThat(newRequests.getVersion()).isEqualTo("2.31.0");
+            assertThat(newCertifi.getVersion()).isEqualTo("2025.1.31");
+            assertThat(newRequests.getDependencies().get(0)).isSameAs(newCertifi);
+            assertThat(updated.getDependencies().get(0).getResolved()).isSameAs(newRequests);
         }
 
         @Test

@@ -20,7 +20,7 @@ unnecessary allocations and GC pressure.
 """
 
 import pytest
-from uuid import uuid4
+from uuid import uuid4, UUID
 
 from rewrite import Markers, random_id
 from rewrite.markers import SearchResult
@@ -72,7 +72,8 @@ class TestReplaceIdentity:
         assert result is not markers, (
             "Markers.replace() with different id should return a new object"
         )
-        assert result.id == new_id
+        # ids are stored internally as int; `.id` reconstructs the UUID lazily
+        assert result.id == UUID(int=new_id)
 
     def test_space_replace_same_values_returns_same_object(self):
         """Space.replace() should return self when nothing changes."""
@@ -194,3 +195,30 @@ class TestReplacePerformanceContract:
             "This is critical for performance - a visitor pass over 10,000 nodes should not "
             "allocate 10,000 new objects if nothing changes."
         )
+
+
+def test_an_unknown_keyword_is_refused_by_both_field_setters():
+    from rewrite.java.tree import Identifier
+    from rewrite.utils import assign_fields, replace_if_changed
+
+    ident = Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], "x", None, None)
+
+    with pytest.raises(TypeError, match="simple_nmae"):
+        assign_fields(ident, simple_nmae="y")
+
+    with pytest.raises(TypeError, match="simple_nmae"):
+        replace_if_changed(ident, simple_nmae="y")
+
+
+def test_container_padding_replace_takes_field_names_and_refuses_unknown_ones():
+    from rewrite.java.support_types import JContainer
+    from rewrite.java.tree import Identifier
+
+    ident = Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], "x", None, None)
+    container = JContainer(Space.EMPTY, [], Markers.EMPTY)
+    padded = [JRightPadded(ident, Space.EMPTY, Markers.EMPTY)]
+
+    assert container.padding.replace(_elements=padded).elements == [ident]
+
+    with pytest.raises(TypeError, match="elemnts"):
+        container.padding.replace(elemnts=padded)

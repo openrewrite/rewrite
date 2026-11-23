@@ -24,8 +24,9 @@ import org.jetbrains.kotlin.KtRealPsiSourceElement;
 import org.jetbrains.kotlin.cli.common.arguments.K2JVMCompilerArguments;
 import org.jetbrains.kotlin.cli.common.messages.AnalyzerWithCompilerReport;
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector;
+import org.jetbrains.kotlin.cli.common.messages.MessageCollectorImpl;
 import org.jetbrains.kotlin.cli.common.messages.PrintingMessageCollector;
-import org.jetbrains.kotlin.cli.jvm.compiler.CliCompilerUtilsKt;
+import org.jetbrains.kotlin.cli.common.messages.SyntaxErrorReporter;
 import org.jetbrains.kotlin.cli.jvm.compiler.EnvironmentConfigFiles;
 import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment;
 import org.jetbrains.kotlin.cli.jvm.compiler.VfsBasedProjectEnvironment;
@@ -42,7 +43,9 @@ import org.jetbrains.kotlin.com.intellij.psi.PsiManager;
 import org.jetbrains.kotlin.com.intellij.psi.SingleRootFileViewProvider;
 import org.jetbrains.kotlin.com.intellij.testFramework.LightVirtualFile;
 import org.jetbrains.kotlin.compiler.plugin.CompilerPluginRegistrar;
+import org.jetbrains.kotlin.compiler.plugin.CompilerPluginRegistrar.ExtensionStorage;
 import org.jetbrains.kotlin.config.*;
+import org.jetbrains.kotlin.diagnostics.KtRegisteredDiagnosticFactoriesStorage;
 import org.jetbrains.kotlin.fir.DependencyListForCliModule;
 import org.jetbrains.kotlin.fir.FirSession;
 import org.jetbrains.kotlin.fir.declarations.FirFile;
@@ -52,7 +55,6 @@ import org.jetbrains.kotlin.fir.resolve.ScopeSession;
 import org.jetbrains.kotlin.fir.session.environment.AbstractProjectFileSearchScope;
 import org.jetbrains.kotlin.idea.KotlinFileType;
 import org.jetbrains.kotlin.idea.KotlinLanguage;
-import org.jetbrains.kotlin.modules.Module;
 import org.jetbrains.kotlin.name.Name;
 import org.jetbrains.kotlin.psi.KtFile;
 import org.jetbrains.kotlin.utils.PathUtil;
@@ -60,7 +62,10 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.internal.DefaultJavaTypeFactory;
+import org.openrewrite.java.internal.HashMapJavaTypeCache;
 import org.openrewrite.java.internal.JavaTypeCache;
+import org.openrewrite.java.internal.JavaTypeFactory;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.kotlin.internal.*;
 import org.openrewrite.kotlin.tree.K;
@@ -81,12 +86,15 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static java.util.Collections.*;
+import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
+import static org.jetbrains.kotlin.cli.FrontendConfigurationKeysKt.*;
 import static org.jetbrains.kotlin.cli.common.messages.MessageRenderer.PLAIN_FULL_PATHS;
 import static org.jetbrains.kotlin.cli.jvm.JvmArgumentsKt.*;
-import static org.jetbrains.kotlin.cli.jvm.K2JVMCompilerKt.configureModuleChunk;
 import static org.jetbrains.kotlin.cli.jvm.config.JvmContentRootsKt.*;
+import static org.jetbrains.kotlin.compiler.plugin.ExtensionRegistrationUtilsKt.registerInProject;
 import static org.jetbrains.kotlin.config.CommonConfigurationKeys.*;
 import static org.jetbrains.kotlin.config.JVMConfigurationKeys.DO_NOT_CLEAR_BINDING_CONTEXT;
 import static org.jetbrains.kotlin.config.JVMConfigurationKeys.LINK_VIA_SIGNATURES;
@@ -110,11 +118,13 @@ public class KotlinParser implements Parser {
     private final List<NamedStyles> styles;
     private final boolean logCompilationWarningsAndErrors;
     private final JavaTypeCache typeCache;
+    private final JavaTypeFactory typeFactory;
     private final String moduleName;
     private final KotlinLanguageLevel languageLevel;
     private final boolean isKotlinScript;
     private final List<String> scriptImplicitReceivers;
     private final List<String> scriptDefaultImports;
+    private final List<String> samWithReceiverAnnotations;
 
     @Override
     public Stream<SourceFile> parse(@Language("kotlin") String... sources) {
@@ -173,49 +183,55 @@ public class KotlinParser implements Parser {
 
         // TODO: FIR and disposable may not be necessary using the IR.
         Disposable disposable = Disposer.newDisposable();
-        CompiledSource compilerCus;
         List<Input> acceptedInputs = ListUtils.concatAll(resolvedDependsOn, acceptedInputs(sources).collect(toList()));
+        // Eagerly materialize all source files inside try/finally so the disposable
+        // is released even when downstream consumers short-circuit the returned
+        // stream (e.g. JavaTemplateParser uses `.findFirst()` when parsing
+        // template stubs). A previous implementation deferred disposal to a
+        // tail Stream.generate(...).limit(1) element, which never ran on a
+        // short-circuited consumer and leaked one KotlinCoreEnvironment plus
+        // ~25MB of classpath ProtoBuf metadata per template apply.
+        List<SourceFile> parsed;
         try {
-            compilerCus = parse(acceptedInputs, disposable, pctx);
+            CompiledSource compilerCus = parse(acceptedInputs, disposable, pctx);
+            FirSession firSession = compilerCus.getFirSession();
+            parsed = new ArrayList<>(compilerCus.getSources().size());
+            for (KotlinSource kotlinSource : compilerCus.getSources()) {
+                try {
+                    assert kotlinSource.getFirFile() != null;
+                    assert kotlinSource.getFirFile().getSource() != null;
+                    PsiElement psi = ((KtRealPsiSourceElement) kotlinSource.getFirFile().getSource()).getPsi();
+                    MessageCollectorImpl syntaxErrors = new MessageCollectorImpl();
+                    SyntaxErrorReporter.SyntaxErrorReport report =
+                            AnalyzerWithCompilerReport.Companion.reportSyntaxErrors(psi, syntaxErrors);
+                    syntaxErrors.forward(compilationMessageCollector());
+                    if (report.isHasErrors()) {
+                        parsed.add(ParseError.build(KotlinParser.this, kotlinSource.getInput(), relativeTo, ctx, new KotlinSyntaxException(syntaxErrors)));
+                        continue;
+                    }
+
+                    KotlinTypeMapping typeMapping = new KotlinTypeMapping(firSession, kotlinSource.getFirFile(), typeFactory);
+                    PsiElementAssociations associations = new PsiElementAssociations(typeMapping, kotlinSource.getFirFile());
+                    associations.initialize();
+                    KotlinTreeParserVisitor psiParser = new KotlinTreeParserVisitor(kotlinSource, associations, styles, relativeTo, ctx);
+                    SourceFile cu = psiParser.parse();
+
+                    parsingListener.parsed(kotlinSource.getInput(), cu);
+                    parsed.add(requirePrintEqualsInput(cu, kotlinSource.getInput(), relativeTo, ctx));
+                } catch (Throwable t) {
+                    ctx.getOnError().accept(t);
+                    parsed.add(ParseError.build(this, kotlinSource.getInput(), relativeTo, ctx, t));
+                }
+            }
         } catch (Throwable t) {
-            disposable.dispose();
-            return acceptedInputs.stream().map(input -> ParseError.build(this, input, relativeTo, ctx, t));
+            return acceptedInputs.stream()
+                    .filter(input -> !dependsOnPaths.contains(input.getRelativePath(relativeTo)))
+                    .map(input -> ParseError.build(this, input, relativeTo, ctx, t));
+        } finally {
+            Disposer.dispose(disposable);
         }
 
-        FirSession firSession = compilerCus.getFirSession();
-        return Stream.concat(
-                        compilerCus.getSources().stream()
-                                .map(kotlinSource -> {
-                                    try {
-                                        assert kotlinSource.getFirFile() != null;
-                                        assert kotlinSource.getFirFile().getSource() != null;
-                                        PsiElement psi = ((KtRealPsiSourceElement) kotlinSource.getFirFile().getSource()).getPsi();
-                                        AnalyzerWithCompilerReport.SyntaxErrorReport report =
-                                                AnalyzerWithCompilerReport.Companion.reportSyntaxErrors(psi, new PrintingMessageCollector(System.err, PLAIN_FULL_PATHS, true));
-                                        if (report.isHasErrors()) {
-                                            return ParseError.build(KotlinParser.this, kotlinSource.getInput(), relativeTo, ctx, new RuntimeException());
-                                        }
-
-                                        KotlinTypeMapping typeMapping = new KotlinTypeMapping(typeCache, firSession, kotlinSource.getFirFile());
-                                        PsiElementAssociations associations = new PsiElementAssociations(typeMapping, kotlinSource.getFirFile());
-                                        associations.initialize();
-                                        KotlinTreeParserVisitor psiParser = new KotlinTreeParserVisitor(kotlinSource, associations, styles, relativeTo, ctx);
-                                        SourceFile cu = psiParser.parse();
-
-                                        parsingListener.parsed(kotlinSource.getInput(), cu);
-                                        return requirePrintEqualsInput(cu, kotlinSource.getInput(), relativeTo, ctx);
-                                    } catch (Throwable t) {
-                                        ctx.getOnError().accept(t);
-                                        return ParseError.build(this, kotlinSource.getInput(), relativeTo, ctx, t);
-                                    }
-                                }),
-                        Stream.generate(() -> {
-                                    // The disposable should be disposed of exactly once after all sources have been parsed
-                                    Disposer.dispose(disposable);
-                                    return (SourceFile) null;
-                                })
-                                .limit(1))
-                .filter(Objects::nonNull)
+        return parsed.stream()
                 .filter(source -> !dependsOnPaths.contains(source.getSourcePath()));
     }
 
@@ -243,8 +259,7 @@ public class KotlinParser implements Parser {
             if (ctx.getMessage(SKIP_SOURCE_SET_TYPE_GENERATION, false)) {
                 sourceSetProvenance = new JavaSourceSet(Tree.randomId(), sourceSet, emptyList(), emptyMap());
             } else {
-                sourceSetProvenance = JavaSourceSet.build(sourceSet, classpath == null ? emptyList() : classpath,
-                        typeCache, false);
+                sourceSetProvenance = JavaSourceSet.build(sourceSet, classpath == null ? emptyList() : classpath);
             }
         }
         return sourceSetProvenance;
@@ -273,13 +288,19 @@ public class KotlinParser implements Parser {
 
         private List<Input> dependsOn = emptyList();
         private JavaTypeCache typeCache = new JavaTypeCache();
+        private boolean typeCacheConfigured;
+
+        @Nullable
+        private JavaTypeFactory typeFactory;
+
         private boolean logCompilationWarningsAndErrors;
-        private final List<NamedStyles> styles = new ArrayList<>();
+        private List<NamedStyles> styles = new ArrayList<>();
         private String moduleName = "main";
         private KotlinLanguageLevel languageLevel = KotlinLanguageLevel.KOTLIN_2_2;
         private boolean isKotlinScript = false;
         private List<String> scriptImplicitReceivers = emptyList();
         private List<String> scriptDefaultImports = emptyList();
+        private List<String> samWithReceiverAnnotations = emptyList();
 
         public Builder() {
             super(K.CompilationUnit.class);
@@ -291,6 +312,8 @@ public class KotlinParser implements Parser {
             this.classpath = base.classpath;
             this.dependsOn = base.dependsOn;
             this.typeCache = base.typeCache;
+            this.typeCacheConfigured = base.typeCacheConfigured;
+            this.typeFactory = base.typeFactory;
             this.logCompilationWarningsAndErrors = base.logCompilationWarningsAndErrors;
             this.styles.addAll(base.styles);
             this.moduleName = base.moduleName;
@@ -298,6 +321,7 @@ public class KotlinParser implements Parser {
             this.isKotlinScript = base.isKotlinScript;
             this.scriptImplicitReceivers = base.scriptImplicitReceivers;
             this.scriptDefaultImports = base.scriptDefaultImports;
+            this.samWithReceiverAnnotations = base.samWithReceiverAnnotations;
         }
 
         public Builder logCompilationWarningsAndErrors(boolean logCompilationWarningsAndErrors) {
@@ -317,6 +341,15 @@ public class KotlinParser implements Parser {
 
         public Builder scriptDefaultImports(String... packages) {
             this.scriptDefaultImports = Arrays.asList(packages);
+            return this;
+        }
+
+        /**
+         * Annotations, by fully qualified name, of the Java SAM interfaces that take a lambda with the SAM's first
+         * parameter as its receiver instead of as {@code it}, as the Kotlin compiler's sam-with-receiver plugin does.
+         */
+        public Builder samWithReceiverAnnotations(String... fqns) {
+            this.samWithReceiverAnnotations = Arrays.asList(fqns);
             return this;
         }
 
@@ -361,8 +394,21 @@ public class KotlinParser implements Parser {
             return this;
         }
 
+        /**
+         * @deprecated Configure a {@link JavaTypeFactory} via {@link #typeFactory} instead.
+         * The cache becomes an implementation
+         * detail of the default {@link org.openrewrite.java.internal.DefaultJavaTypeFactory}.
+         */
+        @Deprecated
         public Builder typeCache(JavaTypeCache typeCache) {
             this.typeCache = typeCache;
+            this.typeCacheConfigured = true;
+            return this;
+        }
+
+        @SuppressWarnings("unused")
+        public Builder typeFactory(JavaTypeFactory typeFactory) {
+            this.typeFactory = typeFactory;
             return this;
         }
 
@@ -393,7 +439,13 @@ public class KotlinParser implements Parser {
 
         @Override
         public KotlinParser build() {
-            return new KotlinParser(resolvedClasspath(), dependsOn, styles, logCompilationWarningsAndErrors, typeCache, moduleName, languageLevel, isKotlinScript, scriptImplicitReceivers, scriptDefaultImports);
+            Collection<Path> cp = resolvedClasspath();
+            typeCache = HashMapJavaTypeCache.forParser(typeCache, typeCacheConfigured || typeFactory != null);
+            JavaTypeFactory factory = typeFactory;
+            if (factory == null) {
+                factory = new DefaultJavaTypeFactory(typeCache);
+            }
+            return new KotlinParser(cp, dependsOn, styles, logCompilationWarningsAndErrors, typeCache, factory, moduleName, languageLevel, isKotlinScript, scriptImplicitReceivers, scriptDefaultImports, samWithReceiverAnnotations);
         }
 
         @Override
@@ -405,18 +457,23 @@ public class KotlinParser implements Parser {
         public KotlinParser.Builder clone() {
             KotlinParser.Builder clone = (KotlinParser.Builder) super.clone();
             clone.typeCache = this.typeCache.clone();
+            clone.styles = new ArrayList<>(this.styles);
             return clone;
         }
     }
 
     public CompiledSource parse(List<Parser.Input> sources, Disposable disposable, ExecutionContext ctx) {
         CompilerConfiguration compilerConfiguration = compilerConfiguration();
-        Module module = buildModule(compilerConfiguration);
+        configureJvmRoots(compilerConfiguration);
 
         KotlinCoreEnvironment environment = KotlinCoreEnvironment.createForProduction(
                 disposable,
                 compilerConfiguration,
                 EnvironmentConfigFiles.JVM_CONFIG_FILES);
+
+        ExtensionStorage extensionsStorage = requireNonNull(getExtensionsStorage(compilerConfiguration), "extensions storage was not set in compilerConfiguration()");
+
+        registerInProject(extensionsStorage, environment.getProject(), ext -> "Failed to register " + ext);
 
         List<KtFile> ktFiles = new ArrayList<>(sources.size());
         List<KotlinSource> kotlinSources = new ArrayList<>(sources.size());
@@ -444,14 +501,11 @@ public class KotlinParser implements Parser {
                 VirtualFileManager.getInstance().getFileSystem(StandardFileSystems.FILE_PROTOCOL),
                 environment::createPackagePartProvider);
 
-        AbstractProjectFileSearchScope sourceScope = projectEnvironment.getSearchScopeByPsiFiles(ktFiles);
-        sourceScope.plus(projectEnvironment.getSearchScopeForProjectJavaSources());
-
         AbstractProjectFileSearchScope libraryScope = projectEnvironment.getSearchScopeForProjectLibraries();
 
-        Name name = Name.identifier(module.getModuleName());
-        DependencyListForCliModule libraryList = CliCompilerUtilsKt.createLibraryListForJvm(
-                module.getModuleName(),
+        Name name = Name.identifier(moduleName);
+        DependencyListForCliModule libraryList = JvmFrontendPipelinePhase.INSTANCE.createLibraryListForJvm(
+                moduleName,
                 compilerConfiguration,
                 compilerConfiguration.get(JVMConfigurationKeys.FRIEND_PATHS, emptyList())
         );
@@ -467,7 +521,7 @@ public class KotlinParser implements Parser {
                         ktFile -> false,
                         KtFile::isScript,
                         (ktFile, mn) -> true,
-                        files -> null
+                        null
                 )
                 .stream()
                 .findFirst()
@@ -490,7 +544,7 @@ public class KotlinParser implements Parser {
 
     }
 
-    private Module buildModule(CompilerConfiguration compilerConfiguration) {
+    private void configureJvmRoots(CompilerConfiguration compilerConfiguration) {
         if (classpath != null) {
             for (Path path : classpath) {
                 File file;
@@ -511,18 +565,25 @@ public class KotlinParser implements Parser {
         configureKlibPaths(compilerConfiguration, arguments);
         configureContentRootsFromClassPath(compilerConfiguration, arguments);
         configureJdkClasspathRoots(compilerConfiguration);
+    }
 
-        return configureModuleChunk(compilerConfiguration, arguments, null).getModules().get(0);
+    private static class KotlinSyntaxException extends RuntimeException {
+        KotlinSyntaxException(MessageCollectorImpl syntaxErrors) {
+            super(syntaxErrors.getErrors().stream()
+                    .map(error -> PLAIN_FULL_PATHS.render(error.getSeverity(), error.getMessage(), error.getLocation()))
+                    .collect(joining("\n")));
+        }
     }
 
     private static String buildFilename(Input source, int index) {
-        String pathName = source.getPath().toString();
-        if ("openRewriteFile.kt".equals(pathName)) {
-            return "openRewriteFile" + index + ".kt";
-        } else if ("openRewriteFile.kts".equals(pathName)) {
-            return "openRewriteFile" + index + ".kts";
+        Path path = source.getPath();
+        String fileName = String.valueOf(path.getFileName());
+        if ("openRewriteFile.kt".equals(fileName)) {
+            return path.resolveSibling("openRewriteFile" + index + ".kt").toString();
+        } else if ("openRewriteFile.kts".equals(fileName)) {
+            return path.resolveSibling("openRewriteFile" + index + ".kts").toString();
         } else {
-            return pathName;
+            return path.toString();
         }
     }
 
@@ -539,16 +600,22 @@ public class KotlinParser implements Parser {
         KOTLIN_1_9,
         KOTLIN_2_0,
         KOTLIN_2_1,
-        KOTLIN_2_2
+        KOTLIN_2_2,
+        KOTLIN_2_3,
+        KOTLIN_2_4
+    }
+
+    private MessageCollector compilationMessageCollector() {
+        return logCompilationWarningsAndErrors ?
+                new PrintingMessageCollector(System.err, PLAIN_FULL_PATHS, true) :
+                MessageCollector.Companion.getNONE();
     }
 
     private CompilerConfiguration compilerConfiguration() {
         CompilerConfiguration compilerConfiguration = new CompilerConfiguration();
 
         compilerConfiguration.put(CommonConfigurationKeys.MODULE_NAME, moduleName);
-        compilerConfiguration.put(MESSAGE_COLLECTOR_KEY, logCompilationWarningsAndErrors ?
-                new PrintingMessageCollector(System.err, PLAIN_FULL_PATHS, true) :
-                MessageCollector.Companion.getNONE());
+        compilerConfiguration.put(MESSAGE_COLLECTOR_KEY, compilationMessageCollector());
 
         compilerConfiguration.put(LANGUAGE_VERSION_SETTINGS, new LanguageVersionSettingsImpl(getLanguageVersion(languageLevel), getApiVersion(languageLevel)));
 
@@ -558,16 +625,32 @@ public class KotlinParser implements Parser {
         compilerConfiguration.put(INCREMENTAL_COMPILATION, true);
         compilerConfiguration.put(LINK_VIA_SIGNATURES, true);
 
+        List<CompilerPluginRegistrar> registrars = new ArrayList<>(2);
         if (!scriptImplicitReceivers.isEmpty() || !scriptDefaultImports.isEmpty()) {
-            compilerConfiguration.put(
-                    CompilerPluginRegistrar.Companion.getCOMPILER_PLUGIN_REGISTRARS(),
-                    singletonList(new ScriptCompilerPlugin(scriptImplicitReceivers, scriptDefaultImports))
-            );
+            registrars.add(new ScriptCompilerPlugin(scriptImplicitReceivers, scriptDefaultImports));
+        }
+        if (!samWithReceiverAnnotations.isEmpty()) {
+            registrars.add(new SamWithReceiverCompilerPlugin(samWithReceiverAnnotations));
+        }
+        if (!registrars.isEmpty()) {
+            compilerConfiguration.put(CompilerPluginRegistrar.Companion.getCOMPILER_PLUGIN_REGISTRARS(), registrars);
         }
 
         addJvmSdkRoots(compilerConfiguration, PathUtil.getJdkClassesRootsFromCurrentJre());
 
+        addExtensionStorage(compilerConfiguration);
+
         return compilerConfiguration;
+    }
+
+    private static void addExtensionStorage(CompilerConfiguration compilerConfiguration) {
+        ExtensionStorage extensionStorage = new ExtensionStorage();
+        List<CompilerPluginRegistrar> registrars = compilerConfiguration.getList(CompilerPluginRegistrar.Companion.getCOMPILER_PLUGIN_REGISTRARS());
+        for (CompilerPluginRegistrar registrar : registrars) {
+            registrar.registerExtensions(extensionStorage, compilerConfiguration);
+        }
+        setExtensionsStorage(compilerConfiguration, extensionStorage);
+        setDiagnosticFactoriesStorage(compilerConfiguration, new KtRegisteredDiagnosticFactoriesStorage());
     }
 
     private LanguageVersion getLanguageVersion(KotlinLanguageLevel languageLevel) {
@@ -598,6 +681,10 @@ public class KotlinParser implements Parser {
                 return LanguageVersion.KOTLIN_2_1;
             case KOTLIN_2_2:
                 return LanguageVersion.KOTLIN_2_2;
+            case KOTLIN_2_3:
+                return LanguageVersion.KOTLIN_2_3;
+            case KOTLIN_2_4:
+                return LanguageVersion.KOTLIN_2_4;
             default:
                 throw new IllegalArgumentException("Unknown language level: " + languageLevel);
         }
@@ -631,6 +718,10 @@ public class KotlinParser implements Parser {
                 return ApiVersion.KOTLIN_2_1;
             case KOTLIN_2_2:
                 return ApiVersion.KOTLIN_2_2;
+            case KOTLIN_2_3:
+                return ApiVersion.KOTLIN_2_3;
+            case KOTLIN_2_4:
+                return ApiVersion.KOTLIN_2_4;
             default:
                 throw new IllegalArgumentException("Unknown language level: " + languageLevel);
         }

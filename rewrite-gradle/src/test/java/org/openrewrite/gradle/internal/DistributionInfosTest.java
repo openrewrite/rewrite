@@ -36,7 +36,7 @@ class DistributionInfosTest {
 
         GradleWrapper.GradleVersion gradleVersion = new GradleWrapper.GradleVersion(
           "7.6",
-          "https://downloads.gradle.org/distributions/gradle-7.6-bin.zip",
+          "https://services.gradle.org/distributions/gradle-7.6-bin.zip",
           GradleWrapper.DistributionType.Bin,
           "https://downloads.gradle.org/distributions/gradle-7.6-bin.zip.sha256",
           "https://downloads.gradle.org/distributions/gradle-7.6-wrapper.jar.sha256"
@@ -45,7 +45,7 @@ class DistributionInfosTest {
           HttpSenderExecutionContextView.view(new InMemoryExecutionContext()).setHttpSender(httpSender));
 
         assertThat(infos).isEqualTo(new DistributionInfos(
-          "https://downloads.gradle.org/distributions/gradle-7.6-bin.zip",
+          "https://services.gradle.org/distributions/gradle-7.6-bin.zip",
           Checksum.fromHex("SHA-256", "7ba68c54029790ab444b39d7e293d3236b2632631fb5f2e012bb28b4ff669e4b"),
           Checksum.fromHex("SHA-256", "c5a643cf80162e665cc228f7b16f343fef868e47d3a4836f62e18b7e17ac018a")));
     }

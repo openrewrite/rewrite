@@ -20,7 +20,11 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 
 import static java.nio.charset.StandardCharsets.ISO_8859_1;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -170,6 +174,155 @@ class EncodingDetectingInputStreamTest {
         String result = is.readFully();
         assertThat(is.getCharset()).isEqualTo(WINDOWS_1252);
         assertThat(result).isEqualTo("Hütte");
+    }
+
+    @Test
+    void utf8WithCjkAndStrayByteReDecodedAsUtf8() {
+        // UTF-8 Chinese "配置" contains byte 0x8D which is undefined in Windows-1252,
+        // plus a stray 0xAA byte (invalid in UTF-8).
+        // Without the fix, this would be detected as Windows-1252, causing
+        // garbled content and UnmappableCharacterException on write-back.
+        // With the fix, readFully() detects the canEncode failure and
+        // re-decodes as UTF-8, producing correct Chinese content.
+        String content = "# app配置，详见 http://example.com\n";
+        byte[] utf8Bytes = content.getBytes(UTF_8);
+        // Insert stray 0xAA byte at the boundary between ASCII and CJK (position 5)
+        // to avoid splitting a UTF-8 multi-byte sequence
+        byte[] withStrayByte = new byte[utf8Bytes.length + 1];
+        System.arraycopy(utf8Bytes, 0, withStrayByte, 0, 5);
+        withStrayByte[5] = (byte) 0xAA; // insert stray byte
+        System.arraycopy(utf8Bytes, 5, withStrayByte, 6, utf8Bytes.length - 5);
+
+        EncodingDetectingInputStream is = new EncodingDetectingInputStream(new ByteArrayInputStream(withStrayByte));
+        String result = is.readFully();
+
+        assertThat(is.getCharset()).isEqualTo(UTF_8);
+        assertThat(result).contains("配置");
+    }
+
+    @Test
+    void utf8WithCjkContentDetectedAsUtf8() {
+        // Pure UTF-8 CJK content should be detected as UTF-8
+        String cjk = "# 配置，详见 http://example.com\n# 关闭内置tomcat\n";
+        byte[] bytes = cjk.getBytes(UTF_8);
+        EncodingDetectingInputStream is = new EncodingDetectingInputStream(new ByteArrayInputStream(bytes));
+        String result = is.readFully();
+        assertThat(is.getCharset()).isEqualTo(UTF_8);
+        assertThat(result).isEqualTo(cjk);
+    }
+
+    @Test
+    void genuineWindows1252StillDetectedAsWindows1252() {
+        // Genuine Windows-1252 content (Western European) should remain Windows-1252
+        String french = "Café résumé naïve";
+        byte[] bytes = french.getBytes(WINDOWS_1252);
+        EncodingDetectingInputStream is = new EncodingDetectingInputStream(new ByteArrayInputStream(bytes));
+        String result = is.readFully();
+        assertThat(is.getCharset()).isEqualTo(WINDOWS_1252);
+        assertThat(result).isEqualTo(french);
+    }
+
+    @Test
+    void readsDelegateInChunksWhileDetectingCharset() {
+        String text = "café 世界 🌟\n".repeat(10_000);
+        ChunkedInputStream delegate = new ChunkedInputStream(text.getBytes(UTF_8), Integer.MAX_VALUE);
+        EncodingDetectingInputStream is = new EncodingDetectingInputStream(delegate);
+        assertThat(is.readFully()).isEqualTo(text);
+        assertThat(is.getCharset()).isEqualTo(UTF_8);
+        // only the byte order mark check reads single bytes
+        assertThat(delegate.singleByteReads).isLessThanOrEqualTo(3);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "61 C3 BC 62,                UTF-8,        2-byte sequence",
+            "61 E4 B8 96 62,             UTF-8,        3-byte sequence",
+            "61 F0 9F 98 80 62,          UTF-8,        4-byte sequence",
+            "C3 A9 E4 B8 96 F0 9F 8C 9F, UTF-8,        consecutive 2/3/4-byte sequences",
+            "61 62 E4 B8,                Windows-1252, 3-byte sequence truncated at the end",
+            "61 F0 9F 98,                Windows-1252, 4-byte sequence truncated at the end",
+            "78 E4 B8 7A,                Windows-1252, 3-byte sequence broken by its last byte",
+            "F0 9F 98 78 62,             Windows-1252, 4-byte sequence broken by its last byte",
+            "C3 BC 20 FC 61,             Windows-1252, invalid byte after a valid sequence",
+    })
+    void detectsCharsetWhenSequencesSpanReads(String hex, String expectedCharset, String description) throws Exception {
+        byte[] bytes = parseHex(hex);
+        for (int chunkSize = 1; chunkSize <= bytes.length; chunkSize++) {
+            for (int bufferSize = 1; bufferSize <= bytes.length; bufferSize++) {
+                ChunkedInputStream chunks = new ChunkedInputStream(bytes, chunkSize);
+                EncodingDetectingInputStream is = new EncodingDetectingInputStream(chunks);
+                assertThat(readAll(is, bufferSize)).isEqualTo(bytes);
+                assertThat(is.getCharset())
+                        .as("%s, read %d bytes at a time from chunks of %d", description, bufferSize, chunkSize)
+                        .isEqualTo(Charset.forName(expectedCharset));
+            }
+        }
+    }
+
+    @Test
+    void skipsUtf8BomWhenReadInChunks() throws Exception {
+        byte[] bytes = "\uFEFFhé".getBytes(UTF_8);
+        for (int chunkSize = 1; chunkSize <= bytes.length; chunkSize++) {
+            for (int bufferSize = 1; bufferSize <= bytes.length; bufferSize++) {
+                ChunkedInputStream chunks = new ChunkedInputStream(bytes, chunkSize);
+                EncodingDetectingInputStream is = new EncodingDetectingInputStream(chunks);
+                assertThat(new String(readAll(is, bufferSize), UTF_8)).isEqualTo("hé");
+                assertThat(is.isCharsetBomMarked()).isTrue();
+                assertThat(is.getCharset()).isEqualTo(UTF_8);
+            }
+        }
+    }
+
+    @Test
+    void utf8WithCjkAndStrayByteAfterFirstReadReDecodedAsUtf8() {
+        // As utf8WithCjkAndStrayByteReDecodedAsUtf8, with the stray byte between lines past readFully()'s first read
+        String line = "# app配置，详见 http://example.com\n";
+        byte[] utf8Bytes = line.repeat(200).getBytes(UTF_8);
+        int at = line.getBytes(UTF_8).length * 120;
+        byte[] withStrayByte = new byte[utf8Bytes.length + 1];
+        System.arraycopy(utf8Bytes, 0, withStrayByte, 0, at);
+        withStrayByte[at] = (byte) 0xAA;
+        System.arraycopy(utf8Bytes, at, withStrayByte, at + 1, utf8Bytes.length - at);
+
+        EncodingDetectingInputStream is = new EncodingDetectingInputStream(new ByteArrayInputStream(withStrayByte));
+        String result = is.readFully();
+
+        assertThat(is.getCharset()).isEqualTo(UTF_8);
+        assertThat(result).isEqualTo(line.repeat(120) + '\uFFFD' + line.repeat(80));
+    }
+
+    private static byte[] readAll(InputStream is, int bufferSize) throws IOException {
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        byte[] buffer = new byte[bufferSize];
+        int n;
+        while ((n = is.read(buffer, 0, bufferSize)) != -1) {
+            bos.write(buffer, 0, n);
+        }
+        return bos.toByteArray();
+    }
+
+    /**
+     * Returns at most {@code chunkSize} bytes from each bulk read and counts single-byte reads.
+     */
+    private static class ChunkedInputStream extends ByteArrayInputStream {
+        private final int chunkSize;
+        int singleByteReads;
+
+        ChunkedInputStream(byte[] bytes, int chunkSize) {
+            super(bytes);
+            this.chunkSize = chunkSize;
+        }
+
+        @Override
+        public synchronized int read() {
+            singleByteReads++;
+            return super.read();
+        }
+
+        @Override
+        public synchronized int read(byte[] b, int off, int len) {
+            return super.read(b, off, Math.min(len, chunkSize));
+        }
     }
 
     private static byte[] parseHex(String hex) {

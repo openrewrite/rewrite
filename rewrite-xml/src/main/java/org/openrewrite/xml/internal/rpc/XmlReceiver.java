@@ -28,6 +28,8 @@ import java.nio.file.Paths;
 import java.util.List;
 import java.util.UUID;
 
+import static java.util.Collections.emptyList;
+
 public class XmlReceiver extends XmlVisitor<RpcReceiveQueue> {
 
     @Override
@@ -95,7 +97,7 @@ public class XmlReceiver extends XmlVisitor<RpcReceiveQueue> {
         if (name == null) name = tag.getName() != null ? tag.getName() : "";
         Xml.Tag t = tag.getName() == null ?
                 new Xml.Tag(tag.getId(), tag.getPrefix(), tag.getMarkers(), name,
-                        tag.getAttributes() != null ? tag.getAttributes() : java.util.Collections.emptyList(),
+                        tag.getAttributes() != null ? tag.getAttributes() : emptyList(),
                         tag.getContent(), tag.getClosing(), tag.getBeforeTagDelimiterPrefix() != null ? tag.getBeforeTagDelimiterPrefix() : "") :
                 tag.withName(name);
         return t

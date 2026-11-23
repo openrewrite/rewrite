@@ -27,12 +27,9 @@ import org.openrewrite.toml.TomlVisitor;
 import org.openrewrite.toml.tree.Toml;
 
 import java.nio.file.Paths;
-import java.util.Collections;
 import java.util.List;
 
 import static java.util.Collections.*;
-import static java.util.Collections.singleton;
-import static java.util.Collections.singletonMap;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.Tree.randomId;
 

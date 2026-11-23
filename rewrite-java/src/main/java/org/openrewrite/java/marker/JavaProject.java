@@ -18,13 +18,12 @@ package org.openrewrite.java.marker;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.marker.Marker;
 
 import java.util.UUID;
 
 @Value
 @With
-public class JavaProject implements Marker {
+public class JavaProject implements ProjectIdentity {
     @EqualsAndHashCode.Exclude
     UUID id;
 

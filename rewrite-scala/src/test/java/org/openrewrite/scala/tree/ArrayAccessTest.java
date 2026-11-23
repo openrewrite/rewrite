@@ -156,15 +156,15 @@ class ArrayAccessTest implements RewriteTest {
         AtomicInteger functionApplicationCount = new AtomicInteger();
         AtomicInteger unknownCount = new AtomicInteger();
         AtomicBoolean foundFunctionApplication = new AtomicBoolean(false);
-        
+
         rewriteRun(
             spec -> spec.recipe(RewriteTest.toRecipe(() -> new JavaIsoVisitor<ExecutionContext>() {
                 @Override
                 public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                     if (method.getMarkers().findFirst(org.openrewrite.scala.marker.FunctionApplication.class).isPresent()) {
                         // Only count array access, not Array construction
-                        if (method.getSelect() != null && 
-                            !(method.getSelect() instanceof J.Identifier && 
+                        if (method.getSelect() != null &&
+                            !(method.getSelect() instanceof J.Identifier &&
                               ((J.Identifier) method.getSelect()).getSimpleName().equals("Array"))) {
                             functionApplicationCount.incrementAndGet();
                             foundFunctionApplication.set(true);
@@ -175,7 +175,7 @@ class ArrayAccessTest implements RewriteTest {
                     }
                     return super.visitMethodInvocation(method, ctx);
                 }
-                
+
                 @Override
                 public J.Unknown visitUnknown(J.Unknown unknown, ExecutionContext ctx) {
                     unknownCount.incrementAndGet();
@@ -187,7 +187,7 @@ class ArrayAccessTest implements RewriteTest {
                     }
                     return super.visitUnknown(unknown, ctx);
                 }
-                
+
                 @Override
                 public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
                     System.out.println("=== AST Debug Output ===");
@@ -209,19 +209,19 @@ class ArrayAccessTest implements RewriteTest {
                 """
             )
         );
-        
+
         // Verify that we found function application nodes and not J.Unknown for array accesses
         assertThat(foundFunctionApplication.get())
             .as("Should have found at least one function application (array access)")
             .isTrue();
-            
+
         // Note: matrix(0)(1) counts as 2 separate function applications:
         // 1. matrix(0) returns an array
         // 2. The result is accessed with (1)
         assertThat(functionApplicationCount.get())
             .as("Should have found at least 2 function applications for array access")
             .isGreaterThanOrEqualTo(2);
-        
+
         System.out.println("\n=== Test Summary ===");
         System.out.println("Function application nodes found: " + functionApplicationCount.get());
         System.out.println("J.Unknown nodes found: " + unknownCount.get());
@@ -231,7 +231,7 @@ class ArrayAccessTest implements RewriteTest {
     void verifyArrayAccessInExpression() {
         AtomicBoolean foundFunctionApplication = new AtomicBoolean(false);
         AtomicInteger functionApplicationCount = new AtomicInteger();
-        
+
         rewriteRun(
             spec -> spec.recipe(RewriteTest.toRecipe(() -> new JavaIsoVisitor<ExecutionContext>() {
                 @Override
@@ -241,8 +241,8 @@ class ArrayAccessTest implements RewriteTest {
                     System.out.println("  Arguments: " + method.getArguments());
                     if (method.getMarkers().findFirst(org.openrewrite.scala.marker.FunctionApplication.class).isPresent()) {
                         // Only count array access, not Array construction
-                        if (method.getSelect() != null && 
-                            !(method.getSelect() instanceof J.Identifier && 
+                        if (method.getSelect() != null &&
+                            !(method.getSelect() instanceof J.Identifier &&
                               ((J.Identifier) method.getSelect()).getSimpleName().equals("Array"))) {
                             foundFunctionApplication.set(true);
                             functionApplicationCount.incrementAndGet();
@@ -251,7 +251,7 @@ class ArrayAccessTest implements RewriteTest {
                     }
                     return super.visitMethodInvocation(method, ctx);
                 }
-                
+
                 @Override
                 public J.Unknown visitUnknown(J.Unknown unknown, ExecutionContext ctx) {
                     System.out.println("Found J.Unknown in expression: " + unknown.getSource());
@@ -269,16 +269,16 @@ class ArrayAccessTest implements RewriteTest {
                 """
             )
         );
-        
+
         // Verify that array access is represented as function application
         assertThat(foundFunctionApplication.get())
             .as("Should have found function application markers for array access")
             .isTrue();
-            
+
         assertThat(functionApplicationCount.get())
             .as("Should have found at least 3 function applications (arr(0), arr(1), arr(2))")
             .isGreaterThanOrEqualTo(3);
-            
+
         System.out.println("\n=== Analysis ===");
         System.out.println("Function applications found: " + functionApplicationCount.get());
         System.out.println("Scala's array access syntax arr(0) is parsed as function application");

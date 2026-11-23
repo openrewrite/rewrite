@@ -19,29 +19,36 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.json.tree.Json;
+import org.openrewrite.marker.Markup;
+import org.openrewrite.python.internal.LockFileRegeneration;
 import org.openrewrite.python.internal.PyProjectHelper;
-import org.openrewrite.python.internal.PythonDependencyExecutionContextView;
 import org.openrewrite.python.marker.PythonResolutionResult;
+import org.openrewrite.python.table.PythonLockRegenerationFailures;
 import org.openrewrite.python.trait.PythonDependencyFile;
 import org.openrewrite.toml.tree.Toml;
 
 import java.nio.file.Path;
-import java.util.Collections;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.Map;
-import java.util.Set;
+import java.util.function.Function;
+
+import static java.util.Collections.singletonMap;
 
 /**
  * Pin a transitive dependency version using the strategy appropriate for the file type
  * and package manager. For {@code pyproject.toml}: uv uses
  * {@code [tool.uv].constraint-dependencies}, PDM uses {@code [tool.pdm.overrides]},
  * and other managers add a direct dependency. For {@code requirements.txt} and
- * {@code Pipfile}: appends the dependency. When uv is available, the uv.lock file
- * is regenerated.
+ * {@code Pipfile}: appends the dependency. The lock file is regenerated to reflect the
+ * change: uv.lock by invoking {@code uv} when available, Pipfile.lock natively via the
+ * project's package index.
  */
 @EqualsAndHashCode(callSuper = false)
 @Value
 public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTransitiveDependencyVersion.Accumulator> {
+
+    transient PythonLockRegenerationFailures lockRegenerationFailures = new PythonLockRegenerationFailures(this);
 
     @Option(displayName = "Package name",
             description = "The PyPI package name of the transitive dependency to pin.",
@@ -68,11 +75,28 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
         return "Pin a transitive dependency version using the strategy appropriate for the file type " +
                 "and package manager. For `pyproject.toml`: uv uses `[tool.uv].constraint-dependencies`, " +
                 "PDM uses `[tool.pdm.overrides]`, and other managers add a direct dependency. " +
-                "For `requirements.txt` and `Pipfile`: appends the dependency.";
+                "For `requirements.txt` and `Pipfile`: appends the dependency. " +
+                "For `pyproject.toml`, `uv.lock`, `poetry.lock`, and `pdm.lock` are regenerated natively without executing the package manager. " +
+                "For `Pipfile`, `Pipfile.lock` is regenerated natively by consulting the project's " +
+                "package index over the network. " +
+                "Not safe to use as a precondition: consults the package index over the network and " +
+                "publishes per-project state shared with other dependency recipes.";
     }
 
     static class Accumulator {
-        final Set<Path> projectsToUpdate = new HashSet<>();
+        final Map<Path, ProjectState> projects = new HashMap<>();
+        final Map<Path, Path> lockToDeps = new HashMap<>();
+    }
+
+    static class ProjectState {
+        /**
+         * The edit of the deps file as scanned, used when its lock file is visited first.
+         */
+        PyProjectHelper.@Nullable DepsEdit capturedEdit;
+        @Nullable String capturedLockContent;
+        boolean computed;
+        LockFileRegeneration.@Nullable Result regenResult;
+        boolean failureRecorded;
     }
 
     @Override
@@ -86,51 +110,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
             final PythonDependencyFile.Matcher matcher = new PythonDependencyFile.Matcher();
 
             @Override
-            public @Nullable Tree preVisit(Tree tree, ExecutionContext ctx) {
-                stopAfterPreVisit();
-                if (!(tree instanceof SourceFile)) {
-                    return tree;
-                }
-                SourceFile sourceFile = (SourceFile) tree;
-                if (tree instanceof Toml.Document && sourceFile.getSourcePath().endsWith("uv.lock")) {
-                    PythonDependencyExecutionContextView.view(ctx).getExistingLockContents().put(
-                            PyProjectHelper.correspondingPyprojectPath(sourceFile.getSourcePath()),
-                            ((Toml.Document) tree).printAll());
-                    return tree;
-                }
-                PythonDependencyFile trait = matcher.get(getCursor()).orElse(null);
-                if (trait == null) {
-                    return tree;
-                }
-                PythonResolutionResult marker = trait.getMarker();
-
-                // Skip if this is a direct dependency
-                if (marker.findDependency(packageName) != null) {
-                    return tree;
-                }
-
-                // For uv: skip if not in the resolved dependency tree
-                if (marker.getPackageManager() == PythonResolutionResult.PackageManager.Uv &&
-                        marker.getResolvedDependency(packageName) == null) {
-                    return tree;
-                }
-
-                acc.projectsToUpdate.add(sourceFile.getSourcePath());
-                return tree;
-            }
-        };
-    }
-
-    @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator acc) {
-        if (acc.projectsToUpdate.isEmpty()) {
-            return TreeVisitor.noop();
-        }
-        return new TreeVisitor<Tree, ExecutionContext>() {
-            final PythonDependencyFile.Matcher matcher = new PythonDependencyFile.Matcher();
-
-            @Override
-            public @Nullable Tree preVisit(Tree tree, ExecutionContext ctx) {
+            public Tree preVisit(Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
                 if (!(tree instanceof SourceFile)) {
                     return tree;
@@ -138,27 +118,157 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                 SourceFile sourceFile = (SourceFile) tree;
                 Path sourcePath = sourceFile.getSourcePath();
 
-                if (acc.projectsToUpdate.contains(sourcePath)) {
-                    PythonDependencyFile trait = matcher.get(getCursor()).orElse(null);
-                    if (trait != null) {
-                        String normalizedName = PythonResolutionResult.normalizeName(packageName);
-                        Map<String, String> pins = Collections.singletonMap(normalizedName, version);
-                        PythonDependencyFile updated = trait.withPinnedTransitiveDependencies(pins, null, null);
-                        if (updated.getTree() != tree) {
-                            return updated.afterModification(ctx);
-                        }
-                    }
-                }
-
                 if (tree instanceof Toml.Document && sourcePath.endsWith("uv.lock")) {
-                    Toml.Document updatedLock = PyProjectHelper.maybeUpdateUvLock((Toml.Document) tree, ctx);
-                    if (updatedLock != null) {
-                        return updatedLock;
-                    }
+                    Path depsPath = PyProjectHelper.correspondingPyprojectPath(sourcePath);
+                    ProjectState ps = acc.projects.computeIfAbsent(depsPath, k -> new ProjectState());
+                    ps.capturedLockContent = ((Toml.Document) tree).printAll();
+                    acc.lockToDeps.put(sourcePath, depsPath);
+                    return tree;
+                }
+                if (tree instanceof Toml.Document && sourcePath.endsWith("poetry.lock")) {
+                    Path depsPath = PyProjectHelper.correspondingPyprojectPath(sourcePath);
+                    ProjectState ps = acc.projects.computeIfAbsent(depsPath, k -> new ProjectState());
+                    ps.capturedLockContent = ((Toml.Document) tree).printAll();
+                    acc.lockToDeps.put(sourcePath, depsPath);
+                    return tree;
+                }
+                if (tree instanceof Toml.Document && sourcePath.endsWith("pdm.lock")) {
+                    Path depsPath = PyProjectHelper.correspondingPyprojectPath(sourcePath);
+                    ProjectState ps = acc.projects.computeIfAbsent(depsPath, k -> new ProjectState());
+                    ps.capturedLockContent = ((Toml.Document) tree).printAll();
+                    acc.lockToDeps.put(sourcePath, depsPath);
+                    return tree;
+                }
+                if (tree instanceof Json.Document && sourcePath.endsWith("Pipfile.lock")) {
+                    Path depsPath = PyProjectHelper.correspondingPipfilePath(sourcePath);
+                    ProjectState ps = acc.projects.computeIfAbsent(depsPath, k -> new ProjectState());
+                    ps.capturedLockContent = ((Json.Document) tree).printAll();
+                    acc.lockToDeps.put(sourcePath, depsPath);
+                    return tree;
                 }
 
+                PythonDependencyFile trait = matcher.get(getCursor()).orElse(null);
+                if (trait != null) {
+                    ProjectState ps = acc.projects.computeIfAbsent(sourcePath, k -> new ProjectState());
+                    ps.capturedEdit = matchesTransitive(trait) ?
+                            PyProjectHelper.DepsEdit.of(trait, pin()) : null;
+                }
                 return tree;
             }
         };
     }
+
+    private boolean matchesTransitive(PythonDependencyFile trait) {
+        PythonResolutionResult marker = trait.getMarker();
+        if (marker.findDependency(packageName) != null) {
+            return false;
+        }
+        if (marker.getPackageManager() == PythonResolutionResult.PackageManager.Uv &&
+                marker.getResolvedDependency(packageName) == null) {
+            return false;
+        }
+        return true;
+    }
+
+    private Function<PythonDependencyFile, PythonDependencyFile> pin() {
+        String normalizedName = PythonResolutionResult.normalizeName(packageName);
+        Map<String, String> pins = singletonMap(normalizedName, version);
+        return t -> t.withPinnedTransitiveDependencies(pins, null, null);
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator acc) {
+        return new TreeVisitor<Tree, ExecutionContext>() {
+            final PythonDependencyFile.Matcher matcher = new PythonDependencyFile.Matcher();
+
+            @Override
+            public Tree preVisit(Tree tree, ExecutionContext ctx) {
+                stopAfterPreVisit();
+                if (!(tree instanceof SourceFile)) {
+                    return tree;
+                }
+                SourceFile sourceFile = (SourceFile) tree;
+                Path sourcePath = sourceFile.getSourcePath();
+
+                ProjectState ps = acc.projects.get(sourcePath);
+                if (ps != null) {
+                    PythonDependencyFile trait = matcher.get(getCursor()).orElse(null);
+                    SourceFile modified = trait != null && (ps.computed || matchesTransitive(trait)) ?
+                            edit(ps, trait, ctx) : null;
+                    if (modified != null) {
+                        SourceFile out = modified;
+                        if (ps.regenResult != null && !ps.regenResult.isSuccess()) {
+                            recordFailure(ctx, ps, sourcePath);
+                            out = Markup.warn(out, new RuntimeException(
+                                    "lock regeneration failed: " + ps.regenResult.getErrorMessage()));
+                        }
+                        PyProjectHelper.putLiveDeps(ctx, sourcePath, modified.printAll(), ps.regenResult);
+                        return out;
+                    }
+                }
+
+                Path depsPath = acc.lockToDeps.get(sourcePath);
+                if (depsPath == null) {
+                    return tree;
+                }
+                ProjectState lockPs = acc.projects.get(depsPath);
+                if (lockPs == null) {
+                    return tree;
+                }
+                if (!lockPs.computed) {
+                    PyProjectHelper.DepsEdit depsEdit = lockPs.capturedEdit;
+                    SourceFile depsTree = PyProjectHelper.getLiveDepsTree(ctx, depsPath);
+                    if (depsTree != null) {
+                        Cursor synth = new Cursor(new Cursor(null, Cursor.ROOT_VALUE), depsTree);
+                        PythonDependencyFile trait = matcher.get(synth).orElse(null);
+                        depsEdit = trait != null && matchesTransitive(trait) ?
+                                PyProjectHelper.DepsEdit.of(trait, pin()) : null;
+                    }
+                    if (depsEdit != null) {
+                        lockPs.computed = true;
+                        lockPs.regenResult = depsEdit.regenerate(lockPs.capturedLockContent, ctx);
+                        PyProjectHelper.putLiveDeps(ctx, depsPath, depsEdit.getModifiedContent(), lockPs.regenResult);
+                    }
+                }
+                if (lockPs.regenResult != null) {
+                    if (lockPs.regenResult.isSuccess()) {
+                        String lockContent = lockPs.regenResult.getLockFileContent();
+                        if (tree instanceof Toml.Document) {
+                            return PyProjectHelper.reparseToml((Toml.Document) tree, lockContent);
+                        }
+                        if (tree instanceof Json.Document) {
+                            return PyProjectHelper.reparseJson((Json.Document) tree, lockContent);
+                        }
+                    } else {
+                        recordFailure(ctx, lockPs, depsPath);
+                        return Markup.warn(sourceFile, new RuntimeException(
+                                "lock regeneration failed: " + lockPs.regenResult.getErrorMessage()));
+                    }
+                }
+                return tree;
+            }
+
+            private @Nullable SourceFile edit(ProjectState ps, PythonDependencyFile trait, ExecutionContext ctx) {
+                if (ps.computed) {
+                    return PyProjectHelper.edit(trait, pin(), ps.regenResult);
+                }
+                PyProjectHelper.EditAndRegenerateResult r =
+                        PyProjectHelper.editAndRegenerate(trait, pin(), ps.capturedLockContent, ctx);
+                if (r.isChanged()) {
+                    ps.computed = true;
+                    ps.regenResult = r.getRegenResult();
+                }
+                return r.getModifiedDepsFile();
+            }
+        };
+    }
+
+    private void recordFailure(ExecutionContext ctx, ProjectState ps, Path depsPath) {
+        if (ps.failureRecorded || ps.regenResult == null) {
+            return;
+        }
+        ps.failureRecorded = true;
+        LockFileRegeneration.insertFailureRow(ctx, lockRegenerationFailures, depsPath, ps.regenResult, packageName);
+    }
+
 }

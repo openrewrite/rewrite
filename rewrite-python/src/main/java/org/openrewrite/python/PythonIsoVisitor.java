@@ -14,12 +14,6 @@
  * limitations under the License.
  */
 
-/*
- * -------------------THIS FILE IS AUTO GENERATED--------------------------
- * Changes to this file may cause incorrect behavior and will be lost if
- * the code is regenerated.
-*/
-
 package org.openrewrite.python;
 
 import org.openrewrite.java.tree.J;
@@ -30,6 +24,11 @@ public class PythonIsoVisitor<P> extends PythonVisitor<P>
     @Override
     public Py.Async visitAsync(Py.Async async, P p) {
         return (Py.Async) super.visitAsync(async, p);
+    }
+
+    @Override
+    public Py.Shebang visitShebang(Py.Shebang shebang, P p) {
+        return (Py.Shebang) super.visitShebang(shebang, p);
     }
 
     @Override

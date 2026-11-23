@@ -17,7 +17,7 @@ package org.openrewrite.properties.trait;
 
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.trait.Reference;
 
@@ -33,9 +33,14 @@ class PropertiesReferenceTest implements RewriteTest {
       c.type=Integer
       """;
 
-    @CsvSource({
+    @ValueSource(strings = {
       "application.properties",
       "application-test.properties",
+      "application-disable-security.properties",
+      "application-eu.west.properties",
+      "application-blue+green.properties",
+      "application-ops@eu.properties",
+      "application-prüfung.properties",
       "/foo/bar/application-test.properties",
     })
     @ParameterizedTest
@@ -60,7 +65,7 @@ class PropertiesReferenceTest implements RewriteTest {
         );
     }
 
-    @CsvSource({
+    @ValueSource(strings = {
       "application-.properties",
       "application.test.properties",
       "other-application.properties",

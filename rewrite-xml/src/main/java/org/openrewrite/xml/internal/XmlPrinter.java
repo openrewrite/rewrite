@@ -19,6 +19,7 @@ import org.openrewrite.Cursor;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.xml.XmlVisitor;
+import org.openrewrite.xml.marker.HtmlVoidElement;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.function.UnaryOperator;
@@ -27,6 +28,9 @@ public class XmlPrinter<P> extends XmlVisitor<PrintOutputCapture<P>> {
 
     @Override
     public Xml visitDocument(Xml.Document document, PrintOutputCapture<P> p) {
+        if (document.isCharsetBomMarked()) {
+            p.append('\uFEFF');
+        }
         beforeSyntax(document, p);
         document = (Xml.Document) super.visitDocument(document, p);
         afterSyntax(document, p);
@@ -65,7 +69,10 @@ public class XmlPrinter<P> extends XmlVisitor<PrintOutputCapture<P>> {
         p.append(tag.getName());
         visit(tag.getAttributes(), p);
         p.append(tag.getBeforeTagDelimiterPrefix());
-        if (tag.getClosing() == null) {
+        if (tag.getMarkers().findFirst(HtmlVoidElement.class).isPresent()) {
+            // HTML void element such as <br> printed with a bare '>' (no slash, no closing tag).
+            p.append('>');
+        } else if (tag.getClosing() == null) {
             p.append("/>");
         } else {
             p.append('>');

@@ -17,45 +17,52 @@
 package recipe
 
 import (
+	"reflect"
 	"time"
 
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
-// TreeVisitor can visit and transform a tree node.
+// TreeVisitor can visit and transform a tree node. Visitors that need
+// ancestor context (a "cursor") expose it as state — typically by
+// embedding visitor.GoVisitor and calling its Cursor() accessor — to
+// match the Java OpenRewrite visitor pattern.
 type TreeVisitor interface {
-	Visit(t tree.Tree, p any) tree.Tree
+	Visit(t java.Tree, p any) java.Tree
 }
 
 // Recipe defines a source code transformation.
 type Recipe interface {
-	// Name returns the fully qualified recipe name (e.g., "org.openrewrite.golang.ChangePackageName").
 	Name() string
 
-	// DisplayName returns a human-readable name for display in UIs.
 	DisplayName() string
 
-	// Description returns a markdown-enabled description of the recipe's purpose.
 	Description() string
 
-	// Tags returns categorization tags (e.g., "cleanup", "security"). May be nil.
 	Tags() []string
 
-	// EstimatedEffortPerOccurrence returns the estimated manual effort per change.
 	EstimatedEffortPerOccurrence() time.Duration
 
-	// Editor returns the visitor that performs the transformation.
 	// Returns nil for recipes that only compose sub-recipes via RecipeList.
 	Editor() TreeVisitor
 
-	// RecipeList returns sub-recipes that run as part of this recipe. May be nil.
 	RecipeList() []Recipe
 
-	// Options returns descriptors for this recipe's configurable options.
 	Options() []OptionDescriptor
+
+	// May be nil. The runtime for writing rows is provided by the DataTable
+	// type and DataTableStore (separate from these descriptors).
+	DataTables() []DataTableDescriptor
+
+	Maintainers() []Maintainer
+
+	// May be nil.
+	Contributors() []Contributor
+
+	// May be nil.
+	Examples() []Example
 }
 
-// Base provides default implementations for optional Recipe methods.
 // Embed it in your recipe struct to avoid implementing every method:
 //
 //	type MyRecipe struct {
@@ -68,6 +75,17 @@ func (Base) EstimatedEffortPerOccurrence() time.Duration { return 5 * time.Minut
 func (Base) Editor() TreeVisitor                         { return nil }
 func (Base) RecipeList() []Recipe                        { return nil }
 func (Base) Options() []OptionDescriptor                 { return nil }
+func (Base) DataTables() []DataTableDescriptor           { return nil }
+func (Base) Maintainers() []Maintainer                   { return nil }
+func (Base) Contributors() []Contributor                 { return nil }
+func (Base) Examples() []Example                         { return nil }
+
+// CausesAnotherCycle is optionally implemented by a recipe whose changes should
+// trigger another recipe cycle, mirroring Java's Recipe.causesAnotherCycle().
+// Kept off Recipe so existing implementations don't have to add it.
+type CausesAnotherCycle interface {
+	CausesAnotherCycle() bool
+}
 
 // DelegatesTo marks a recipe that delegates entirely to a Java-side recipe.
 // When the Java host calls PrepareRecipe, the Go server includes the
@@ -76,39 +94,21 @@ func (Base) Options() []OptionDescriptor                 { return nil }
 type DelegatesTo interface {
 	Recipe
 
-	// JavaRecipeName returns the fully qualified Java recipe name
-	// (e.g., "org.openrewrite.java.ChangeType").
 	JavaRecipeName() string
 
-	// JavaOptions returns options to configure the Java recipe, keyed by option name.
 	JavaOptions() map[string]any
 }
 
-// OptionDescriptor describes a configurable option on a recipe.
 type OptionDescriptor struct {
-	// Name is the programmatic name (e.g., "oldPackageName").
-	Name string
-
-	// DisplayName is the human-readable label.
+	Name        string
 	DisplayName string
-
-	// Description explains the option's purpose.
 	Description string
-
-	// Example shows a sample value.
-	Example string
-
-	// Required indicates the option must be set.
-	Required bool
-
-	// Valid lists allowed values (nil means any value is accepted).
-	Valid []string
-
-	// Value is the current value, if set.
-	Value any
+	Example     string
+	Required    bool
+	Valid       []string
+	Value       any
 }
 
-// Option creates a required OptionDescriptor with the given name, display name, and description.
 // Use the fluent With* methods to customize further:
 //
 //	recipe.Option("oldName", "Old name", "The identifier to rename.").WithValue(r.OldName)
@@ -118,19 +118,79 @@ func Option(name, displayName, description string) OptionDescriptor {
 	return OptionDescriptor{Name: name, DisplayName: displayName, Description: description, Required: true}
 }
 
-// WithValue sets the current value of the option.
 func (o OptionDescriptor) WithValue(v any) OptionDescriptor { o.Value = v; return o }
 
-// WithExample sets an example value for the option.
 func (o OptionDescriptor) WithExample(e string) OptionDescriptor { o.Example = e; return o }
 
-// WithValid sets the allowed values for the option.
 func (o OptionDescriptor) WithValid(v ...string) OptionDescriptor { o.Valid = v; return o }
 
-// AsOptional marks the option as not required.
 func (o OptionDescriptor) AsOptional() OptionDescriptor { o.Required = false; return o }
 
-// RecipeDescriptor provides metadata about a recipe for display and serialization.
+// Used to populate the marketplace option `type` wire field.
+func (o OptionDescriptor) TypeName() string {
+	if o.Value == nil {
+		return "String"
+	}
+	switch reflect.TypeOf(o.Value).Kind() {
+	case reflect.Bool:
+		return "Boolean"
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32:
+		return "Integer"
+	case reflect.Int64:
+		return "Long"
+	case reflect.Float32, reflect.Float64:
+		return "Double"
+	case reflect.Slice, reflect.Array:
+		return "List"
+	default:
+		return "String"
+	}
+}
+
+type DataTableDescriptor struct {
+	Name        string
+	DisplayName string
+	Description string
+	Columns     []ColumnDescriptor
+}
+
+type ColumnDescriptor struct {
+	Name        string
+	DisplayName string
+	Description string
+	Type        string // e.g. "String", "Integer", "Long"
+}
+
+type Maintainer struct {
+	Name  string
+	Email string
+	Logo  string
+}
+
+type Contributor struct {
+	Name      string
+	Email     string
+	LineCount int
+}
+
+type Example struct {
+	Description string
+	Sources     []ExampleSource
+	Parameters  []string
+}
+
+type ExampleSource struct {
+	Before   string
+	After    string
+	Path     string
+	Language string
+}
+
+// Note: the Preconditions field carries declarative-recipe metadata
+// (the Java RecipeDescriptor.preconditions list, for YAML
+// DeclarativeRecipe). Runtime precondition gates are expressed via the
+// preconditions package's Check wrapper around Editor() and travel
+// through the editPreconditions wire slot, not this descriptor field.
 type RecipeDescriptor struct {
 	Name                         string
 	DisplayName                  string
@@ -139,22 +199,45 @@ type RecipeDescriptor struct {
 	EstimatedEffortPerOccurrence time.Duration
 	Options                      []OptionDescriptor
 	RecipeList                   []RecipeDescriptor
+	Preconditions                []RecipeDescriptor
+	DataTables                   []DataTableDescriptor
+	Maintainers                  []Maintainer
+	Contributors                 []Contributor
+	Examples                     []Example
 }
 
-// Describe creates a RecipeDescriptor from a Recipe.
+// Describe creates a RecipeDescriptor from a Recipe. Recursive descriptors
+// (RecipeList) are protected against cycles via a visited set keyed by
+// recipe name; if a recipe name re-appears in the descent, a stub
+// descriptor with just the name and display name is returned in its place.
 func Describe(r Recipe) RecipeDescriptor {
+	return describe(r, map[string]bool{})
+}
+
+func describe(r Recipe, seen map[string]bool) RecipeDescriptor {
+	name := r.Name()
+	if seen[name] {
+		return RecipeDescriptor{Name: name, DisplayName: r.DisplayName()}
+	}
+	seen[name] = true
+	defer delete(seen, name)
+
 	desc := RecipeDescriptor{
-		Name:                         r.Name(),
+		Name:                         name,
 		DisplayName:                  r.DisplayName(),
 		Description:                  r.Description(),
 		Tags:                         r.Tags(),
 		EstimatedEffortPerOccurrence: r.EstimatedEffortPerOccurrence(),
 		Options:                      r.Options(),
+		DataTables:                   r.DataTables(),
+		Maintainers:                  r.Maintainers(),
+		Contributors:                 r.Contributors(),
+		Examples:                     r.Examples(),
 	}
 	if subs := r.RecipeList(); len(subs) > 0 {
 		desc.RecipeList = make([]RecipeDescriptor, len(subs))
 		for i, sub := range subs {
-			desc.RecipeList[i] = Describe(sub)
+			desc.RecipeList[i] = describe(sub, seen)
 		}
 	}
 	return desc

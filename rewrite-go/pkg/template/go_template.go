@@ -17,9 +17,13 @@
 package template
 
 import (
+	"io/fs"
 	"sync"
 
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/google/uuid"
+
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
@@ -29,88 +33,306 @@ type GoTemplate struct {
 	code     string
 	captures map[string]*Capture
 	imports  []string
+	context  []string
 	kind     ScaffoldKind
+	importerCache
 
 	once     sync.Once
-	cached   tree.J
+	cached   java.J
 	parseErr error
+
+	// required names the captures the parsed tree stands in for, which is a
+	// property of the template rather than of an application.
+	requiredOnce sync.Once
+	required     map[string]bool
+
+	// sourceImports are the imports a recipe adds alongside the template,
+	// whose names the template qualifies with as it does its own imports'.
+	sourceImports  []SourceImportSpec
+	qualifiersOnce sync.Once
+	qualifierNames map[string]bool
+}
+
+// qualifiedBy names the package qualifiers the template's code is written
+// with, which a local declaration at the site would capture.
+func (t *GoTemplate) qualifiedBy(tree java.J) map[string]bool {
+	t.qualifiersOnce.Do(func() {
+		paths := append([]string(nil), t.imports...)
+		var aliases []string
+		for _, imp := range t.sourceImports {
+			if imp.Alias == nil {
+				paths = append(paths, imp.Path)
+			} else if *imp.Alias != "_" && *imp.Alias != "." {
+				aliases = append(aliases, *imp.Alias)
+			}
+		}
+		t.qualifierNames = qualifiers(tree, paths, aliases)
+	})
+	return t.qualifierNames
+}
+
+// fileQualifiers maps each qualifier the template's code is written with to the
+// name cu imports the same package under, where that is another one. It is not
+// ok where cu imports such a package with a dot only, leaving no qualifier to
+// write.
+func (t *GoTemplate) fileQualifiers(cu *golang.CompilationUnit, qualified map[string]bool) (map[string]string, bool) {
+	if cu == nil || cu.Imports == nil {
+		return nil, true
+	}
+	paths := map[string]string{}
+	for _, imp := range t.imports {
+		paths[packageNameOf(imp)] = imp
+	}
+	for _, imp := range t.sourceImports {
+		if imp.Alias == nil {
+			paths[packageNameOf(imp.Path)] = imp.Path
+		} else {
+			paths[*imp.Alias] = imp.Path
+		}
+	}
+	var renames map[string]string
+	for name := range qualified {
+		path, ok := paths[name]
+		if !ok {
+			continue
+		}
+		var alias string
+		imported, dotted := false, false
+		for _, rp := range cu.Imports.Elements {
+			imp := rp.Element
+			if imp == nil || imp.Path() != path {
+				continue
+			}
+			as := packageNameOf(path)
+			if imp.Alias != nil && imp.Alias.Element != nil {
+				as = imp.Alias.Element.Name
+			}
+			switch as {
+			case name:
+				imported = true
+			case ".":
+				dotted = true
+			case "_":
+			default:
+				if alias == "" {
+					alias = as
+				}
+			}
+		}
+		switch {
+		case imported:
+		case alias != "":
+			if renames == nil {
+				renames = map[string]string{}
+			}
+			renames[name] = alias
+		case dotted:
+			return nil, false
+		}
+	}
+	return renames, true
+}
+
+// required names the captures a substitution has to bind. A capture the
+// template never names has no placeholder to leave behind, so a recipe may
+// declare one and share it across alternatives that do not all use it.
+func (t *GoTemplate) requiredCaptures(tree java.J) map[string]bool {
+	t.requiredOnce.Do(func() {
+		t.required = map[string]bool{}
+		for name := range placeholdersIn(tree) {
+			if _, declared := t.captures[name]; declared {
+				t.required[name] = true
+			}
+		}
+	})
+	return t.required
 }
 
 // Apply produces a new AST node by parsing the template and substituting
-// captured values from the MatchResult.
-func (t *GoTemplate) Apply(cursor *visitor.Cursor, values *MatchResult) tree.J {
+// captured values from the MatchResult. cursor is the node the result replaces,
+// and is what lets Apply place the result there: leading whitespace,
+// parentheses where the expression around it binds tighter, indentation. Pass
+// nil for the substituted tree alone, carrying the template's own whitespace.
+func (t *GoTemplate) Apply(cursor *visitor.Cursor, values *MatchResult) java.J {
+	return t.apply(cursor, values, false)
+}
+
+// applyInFile is Apply for a rewrite that hands its result to the file as it
+// is, as Rewrite and NewRecipe do, the cursor naming exactly the node replaced.
+// The result is nil where Go's grammar does not admit it in that slot, such as
+// a statement where an expression belongs. The template's package qualifiers
+// take on the names the file imports their packages under, and the result is
+// nil where a local declaration in scope at the site shadows one of them, or
+// where the file dot-imports one. A recipe calling Apply places the result
+// itself and keeps those decisions; it may alias an import a local shadows.
+func (t *GoTemplate) applyInFile(cursor *visitor.Cursor, values *MatchResult) java.J {
+	return t.apply(cursor, values, true)
+}
+
+func (t *GoTemplate) apply(cursor *visitor.Cursor, values *MatchResult, inFile bool) java.J {
 	templateTree, err := t.getTree()
 	if err != nil || templateTree == nil {
 		return nil
 	}
 
-	// Deep-copy the template tree by re-parsing (safe because parseScaffold is cached
-	// and we need a fresh tree to substitute into).
-	// For now, re-parse each time. Optimization: clone the cached tree.
-	fresh, err := parseScaffold(t.code, t.captures, t.imports, t.kind)
-	if err != nil {
-		return nil
+	// A placeholder left unsubstituted prints as the identifier standing in
+	// for it, which would reach the source file.
+	for name := range t.requiredCaptures(templateTree) {
+		if values == nil || !values.satisfies(t.captures[name]) {
+			return nil
+		}
+	}
+
+	// The file may import a package the template qualifies with under another
+	// name, which the template's code takes on. A local declaration at the
+	// site naming one of them would take the reference over.
+	var requalified map[string]string
+	if inFile && cursor != nil {
+		if qualified := t.qualifiedBy(templateTree); len(qualified) > 0 {
+			var ok bool
+			if requalified, ok = t.fileQualifiers(compilationUnitOf(cursor), qualified); !ok {
+				return nil
+			}
+			locals := localNames(cursor)
+			for name := range qualified {
+				if as, renamed := requalified[name]; renamed {
+					name = as
+				}
+				if locals[name] {
+					return nil
+				}
+			}
+		}
+	}
+
+	// Giving every node a new ID copies the whole tree, so the result shares
+	// no node with the cached one and two applications share none with each
+	// other. The cache is what the scaffold parse produced, once.
+	fresh := withFreshIDs(templateTree)
+	if len(requalified) > 0 {
+		fresh = renamedQualifiers(fresh, requalified)
 	}
 
 	if values != nil {
+		if cursor != nil {
+			if replaced, ok := cursor.Value().(java.J); ok {
+				fresh = hygienic(fresh, values, replaced)
+			}
+		}
 		fresh = substitute(fresh, values)
+		if fresh != nil && !wellFormed(fresh) {
+			return nil
+		}
 	}
+	if fresh == nil {
+		return nil
+	}
+	if cursor == nil {
+		return fresh
+	}
+	return placeAt(fresh, cursor, inFile)
+}
 
-	return fresh
+// Instantiate produces the template as a detached node for a recipe that
+// inserts the result somewhere new, where Apply replaces a matched node. Bound
+// values are copied, so a spliced subtree may also stay where it came from.
+// The result carries no leading whitespace. Like Apply it is nil unless every
+// capture is bound, through Bind for a single subtree or BindList for a run of
+// them within the capture's declared bounds.
+func (t *GoTemplate) Instantiate(values *MatchResult) java.J {
+	instantiated := t.Apply(nil, values)
+	if instantiated == nil {
+		return nil
+	}
+	// The whitespace is the gap the scaffold leaves before the template code,
+	// not whitespace the template itself declares. Its comments are its own.
+	return setLeadingPrefix(instantiated, java.MakeSpace(getLeadingPrefix(instantiated).Comments(), ""))
+}
+
+// withFreshIDs returns a copy of j in which every node has a new ID, keeping
+// IDs unique within whatever tree the result is inserted into.
+func withFreshIDs(j java.J) java.J {
+	v := &idRefreshVisitor{}
+	v.Self = v
+	return v.Visit(j, nil).(java.J)
+}
+
+type idRefreshVisitor struct {
+	visitor.GoVisitor
+}
+
+func (v *idRefreshVisitor) Visit(t java.Tree, p any) java.Tree {
+	visited := v.GoVisitor.Visit(t, p)
+	if j, ok := visited.(java.J); ok && j != nil {
+		return j.WithID(uuid.New())
+	}
+	return visited
 }
 
 // getTree lazily parses the template and caches the result.
-func (t *GoTemplate) getTree() (tree.J, error) {
+func (t *GoTemplate) getTree() (java.J, error) {
 	t.once.Do(func() {
-		t.cached, t.parseErr = parseScaffold(t.code, t.captures, t.imports, t.kind)
+		t.cached, t.parseErr = parseScaffold(t.code, t.captures, t.imports, t.context, t.kind, t.shared())
 	})
 	return t.cached, t.parseErr
 }
 
-// --- Template builder ---
-
-// TemplateBuilder constructs a GoTemplate with fluent configuration.
 type TemplateBuilder struct {
-	code     string
-	captures []*Capture
-	imports  []string
-	kind     ScaffoldKind
+	code       string
+	captures   []*Capture
+	imports    []string
+	context    []string
+	kind       ScaffoldKind
+	exportData []fs.FS
 }
 
-// ExpressionTemplate creates a TemplateBuilder for producing an expression.
 func ExpressionTemplate(code string) *TemplateBuilder {
 	return &TemplateBuilder{code: code, kind: ScaffoldExpression}
 }
 
-// StatementTemplate creates a TemplateBuilder for producing a statement.
 func StatementTemplate(code string) *TemplateBuilder {
 	return &TemplateBuilder{code: code, kind: ScaffoldStatement}
 }
 
-// TopLevelTemplate creates a TemplateBuilder for producing a top-level declaration.
 func TopLevelTemplate(code string) *TemplateBuilder {
 	return &TemplateBuilder{code: code, kind: ScaffoldTopLevel}
 }
 
-// Captures adds captures to the builder.
 func (b *TemplateBuilder) Captures(caps ...*Capture) *TemplateBuilder {
 	b.captures = append(b.captures, caps...)
 	return b
 }
 
-// Imports adds required imports for the template code.
+// It does not edit imports in the source file being rewritten.
 func (b *TemplateBuilder) Imports(pkgs ...string) *TemplateBuilder {
 	b.imports = append(b.imports, pkgs...)
 	return b
 }
 
-// Build creates the GoTemplate.
+// Context adds declarations the template is parsed against. See
+// PatternBuilder.Context.
+func (b *TemplateBuilder) Context(decls ...string) *TemplateBuilder {
+	b.context = append(b.context, decls...)
+	return b
+}
+
+// ExportData attributes the template against compiler export data the recipe
+// module carries, reaching packages the running toolchain cannot load. Sets
+// accumulate, as Imports does, so a module can draw on several generated
+// packages; see exportdata.Importer for what none of them covers.
+func (b *TemplateBuilder) ExportData(sets ...fs.FS) *TemplateBuilder {
+	b.exportData = append(b.exportData, sets...)
+	return b
+}
+
 func (b *TemplateBuilder) Build() *GoTemplate {
 	return &GoTemplate{
-		code:     b.code,
-		captures: captureMap(b.captures),
-		imports:  b.imports,
-		kind:     b.kind,
+		code:          b.code,
+		captures:      captureMap(b.captures),
+		imports:       b.imports,
+		context:       b.context,
+		kind:          b.kind,
+		importerCache: importerCache{exportData: b.exportData},
 	}
 }
 
@@ -122,7 +344,6 @@ func Rewrite(before *GoPattern, after *GoTemplate) *RewriteVisitor {
 	return v
 }
 
-// RewriteVisitor applies a pattern match + template replacement on every node.
 type RewriteVisitor struct {
 	visitor.GoVisitor
 	before *GoPattern
@@ -130,13 +351,13 @@ type RewriteVisitor struct {
 }
 
 // Visit overrides the default Visit to attempt pattern matching on every node.
-func (v *RewriteVisitor) Visit(t tree.Tree, p any) tree.Tree {
+func (v *RewriteVisitor) Visit(t java.Tree, p any) java.Tree {
 	result := v.GoVisitor.Visit(t, p)
 	if result == nil {
 		return nil
 	}
 
-	j, ok := result.(tree.J)
+	j, ok := result.(java.J)
 	if !ok {
 		return result
 	}
@@ -146,204 +367,39 @@ func (v *RewriteVisitor) Visit(t tree.Tree, p any) tree.Tree {
 		return result
 	}
 
-	replaced := v.after.Apply(nil, match)
+	// The cursor names t, not the visited j: rewriting a descendant leaves j a
+	// new node, while the parent Apply consults still holds t.
+	replaced := v.after.applyInFile(visitor.NewCursor(v.Cursor(), t), match)
 	if replaced == nil {
 		return result
 	}
-
-	// Preserve the original node's leading prefix on the replacement.
-	return setLeadingPrefix(replaced, getLeadingPrefix(j))
+	return replaced
 }
 
-// setLeadingPrefix sets the prefix on the leftmost leaf of the node,
-// mirroring getLeadingPrefix. This ensures compound nodes like
-// MethodInvocation (where the prefix lives on Select, not the root)
-// get the right whitespace.
-func setLeadingPrefix(j tree.J, prefix tree.Space) tree.J {
-	switch n := j.(type) {
-	case *tree.Identifier:
-		return n.WithPrefix(prefix)
-	case *tree.Literal:
-		return n.WithPrefix(prefix)
-	case *tree.Empty:
-		return n.WithPrefix(prefix)
-	case *tree.Binary:
-		return n.WithLeft(setLeadingPrefix(n.Left, prefix).(tree.Expression))
-	case *tree.Unary:
-		return n.WithPrefix(prefix)
-	case *tree.FieldAccess:
-		return n.WithTarget(setLeadingPrefix(n.Target, prefix).(tree.Expression))
-	case *tree.MethodInvocation:
-		if n.Select != nil {
-			sel := *n.Select
-			sel.Element = setLeadingPrefix(sel.Element, prefix).(tree.Expression)
-			return &tree.MethodInvocation{
-				ID: n.ID, Prefix: n.Prefix, Markers: n.Markers,
-				Select: &sel, Name: n.Name, Arguments: n.Arguments, MethodType: n.MethodType,
-			}
-		}
-		return n.WithName(n.Name.WithPrefix(prefix))
-	case *tree.Assignment:
-		return n.WithVariable(setLeadingPrefix(n.Variable, prefix).(tree.Expression))
-	case *tree.AssignmentOperation:
-		return n.WithVariable(setLeadingPrefix(n.Variable, prefix).(tree.Expression))
-	case *tree.Parentheses:
-		return n.WithPrefix(prefix)
-	case *tree.TypeCast:
-		return n.WithPrefix(prefix)
-	case *tree.ArrayAccess:
-		return &tree.ArrayAccess{
-			ID: n.ID, Prefix: n.Prefix, Markers: n.Markers,
-			Indexed: setLeadingPrefix(n.Indexed, prefix).(tree.Expression),
-			Dimension: n.Dimension, Type: n.Type,
-		}
-	case *tree.Composite:
-		if n.TypeExpr != nil {
-			return &tree.Composite{
-				ID: n.ID, Prefix: n.Prefix, Markers: n.Markers,
-				TypeExpr: setLeadingPrefix(n.TypeExpr, prefix).(tree.Expression),
-				Elements: n.Elements,
-			}
-		}
-		return n.WithPrefix(prefix)
-	case *tree.Slice:
-		return &tree.Slice{
-			ID: n.ID, Prefix: n.Prefix, Markers: n.Markers,
-			Indexed: setLeadingPrefix(n.Indexed, prefix).(tree.Expression),
-			OpenBracket: n.OpenBracket, Low: n.Low, High: n.High, Max: n.Max, CloseBracket: n.CloseBracket,
-		}
-	case *tree.IndexList:
-		return &tree.IndexList{
-			ID: n.ID, Prefix: n.Prefix, Markers: n.Markers,
-			Target: setLeadingPrefix(n.Target, prefix).(tree.Expression),
-			Indices: n.Indices,
-		}
-	case *tree.Send:
-		return &tree.Send{
-			ID: n.ID, Prefix: n.Prefix, Markers: n.Markers,
-			Channel: setLeadingPrefix(n.Channel, prefix).(tree.Expression),
-			Arrow: n.Arrow,
-		}
-	case *tree.KeyValue:
-		return &tree.KeyValue{
-			ID: n.ID, Prefix: n.Prefix, Markers: n.Markers,
-			Key: setLeadingPrefix(n.Key, prefix).(tree.Expression),
-			Value: n.Value,
-		}
-	default:
-		return setPrefix(j, prefix)
-	}
+// setLeadingPrefix sets the node's own leading whitespace. The parser
+// attaches inter-element whitespace to the outermost element, so the
+// leading prefix lives directly on the node.
+func setLeadingPrefix(j java.J, prefix java.Space) java.J {
+	return setPrefix(j, prefix)
 }
 
-// getLeadingPrefix extracts the effective leading whitespace from a node
-// by walking to its leftmost leaf token. This is needed because in the
-// Go LST, compound nodes (Binary, Unary, etc.) may have empty prefixes
-// with the actual leading whitespace on the first child.
-func getLeadingPrefix(j tree.J) tree.Space {
-	switch n := j.(type) {
-	case *tree.Identifier:
-		return n.Prefix
-	case *tree.Literal:
-		return n.Prefix
-	case *tree.Empty:
-		return n.Prefix
-	case *tree.Binary:
-		// The leading prefix is on the left operand.
-		return getLeadingPrefix(n.Left)
-	case *tree.Unary:
-		return n.Prefix
-	case *tree.FieldAccess:
-		return getLeadingPrefix(n.Target)
-	case *tree.MethodInvocation:
-		if n.Select != nil {
-			return getLeadingPrefix(n.Select.Element)
+// getLeadingPrefix returns the node's own leading whitespace. The parser
+// attaches inter-element whitespace to the outermost element, so the
+// leading prefix lives directly on the node.
+func getLeadingPrefix(j java.J) java.Space {
+	return j.GetPrefix()
+}
+
+// placeholdersIn names the captures a template tree stands in for.
+func placeholdersIn(tree java.J) map[string]bool {
+	names := map[string]bool{}
+	visitor.Walk(tree, func(t java.Tree) bool {
+		if ident, ok := t.(*java.Identifier); ok {
+			if name, isPlaceholder := FromPlaceholder(ident.Name); isPlaceholder {
+				names[name] = true
+			}
 		}
-		return getLeadingPrefix(n.Name)
-	case *tree.Assignment:
-		return getLeadingPrefix(n.Variable)
-	case *tree.AssignmentOperation:
-		return getLeadingPrefix(n.Variable)
-	case *tree.Block:
-		return n.Prefix
-	case *tree.Return:
-		return n.Prefix
-	case *tree.If:
-		return n.Prefix
-	case *tree.MethodDeclaration:
-		return n.Prefix
-	case *tree.VariableDeclarations:
-		return n.Prefix
-	case *tree.Parentheses:
-		return n.Prefix
-	case *tree.TypeCast:
-		return getLeadingPrefix(n.Expr)
-	case *tree.ControlParentheses:
-		return n.Prefix
-	case *tree.ArrayAccess:
-		return getLeadingPrefix(n.Indexed)
-	case *tree.ArrayType:
-		return n.Prefix
-	case *tree.ForLoop:
-		return n.Prefix
-	case *tree.ForEachLoop:
-		return n.Prefix
-	case *tree.Switch:
-		return n.Prefix
-	case *tree.Case:
-		return n.Prefix
-	case *tree.Break:
-		return n.Prefix
-	case *tree.Continue:
-		return n.Prefix
-	case *tree.Label:
-		return n.Prefix
-	case *tree.GoStmt:
-		return n.Prefix
-	case *tree.Defer:
-		return n.Prefix
-	case *tree.Send:
-		return getLeadingPrefix(n.Channel)
-	case *tree.Goto:
-		return n.Prefix
-	case *tree.Fallthrough:
-		return n.Prefix
-	case *tree.Composite:
-		if n.TypeExpr != nil {
-			return getLeadingPrefix(n.TypeExpr)
-		}
-		return n.Prefix
-	case *tree.KeyValue:
-		return getLeadingPrefix(n.Key)
-	case *tree.Slice:
-		return getLeadingPrefix(n.Indexed)
-	case *tree.MapType:
-		return n.Prefix
-	case *tree.Channel:
-		return n.Prefix
-	case *tree.FuncType:
-		return n.Prefix
-	case *tree.StructType:
-		return n.Prefix
-	case *tree.InterfaceType:
-		return n.Prefix
-	case *tree.TypeList:
-		return n.Prefix
-	case *tree.TypeDecl:
-		return n.Prefix
-	case *tree.MultiAssignment:
-		if len(n.Variables) > 0 {
-			return getLeadingPrefix(n.Variables[0].Element)
-		}
-		return n.Prefix
-	case *tree.CommClause:
-		return n.Prefix
-	case *tree.IndexList:
-		return getLeadingPrefix(n.Target)
-	case *tree.Import:
-		return n.Prefix
-	case *tree.CompilationUnit:
-		return n.Prefix
-	default:
-		return tree.Space{}
-	}
+		return true
+	})
+	return names
 }

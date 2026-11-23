@@ -40,7 +40,6 @@ func FromPlaceholder(identifier string) (string, bool) {
 	return name, true
 }
 
-// IsPlaceholder returns true if the identifier is a template placeholder.
 func IsPlaceholder(identifier string) bool {
 	return strings.HasPrefix(identifier, placeholderPrefix) &&
 		strings.HasSuffix(identifier, placeholderSuffix) &&

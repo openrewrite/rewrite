@@ -25,7 +25,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-public class GroovyParserVisitorTest {
+class GroovyParserVisitorTest {
 
     @Test
     void eraseCommentsSimple() {
@@ -39,7 +39,7 @@ public class GroovyParserVisitorTest {
             a ____________
             ____
             ____________ b
-            """.replaceAll("_", " "), // this is to prevent IntelliJ from removing trailing whitespace
+            """.replace("_", " "), // this is to prevent IntelliJ from removing trailing whitespace
           GroovyParserVisitor.eraseComments(
             """
               a /* something

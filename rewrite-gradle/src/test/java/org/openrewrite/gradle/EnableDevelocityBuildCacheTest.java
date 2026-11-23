@@ -120,6 +120,36 @@ class EnableDevelocityBuildCacheTest implements RewriteTest {
     }
 
     @Test
+    void optionValueContainingTemplatePlaceholderSyntax() {
+        rewriteRun(spec -> spec.recipe(new EnableDevelocityBuildCache("true", "System.getenv(\"#{CI}\") != null")),
+          settingsGradle(
+            """
+              plugins {
+                  id 'com.gradle.develocity' version '3.17.6'
+              }
+              develocity {
+                  server = 'https://dev.example.com/'
+              }
+              """,
+            """
+              plugins {
+                  id 'com.gradle.develocity' version '3.17.6'
+              }
+              develocity {
+                  server = 'https://dev.example.com/'
+                  buildCache {
+                      remote(develocity.buildCache) {
+                          enabled = true
+                          push = System.getenv("#{CI}") != null
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void shouldNotModifyBuildCacheConfig() {
         rewriteRun(spec -> spec.recipe(new EnableDevelocityBuildCache(null, "#{isTrue(env['CI'])}")),
           settingsGradle(

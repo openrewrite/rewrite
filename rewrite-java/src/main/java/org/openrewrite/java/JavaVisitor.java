@@ -18,11 +18,13 @@ package org.openrewrite.java;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.internal.LineStart;
 import org.openrewrite.java.service.AutoFormatService;
 import org.openrewrite.java.service.ImportService;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
+import javax.annotation.CheckReturnValue;
 import java.util.*;
 
 @SuppressWarnings("unused")
@@ -63,36 +65,99 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
     }
 
+    @CheckReturnValue
     public <J2 extends J> J2 maybeAutoFormat(J2 before, J2 after, P p) {
         return maybeAutoFormat(before, after, p, getCursor().getParentTreeCursor());
     }
 
+    @CheckReturnValue
     public <J2 extends J> J2 maybeAutoFormat(J2 before, J2 after, P p, Cursor parent) {
         return maybeAutoFormat(before, after, null, p, parent);
     }
 
+    @CheckReturnValue
     public <J2 extends J> J2 maybeAutoFormat(J2 before, J2 after, @Nullable J stopAfter, P p, Cursor parent) {
         if (before != after) {
-            return autoFormat(after, stopAfter, p, parent);
+            // what changed in place keeps the indentation of the line it starts, however the file is indented, and a
+            // declaration also keeps the indentation of the line that holds its modifiers and name
+            J2 formatted = autoFormat(after, stopAfter, p, parent);
+            formatted = formatted.withPrefix(LineStart.keep(formatted.getPrefix(), before.getPrefix(), after.getPrefix()));
+            return LineStart.keepDeclarationLine(formatted, before, after.getPrefix());
         }
         return after;
     }
 
+    @CheckReturnValue
     public <J2 extends J> J2 autoFormat(J2 j, P p) {
         return autoFormat(j, p, getCursor().getParentTreeCursor());
     }
 
+    @CheckReturnValue
     public <J2 extends J> J2 autoFormat(J2 j, P p, Cursor parent) {
         return autoFormat(j, null, p, parent);
     }
 
     @SuppressWarnings({"ConstantConditions", "unchecked"})
+    @CheckReturnValue
     public <J2 extends J> J2 autoFormat(J2 j, @Nullable J stopAfter, P p, Cursor parent) {
+        FormattingListener.beforeFormat(j, stopAfter, parent);
         JavaSourceFile cu = (j instanceof JavaSourceFile) ?
                 (JavaSourceFile) j :
                 getCursor().firstEnclosingOrThrow(JavaSourceFile.class);
         AutoFormatService service = cu.service(AutoFormatService.class);
         return (J2) service.autoFormatVisitor(stopAfter).visit(j, p, parent);
+    }
+
+    public <J2 extends J> J2 autoIndent(J2 j, P p, Cursor parent) {
+        return autoIndent(j, null, p, parent);
+    }
+
+    /**
+     * Re-indent {@code j} for where it now sits, leaving every other aspect of its formatting alone. Statements
+     * moved in from elsewhere in the tree arrive with the indentation of where they came from, which is all that
+     * needs fixing when the surrounding shell was itself parsed from well-formed source.
+     */
+    @SuppressWarnings({"ConstantConditions", "unchecked"})
+    public <J2 extends J> J2 autoIndent(J2 j, @Nullable J stopAfter, P p, Cursor parent) {
+        JavaSourceFile cu = (j instanceof JavaSourceFile) ?
+                (JavaSourceFile) j :
+                getCursor().firstEnclosingOrThrow(JavaSourceFile.class);
+        AutoFormatService service = cu.service(AutoFormatService.class);
+        return (J2) service.tabsAndIndentsVisitor(cu, stopAfter).visit(j, p, parent);
+    }
+
+    /**
+     * Targeted, low-blast-radius cleanup pass for the result of an LST edit.
+     * Runs only the whitespace-normalisation steps of auto-format:
+     * {@code NormalizeFormatVisitor} (which moves stranded whitespace out
+     * to the outermost LST element — OpenRewrite's "whitespace lives on the
+     * outermost element" convention) followed by {@code BlankLinesVisitor}
+     * (which normalises blank-line counts based on the host file's style).
+     *
+     * <p>Cheaper and far less invasive than {@link #autoFormat(J, Object)};
+     * it never touches indentation, brace style, annotation-list wrapping,
+     * spaces around operators, etc. Use after a manual prefix adjustment if
+     * you want to recover idiomatic whitespace without changing unrelated
+     * formatting in the surrounding source.
+     *
+     * <p>If {@code before == after} (no change), returns {@code after}
+     * unchanged.
+     */
+    public <J2 extends J> J2 maybeRemoveBlankLines(J2 before, J2 after, P p) {
+        return maybeRemoveBlankLines(before, after, p, getCursor().getParentTreeCursor());
+    }
+
+    @SuppressWarnings({"ConstantConditions", "unchecked"})
+    public <J2 extends J> J2 maybeRemoveBlankLines(J2 before, J2 after, P p, Cursor parent) {
+        if (before == after) {
+            return after;
+        }
+        JavaSourceFile cu = (after instanceof JavaSourceFile) ?
+                (JavaSourceFile) after :
+                getCursor().firstEnclosingOrThrow(JavaSourceFile.class);
+        AutoFormatService service = cu.service(AutoFormatService.class);
+        J2 result = (J2) service.normalizeFormatVisitor(null).visit(after, p, parent);
+        return (J2) service.blankLinesVisitor(cu, null).visit(result, p, parent);
     }
 
     /**
@@ -165,7 +230,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     public void maybeRemoveImport(String fullyQualifiedName) {
-        RemoveImport<P> op = new RemoveImport<>(fullyQualifiedName);
+        JavaVisitor<P> op = service(ImportService.class).removeImportVisitor(fullyQualifiedName);
         if (!getAfterVisit().contains(op)) {
             doAfterVisit(op);
         }
@@ -832,6 +897,12 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         m = m.getAnnotations().withName(m.getAnnotations().getName().withAnnotations(ListUtils.map(m.getAnnotations().getName().getAnnotations(), a -> visitAndCast(a, p))));
         m = m.withName((J.Identifier) visitNonNull(m.getName(), p));
         m = m.getPadding().withParameters(visitContainer(m.getPadding().getParameters(), JContainer.Location.METHOD_DECLARATION_PARAMETERS, p));
+        m = m.withDimensionsAfterName(
+                ListUtils.map(m.getDimensionsAfterName(),
+                        dim -> dim.withBefore(visitSpace(dim.getBefore(), Space.Location.DIMENSION_PREFIX, p))
+                                .withElement(visitSpace(dim.getElement(), Space.Location.DIMENSION, p))
+                )
+        );
         if (m.getPadding().getThrows() != null) {
             m = m.getPadding().withThrows(visitContainer(m.getPadding().getThrows(), JContainer.Location.THROWS, p));
         }

@@ -18,16 +18,15 @@ package golang
 
 import "github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
 
-// FindTypes finds all references to a given type.
 // Delegates to the Java FindTypes recipe via RPC.
 type FindTypes struct {
 	recipe.Base
 	FullyQualifiedTypeName string
 }
 
-func (r *FindTypes) Name() string        { return "org.openrewrite.golang.search.FindTypes" }
-func (r *FindTypes) DisplayName() string  { return "Find types" }
-func (r *FindTypes) Description() string  { return "Find all references to a given type." }
+func (r *FindTypes) Name() string           { return "org.openrewrite.golang.search.FindTypes" }
+func (r *FindTypes) DisplayName() string    { return "Find types" }
+func (r *FindTypes) Description() string    { return "Find all references to a given type." }
 func (r *FindTypes) JavaRecipeName() string { return "org.openrewrite.java.search.FindTypes" }
 func (r *FindTypes) JavaOptions() map[string]any {
 	return map[string]any{

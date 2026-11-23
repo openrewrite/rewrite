@@ -402,6 +402,40 @@ public class StringUtils {
     }
 
     /**
+     * Translate a simple glob pattern (using {@code *} for any run of characters and {@code ?}
+     * for any single character) into an equivalent Java regular expression that can be fed
+     * into {@link Pattern#compile(String)}. All other characters are escaped via
+     * {@link Pattern#quote(String)} so they are treated literally.
+     *
+     * @param glob the glob pattern; {@code null} returns {@code null}
+     * @return a regex that matches the same set of strings as the glob, or {@code null} if {@code glob} is null
+     * @see #matchesGlob(String, String)
+     */
+    public static @Nullable String globToRegex(@Nullable String glob) {
+        if (glob == null) {
+            return null;
+        }
+        StringBuilder regex = new StringBuilder(glob.length() + 8);
+        StringBuilder literal = new StringBuilder();
+        for (int i = 0; i < glob.length(); i++) {
+            char c = glob.charAt(i);
+            if (c == '*' || c == '?') {
+                if (literal.length() > 0) {
+                    regex.append(Pattern.quote(literal.toString()));
+                    literal.setLength(0);
+                }
+                regex.append(c == '*' ? ".*" : ".");
+            } else {
+                literal.append(c);
+            }
+        }
+        if (literal.length() > 0) {
+            regex.append(Pattern.quote(literal.toString()));
+        }
+        return regex.toString();
+    }
+
+    /**
      * Checks if a given string matches a specified glob pattern. A glob pattern may include
      * special characters such as '*' to represent any sequence of characters and '?' to
      * represent any single character.

@@ -41,6 +41,11 @@ public static class MarkerPrinter
     public static readonly IMarkerPrinter SearchMarkersOnly = new SearchMarkersOnlyPrinter();
 
     /// <summary>
+    /// Prints the detail of a Markup marker in place of its message.
+    /// </summary>
+    public static readonly IMarkerPrinter Verbose = new VerboseMarkerPrinter();
+
+    /// <summary>
     /// Wraps SearchResult and Markup markers with fenced {{id}} delimiters.
     /// </summary>
     public static readonly IMarkerPrinter Fenced = new FencedMarkerPrinter();
@@ -57,7 +62,20 @@ public static class MarkerPrinter
             return marker switch
             {
                 SearchResult sr => commentWrapper(sr.Description == null ? "" : $"({sr.Description})"),
-                Markup m => commentWrapper(m.Detail != null ? $"({m.Message}: {m.Detail})" : $"({m.Message})"),
+                Markup m => commentWrapper($"({m.Message})"),
+                _ => ""
+            };
+        }
+    }
+
+    private class VerboseMarkerPrinter : IMarkerPrinter
+    {
+        public string BeforeSyntax(Marker marker, Cursor cursor, Func<string, string> commentWrapper)
+        {
+            return marker switch
+            {
+                SearchResult sr => commentWrapper(sr.Description == null ? "" : $"({sr.Description})"),
+                Markup m => commentWrapper($"({m.Detail ?? m.Message})"),
                 _ => ""
             };
         }

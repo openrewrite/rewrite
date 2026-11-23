@@ -19,14 +19,10 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.search.DeclaresMethod;
-import org.openrewrite.java.tree.Comment;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.TextComment;
-import org.openrewrite.marker.Markers;
+import org.openrewrite.trait.Comments;
 
-import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -79,28 +75,16 @@ public class AddCommentToMethod extends Recipe {
                 J.ClassDeclaration cd = getCursor().firstEnclosingOrThrow(J.ClassDeclaration.class);
 
                 if (methodMatcher.matches(m, cd)) {
-                    String methodPrefixWhitespace = m.getPrefix().getWhitespace();
-
                     boolean createMultiline = Boolean.TRUE.equals(isMultiline);
                     Matcher matcher = NEWLINE.matcher(comment);
-                    String newCommentText = matcher.find() ? matcher.replaceAll(createMultiline ? methodPrefixWhitespace: " ") : comment;
-
-                    if (doesNotHaveComment(newCommentText, m.getComments())) {
-                        TextComment textComment = new TextComment(createMultiline, newCommentText, methodPrefixWhitespace, Markers.EMPTY);
-                        return m.withComments(ListUtils.concat(m.getComments(), textComment));
-                    }
+                    String newCommentText = matcher.find() ?
+                            matcher.replaceAll(createMultiline ? m.getPrefix().getWhitespace() : " ") : comment;
+                    Comments comments = Comments.of(new Cursor(getCursor().getParentOrThrow(), m));
+                    return createMultiline ?
+                            comments.multilineComment(newCommentText) :
+                            comments.comment(newCommentText);
                 }
                 return m;
-            }
-
-            private boolean doesNotHaveComment(String lookFor, List<Comment> comments) {
-                for (Comment c : comments) {
-                    if (c instanceof TextComment &&
-                        lookFor.equals(((TextComment) c).getText())) {
-                        return false;
-                    }
-                }
-                return true;
             }
         });
     }

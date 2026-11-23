@@ -16,14 +16,96 @@
 package org.openrewrite.python;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
+import org.openrewrite.marker.Markup;
 import org.openrewrite.test.RewriteTest;
 
 import java.nio.file.Path;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.python.Assertions.*;
 
 class UpgradeDependencyVersionTest implements RewriteTest {
+
+    @Test
+    void upgradesDevPackagesDependencyByDefault() {
+        // pytube shape: coverage declared only in [dev-packages]; the default (null) scope must find it
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("coverage", "==6.5.0", null, null)),
+          pipfile(
+            """
+              [[source]]
+              url = "https://pypi.org/simple"
+              verify_ssl = true
+              name = "pypi"
+
+              [packages]
+
+              [dev-packages]
+              coverage = "*"
+              flake8 = "*"
+              """,
+            """
+              [[source]]
+              url = "https://pypi.org/simple"
+              verify_ssl = true
+              name = "pypi"
+
+              [packages]
+
+              [dev-packages]
+              coverage = "==6.5.0"
+              flake8 = "*"
+              """
+          )
+        );
+    }
+
+    @Test
+    void invalidNewVersionIsRejected() {
+        // a fat-fingered trailing quote must fail validation, not corrupt the manifest
+        assertThat(new UpgradeDependencyVersion("six", "==1.17.0\"", null, null).validate().isValid()).isFalse();
+        assertThat(new UpgradeDependencyVersion("six", "==1.17.0", null, null).validate().isValid()).isTrue();
+        assertThat(new UpgradeDependencyVersion("six", "1.17.0", null, null).validate().isValid()).isTrue();
+    }
+
+    @Test
+    @Timeout(120)
+    void warnsOnBothManifestAndLockWhenRegenerationFails() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion(
+            "nonexistent-openrewrite-lock-test-package", ">=2.0", null, null)),
+          pyproject(
+            """
+              [project]
+              name = "myapp"
+              version = "1.0.0"
+              dependencies = [
+                  "nonexistent-openrewrite-lock-test-package>=1.0",
+              ]
+
+              [tool.uv]
+              """,
+            s -> s.after(actual -> {
+                assertThat(actual).contains("nonexistent-openrewrite-lock-test-package>=2.0");
+                return actual;
+            }).afterRecipe(doc -> assertThat(doc.getMarkers().findFirst(Markup.Warn.class))
+                    .as("manifest should carry the lock-regeneration-failure warning")
+                    .isPresent())
+          ),
+          uvLock(
+            """
+              version = 1
+              requires-python = ">=3.9"
+              """,
+            s -> s.after(actual -> actual)
+                    .afterRecipe(doc -> assertThat(doc.getMarkers().findFirst(Markup.Warn.class))
+                            .as("lock file should carry the lock-regeneration-failure warning")
+                            .isPresent())
+          )
+        );
+    }
 
     @Test
     void changeVersionWithResolvedProject(@TempDir Path tempDir) {
@@ -318,6 +400,224 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               [packages]
               requests = ">=2.31.0"
               click = ">=8.0"
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotDowngradeNewerConstraintInPyproject() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("requests", ">=2.31.0", null, null)),
+          pyproject(
+            """
+              [project]
+              name = "demo"
+              version = "0.1.0"
+              dependencies = [
+                  "requests>=3.0",
+              ]
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotDowngradeNewerCompatibleRelease() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("click", ">=8.1.0", null, null)),
+          pyproject(
+            """
+              [project]
+              name = "demo"
+              version = "0.1.0"
+              dependencies = ["click~=8.2"]
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotDowngradeNewerPinnedVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("requests", "==2.31.0", null, null)),
+          pyproject(
+            """
+              [project]
+              name = "demo"
+              version = "0.1.0"
+              dependencies = ["requests==3.1.0"]
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotDowngradeNewerConstraintInRequirementsTxt() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("requests", ">=2.31.0", null, null)),
+          requirementsTxt("requests>=2.32.0\nclick>=8.0")
+        );
+    }
+
+    @Test
+    void doesNotDowngradeNewerConstraintInPipfile() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("requests", ">=2.31.0", null, null)),
+          pipfile(
+            """
+              [packages]
+              requests = ">=3.0"
+              click = ">=8.0"
+
+              [dev-packages]
+              requests = {version = "==3.1.0", extras = ["socks"]}
+              """
+          )
+        );
+    }
+
+    @Test
+    void upgradesOnlyTheDeclarationBelowTarget() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("requests", ">=2.31.0", null, null)),
+          pyproject(
+            """
+              [project]
+              name = "demo"
+              version = "0.1.0"
+              dependencies = ["requests>=3.0"]
+
+              [dependency-groups]
+              dev = ["requests>=2.0"]
+              """,
+            """
+              [project]
+              name = "demo"
+              version = "0.1.0"
+              dependencies = ["requests>=3.0"]
+
+              [dependency-groups]
+              dev = ["requests>=2.31.0"]
+              """
+          )
+        );
+    }
+
+    @Test
+    void upgradesConstraintWithoutLowerBound() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("requests", ">=2.31.0", null, null)),
+          requirementsTxt(
+            "requests<3",
+            "requests>=2.31.0"
+          )
+        );
+    }
+
+    @Test
+    void appliesConstraintWithoutLowerBoundToUnconstrainedRequirement() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("requests", "<3", null, null)),
+          requirementsTxt(
+            "requests\nclick>=8.0",
+            "requests<3\nclick>=8.0"
+          )
+        );
+    }
+
+    @Test
+    void upgradeQuotedKeyInPipfile() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("urllib3", ">=2.0", null, null)),
+          pipfile(
+            """
+              [packages]
+              "urllib3" = ">=1.26"
+              """,
+            """
+              [packages]
+              "urllib3" = ">=2.0"
+              """
+          )
+        );
+    }
+
+    @Test
+    void noChangeWhenVersionAlreadyTargetDespiteSpacing() {
+        // Whitespace-only difference must not produce an edit.
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("six", "==1.17.0", null, null)),
+          pyproject(
+            """
+              [project]
+              name = "calibre"
+              dependencies = [
+                  "six == 1.17.0",
+              ]
+              """
+          )
+        );
+    }
+
+    @Test
+    void spacePaddedRequirementRewritesCleanly() {
+        // kovidgoyal/calibre shape: "six == 1.17.0" (spaces around ==) — only the
+        // version token changes; the original spacing is preserved.
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("six", "==1.17.1", null, null)),
+          pyproject(
+            """
+              [project]
+              name = "calibre"
+              dependencies = [
+                  "six == 1.17.0",
+                  "lxml == 6.1.1",
+              ]
+              """,
+            """
+              [project]
+              name = "calibre"
+              dependencies = [
+                  "six == 1.17.1",
+                  "lxml == 6.1.1",
+              ]
+              """
+          )
+        );
+    }
+
+    @Test
+    void starConstraintPipfileRewritesCleanly() {
+        // postmanlabs/httpbin shape: six = "*" alongside git inline-table entries
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("six", "==1.17.0", null, null)),
+          pipfile(
+            """
+              [[source]]
+              url = "https://pypi.python.org/simple"
+              verify_ssl = true
+
+              [packages]
+              Flask = "*"
+              six = "*"
+              pyyaml = {git = "https://github.com/yaml/pyyaml.git"}
+
+              [dev-packages]
+              rope = "*"
+              """,
+            """
+              [[source]]
+              url = "https://pypi.python.org/simple"
+              verify_ssl = true
+
+              [packages]
+              Flask = "*"
+              six = "==1.17.0"
+              pyyaml = {git = "https://github.com/yaml/pyyaml.git"}
+
+              [dev-packages]
+              rope = "*"
               """
           )
         );

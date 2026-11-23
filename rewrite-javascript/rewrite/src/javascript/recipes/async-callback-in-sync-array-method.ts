@@ -22,6 +22,7 @@ import {J} from "../../java";
 import {JS} from "../tree";
 import {Type} from "../../java";
 import {markupWarn} from "../../markers";
+import {MethodMatcher} from "../method-matcher";
 
 /**
  * Array methods that don't await async callbacks.
@@ -36,6 +37,15 @@ const SYNC_ARRAY_METHODS = new Set([
     'filter',    // Filters based on truthy values, but Promise is always truthy
     'forEach',   // Ignores return values entirely, async callbacks won't be awaited
 ]);
+
+// Tuples, `T[]` and array subclasses that don't override the method all declare it on one of these.
+const ARRAY_DECLARING_TYPES = [new MethodMatcher('Array *(..)'), new MethodMatcher('ReadonlyArray *(..)')];
+
+/** A receiver without type attribution may still be an array, so its call is kept. */
+function isArrayMethodOrUntyped(method?: Type.Method): boolean {
+    return !method || method.declaringType.kind === Type.Kind.Unknown ||
+        ARRAY_DECLARING_TYPES.some(matcher => matcher.matches(method));
+}
 
 /**
  * Check if a type is a Promise type.
@@ -211,7 +221,7 @@ export class AsyncCallbackInSyncArrayMethod extends Recipe {
                 let m = await super.visitMethodInvocation(method, ctx) as J.MethodInvocation;
 
                 const methodName = m.name?.simpleName;
-                if (!methodName || !SYNC_ARRAY_METHODS.has(methodName)) {
+                if (!methodName || !SYNC_ARRAY_METHODS.has(methodName) || !isArrayMethodOrUntyped(m.methodType)) {
                     return m;
                 }
 

@@ -191,7 +191,7 @@ describe('enum mapping', () => {
            `)
         ));
 
-    test.skip('enum with non identifier name', () =>
+    test('enum with non identifier name', () =>
         spec.rewriteRun(
             //language=typescript
             typescript(`

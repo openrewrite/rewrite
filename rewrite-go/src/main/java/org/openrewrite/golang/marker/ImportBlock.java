@@ -17,6 +17,8 @@ package org.openrewrite.golang.marker;
 
 import lombok.Value;
 import lombok.With;
+import org.openrewrite.java.internal.rpc.JavaReceiver;
+import org.openrewrite.java.internal.rpc.JavaSender;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.rpc.RpcCodec;
@@ -24,6 +26,9 @@ import org.openrewrite.rpc.RpcReceiveQueue;
 import org.openrewrite.rpc.RpcSendQueue;
 
 import java.util.UUID;
+
+import static org.openrewrite.java.internal.rpc.JavaSender.spaceRef;
+import static org.openrewrite.rpc.Reference.getValueNonNull;
 
 @Value
 @With
@@ -38,18 +43,18 @@ public class ImportBlock implements Marker, RpcCodec<ImportBlock> {
     public void rpcSend(ImportBlock after, RpcSendQueue q) {
         q.getAndSend(after, Marker::getId);
         q.getAndSend(after, ImportBlock::isClosePrevious);
-        q.getAndSend(after, b -> b.getBefore().getWhitespace());
+        q.getAndSend(after, x -> spaceRef(x.getBefore()), space -> new JavaSender().visitSpace(getValueNonNull(space), q));
         q.getAndSend(after, ImportBlock::isGrouped);
-        q.getAndSend(after, b -> b.getGroupedBefore().getWhitespace());
+        q.getAndSend(after, x -> spaceRef(x.getGroupedBefore()), space -> new JavaSender().visitSpace(getValueNonNull(space), q));
     }
 
     @Override
     public ImportBlock rpcReceive(ImportBlock before, RpcReceiveQueue q) {
         return before
                 .withId(q.receiveAndGet(before.getId(), UUID::fromString))
-                .withClosePrevious(q.receiveAndGet(before.isClosePrevious(), Boolean::parseBoolean))
-                .withBefore(Space.format(q.receive(before.getBefore() == null ? "" : before.getBefore().getWhitespace())))
-                .withGrouped(q.receiveAndGet(before.isGrouped(), Boolean::parseBoolean))
-                .withGroupedBefore(Space.format(q.receive(before.getGroupedBefore() == null ? "" : before.getGroupedBefore().getWhitespace())));
+                .withClosePrevious(q.receive(before.isClosePrevious()))
+                .withBefore(q.receive(before.getBefore(), space -> new JavaReceiver().visitSpace(space, q)))
+                .withGrouped(q.receive(before.isGrouped()))
+                .withGroupedBefore(q.receive(before.getGroupedBefore(), space -> new JavaReceiver().visitSpace(space, q)));
     }
 }

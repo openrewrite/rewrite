@@ -19,7 +19,9 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Incubating;
 
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayDeque;
 import java.util.Arrays;
+import java.util.Deque;
 
 @Incubating(since = "8.38.0")
 public class AdaptiveRadixTree<V> {
@@ -50,7 +52,12 @@ public class AdaptiveRadixTree<V> {
 
         abstract Node<V> insert(byte[] key, int depth, V value, KeyTable keyTable);
 
-        abstract Node<V> copy(); // New abstract method
+        /**
+         * Clone this node without recursing into children: child references are copied
+         * as-is. Whole-tree deep copies are assembled iteratively by
+         * {@link AdaptiveRadixTree#deepCopy} so they are bounded by heap, not the JVM stack.
+         */
+        abstract Node<V> shallowCopy();
 
         protected boolean matchesPartialKey(byte[] key, int depth, KeyTable keyTable) {
             return keyTable.matches(key, depth, keyOffset, keyLength);
@@ -147,7 +154,7 @@ public class AdaptiveRadixTree<V> {
         }
 
         @Override
-        Node<V> copy() {
+        Node<V> shallowCopy() {
             return new LeafNode<>(keyOffset, keyLength, value);
         }
     }
@@ -165,6 +172,21 @@ public class AdaptiveRadixTree<V> {
         // Return the new node if growth occurred, otherwise null
         abstract @Nullable InternalNode<V> addChild(byte key, Node<V> child, KeyTable keyTable);
 
+        /**
+         * Replace each child reference (initially shared with the source node after a
+         * {@link #shallowCopy()}) with a shallow clone of it, pushing any internal clone
+         * onto {@code work} so its own children get cloned in turn.
+         */
+        abstract void cloneChildrenInto(Deque<InternalNode<V>> work);
+
+        static <V> Node<V> pushClone(Node<V> child, Deque<InternalNode<V>> work) {
+            Node<V> clone = child.shallowCopy();
+            if (clone instanceof InternalNode) {
+                work.push((InternalNode<V>) clone);
+            }
+            return clone;
+        }
+
         void adjustKey(int newKeyOffset, int newKeyLength) {
             this.keyOffset = newKeyOffset;
             this.keyLength = newKeyLength;
@@ -173,79 +195,118 @@ public class AdaptiveRadixTree<V> {
         @Override
         @Nullable
         V search(byte[] key, int depth, KeyTable keyTable) {
-            // Fast path for empty partial key
-            if (keyLength == 0) {
-                if (depth == key.length) {
-                    return value;
+            // Iterative descent: each step strictly advances `depth`, so we bound work
+            // by the key length rather than the JVM stack. LeafNode.search remains
+            // non-recursive and is delegated to when we land on one.
+            InternalNode<V> node = this;
+            while (true) {
+                if (node.keyLength != 0) {
+                    if (!node.matchesPartialKey(key, depth, keyTable)) return null;
+                    depth += node.keyLength;
                 }
-                Node<V> child = getChild(key[depth]);
-                return child != null ? child.search(key, depth + 1, keyTable) : null;
+
+                if (depth == key.length) {
+                    return node.value;
+                }
+
+                Node<V> child = node.getChild(key[depth]);
+                if (child == null) return null;
+                depth++;
+
+                if (child instanceof InternalNode) {
+                    node = (InternalNode<V>) child;
+                } else {
+                    return child.search(key, depth, keyTable);
+                }
             }
-
-            if (!matchesPartialKey(key, depth, keyTable)) return null;
-            depth += keyLength;
-
-            // We've reached the end of the search key
-            if (depth == key.length) {
-                return value;
-            }
-
-            // If there's more key to search but we've found a value, keep searching
-            Node<V> child = getChild(key[depth]);
-            return child != null ? child.search(key, depth + 1, keyTable) : null;
         }
 
         @Override
         Node<V> insert(byte[] key, int depth, V value, KeyTable keyTable) {
-            if (!matchesPartialKey(key, depth, keyTable)) {
-                // Find common prefix length
-                int commonPrefix = 0;
-                int maxLength = Math.min(key.length - depth, keyLength);
-                while (commonPrefix < maxLength && key[depth + commonPrefix] == keyTable.get(keyOffset + commonPrefix)) {
-                    commonPrefix++;
+            // Iterative descent: each step strictly advances `depth`, so we bound work
+            // by the key length rather than the JVM stack. Only the immediate parent of
+            // the node where the terminal action happens can ever need its child slot
+            // repointed: every slot we descend through already exists in its node, so
+            // `addChild` replaces it in place (returning null) and never grows an
+            // ancestor. Ancestors above that parent keep their identity, so the original
+            // root is returned unchanged.
+            InternalNode<V> parent = null;
+            byte parentSlot = 0;
+            InternalNode<V> current = this;
+            Node<V> replacement;
+
+            while (true) {
+                if (current.keyLength != 0) {
+                    if (!current.matchesPartialKey(key, depth, keyTable)) {
+                        int commonPrefix = 0;
+                        int maxLength = Math.min(key.length - depth, current.keyLength);
+                        while (commonPrefix < maxLength &&
+                               key[depth + commonPrefix] == keyTable.get(current.keyOffset + commonPrefix)) {
+                            commonPrefix++;
+                        }
+
+                        Node4<V> newNode = current.split(commonPrefix, keyTable);
+
+                        int remainingNewLength = key.length - (depth + commonPrefix);
+                        if (remainingNewLength > 0) {
+                            byte firstByte = key[depth + commonPrefix];
+                            Node<V> leafNode = LeafNode.create(
+                                    key, depth + commonPrefix + 1, remainingNewLength - 1,
+                                    value, keyTable);
+                            InternalNode<V> grown = newNode.addChild(firstByte, leafNode, keyTable);
+                            replacement = grown != null ? grown : newNode;
+                        } else {
+                            newNode.value = value;
+                            replacement = newNode;
+                        }
+                        break;
+                    }
+                    depth += current.keyLength;
                 }
 
-                Node4<V> newNode = split(commonPrefix, keyTable);
-
-                // Handle remaining parts of new key
-                int remainingNewLength = key.length - (depth + commonPrefix);
-                if (remainingNewLength > 0) {
-                    byte firstByte = key[depth + commonPrefix];
-                    Node<V> leafNode = LeafNode.create(
-                            key, depth + commonPrefix + 1, remainingNewLength - 1,
-                            value, keyTable);
-                    InternalNode<V> grown = newNode.addChild(firstByte, leafNode, keyTable);
-                    return grown != null ? grown : newNode;
-                } else {
-                    newNode.value = value;
-                    return newNode;
+                if (depth == key.length) {
+                    current.value = value;
+                    replacement = current;
+                    break;
                 }
+
+                byte nextByte = key[depth];
+                Node<V> child = current.getChild(nextByte);
+
+                if (child == null) {
+                    Node<V> newChild = LeafNode.create(key, depth + 1, key.length - (depth + 1), value, keyTable);
+                    InternalNode<V> grown = current.addChild(nextByte, newChild, keyTable);
+                    replacement = grown != null ? grown : current;
+                    break;
+                }
+
+                if (!(child instanceof InternalNode)) {
+                    // LeafNode.insert is non-recursive and may return a new node.
+                    Node<V> newChild = child.insert(key, depth + 1, value, keyTable);
+                    if (newChild != child) {
+                        InternalNode<V> grown = current.addChild(nextByte, newChild, keyTable);
+                        replacement = grown != null ? grown : current;
+                    } else {
+                        replacement = current;
+                    }
+                    break;
+                }
+
+                parent = current;
+                parentSlot = nextByte;
+                current = (InternalNode<V>) child;
+                depth++;
             }
 
-            depth += keyLength;
-
-            // We've reached the end of the key
-            if (depth == key.length) {
-                this.value = value;
-                return this;
+            // No ancestor was traversed: `replacement` is the new root of this subtree.
+            if (parent == null) {
+                return replacement;
             }
-
-            // Continue with child node
-            byte nextByte = key[depth];
-            Node<V> child = getChild(nextByte);
-
-            if (child == null) {
-                // Create new leaf node
-                Node<V> newChild = LeafNode.create(key, depth + 1, key.length - (depth + 1), value, keyTable);
-                InternalNode<V> grown = addChild(nextByte, newChild, keyTable);
-                return grown != null ? grown : this;
-            }
-
-            // Recursively insert into child node
-            Node<V> newChild = child.insert(key, depth + 1, value, keyTable);
-            if (newChild != child) {
-                InternalNode<V> grown = addChild(nextByte, newChild, keyTable);
-                return grown != null ? grown : this;
+            // Point the immediate parent's existing slot at `replacement`. Because the
+            // slot already exists, this replaces in place without growing the parent, so
+            // every ancestor above keeps its identity and the original root stays valid.
+            if (replacement != current) {
+                parent.addChild(parentSlot, replacement, keyTable);
             }
             return this;
         }
@@ -385,9 +446,8 @@ public class AdaptiveRadixTree<V> {
             return null;
         }
 
-        @SuppressWarnings("DataFlowIssue")
         @Override
-        Node<V> copy() {
+        Node<V> shallowCopy() {
             Node4<V> clone = new Node4<>(keyOffset, keyLength);
             clone.value = this.value;
             clone.size = this.size;
@@ -395,11 +455,20 @@ public class AdaptiveRadixTree<V> {
             clone.k1 = this.k1;
             clone.k2 = this.k2;
             clone.k3 = this.k3;
-            if (size > 0) clone.c0 = c0.copy();
-            if (size > 1) clone.c1 = c1.copy();
-            if (size > 2) clone.c2 = c2.copy();
-            if (size > 3) clone.c3 = c3.copy();
+            clone.c0 = this.c0;
+            clone.c1 = this.c1;
+            clone.c2 = this.c2;
+            clone.c3 = this.c3;
             return clone;
+        }
+
+        @SuppressWarnings("DataFlowIssue")
+        @Override
+        void cloneChildrenInto(Deque<InternalNode<V>> work) {
+            if (size > 0) c0 = pushClone(c0, work);
+            if (size > 1) c1 = pushClone(c1, work);
+            if (size > 2) c2 = pushClone(c2, work);
+            if (size > 3) c3 = pushClone(c3, work);
         }
     }
 
@@ -490,18 +559,21 @@ public class AdaptiveRadixTree<V> {
         }
 
         @Override
-        Node<V> copy() {
+        Node<V> shallowCopy() {
             Node16<V> clone = new Node16<>(keyOffset, keyLength);
             clone.value = this.value;
             clone.size = this.size;
             clone.keys = Arrays.copyOf(this.keys, this.keys.length);
             clone.children = Arrays.copyOf(this.children, this.children.length);
-            // Deep copy children
+            return clone;
+        }
+
+        @Override
+        void cloneChildrenInto(Deque<InternalNode<V>> work) {
             for (int i = 0; i < size; i++) {
                 //noinspection DataFlowIssue
-                clone.children[i] = children[i].copy();
+                children[i] = pushClone(children[i], work);
             }
-            return clone;
         }
     }
 
@@ -689,23 +761,23 @@ public class AdaptiveRadixTree<V> {
         }
 
         @Override
-        Node<V> copy() {
+        Node<V> shallowCopy() {
             Node64<V> clone = new Node64<>(keyOffset, keyLength);
             clone.value = this.value;
             clone.bitmap0 = this.bitmap0;
             clone.bitmap1 = this.bitmap1;
             clone.bitmap2 = this.bitmap2;
             clone.bitmap3 = this.bitmap3;
-
-            clone.children = new Node[this.children.length];
-
-            // Deep copy children
-            for (int i = 0; i < this.children.length; i++) {
-                //noinspection DataFlowIssue
-                clone.children[i] = this.children[i].copy();
-            }
-
+            clone.children = Arrays.copyOf(this.children, this.children.length);
             return clone;
+        }
+
+        @Override
+        void cloneChildrenInto(Deque<InternalNode<V>> work) {
+            for (int i = 0; i < children.length; i++) {
+                //noinspection DataFlowIssue
+                children[i] = pushClone(children[i], work);
+            }
         }
     }
 
@@ -733,18 +805,20 @@ public class AdaptiveRadixTree<V> {
         }
 
         @Override
-        Node<V> copy() {
+        Node<V> shallowCopy() {
             Node256<V> clone = new Node256<>(keyOffset, keyLength);
             clone.value = this.value;
             System.arraycopy(this.children, 0, clone.children, 0, this.children.length);
-            // Deep copy children
+            return clone;
+        }
+
+        @Override
+        void cloneChildrenInto(Deque<InternalNode<V>> work) {
             for (int i = 0; i < 256; i++) {
-                Node<V> child = children[i];
-                if (child != null) {
-                    clone.children[i] = child.copy();
+                if (children[i] != null) {
+                    children[i] = pushClone(children[i], work);
                 }
             }
-            return clone;
         }
     }
 
@@ -773,9 +847,24 @@ public class AdaptiveRadixTree<V> {
     public AdaptiveRadixTree<V> copy() {
         AdaptiveRadixTree<V> newTree = new AdaptiveRadixTree<>(keyTable.copy());
         if (root != null) {
-            newTree.root = root.copy();
+            newTree.root = deepCopy(root);
         }
         return newTree;
+    }
+
+    // Iterative deep copy: clone the root shallowly, then repeatedly replace each cloned
+    // node's child references with shallow clones of their own. An explicit stack bounds
+    // the work by heap rather than the JVM call stack, matching insert/search.
+    private static <V> Node<V> deepCopy(Node<V> root) {
+        Node<V> rootClone = root.shallowCopy();
+        if (rootClone instanceof InternalNode) {
+            Deque<InternalNode<V>> work = new ArrayDeque<>();
+            work.push((InternalNode<V>) rootClone);
+            while (!work.isEmpty()) {
+                work.pop().cloneChildrenInto(work);
+            }
+        }
+        return rootClone;
     }
 
     public void clear() {

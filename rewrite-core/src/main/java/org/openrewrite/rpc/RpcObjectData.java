@@ -18,8 +18,12 @@ package org.openrewrite.rpc;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonSerializer;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializerProvider;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.cfg.ConstructorDetector;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -30,6 +34,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 
+import java.io.IOException;
 import java.util.Map;
 
 /**
@@ -67,6 +72,7 @@ public class RpcObjectData {
      * In the case of a {@link Tree} ADD, this is the tree ID.
      */
     @Nullable
+    @JsonSerialize(using = SelfContained.class)
     Object value;
 
     /**
@@ -102,13 +108,20 @@ public class RpcObjectData {
             try {
                 Class<?> valueClass = Class.forName(valueType);
 
-                // While we know exactly what type of value we are converting to,
-                // Jackson will still require the '@c' field in the map when the type
-                // we are converting to is annotated with @JsonTypeInfo.
-                //noinspection unchecked
-                ((Map<String, Object>) value).put("@c", valueType);
-                //noinspection unchecked
-                ((Map<String, Object>) value).put("@ref", 1);
+                // A plain Map is serialized structurally and consumes no type/identity
+                // metadata, so the "@c"/"@ref" keys below would leak as real entries and
+                // corrupt it -- e.g. a Map<String, String> would gain an "@ref" -> Integer
+                // entry that breaks strict serialization downstream. Only inject them for
+                // POJOs (which may be annotated with @JsonTypeInfo/@JsonIdentityInfo).
+                if (!Map.class.isAssignableFrom(valueClass)) {
+                    // While we know exactly what type of value we are converting to,
+                    // Jackson will still require the '@c' field in the map when the type
+                    // we are converting to is annotated with @JsonTypeInfo.
+                    //noinspection unchecked
+                    ((Map<String, Object>) value).put("@c", valueType);
+                    //noinspection unchecked
+                    ((Map<String, Object>) value).put("@ref", 1);
+                }
 
                 //noinspection unchecked
                 return (V) mapper.convertValue(value, valueClass);
@@ -118,6 +131,22 @@ public class RpcObjectData {
         }
         // noinspection unchecked
         return (V) value;
+    }
+
+    /**
+     * Writes a value with object ids of its own. Left to the serializer of the batch, an object that
+     * two values share is written whole in the first and as a bare id in the second, and since each
+     * value is read on its own, that id resolves to nothing.
+     */
+    static class SelfContained extends JsonSerializer<Object> {
+        @Override
+        public void serialize(Object value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
+            if (value instanceof String || value instanceof Number || value instanceof Boolean) {
+                serializers.defaultSerializeValue(value, gen);
+            } else {
+                gen.writeObject(value);
+            }
+        }
     }
 
     @JsonFormat(shape = JsonFormat.Shape.STRING)

@@ -5,15 +5,20 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, ClassVar, TYPE_CHECKING, List, Optional
 
+from .heavyweight import Heavyweight
 from .tree import SourceFile
 
 if TYPE_CHECKING:
     from .visitor import TreeVisitor, Cursor
 
 
-class ExecutionContext(ABC):
+class ExecutionContext(Heavyweight, ABC):
     REQUIRE_PRINT_EQUALS_INPUT: ClassVar[str] = "org.openrewrite.requirePrintEqualsInput"
     CHARSET: ClassVar[str] = "org.openrewrite.parser.charset"
+    # Set by a test harness to fail a ScanningRecipe whose scanner changes the tree it scans.
+    SCANNING_MUTATION_VALIDATION: ClassVar[str] = "org.openrewrite.test.scanningMutationValidation"
+    # Set by a test harness to a callable that sees each ScanningRecipe's accumulator after scanning and editing.
+    ACCUMULATOR_INSPECTION: ClassVar[str] = "org.openrewrite.test.accumulatorInspection"
 
     @abstractmethod
     def get_message(self, key: str, default_value=None) -> Any:
@@ -67,6 +72,10 @@ class LargeSourceSet(ABC):
         ...
 
     @abstractmethod
+    def generate(self, ls: List[SourceFile]) -> LargeSourceSet:
+        ...
+
+    @abstractmethod
     def get_changeset(self) -> List[Result]:
         ...
 
@@ -89,11 +98,17 @@ class InMemoryLargeSourceSet(LargeSourceSet):
             mapped_source = map(source)
             if mapped_source is not None:
                 mapped.append(mapped_source)
-                changed = mapped_source is not source
+                if mapped_source is not source:
+                    changed = True
             else:
                 deleted.append(source)
                 changed = True
         return self if not changed else InMemoryLargeSourceSet(mapped, deleted, self._initial_state or self)
+
+    def generate(self, ls: List[SourceFile]) -> LargeSourceSet:
+        if not ls:
+            return self
+        return InMemoryLargeSourceSet(self._sources + ls, list(self._deletions), self._initial_state or self)
 
     def get_changeset(self) -> List[Result]:
         source_file_by_id = {sf.id: sf for sf in (self._initial_state or self)._sources}

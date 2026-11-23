@@ -91,6 +91,18 @@ class FieldAccessTest implements RewriteTest {
     }
 
     @Test
+    void qualifiedThis() {
+        rewriteRun(
+          scala(
+            """
+              class Status:
+                val name = Status.this.toString
+              """
+          )
+        );
+    }
+
+    @Test
     void fieldAccessWithParentheses() {
         rewriteRun(
           scala(

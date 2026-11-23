@@ -18,7 +18,7 @@ import {AsyncLocalStorage} from "node:async_hooks";
 
 const stackStorage = new AsyncLocalStorage<string>();
 
-export function saveTrace<T>(enabled: boolean, action: () => Promise<T>): Promise<T> {
+export function saveTrace<T>(enabled: boolean, action: () => T): T {
     if (enabled) {
         const entryStack = new Error().stack ?? '';
         return stackStorage.run(entryStack, action);

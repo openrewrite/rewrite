@@ -20,7 +20,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
-import org.openrewrite.python.internal.UvExecutor;
+import org.openrewrite.python.internal.PackageManagerExecutor;
 import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.marker.PythonResolutionResult.ResolvedDependency;
 import org.openrewrite.text.PlainText;
@@ -29,10 +29,12 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.UUID;
+import java.util.stream.Stream;
 
+import static java.util.Collections.singletonList;
+import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
@@ -55,28 +57,36 @@ class SetupCfgParserTest {
     }
 
     @Test
-    void markerContainsDependenciesFromFreeze(@TempDir Path tempDir) throws IOException {
-        assumeTrue(UvExecutor.findUvExecutable() != null, "uv is not installed");
+    void markerContainsDependenciesWithoutWritingIntoProject(@TempDir Path tempDir) throws Exception {
+        assumeTrue(PackageManagerExecutor.UV.find() != null, "uv is not installed");
 
+        // Unique content, so a workspace cached by an earlier run cannot skip the resolution.
         Files.writeString(tempDir.resolve("setup.cfg"), """
+                # %s
                 [metadata]
                 name = myapp
                 version = 1.0.0
 
                 [options]
+                package_dir =
+                    = src
+                packages = myapp
                 install_requires =
                     requests>=2.28.0
-                """);
+                """.formatted(UUID.randomUUID()));
         // setup.py is required for uv pip install to recognize the project
         Files.writeString(tempDir.resolve("setup.py"), "from setuptools import setup; setup()");
+        Files.createDirectories(tempDir.resolve("src/myapp"));
+        Files.writeString(tempDir.resolve("src/myapp/__init__.py"), "");
+        List<Path> projectFiles = listFiles(tempDir);
 
         SetupCfgParser parser = new SetupCfgParser();
         Parser.Input input = Parser.Input.fromFile(tempDir.resolve("setup.cfg"));
         List<SourceFile> parsed = parser.parseInputs(
-                Collections.singletonList(input),
+                singletonList(input),
                 tempDir,
                 new InMemoryExecutionContext(Throwable::printStackTrace)
-        ).collect(Collectors.toList());
+        ).collect(toList());
 
         assertThat(parsed).hasSize(1);
         PlainText text = (PlainText) parsed.get(0);
@@ -88,5 +98,40 @@ class SetupCfgParserTest {
         assertThat(marker.getResolvedDependencies().stream().map(ResolvedDependency::getName))
                 .contains("requests");
         assertThat(marker.getPackageManager()).isEqualTo(PythonResolutionResult.PackageManager.Uv);
+        assertThat(listFiles(tempDir)).isEqualTo(projectFiles);
+    }
+
+    @Test
+    void markerCarriesPythonRequiresFromOptions(@TempDir Path tempDir) throws Exception {
+        Files.writeString(tempDir.resolve("setup.cfg"), """
+                [metadata]
+                name = myapp
+
+                [options]
+                python_requires = >=3.9
+                install_requires =
+                    six
+                """);
+        Path env = tempDir.resolve(".venv");
+        Path distInfo = Files.createDirectories(env.resolve("lib/python3.12/site-packages/six-1.16.0.dist-info"));
+        Files.writeString(distInfo.resolve("METADATA"), "Metadata-Version: 2.1\nName: six\nVersion: 1.16.0\n");
+
+        SourceFile parsed = new SetupCfgParser(env).parseInputs(
+                singletonList(Parser.Input.fromFile(tempDir.resolve("setup.cfg"))), tempDir,
+                new InMemoryExecutionContext(Throwable::printStackTrace)).findFirst().orElseThrow();
+
+        PythonResolutionResult marker = parsed.getMarkers().findFirst(PythonResolutionResult.class).orElseThrow();
+        assertThat(marker.getRequiresPython()).isEqualTo(">=3.9");
+        assertThat(marker.getDependencies()).singleElement().satisfies(six -> {
+            assertThat(six.getName()).isEqualTo("six");
+            assertThat(six.getResolved()).isNotNull()
+                    .extracting(ResolvedDependency::getVersion).isEqualTo("1.16.0");
+        });
+    }
+
+    private static List<Path> listFiles(Path dir) throws IOException {
+        try (Stream<Path> walk = Files.walk(dir)) {
+            return walk.map(dir::relativize).sorted().collect(toList());
+        }
     }
 }

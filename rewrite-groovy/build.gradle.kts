@@ -7,7 +7,7 @@ plugins {
 
 testing {
     suites {
-        val test by getting(JvmTestSuite::class) {
+        val test = getByName<JvmTestSuite>("test") {
             useJUnitJupiter()
         }
 
@@ -51,8 +51,6 @@ dependencies {
     compileOnly(project(":rewrite-test"))
     compileOnly("org.slf4j:slf4j-api:1.7.+")
 
-    api("io.micrometer:micrometer-core:1.9.+")
-
     api("org.jetbrains:annotations:latest.release")
 
     api("com.fasterxml.jackson.core:jackson-annotations")
@@ -62,6 +60,7 @@ dependencies {
     testImplementation("org.junit-pioneer:junit-pioneer:latest.release")
     testRuntimeOnly("org.antlr:antlr4-runtime:4.13.2")
     testRuntimeOnly("org.apache.groovy:groovy-all:4.+")
+    testRuntimeOnly("org.spockframework:spock-core:2.4-groovy-4.0")
     testRuntimeOnly(project(":rewrite-java-21"))
 }
 

@@ -15,14 +15,76 @@
  */
 package org.openrewrite;
 
+import com.google.common.jimfs.Configuration;
+import com.google.common.jimfs.Jimfs;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledOnOs;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
+import java.io.IOException;
+import java.nio.file.FileSystem;
 import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.condition.OS.WINDOWS;
+import static org.openrewrite.PathUtils.isValidSourcePath;
 import static org.openrewrite.PathUtils.matchesGlob;
+import static org.openrewrite.PathUtils.toSlashPath;
 
 class PathUtilsTest {
+
+    @Test
+    void sourcePathValidation() {
+        // valid: relative and already normalized
+        assertThat(isValidSourcePath(path("foo.txt"))).isTrue();
+        assertThat(isValidSourcePath(path("foo/bar/baz.txt"))).isTrue();
+
+        assertThat(isValidSourcePath(path("").toAbsolutePath().resolve("foo.txt"))).isFalse(); // absolute
+        assertThat(isValidSourcePath(path(""))).isFalse(); // empty
+        assertThat(isValidSourcePath(path("../foo.txt"))).isFalse(); // outside the source root
+        assertThat(isValidSourcePath(path("foo/../../bar.txt"))).isFalse(); // outside the source root
+        assertThat(isValidSourcePath(path("foo/../bar.txt"))).isFalse(); // not normalized
+        assertThat(isValidSourcePath(path("foo/./bar.txt"))).isFalse(); // not normalized
+    }
+
+    @CsvSource(textBlock = """
+      foo.txt, foo.txt
+      foo/bar/baz.txt, foo/bar/baz.txt
+      '', ''
+      """)
+    @ParameterizedTest
+    void slashPath(String path, String expected) {
+        assertThat(toSlashPath(Path.of(path))).isEqualTo(expected);
+    }
+
+    @CsvSource(textBlock = """
+      foo/a\\b.txt, foo/a\\b.txt
+      /foo/a\\b.txt, /foo/a\\b.txt
+      """)
+    @DisabledOnOs(value = WINDOWS, disabledReason = "Backslash is a path separator on Windows")
+    @ParameterizedTest
+    void slashPathKeepsBackslashInFileName(String path, String expected) {
+        assertThat(toSlashPath(Path.of(path))).isEqualTo(expected);
+    }
+
+    @CsvSource(textBlock = """
+      Foo.java, Foo.java
+      src\\main\\Foo.java, src/main/Foo.java
+      src/main/Foo.java, src/main/Foo.java
+      src/main\\Foo.java, src/main/Foo.java
+      C:/repo/src/Foo.java, C:/repo/src/Foo.java
+      C:\\repo\\src\\Foo.java, C:/repo/src/Foo.java
+      \\\\server\\share\\src\\Foo.java, //server/share/src/Foo.java
+      '', ''
+      """)
+    @ParameterizedTest
+    void slashPathOnWindows(String path, String expected) throws IOException {
+        try (FileSystem windows = Jimfs.newFileSystem(Configuration.windows())) {
+            assertThat(toSlashPath(windows.getPath(path))).isEqualTo(expected);
+        }
+    }
+
     @Test
     void globMatching() {
         // exact matches

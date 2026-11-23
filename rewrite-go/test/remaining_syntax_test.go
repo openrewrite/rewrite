@@ -1208,3 +1208,13 @@ func TestParseEmptySwitchTagless(t *testing.T) {
 			}
 		`))
 }
+
+func TestParseRawStringWithCarriageReturn(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang("package main\n\nfunc f() string {\n\treturn `line1\r\nline2\r`\n}\n"))
+}
+
+func TestParseRawStringInCRLFFile(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang("package main\r\n\r\nvar s = `a\r\nb`\r\n\r\nfunc f() string {\r\n\treturn s\r\n}\r\n"))
+}

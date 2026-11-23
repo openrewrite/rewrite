@@ -19,6 +19,8 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.ArrayList;
+
 import static org.openrewrite.groovy.Assertions.groovy;
 
 class MethodInvocationTest implements RewriteTest {
@@ -64,6 +66,13 @@ class MethodInvocationTest implements RewriteTest {
     void emptyArgsWithParens() {
         rewriteRun(
           groovy("mavenCentral()")
+        );
+    }
+
+    @Test
+    void closureArgumentOnNumericLiteralReceiver() {
+        rewriteRun(
+          groovy("50.times { 1 }")
         );
     }
 
@@ -206,6 +215,18 @@ class MethodInvocationTest implements RewriteTest {
               def xMethod() {}
               def prefix = "x"
               "${prefix}Method"()
+              """
+          )
+        );
+    }
+
+    @Test
+    void tripleQuotedMethodName() {
+        rewriteRun(
+          groovy(
+            """
+              def 'foo bar'(int i) { i }
+              '''foo bar'''(1)
               """
           )
         );
@@ -749,6 +770,149 @@ class MethodInvocationTest implements RewriteTest {
                   }
               }
               Util.<String>compare("A", "B")
+              """
+          )
+        );
+    }
+
+    @Test
+    void methodNameStartingWithClassKeyword() {
+        rewriteRun(
+          groovy(
+            """
+              Object.className("foo")
+              """
+          )
+        );
+    }
+
+    @Test
+    void commandExpressionWithParenthesizedArgument() {
+        rewriteRun(
+          groovy(
+            """
+              def x
+              x foo(c)
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9864")
+    @Test
+    void aClosureArgumentHoldingAGstringThenTwoCalls() {
+        rewriteRun(
+          groovy(
+            """
+              def m() {
+                p.t({ "${d}" }).f().g()
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9864")
+    @Test
+    void theSameInsideAReactorStylePipeline() {
+        rewriteRun(
+          groovy(
+            """
+              def m() {
+                run({ ->
+                  p.timeout(d,
+                    Mono.error { new E("after ${d.toMillis()}ms", null) },
+                    S.parallel())
+                    .doOnError(a.&f)
+                    .block()
+                } as Supplier<T>)
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9864")
+    @Test
+    void anEscapedQuoteAndAParenthesisInTheString() {
+        rewriteRun(
+          groovy(
+            """
+              def m() {
+                p.t({ "a \\" ( b" }).f().g()
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9864")
+    @Test
+    void aListAndAMapHoldingAGstring() {
+        rewriteRun(
+          groovy(
+            """
+              def m() {
+                p.t([a: "${x}", b: [1, 2]]).f().g()
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9864")
+    @Test
+    void realParenthesesAroundTheCall() {
+        rewriteRun(
+          groovy(
+            """
+              def m() {
+                (p.t({ "${d}" })).f().g()
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9267")
+    @Test
+    void aPropertyReadAtTheEndOfACommandChain() {
+        rewriteRun(
+          groovy(
+            """
+              library('my-shared-lib') _
+
+              foo()
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9267")
+    @Test
+    void withALaterDotInTheFile() {
+        rewriteRun(
+          groovy(
+            """
+              library('my-shared-lib') _
+
+              foo.bar()
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9267")
+    @Test
+    void withTheLibrarySVersion() {
+        rewriteRun(
+          groovy(
+            """
+              library('my-shared-lib@1.0') _
+
+              pipeline {
+                agent any
+              }
               """
           )
         );

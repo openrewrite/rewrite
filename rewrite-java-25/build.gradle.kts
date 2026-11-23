@@ -7,7 +7,15 @@ plugins {
 
 val javaTck = configurations.create("javaTck") {
     isTransitive = false
+    isCanBeConsumed = false
+    isCanBeResolved = true
 }
+
+val javaTckClasses = javaTck.incoming.artifactView {
+    attributes {
+        attribute(LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE, objects.named(LibraryElements.CLASSES))
+    }
+}.files
 
 dependencies {
     api(project(":rewrite-core"))
@@ -16,8 +24,6 @@ dependencies {
 
     compileOnly("org.slf4j:slf4j-api:1.7.+")
 
-    implementation("io.micrometer:micrometer-core:1.9.+")
-    implementation("io.github.classgraph:classgraph:latest.release")
     implementation("org.ow2.asm:asm:latest.release")
 
     testImplementation(project(":rewrite-test"))
@@ -32,6 +38,10 @@ java {
 }
 
 tasks.named("licenseFormat") { enabled = false }
+
+// Lombok calls sun.misc.Unsafe, which JDK 25 warns about in every compiler and test JVM that loads it. This also
+// hides rewrite's own Unsafe use, so drop it once Lombok stops, and before any JDK that denies Unsafe by default.
+val allowSunMiscUnsafe = "--sun-misc-unsafe-memory-access=allow"
 
 tasks.withType<JavaCompile>().configureEach {
     sourceCompatibility = JavaVersion.VERSION_25.toString()
@@ -49,6 +59,11 @@ tasks.withType<JavaCompile>().configureEach {
             "--add-exports", "jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED"
         )
     )
+    options.forkOptions.jvmArgs!!.add(allowSunMiscUnsafe)
+}
+
+tasks.withType<Test>().configureEach {
+    jvmArgs(allowSunMiscUnsafe)
 }
 
 //Javadoc compiler will complain about the use of the internal types.
@@ -64,7 +79,7 @@ tasks.withType<Javadoc>().configureEach {
 
 testing {
     suites {
-        val test by getting(JvmTestSuite::class)
+        val test = getByName<JvmTestSuite>("test")
 
         register("compatibilityTest", JvmTestSuite::class) {
             dependencies {
@@ -79,8 +94,8 @@ testing {
                 all {
                     testTask.configure {
                         useJUnitPlatform()
-                        testClassesDirs += files(javaTck.files.map { zipTree(it) })
-                        jvmArgs = listOf("-XX:+UnlockDiagnosticVMOptions", "-XX:+ShowHiddenFrames")
+                        testClassesDirs += javaTckClasses
+                        jvmArgs = listOf("-XX:+UnlockDiagnosticVMOptions", "-XX:+ShowHiddenFrames", allowSunMiscUnsafe)
                         shouldRunAfter(test)
                     }
                 }
@@ -89,6 +104,33 @@ testing {
     }
 }
 
+// Keep the Test tasks' @Classpath fingerprint stable across CI runs. In this module the
+// only consumers of runtimeClasspath are :test and :compatibilityTest (compileJava uses
+// compileClasspath / ABI-only normalization and is unaffected). The convention plugin's
+// info-broker writes build-varying entries (Build-Date, Change, Build-Number, ...) into
+// MANIFEST.MF and META-INF/<project>.properties of every consumed JAR; none of META-INF
+// is a real input for the TCK's parser tests, so drop the whole directory from the
+// fingerprint and let the build cache hit when only those metadata bytes have changed.
+normalization {
+    runtimeClasspath {
+        metaInf {
+            ignoreCompletely()
+        }
+    }
+}
+
+// Each fork spends more CPU warming up javac and the parser than these short tests save by running in more forks
+tasks.named<Test>("compatibilityTest") {
+    maxParallelForks = 2
+}
+
 tasks.named("check") {
     dependsOn(testing.suites.named("compatibilityTest"))
+}
+
+val legacyRuntime17 = javaToolchains.launcherFor {
+    languageVersion.set(JavaLanguageVersion.of(17))
+}
+tasks.named<Test>("test") {
+    systemProperty("org.openrewrite.java17.home", legacyRuntime17.get().metadata.installationPath.asFile.absolutePath)
 }

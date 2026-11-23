@@ -133,4 +133,26 @@ class ForEachLoopTest implements RewriteTest {
             )
         );
     }
+
+    @Test
+    void significantCharactersInComments() {
+        // visitForDo — `for` keyword preceded by `for` text inside a line comment
+        rewriteRun(
+            scala(
+                """
+                // for
+                for (i <- 1 to 3) println(i)
+                """
+            )
+        );
+        // buildSFor — for-paren close paren in line comment (closeChar scan)
+        rewriteRun(
+            scala(
+                """
+                val ys = for ( i <- 1 to 3 // )
+                ) yield i
+                """
+            )
+        );
+    }
 }

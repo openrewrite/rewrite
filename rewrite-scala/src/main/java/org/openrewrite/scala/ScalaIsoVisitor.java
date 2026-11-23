@@ -43,6 +43,11 @@ public class ScalaIsoVisitor<P> extends ScalaVisitor<P> {
     }
 
     @Override
+    public J visitExpressionStatement(S.ExpressionStatement expressionStatement, P p) {
+        return super.visitExpressionStatement(expressionStatement, p);
+    }
+
+    @Override
     public Expression visitExpression(Expression expression, P p) {
         return (Expression) super.visitExpression(expression, p);
     }
@@ -110,6 +115,11 @@ public class ScalaIsoVisitor<P> extends ScalaVisitor<P> {
     @Override
     public J.Case visitCase(J.Case _case, P p) {
         return (J.Case) super.visitCase(_case, p);
+    }
+
+    @Override
+    public J.DeconstructionPattern visitDeconstructionPattern(J.DeconstructionPattern deconstructionPattern, P p) {
+        return (J.DeconstructionPattern) super.visitDeconstructionPattern(deconstructionPattern, p);
     }
 
     @Override
@@ -201,6 +211,31 @@ public class ScalaIsoVisitor<P> extends ScalaVisitor<P> {
     @Override
     public J.Import visitImport(J.Import _import, P p) {
         return (J.Import) super.visitImport(_import, p);
+    }
+
+    @Override
+    public S.SelfType visitSelfType(S.SelfType selfType, P p) {
+        return (S.SelfType) super.visitSelfType(selfType, p);
+    }
+
+    @Override
+    public S.Export visitExport(S.Export export, P p) {
+        return (S.Export) super.visitExport(export, p);
+    }
+
+    @Override
+    public S.InterpolatedString visitInterpolatedString(S.InterpolatedString interpolatedString, P p) {
+        return (S.InterpolatedString) super.visitInterpolatedString(interpolatedString, p);
+    }
+
+    @Override
+    public S.Interpolation visitInterpolation(S.Interpolation interpolation, P p) {
+        return (S.Interpolation) super.visitInterpolation(interpolation, p);
+    }
+
+    @Override
+    public S.Try visitSTry(S.Try tryable, P p) {
+        return (S.Try) super.visitSTry(tryable, p);
     }
 
     @Override
@@ -352,5 +387,10 @@ public class ScalaIsoVisitor<P> extends ScalaVisitor<P> {
     @Override
     public J.Yield visitYield(J.Yield yield, P p) {
         return (J.Yield) super.visitYield(yield, p);
+    }
+
+    @Override
+    public S.ConstructorInvocation visitConstructorInvocation(S.ConstructorInvocation constructorInvocation, P p) {
+        return (S.ConstructorInvocation) super.visitConstructorInvocation(constructorInvocation, p);
     }
 }

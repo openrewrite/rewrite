@@ -20,8 +20,10 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
+import org.openrewrite.test.TypeValidation;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
+import static org.openrewrite.kotlin.Assertions.kotlinScript;
 
 class CompilationUnitTest implements RewriteTest {
 
@@ -65,6 +67,18 @@ class CompilationUnitTest implements RewriteTest {
               // C2
               """,
             SourceSpec::noTrim
+          )
+        );
+    }
+
+    @Test
+    void unresolvedCallableReference() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.all().identifiers(false).methodInvocations(false)),
+          kotlinScript(
+            """
+              kotlin { jvmToolchain { languageVersion.set(libs.versions.jdk.map(JavaLanguageVersion::of)) } }
+              """
           )
         );
     }

@@ -1,0 +1,261 @@
+/*
+ * Copyright 2025 the original author or authors.
+ * <p>
+ * Licensed under the Moderne Source Available License (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://docs.moderne.io/licensing/moderne-source-available-license
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+import {fromVisitor, RecipeSpec} from "../../../src/test";
+import {capture, JavaScriptVisitor, pattern, rewrite, template, typescript} from "../../../src/javascript";
+import {J} from "../../../src/java";
+
+describe('templates that declare module bindings', () => {
+    const spec = new RecipeSpec();
+
+    /** Rewrites every `applyTheme(...)` through `tmpl`, resolving the template's bindings per file. */
+    function recipeApplying(tmpl: ReturnType<typeof template>, arg: ReturnType<typeof capture>) {
+        const rule = rewrite(() => ({before: pattern`applyTheme(${arg})`, after: tmpl}));
+        return fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                method = await super.visitMethodInvocation(method, p) as J.MethodInvocation;
+                return await rule.tryOn(this.cursor, method, {visitor: this}) || method;
+            }
+        });
+    }
+
+    test('the bound name is deconflicted and the template follows it', async () => {
+        const arg = capture('arg');
+        spec.recipe = recipeApplying(template`Theming.setTheme(${arg})`.configure({
+            context: [`import Theming from 'sap/ui/core/Theming';`]
+        }), arg);
+
+        await spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `
+                const Theming = 1;
+                applyTheme('dark');`,
+                `
+                import Theming_1 from 'sap/ui/core/Theming';
+
+                const Theming = 1;
+                Theming_1.setTheme('dark');`
+            )
+        );
+    });
+
+    test('an import already binding the module is reused, under the name it already has', async () => {
+        const arg = capture('arg');
+        spec.recipe = recipeApplying(template`Theming.setTheme(${arg})`.configure({
+            context: [`import Theming from 'sap/ui/core/Theming';`]
+        }), arg);
+
+        await spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `
+                import Th from 'sap/ui/core/Theming';
+
+                applyTheme('dark');`,
+                `
+                import Th from 'sap/ui/core/Theming';
+
+                Th.setTheme('dark');`
+            )
+        );
+    });
+
+    test('a template resolves every binding it declares', async () => {
+        const arg = capture('arg');
+        spec.recipe = recipeApplying(template`new Locale(Localization.getLanguageTag(${arg}))`.configure({
+            context: [
+                `import Locale from 'sap/ui/core/Locale';`,
+                `import Localization from 'sap/base/i18n/Localization';`
+            ]
+        }), arg);
+
+        await spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `applyTheme('dark');`,
+                `
+                import Locale from 'sap/ui/core/Locale';
+                import Localization from 'sap/base/i18n/Localization';
+
+                new Locale(Localization.getLanguageTag('dark'));`
+            )
+        );
+    });
+
+    test('a name in a naming position is not a reference to the binding', async () => {
+        const arg = capture('arg');
+        spec.recipe = recipeApplying(template`Theming.setTheme(${arg}.Theming)`.configure({
+            context: [`import Theming from 'sap/ui/core/Theming';`]
+        }), arg);
+
+        await spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `
+                const Theming = 1;
+                applyTheme(props);`,
+                `
+                import Theming_1 from 'sap/ui/core/Theming';
+
+                const Theming = 1;
+                Theming_1.setTheme(props.Theming);`
+            )
+        );
+    });
+
+    test('a binding called on its own is a reference to it, not a name it gives something', async () => {
+        const arg = capture('arg');
+        spec.recipe = recipeApplying(template`merge(${arg}, {}).merge()`.configure({
+            context: [`import merge from 'sap/base/util/merge';`]
+        }), arg);
+
+        await spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `
+                const merge = 1;
+                applyTheme('dark');`,
+                `
+                import merge_1 from 'sap/base/util/merge';
+
+                const merge = 1;
+                merge_1('dark', {}).merge();`
+            )
+        );
+    });
+
+    test('a type the template names binds its module, though the type is declared in another package', async () => {
+        const arg = capture('arg');
+        // `vitest` re-exports `Mocked` from `@vitest/spy`, so the reference's attribution names no `vitest`
+        spec.recipe = recipeApplying(template`${arg} as unknown as Mocked<typeof ${arg}>`.configure({
+            context: [`import {Mocked} from 'vitest';`],
+            dependencies: {vitest: '^3.0.0'}
+        }), arg);
+
+        await spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `applyTheme(svc);`,
+                `
+                import {Mocked} from 'vitest';
+
+                svc as unknown as Mocked<typeof svc>;`
+            )
+        );
+    });
+
+    test('a deconflicted name follows into the class of a generic type', async () => {
+        const arg = capture('arg');
+        spec.recipe = recipeApplying(template`${arg} as unknown as Mocked<typeof ${arg}>`.configure({
+            context: [`import {Mocked} from 'vitest';`]
+        }), arg);
+
+        await spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `
+                const Mocked = 1;
+                applyTheme(svc);`,
+                `
+                import {Mocked as Mocked_1} from 'vitest';
+
+                const Mocked = 1;
+                svc as unknown as Mocked_1<typeof svc>;`
+            )
+        );
+    });
+
+    test('a context binding the template never reads is not bound', async () => {
+        const arg = capture('arg');
+        spec.recipe = recipeApplying(template`Theming.setTheme(${arg})`.configure({
+            context: [
+                `import Theming from 'sap/ui/core/Theming';`,
+                `import Localization from 'sap/base/i18n/Localization';`
+            ]
+        }), arg);
+
+        await spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `applyTheme('dark');`,
+                `
+                import Theming from 'sap/ui/core/Theming';
+
+                Theming.setTheme('dark');`
+            )
+        );
+    });
+
+    test('a rule that does not fire leaves the file\'s imports alone', async () => {
+        const arg = capture('arg');
+        spec.recipe = recipeApplying(template`Theming.setTheme(${arg})`.configure({
+            context: [`import Theming from 'sap/ui/core/Theming';`]
+        }), arg);
+
+        await spec.rewriteRun(
+            //language=typescript
+            typescript(`
+                const x = Theming;
+                somethingElse('dark');`)
+        );
+    });
+
+    test('a context statement that is not an import binds nothing', async () => {
+        const arg = capture('arg');
+        spec.recipe = recipeApplying(template`helper(${arg})`.configure({
+            context: [`declare function helper(x: string): void;`]
+        }), arg);
+
+        await spec.rewriteRun(
+            //language=typescript
+            typescript(`applyTheme('dark');`, `helper('dark');`)
+        );
+    });
+
+    test('a rule given no way to resolve its bindings is an error, not a silent wrong name', async () => {
+        const arg = capture('arg');
+        const tmpl = template`Theming.setTheme(${arg})`.configure({
+            context: [`import Theming from 'sap/ui/core/Theming';`]
+        });
+        const rule = rewrite(() => ({before: pattern`applyTheme(${arg})`, after: tmpl}));
+
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                method = await super.visitMethodInvocation(method, p) as J.MethodInvocation;
+                return await rule.tryOn(this.cursor, method) || method;
+            }
+        });
+
+        await expect(spec.rewriteRun(
+            //language=typescript
+            typescript(`applyTheme('dark');`)
+        )).rejects.toThrow(/needs their local names/);
+    });
+
+    test('the removed `bindings` option is rejected by the type and names its replacement', () => {
+        // Neither simplification of this fixture still pins the tombstone: excess property checking
+        // rejects a fresh literal, and the weak-type check rejects a lone `bindings`.
+        const optionsFrom = (member: string) => ({
+            dependencies: {vitest: '^2.0.0'},
+            bindings: {[member]: {module: 'vitest', member}}
+        });
+
+        expect(() => template`vi.fn()`.configure(
+            // @ts-expect-error
+            optionsFrom('vi')
+        )).toThrow(/context/);
+    });
+});

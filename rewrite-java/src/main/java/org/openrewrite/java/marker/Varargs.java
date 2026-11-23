@@ -18,17 +18,32 @@ package org.openrewrite.java.marker;
 import lombok.Value;
 import lombok.With;
 import org.openrewrite.marker.Marker;
+import org.openrewrite.rpc.RpcCodec;
+import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.RpcSendQueue;
 
 import java.util.UUID;
 
 /**
- * Indicates that a {@link org.openrewrite.java.tree.J.ArrayType} represents a varargs parameter type.
- * When present, the array type should be printed using {@code ...} syntax instead of {@code []}.
- * <p>
- * For example, {@code String...} instead of {@code String[]}.
+ * Marks a {@link org.openrewrite.java.tree.J.ArrayType} that was written using varargs syntax
+ * ({@code ...}) rather than array brackets ({@code []}). The element type and dimension space are
+ * modeled like any other array type; this marker only records that the type should be printed with
+ * {@code ...}. Produced by the Java parsers for varargs parameters such as {@code String @A ... args},
+ * and by the Javadoc parser for references such as {@code {@link String#format(String, Object...)}}.
  */
 @Value
 @With
-public class Varargs implements Marker {
+public class Varargs implements Marker, RpcCodec<Varargs> {
     UUID id;
+
+    @Override
+    public void rpcSend(Varargs after, RpcSendQueue q) {
+        q.getAndSend(after, Marker::getId);
+    }
+
+    @Override
+    public Varargs rpcReceive(Varargs before, RpcReceiveQueue q) {
+        return before
+                .withId(q.receiveAndGet(before.getId(), UUID::fromString));
+    }
 }

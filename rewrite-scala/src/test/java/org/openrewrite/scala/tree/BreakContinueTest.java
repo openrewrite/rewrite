@@ -20,8 +20,8 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.scala.Assertions.scala;
 
-public class BreakContinueTest implements RewriteTest {
-    
+class BreakContinueTest implements RewriteTest {
+
     @Test
     void breakInWhileLoop() {
         rewriteRun(
@@ -60,7 +60,7 @@ public class BreakContinueTest implements RewriteTest {
             )
         );
     }
-    
+
     @Test
     void breakInForLoop() {
         rewriteRun(
@@ -81,7 +81,7 @@ public class BreakContinueTest implements RewriteTest {
             )
         );
     }
-    
+
     @Test
     void nestedBreakable() {
         rewriteRun(
@@ -108,7 +108,7 @@ public class BreakContinueTest implements RewriteTest {
             )
         );
     }
-    
+
     @Test
     void breakWithoutBreakable() {
         rewriteRun(

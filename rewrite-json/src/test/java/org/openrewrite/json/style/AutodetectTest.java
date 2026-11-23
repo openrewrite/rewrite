@@ -15,12 +15,17 @@
  */
 package org.openrewrite.json.style;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.SourceFile;
+import org.openrewrite.internal.ObjectMappers;
+import org.openrewrite.json.JsonParser;
 import org.openrewrite.style.LineWrapSetting;
 import org.openrewrite.style.Style;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.List;
 import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -81,7 +86,7 @@ class AutodetectTest implements RewriteTest {
               TAB"age": 30,
               TAB"car": null
               }
-              """.replaceAll("TAB", "\t")
+              """.replace("TAB", "\t")
           )
         );
     }
@@ -176,5 +181,34 @@ class AutodetectTest implements RewriteTest {
               .findAny().orElseThrow();
             fn.accept(foundStyle);
         });
+    }
+    @Test
+    void mergedAndSerializedDetectorsMatchOneDetectorThatSampledEverything() throws Exception {
+        var docs = JsonParser.builder().build().parse(
+          sgml,
+          """
+            {
+                "a": [1, 2],
+                "b": {"c": 1, "d": 2}
+            }
+            """,
+          "{\r\n\t\"a\": [\r\n\t\t1,\r\n\t\t2\r\n\t]\r\n}"
+        ).toList();
+
+        var all = detector(docs);
+        assertThat(Autodetect.detector().merge(detector(docs.subList(2, 3))).merge(detector(docs.subList(0, 2))).build().getStyles())
+          .isEqualTo(all.build().getStyles());
+
+        for (ObjectMapper mapper : List.of(new ObjectMapper().findAndRegisterModules(), ObjectMappers.propertyBasedMapper(null))) {
+            var first = mapper.readValue(mapper.writeValueAsBytes(detector(docs.subList(0, 1))), Autodetect.Detector.class);
+            var second = mapper.readValue(mapper.writeValueAsBytes(detector(docs.subList(1, 3))), Autodetect.Detector.class);
+            assertThat(first.merge(second).build().getStyles()).isEqualTo(all.build().getStyles());
+        }
+    }
+
+    private static Autodetect.Detector detector(List<SourceFile> docs) {
+        var detector = Autodetect.detector();
+        docs.forEach(detector::sample);
+        return detector;
     }
 }

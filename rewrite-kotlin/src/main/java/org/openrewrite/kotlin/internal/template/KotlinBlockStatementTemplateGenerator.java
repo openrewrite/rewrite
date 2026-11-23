@@ -19,7 +19,9 @@ import org.openrewrite.Cursor;
 import org.openrewrite.java.internal.template.BlockStatementTemplateGenerator;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaCoordinates;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.kotlin.tree.K;
@@ -34,9 +36,10 @@ public class KotlinBlockStatementTemplateGenerator extends BlockStatementTemplat
     }
 
     @Override
-    protected void contextFreeTemplate(Cursor cursor, J j, Collection<JavaType.GenericTypeVariable> typeVariables, StringBuilder before, StringBuilder after) {
+    protected void contextFreeTemplate(Cursor cursor, J j, Collection<JavaType.GenericTypeVariable> typeVariables, StringBuilder before, StringBuilder after,
+                                       Space.Location location, JavaCoordinates.Mode mode) {
         String classDeclaration = "class Template" + kotlinTypeParameters(typeVariables);
-        if (j instanceof Expression && !(j instanceof J.Assignment)) {
+        if (j instanceof Expression && !(j instanceof J.Assignment) && !insertsBesideStatement(location, mode)) {
             before.insert(0, classDeclaration + " {\n");
             before.append("var o : Any = ");
             after.append(";\n}");
@@ -67,6 +70,7 @@ public class KotlinBlockStatementTemplateGenerator extends BlockStatementTemplat
         boolean firstParam = true;
         for (JavaType.GenericTypeVariable tv : typeVariables) {
             if ("?".equals(tv.getName())) {
+                // Wildcards do not appear in declaration position; skip.
                 continue;
             }
             if (!firstParam) {
@@ -74,8 +78,15 @@ public class KotlinBlockStatementTemplateGenerator extends BlockStatementTemplat
             }
             firstParam = false;
             params.append(tv.getName());
+            // Note: the Kotlin parser currently maps both Kotlin's `out T` AND Kotlin's `T : Bound`
+            // (invariant-with-bound) to Variance.COVARIANT. We emit bounds for COVARIANT and
+            // CONTRAVARIANT alike so that `<in T : Foo>` round-trips correctly through the template
+            // wrapper. INVARIANT bounded types are still under-served by the current model — that's
+            // a separate fix in the parser-side mapping, not here.
+            JavaType.GenericTypeVariable.Variance variance = tv.getVariance();
             List<JavaType> bounds = tv.getBounds();
-            if (tv.getVariance() == JavaType.GenericTypeVariable.Variance.COVARIANT && !bounds.isEmpty()) {
+            if ((variance == JavaType.GenericTypeVariable.Variance.COVARIANT ||
+                 variance == JavaType.GenericTypeVariable.Variance.CONTRAVARIANT) && !bounds.isEmpty()) {
                 if (bounds.size() == 1) {
                     params.append(" : ").append(TypeUtils.toString(bounds.get(0)));
                 } else {
