@@ -2280,5 +2280,110 @@ class ChangeDependencyTest implements RewriteTest {
               )
             );
         }
+
+        @Test
+        void extSetMethod() {
+            rewriteRun(
+              spec -> spec.recipe(commonsLangToLang3),
+              buildGradle(
+                """
+                  plugins {
+                      id 'java-library'
+                  }
+                  repositories {
+                      mavenCentral()
+                  }
+                  ext.set('commonsLangVersion', '2.6')
+                  dependencies {
+                      implementation "commons-lang:commons-lang:$commonsLangVersion"
+                  }
+                  """,
+                spec -> spec.after(actual -> assertThat(actual)
+                  .containsPattern("ext.set\\('commonsLangVersion', '" + COMMONS_LANG_3_VERSION + "'\\)")
+                  .contains("implementation \"org.apache.commons:commons-lang3:$commonsLangVersion\"")
+                  .actual())
+              )
+            );
+        }
+
+        @Test
+        void extSubscriptAccess() {
+            rewriteRun(
+              spec -> spec.recipe(commonsLangToLang3),
+              buildGradle(
+                """
+                  plugins {
+                      id 'java-library'
+                  }
+                  repositories {
+                      mavenCentral()
+                  }
+                  ext['commonsLangVersion'] = '2.6'
+                  dependencies {
+                      implementation "commons-lang:commons-lang:$commonsLangVersion"
+                  }
+                  """,
+                spec -> spec.after(actual -> assertThat(actual)
+                  .containsPattern("ext\\['commonsLangVersion'\\] = '" + COMMONS_LANG_3_VERSION + "'")
+                  .contains("implementation \"org.apache.commons:commons-lang3:$commonsLangVersion\"")
+                  .actual())
+              )
+            );
+        }
+
+        @Test
+        void kotlinDslExtraSubscript() {
+            rewriteRun(
+              spec -> spec.recipe(commonsLangToLang3),
+              buildGradleKts(
+                """
+                  plugins {
+                      `java-library`
+                  }
+                  repositories {
+                      mavenCentral()
+                  }
+                  extra["commonsLangVersion"] = "2.6"
+                  val commonsLangVersion: String by extra
+                  dependencies {
+                      implementation("commons-lang:commons-lang:$commonsLangVersion")
+                  }
+                  """,
+                spec -> spec.after(actual -> assertThat(actual)
+                  .containsPattern("extra\\[\"commonsLangVersion\"\\] = \"" + COMMONS_LANG_3_VERSION + "\"")
+                  .contains("val commonsLangVersion: String by extra\n")
+                  .contains("implementation(\"org.apache.commons:commons-lang3:$commonsLangVersion\")")
+                  .actual())
+              )
+            );
+        }
+
+        @Test
+        void warnOnExtraPropertyWhenResolutionFails() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeDependency(
+                "commons-lang", "commons-lang", "org.openrewrite.nonexistent", "does-not-exist", "1.x", null, null, null)),
+              buildGradle(
+                """
+                  plugins {
+                      id 'java-library'
+                  }
+                  repositories {
+                      mavenCentral()
+                  }
+                  ext {
+                      commonsLangVersion = '2.6'
+                  }
+                  dependencies {
+                      implementation "commons-lang:commons-lang:$commonsLangVersion"
+                  }
+                  """,
+                spec -> spec.after(actual -> assertThat(actual)
+                  .contains("/*~~(org.openrewrite.nonexistent:does-not-exist failed. Unable to download metadata.")
+                  .containsPattern("~~>\\*/commonsLangVersion = '2.6'")
+                  .actual())
+              )
+            );
+        }
     }
 }

@@ -378,8 +378,9 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                 String varName = dep.getVersionVariable();
                 if (varName != null) {
                     // Variable-backed: if the variable is safe to update (used only by OLD or NEW/survivor coords),
-                    // let visitVariable rewrite the shared variable value. Otherwise write a literal override
-                    // to this method invocation so we don't drag unrelated deps along with the variable change.
+                    // let postVisit rewrite its definition, whether a local variable or an extra property. Otherwise
+                    // write a literal override to this method invocation so we don't drag unrelated deps along with
+                    // the variable change.
                     if (canSafelyUpdateVariable(varName, depMatcher, existingMatcher, acc)) {
                         return m;
                     }
