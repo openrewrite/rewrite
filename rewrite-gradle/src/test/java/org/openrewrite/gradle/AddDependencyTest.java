@@ -668,6 +668,296 @@ class AddDependencyTest implements RewriteTest {
     }
 
     @Test
+    void appendAfterLastDependencyWithTrailingComment() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath")),
+          mavenProject("project",
+            srcMainJava(
+              java(usingGuavaIntMath)
+            ),
+            buildGradle(
+              """
+                plugins {
+                    id 'java-library'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    implementation "ch.qos.logback:logback-classic:1.2.11" // pinned for CVE
+                    // more to come
+                }
+                """,
+              """
+                plugins {
+                    id 'java-library'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    implementation "ch.qos.logback:logback-classic:1.2.11" // pinned for CVE
+                    implementation "com.google.guava:guava:29.0-jre"
+                    // more to come
+                }
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void insertAfterDependencyWithTrailingComment() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath")),
+          mavenProject("project",
+            srcMainJava(
+              java(usingGuavaIntMath)
+            ),
+            buildGradle(
+              """
+                plugins {
+                    id 'java-library'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies { // sorted
+                    implementation "ch.qos.logback:logback-classic:1.2.11" // pinned for CVE
+                    implementation "commons-lang:commons-lang:1.0"
+                }
+                """,
+              """
+                plugins {
+                    id 'java-library'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies { // sorted
+                    implementation "ch.qos.logback:logback-classic:1.2.11" // pinned for CVE
+                    implementation "com.google.guava:guava:29.0-jre"
+                    implementation "commons-lang:commons-lang:1.0"
+                }
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void addAfterDependencyWithTrailingCommentKotlin() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath")),
+          mavenProject("project",
+            srcTestJava(
+              java(usingGuavaIntMath)
+            ),
+            buildGradleKts(
+              """
+                plugins {
+                    `java-library`
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    implementation("ch.qos.logback:logback-classic:1.2.11") // pinned for CVE
+                    implementation("commons-lang:commons-lang:1.0") /* legacy */
+                }
+                """,
+              """
+                plugins {
+                    `java-library`
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    implementation("ch.qos.logback:logback-classic:1.2.11") // pinned for CVE
+                    implementation("commons-lang:commons-lang:1.0") /* legacy */
+
+                    testImplementation("com.google.guava:guava:29.0-jre")
+                }
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void insertFirstDependencyBelowCommentOnDependenciesLine() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath")),
+          mavenProject("project",
+            srcMainJava(
+              java(usingGuavaIntMath)
+            ),
+            buildGradle(
+              """
+                plugins {
+                    id 'java-library'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies { // sorted
+                    implementation "commons-lang:commons-lang:1.0"
+                }
+                """,
+              """
+                plugins {
+                    id 'java-library'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies { // sorted
+                    implementation "com.google.guava:guava:29.0-jre"
+                    implementation "commons-lang:commons-lang:1.0"
+                }
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void addToEmptyDependenciesWithComment() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath")),
+          mavenProject("project",
+            srcMainJava(
+              java(usingGuavaIntMath)
+            ),
+            buildGradle(
+              """
+                plugins {
+                    id 'java-library'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies { // none yet
+                }
+                """,
+              """
+                plugins {
+                    id 'java-library'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies { // none yet
+                    implementation "com.google.guava:guava:29.0-jre"
+                }
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void appendToSingleLineDependenciesWithBlockComment() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath")),
+          mavenProject("project",
+            srcMainJava(
+              java(usingGuavaIntMath)
+            ),
+            buildGradle(
+              """
+                plugins {
+                    id 'java-library'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies { implementation "ch.qos.logback:logback-classic:1.2.11" /* pinned */ }
+                """,
+              """
+                plugins {
+                    id 'java-library'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies { implementation "ch.qos.logback:logback-classic:1.2.11" /* pinned */
+                    implementation "com.google.guava:guava:29.0-jre" }
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void insertAfterDependencyWithTrailingCommentCrlf() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath")),
+          mavenProject("project",
+            srcMainJava(
+              java(usingGuavaIntMath)
+            ),
+            buildGradle(
+              """
+                plugins {
+                    id 'java-library'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    implementation "ch.qos.logback:logback-classic:1.2.11" // pinned for CVE
+                    implementation "commons-lang:commons-lang:1.0"
+                }
+                """.replace("\n", "\r\n"),
+              """
+                plugins {
+                    id 'java-library'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    implementation "ch.qos.logback:logback-classic:1.2.11" // pinned for CVE
+                    implementation "com.google.guava:guava:29.0-jre"
+                    implementation "commons-lang:commons-lang:1.0"
+                }
+                """.replace("\n", "\r\n")
+            )
+          )
+        );
+    }
+
+    @Test
     void addDependenciesKeepFormatting() {
         rewriteRun(
           spec -> spec.recipe(addDependency("org.slf4j:slf4j-api:2.0.7", "com.google.common.math.IntMath")),

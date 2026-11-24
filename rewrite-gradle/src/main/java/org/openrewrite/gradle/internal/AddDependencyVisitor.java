@@ -32,6 +32,7 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.RandomizeIdVisitor;
 import org.openrewrite.java.marker.JavaSourceSet;
+import org.openrewrite.java.tree.Comment;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.Space;
@@ -164,6 +165,9 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
                     for (; i < body.getStatements().size(); i++) {
                         Statement currentStatement = body.getStatements().get(i);
                         if (dependencyComparator.compare(currentStatement, addDependencyInvocation) > 0) {
+                            CommentSplit split = CommentSplit.of(currentStatement.getPrefix());
+                            currentStatement = currentStatement.withPrefix(split.getRest());
+                            statements.set(i, currentStatement);
                             if (dependencyComparator.getBeforeDependency() != null) {
                                 J.MethodInvocation beforeDependency = (J.MethodInvocation) (dependencyComparator.getBeforeDependency() instanceof J.Return ?
                                         requireNonNull(((J.Return) dependencyComparator.getBeforeDependency()).getExpression()) :
@@ -184,7 +188,7 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
                                 }
                             }
 
-                            statements.add(i, addDependencyInvocation);
+                            statements.add(i, split.prependSameLineTo(addDependencyInvocation));
                             break;
                         }
                     }
@@ -202,9 +206,10 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
                                 addDependencyInvocation = addDependencyInvocation.withPrefix(Space.format("\n\n" + addDependencyInvocation.getPrefix().getIndent()));
                             }
                         }
-                        statements.add(addDependencyInvocation);
+                        CommentSplit split = CommentSplit.of(body.getEnd());
+                        body = body.withEnd(split.getRest());
+                        statements.add(split.prependSameLineTo(addDependencyInvocation));
                     }
-                    body = body.withStatements(statements);
                     return lambda.withBody(body.withStatements(statements));
                 }
                 return arg;
@@ -476,5 +481,46 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
         String template;
         boolean isKotlinDsl;
         Class<? extends J> expected;
+    }
+
+    /// A whitespace split into the comments that trail the preceding token on its line, and the rest.
+    @Value
+    private static class CommentSplit {
+        Space sameLine;
+        Space rest;
+
+        static CommentSplit of(Space space) {
+            List<Comment> comments = space.getComments();
+            if (comments.isEmpty() || space.getWhitespace().contains("\n")) {
+                return new CommentSplit(Space.EMPTY, space);
+            }
+            int last = 0;
+            while (last < comments.size() - 1 && !comments.get(last).getSuffix().contains("\n")) {
+                last++;
+            }
+            String suffix = comments.get(last).getSuffix();
+            int lineBreak = suffix.indexOf('\n');
+            if (lineBreak < 0) {
+                lineBreak = 0;
+            } else if (lineBreak > 0 && suffix.charAt(lineBreak - 1) == '\r') {
+                lineBreak--;
+            }
+            String sameLineSuffix = suffix.substring(0, lineBreak);
+            return new CommentSplit(
+                    Space.build(space.getWhitespace(), ListUtils.mapLast(comments.subList(0, last + 1),
+                            comment -> comment.withSuffix(sameLineSuffix))),
+                    Space.build(suffix.substring(lineBreak), comments.subList(last + 1, comments.size())));
+        }
+
+        <J2 extends J> J2 prependSameLineTo(J2 tree) {
+            if (sameLine.getComments().isEmpty()) {
+                return tree;
+            }
+            Space prefix = tree.getPrefix();
+            return tree.withPrefix(Space.build(sameLine.getWhitespace(), ListUtils.concatAll(
+                    ListUtils.mapLast(sameLine.getComments(),
+                            comment -> comment.withSuffix(comment.getSuffix() + prefix.getWhitespace())),
+                    prefix.getComments())));
+        }
     }
 }
