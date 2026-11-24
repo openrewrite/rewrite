@@ -29,6 +29,7 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.marker.TrailingComma;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.style.LineWrapSetting;
@@ -1239,6 +1240,8 @@ public class Autodetect extends NamedStyles {
         int afterForSemiColon;
         int afterTypeCast;
         int withinMethodCallParentheses;
+        int arrayInitializerLeftBrace;
+        int withinArrayInitializerBraces;
 
         void merge(SpacesStatistics other) {
             beforeIf += other.beforeIf;
@@ -1257,6 +1260,8 @@ public class Autodetect extends NamedStyles {
             afterForSemiColon += other.afterForSemiColon;
             afterTypeCast += other.afterTypeCast;
             withinMethodCallParentheses += other.withinMethodCallParentheses;
+            arrayInitializerLeftBrace += other.arrayInitializerLeftBrace;
+            withinArrayInitializerBraces += other.withinArrayInitializerBraces;
         }
 
         public SpacesStyle getSpacesStyle() {
@@ -1281,8 +1286,11 @@ public class Autodetect extends NamedStyles {
                                     false
                             )
                     )
-                    .withWithin(within.withMethodCallParentheses(
-                            vote(withinMethodCallParentheses, within.getMethodCallParentheses())))
+                    .withBeforeLeftBrace(spaces.getBeforeLeftBrace().withArrayInitializerLeftBrace(
+                            vote(arrayInitializerLeftBrace, spaces.getBeforeLeftBrace().getArrayInitializerLeftBrace())))
+                    .withWithin(within
+                            .withMethodCallParentheses(vote(withinMethodCallParentheses, within.getMethodCallParentheses()))
+                            .withArrayInitializerBraces(vote(withinArrayInitializerBraces, within.getArrayInitializerBraces())))
                     .withOther(new SpacesStyle.Other(
                             vote(beforeComma, other.getBeforeComma()),
                             vote(afterComma, other.getAfterComma()),
@@ -1343,10 +1351,24 @@ public class Autodetect extends NamedStyles {
         @Override
         public J.ForLoop visitForLoop(J.ForLoop forLoop, SpacesStatistics stats) {
             stats.beforeFor += hasSpace(forLoop.getControl().getPrefix());
-            stats.beforeForSemiColon += hasSpace(forLoop.getControl().getPadding().getInit().get(forLoop.getControl().getInit().size() - 1).getAfter());
-            stats.beforeForSemiColon += hasSpace(forLoop.getControl().getPadding().getCondition().getAfter());
-            stats.afterForSemiColon += hasSpace(forLoop.getControl().getInit().get(forLoop.getControl().getInit().size() - 1).getPrefix());
-            stats.afterForSemiColon += hasSpace(forLoop.getControl().getCondition().getPrefix());
+            J.ForLoop.Control control = forLoop.getControl();
+            List<JRightPadded<Statement>> init = control.getPadding().getInit();
+            JRightPadded<Statement> lastInit = init.get(init.size() - 1);
+            JRightPadded<Expression> condition = control.getPadding().getCondition();
+            List<JRightPadded<Statement>> update = control.getPadding().getUpdate();
+            // `for (;;)` has empty placeholders, which carry no spacing information
+            if (!(lastInit.getElement() instanceof J.Empty)) {
+                stats.beforeForSemiColon += hasSpace(lastInit.getAfter());
+            }
+            if (!(condition.getElement() instanceof J.Empty)) {
+                stats.beforeForSemiColon += hasSpace(condition.getAfter());
+                // The space after the first semicolon precedes the condition
+                stats.afterForSemiColon += hasSpace(condition.getElement().getPrefix());
+            }
+            // The space after the second semicolon precedes the first update expression
+            if (!update.isEmpty() && !(update.get(0).getElement() instanceof J.Empty)) {
+                stats.afterForSemiColon += hasSpace(update.get(0).getElement().getPrefix());
+            }
             return super.visitForLoop(forLoop, stats);
         }
 
@@ -1413,6 +1435,28 @@ public class Autodetect extends NamedStyles {
         public J.NewArray visitNewArray(J.NewArray newArray, SpacesStatistics stats) {
             JContainer<Expression> initializer = newArray.getPadding().getInitializer();
             List<Expression> elements = newArray.getInitializer();
+            if (elements != null && initializer != null && !elements.isEmpty()) {
+                // In `int[] a = {1}` the space before the brace belongs to the `=`
+                if (newArray.getTypeExpression() != null) {
+                    stats.arrayInitializerLeftBrace += hasSpace(initializer.getBefore());
+                }
+                // `{}` is governed by the separate empty-initializer setting, and a brace
+                // followed or preceded by a line break says nothing about brace padding
+                if (!(elements.get(0) instanceof J.Empty)) {
+                    Space afterOpen = elements.get(0).getPrefix();
+                    JRightPadded<Expression> last = initializer.getPadding().getElements().get(elements.size() - 1);
+                    // With a trailing comma, the space before the brace follows the comma
+                    Space beforeClose = last.getMarkers().findFirst(TrailingComma.class)
+                            .map(TrailingComma::getSuffix)
+                            .orElse(last.getAfter());
+                    if (!hasLineBreak(afterOpen.getWhitespace())) {
+                        stats.withinArrayInitializerBraces += hasSpace(afterOpen);
+                    }
+                    if (!hasLineBreak(beforeClose.getWhitespace())) {
+                        stats.withinArrayInitializerBraces += hasSpace(beforeClose);
+                    }
+                }
+            }
             if (elements != null && initializer != null && elements.size() > 1) {
                 List<JRightPadded<Expression>> paddedElements = initializer.getPadding().getElements();
                 for (int i = 0; i < paddedElements.size() - 1; i++) {

@@ -808,6 +808,360 @@ class AutodetectTest implements RewriteTest {
 
     @SuppressWarnings("StatementWithEmptyBody")
     @Test
+    void detectSpaceAfterForSemicolon() {
+        var cus = jp().parse(
+          """
+            class T {
+                void m(int x) {
+                    for (int i = 0; i < x; i++) {}
+                    for (int j = 0; j < x; j++) {}
+                    for (int k = 0;k < x;k++) {}
+                }
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
+
+        assertThat(spacesStyle.getOther().getAfterForSemicolon()).isTrue();
+    }
+
+    @SuppressWarnings("StatementWithEmptyBody")
+    @Test
+    void detectNoSpaceAfterForSemicolon() {
+        var cus = jp().parse(
+          """
+            class T {
+                void m(int x) {
+                    for (int i = 0;i < x;i++) {}
+                    for (int j = 0;j < x;j++) {}
+                    for (int k = 0; k < x; k++) {}
+                }
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
+
+        assertThat(spacesStyle.getOther().getAfterForSemicolon()).isFalse();
+    }
+
+    @SuppressWarnings("StatementWithEmptyBody")
+    @Test
+    void detectSpaceBeforeForSemicolon() {
+        var cus = jp().parse(
+          """
+            class T {
+                void m(int x) {
+                    for (int i = 0 ; i < x ; i++) {}
+                    for (int j = 0 ; j < x ; j++) {}
+                    for (int k = 0; k < x; k++) {}
+                }
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
+
+        assertThat(spacesStyle.getOther().getBeforeForSemicolon()).isTrue();
+    }
+
+    @SuppressWarnings("StatementWithEmptyBody")
+    @Test
+    void emptyForLoopPartsDoNotVoteOnSemicolonSpacing() {
+        var cus = jp().parse(
+          """
+            class T {
+                void m(int x) {
+                    for (int i = 0 ; i < x ; i++) {}
+                    for (;;) { break; }
+                    for (;;) { break; }
+                    for (;;) { break; }
+                }
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
+
+        assertThat(spacesStyle.getOther().getBeforeForSemicolon()).isTrue();
+        assertThat(spacesStyle.getOther().getAfterForSemicolon()).isTrue();
+    }
+
+    @SuppressWarnings({"StatementWithEmptyBody", "ForLoopReplaceableByWhile"})
+    @Test
+    void forLoopWithoutConditionVotesOnSpaceAfterSemicolon() {
+        var cus = jp().parse(
+          """
+            class T {
+                void m(int x) {
+                    for (int i = 0;;i++) {
+                        if (i > x) break;
+                    }
+                }
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
+
+        assertThat(spacesStyle.getOther().getAfterForSemicolon()).isFalse();
+    }
+
+    @Test
+    void detectSpaceBeforeArrayInitializerBrace() {
+        var cus = jp().parse(
+          """
+            class T {
+                int[] a = new int[] {1, 2};
+                int[] b = new int[] {3, 4};
+                int[] c = new int[]{5, 6};
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
+
+        assertThat(spacesStyle.getBeforeLeftBrace().getArrayInitializerLeftBrace()).isTrue();
+    }
+
+    @Test
+    void detectNoSpaceBeforeArrayInitializerBrace() {
+        var cus = jp().parse(
+          """
+            class T {
+                int[] a = new int[]{1, 2};
+                int[] b = new int[]{3, 4};
+                int[] c = new int[] {5, 6};
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
+
+        assertThat(spacesStyle.getBeforeLeftBrace().getArrayInitializerLeftBrace()).isFalse();
+    }
+
+    @Test
+    void initializersWithoutTypeDoNotVoteOnSpaceBeforeArrayInitializerBrace() {
+        var cus = jp().parse(
+          """
+            class T {
+                int[] a = new int[] {1, 2};
+                int[] b = {3, 4};
+                @SuppressWarnings({"a", "b"})
+                int[] c = {5, 6};
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
+
+        assertThat(spacesStyle.getBeforeLeftBrace().getArrayInitializerLeftBrace()).isTrue();
+    }
+
+    @Test
+    void detectSpacesWithinArrayInitializerBraces() {
+        var cus = jp().parse(
+          """
+            class T {
+                int[] a = { 1, 2 };
+                int[] b = new int[]{ 3, 4 };
+                int[] c = {5, 6};
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
+
+        assertThat(spacesStyle.getWithin().getArrayInitializerBraces()).isTrue();
+    }
+
+    @Test
+    void detectNoSpacesWithinArrayInitializerBraces() {
+        var cus = jp().parse(
+          """
+            class T {
+                int[] a = {1, 2};
+                int[] b = new int[]{3, 4};
+                int[] c = { 5, 6 };
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
+
+        assertThat(spacesStyle.getWithin().getArrayInitializerBraces()).isFalse();
+    }
+
+    @Test
+    void multiLineArrayInitializersDoNotVoteOnSpacesWithinBraces() {
+        var cus = jp().parse(
+          """
+            class T {
+                int[] a = {1, 2};
+                int[] b = {
+                    3,
+                    4
+                };
+                int[] c = {
+                    5,
+                    6
+                };
+                int[] d = {
+                    7,
+                    8
+                };
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
+
+        assertThat(spacesStyle.getWithin().getArrayInitializerBraces()).isFalse();
+    }
+
+    @Test
+    void closingBraceOnTheSameLineAsElementsVotesOnSpacesWithinBraces() {
+        var cus = jp().parse(
+          """
+            class T {
+                int[] a = {1, 2};
+                int[] b = {
+                    3, 4 };
+                int[] c = {
+                    5, 6 };
+                int[] d = {
+                    7, 8 };
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
+
+        assertThat(spacesStyle.getWithin().getArrayInitializerBraces()).isTrue();
+    }
+
+    @Test
+    void openingBraceOnTheSameLineAsElementsVotesOnSpacesWithinBraces() {
+        var cus = jp().parse(
+          """
+            class T {
+                int[] a = {1, 2};
+                int[] b = { 3,
+                    4
+                };
+                int[] c = { 5,
+                    6
+                };
+                int[] d = { 7,
+                    8
+                };
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
+
+        assertThat(spacesStyle.getWithin().getArrayInitializerBraces()).isTrue();
+    }
+
+    @Test
+    void emptyArrayInitializersDoNotVoteOnSpacesWithinBraces() {
+        var cus = jp().parse(
+          """
+            class T {
+                int[] a = { 1, 2 };
+                int[] b = {};
+                int[] c = {};
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
+
+        assertThat(spacesStyle.getWithin().getArrayInitializerBraces()).isTrue();
+    }
+
+    @Test
+    void trailingCommaVotesOnSpaceBeforeClosingBrace() {
+        var cus = jp().parse(
+          """
+            class T {
+                int[] a = { 1, 2, };
+                int[] b = { 3, 4, };
+                int[] c = { 5, 6, };
+                int[] d = {7, 8};
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
+
+        assertThat(spacesStyle.getWithin().getArrayInitializerBraces()).isTrue();
+    }
+
+    @Test
+    void multiLineArrayInitializersWithTrailingCommaDoNotVoteOnSpacesWithinBraces() {
+        var cus = jp().parse(
+          """
+            class T {
+                int[] a = { 1, 2 };
+                int[] b = {
+                    3,
+                    4,
+                };
+                int[] c = {
+                    5,
+                    6,
+                };
+                int[] d = {
+                    7,
+                    8,
+                };
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
+
+        assertThat(spacesStyle.getWithin().getArrayInitializerBraces()).isTrue();
+    }
+
+    @SuppressWarnings("StatementWithEmptyBody")
+    @Test
     void detectBeforeForSemicolon() {
         var cus = jp().parse(
           """
