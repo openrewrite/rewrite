@@ -459,7 +459,7 @@ public class TypeUtils {
             boolean matchOverride,
             Predicate<String> matcher
     ) {
-        return isOfTypeWithName(type, matchOverride, matcher, Collections.newSetFromMap(new IdentityHashMap<>()));
+        return isOfTypeWithName(type, matchOverride, matcher, Collections.newSetFromMap(new IdentityHashMap<>(8)));
     }
 
     private static boolean isOfTypeWithName(
@@ -585,7 +585,7 @@ public class TypeUtils {
         // Handle fully qualified types (e.g., java.util.List, java.util.List<String>)
         if (to instanceof JavaType.FullyQualified) {
             return isAssignableToFullyQualified((JavaType.FullyQualified) to, from, context,
-                    Collections.newSetFromMap(new IdentityHashMap<>()));
+                    Collections.newSetFromMap(new IdentityHashMap<>(8)));
         }
         // Handle arrays types (e.g., String[])
         else if (to instanceof JavaType.Array) {
@@ -910,7 +910,7 @@ public class TypeUtils {
     }
 
     public static boolean isAssignableTo(String to, @Nullable JavaType from) {
-        return isAssignableTo(to, from, Collections.newSetFromMap(new IdentityHashMap<>()));
+        return isAssignableTo(to, from, Collections.newSetFromMap(new IdentityHashMap<>(8)));
     }
 
     private static boolean isAssignableTo(String to, @Nullable JavaType from, Set<JavaType> seen) {
@@ -981,7 +981,7 @@ public class TypeUtils {
     }
 
     public static boolean isAssignableTo(Predicate<JavaType> predicate, @Nullable JavaType from) {
-        return isAssignableTo(predicate, from, Collections.newSetFromMap(new IdentityHashMap<>()));
+        return isAssignableTo(predicate, from, Collections.newSetFromMap(new IdentityHashMap<>(8)));
     }
 
     private static boolean isAssignableTo(Predicate<JavaType> predicate, @Nullable JavaType from, Set<JavaType> seen) {
@@ -1112,7 +1112,7 @@ public class TypeUtils {
      * declaring the same method satisfy each other, and the Go mapper records each as extending the other.
      */
     private static boolean reaches(JavaType.FullyQualified start, JavaType.FullyQualified target) {
-        Set<JavaType.FullyQualified> seen = Collections.newSetFromMap(new IdentityHashMap<>());
+        Set<JavaType.FullyQualified> seen = Collections.newSetFromMap(new IdentityHashMap<>(8));
         Deque<JavaType.FullyQualified> remaining = new ArrayDeque<>();
         addSupertypes(start, remaining);
         while (!remaining.isEmpty()) {
