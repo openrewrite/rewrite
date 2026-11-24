@@ -1084,10 +1084,14 @@ public class TypeUtils {
             }
         }
 
-        // A cyclic hierarchy cannot say what overrides what, naming a method as much below the declaring
-        // type as above it. Checked after the search, which has already walked the closure on a miss.
-        if (methodResult.isPresent() && hierarchyIsCyclic(dt)) {
-            return Optional.empty();
+        // An answer reached through a cycle names a method as much below the declaring type as above it, so
+        // it cannot be an override. Only the answer is rejected, not every answer from a type that happens
+        // to sit in a cycle: such a type can still have an ordinary acyclic ancestor declaring the method.
+        if (methodResult.isPresent()) {
+            JavaType.FullyQualified overriddenIn = methodResult.get().getDeclaringType();
+            if (overriddenIn != null && reaches(overriddenIn, dt)) {
+                return Optional.empty();
+            }
         }
 
         return methodResult
@@ -1102,18 +1106,18 @@ public class TypeUtils {
     }
 
     /**
-     * Whether the type is reachable from itself through supertypes and interfaces. Java source cannot
-     * declare that, but a model built for another language on the Java tree can: Go interfaces are
-     * structurally typed, so two declaring the same method satisfy each other, and the Go mapper
-     * records each as extending the other.
+     * Whether target is above start through supertypes and interfaces, start itself not counting, so that
+     * {@code reaches(t, t)} asks whether t's hierarchy is cyclic. Java source cannot declare a cycle, but a
+     * model built for another language on the Java tree can: Go interfaces are structurally typed, so two
+     * declaring the same method satisfy each other, and the Go mapper records each as extending the other.
      */
-    private static boolean hierarchyIsCyclic(JavaType.FullyQualified start) {
+    private static boolean reaches(JavaType.FullyQualified start, JavaType.FullyQualified target) {
         Set<JavaType.FullyQualified> seen = Collections.newSetFromMap(new IdentityHashMap<>());
         Deque<JavaType.FullyQualified> remaining = new ArrayDeque<>();
         addSupertypes(start, remaining);
         while (!remaining.isEmpty()) {
             JavaType.FullyQualified next = remaining.poll();
-            if (next == start) {
+            if (next == target) {
                 return true;
             }
             if (seen.add(next)) {
