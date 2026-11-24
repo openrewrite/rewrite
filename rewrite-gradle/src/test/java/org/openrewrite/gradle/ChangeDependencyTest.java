@@ -2472,5 +2472,53 @@ class ChangeDependencyTest implements RewriteTest {
             );
         }
 
+        @Test
+        void survivorVersionDeclaredInRootProject() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeDependency(
+                "org.hibernate", "hibernate-entitymanager", "org.hibernate", "hibernate-core", "5.6.x", null, null, null)),
+              settingsGradle(
+                """
+                  rootProject.name = 'root'
+                  include 'app'
+                  """
+              ),
+              buildGradle(
+                """
+                  ext {
+                      hibernateVersion = '5.1.17.Final'
+                  }
+                  subprojects {
+                      repositories {
+                          mavenCentral()
+                      }
+                  }
+                  """,
+                spec -> spec.after(actual -> assertThat(actual)
+                  .containsPattern("hibernateVersion = '5\\.6\\.\\d+\\.Final'")
+                  .actual())
+              ),
+              buildGradle(
+                """
+                  plugins {
+                      id 'java-library'
+                  }
+                  dependencies {
+                      implementation "org.hibernate:hibernate-core:$hibernateVersion"
+                      implementation "org.hibernate:hibernate-entitymanager:$hibernateVersion"
+                  }
+                  """,
+                """
+                  plugins {
+                      id 'java-library'
+                  }
+                  dependencies {
+                      implementation "org.hibernate:hibernate-core:$hibernateVersion"
+                  }
+                  """,
+                spec -> spec.path("app/build.gradle")
+              )
+            );
+        }
     }
 }
