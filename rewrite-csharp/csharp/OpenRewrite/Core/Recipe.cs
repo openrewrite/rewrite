@@ -26,6 +26,7 @@ namespace OpenRewrite.Core;
 public abstract class Recipe
 {
     private RecipeDescriptor? _descriptor;
+    private bool? _visitsGeneratedCode;
 
     /// <summary>
     /// Unique name for this recipe, typically the fully qualified type name.
@@ -46,6 +47,13 @@ public abstract class Recipe
     /// Whether changes made by this recipe should trigger another recipe cycle.
     /// </summary>
     public virtual bool CausesAnotherCycle => false;
+
+    /// <summary>
+    /// Whether this recipe edits generated C# code, and reports what it finds there. Scanners visit it either way.
+    /// Defaults to true, except in an assembly marked with <see cref="SkipGeneratedCodeAttribute"/>.
+    /// </summary>
+    public virtual bool VisitsGeneratedCode =>
+        _visitsGeneratedCode ??= !GetType().Assembly.IsDefined(typeof(SkipGeneratedCodeAttribute), false);
 
     public virtual IReadOnlyList<DataTableDescriptor> DataTables => [];
 

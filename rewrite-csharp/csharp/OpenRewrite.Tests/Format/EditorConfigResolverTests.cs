@@ -62,6 +62,35 @@ public class EditorConfigResolverTests : IDisposable
         Assert.True(style.WrappingKeepStatementsOnSingleLine);
     }
 
+    [Theory]
+    [InlineData("Proxies/Client.cs", true)]
+    [InlineData("Proxies/Custom/Client.cs", false)]
+    [InlineData("Migrations/Init.cs", true)]
+    [InlineData("Orders.designer.cs", false)]
+    [InlineData("Program.cs", null)]
+    public void GeneratedCodeOptionOfTheMatchingSection(string path, bool? expected)
+    {
+        CreateFile(".editorconfig", """
+            root = true
+
+            [{Proxies,Migrations}/**.cs]
+            generated_code = true
+
+            [*.designer.cs]
+            generated_code = false
+            """);
+        CreateFile("Proxies/Custom/.editorconfig", """
+            [*.cs]
+            generated_code = false
+            """);
+
+        Assert.Equal(expected, new EditorConfigResolver(_tempDir).GeneratedCode(CreateFile(path, "")));
+    }
+
+    [Fact]
+    public void NoGeneratedCodeOptionWithoutEditorConfig() =>
+        Assert.Null(new EditorConfigResolver(_tempDir).GeneratedCode(CreateFile("Program.cs", "")));
+
     [Fact]
     public void DetectsIndentStyleTabs()
     {

@@ -923,8 +923,7 @@ public class SolutionParser
                 }
 
                 // Attach formatting style marker from .editorconfig, and the file's own indentation where it sets none
-                var formatStyle = editorConfigResolver.Resolve(unit.FilePath, cu);
-                cu = cu.WithMarkers(cu.Markers.Add(formatStyle));
+                cu = editorConfigResolver.Mark(cu, unit.FilePath);
 
                 if (requirePrintEqualsInput)
                 {
