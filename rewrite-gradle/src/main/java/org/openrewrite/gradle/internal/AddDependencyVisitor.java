@@ -501,7 +501,7 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
             String suffix = comments.get(last).getSuffix();
             int lineBreak = suffix.indexOf('\n');
             if (lineBreak < 0) {
-                lineBreak = suffix.length();
+                lineBreak = 0;
             } else if (lineBreak > 0 && suffix.charAt(lineBreak - 1) == '\r') {
                 lineBreak--;
             }
