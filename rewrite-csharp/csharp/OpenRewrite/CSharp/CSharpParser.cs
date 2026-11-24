@@ -302,6 +302,8 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
 
     public override J? Visit(SyntaxNode? node)
     {
+        if (node is StatementSyntax or MemberDeclarationSyntax && HasOwnMissingToken(node))
+            return VisitErroneous(node);
         try
         {
             return base.Visit(node);
@@ -313,6 +315,20 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             throw new InvalidOperationException(
                 $"{e.Message} [node: {node?.GetType().Name}, kind: {node?.Kind()}, text: {snippet}]", e);
         }
+    }
+
+    private static bool HasOwnMissingToken(SyntaxNode node) =>
+        node.DescendantTokens(n => n == node || n is not (StatementSyntax or MemberDeclarationSyntax))
+            .Any(t => t.IsMissing);
+
+    private Erroneous VisitErroneous(SyntaxNode node)
+    {
+        var prefix = ExtractPrefix(node);
+        var lastToken = node.GetLastToken();
+        var end = Math.Max(_cursor, lastToken == default ? node.SpanStart : lastToken.Span.End);
+        var text = _source[_cursor..end];
+        _cursor = end;
+        return new Erroneous(Tree.RandomId(), prefix, Markers.Empty, text);
     }
 
     public new CompilationUnit VisitCompilationUnit(CompilationUnitSyntax node)

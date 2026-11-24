@@ -1907,6 +1907,14 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         return emp;
     }
 
+    public override J VisitErroneous(Erroneous erroneous, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(erroneous, p);
+        p.Append(erroneous.Text);
+        AfterSyntax(erroneous, p);
+        return erroneous;
+    }
+
     public override J VisitControlParentheses(ControlParentheses<Expression> cp, PrintOutputCapture<P> p)
     {
         BeforeSyntax(cp, p);

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using OpenRewrite.Java;
 using OpenRewrite.Test;
 
 namespace OpenRewrite.Tests.Tree;
@@ -154,6 +155,71 @@ public class ConstantConditionalDirectiveTests : RewriteTest
                 """
                 #if true
                 class Foo { }
+                #endif
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void IfFalseWithIncompleteStatement()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                #if false
+                ILGenerator Unknown
+                #endif
+                class Other { }
+                """
+            ).AfterRecipe(cu => Assert.Equal("ILGenerator Unknown", FindFirst<Erroneous>(cu)?.Text))
+        );
+    }
+
+    [Fact]
+    public void IfFalseWithIncompleteStatementInMethodBody()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                class Foo {
+                    void Bar() {
+                #if false
+                        ILGenerator Unknown
+                #endif
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void IfTrueWithElifFalseIncompleteStatement()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                #if true
+                class Foo { }
+                #elif false
+                ILGenerator Unknown
+                #endif
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void IfTrueWithElseIncompleteStatement()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                #if true
+                class Foo { }
+                #else
+                ILGenerator Unknown
                 #endif
                 """
             )

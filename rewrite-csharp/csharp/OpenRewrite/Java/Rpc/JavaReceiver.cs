@@ -74,6 +74,7 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
             Break brk => VisitBreak(brk, q),
             Continue cont => VisitContinue(cont, q),
             Empty emp => VisitEmpty(emp, q),
+            Erroneous err => VisitErroneous(err, q),
             Literal lit => VisitLiteral(lit, q),
             Identifier id => VisitIdentifier(id, q),
             FieldAccess fa => VisitFieldAccess(fa, q),
@@ -314,6 +315,12 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
     public override J VisitEmpty(Empty empty, RpcReceiveQueue q)
     {
         return empty.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers);
+    }
+
+    public override J VisitErroneous(Erroneous erroneous, RpcReceiveQueue q)
+    {
+        var text = q.Receive(erroneous.Text);
+        return erroneous.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithText(text!);
     }
 
     public override J VisitEnumValue(EnumValue enumValue, RpcReceiveQueue q)
