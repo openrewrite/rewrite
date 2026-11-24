@@ -1728,6 +1728,20 @@ class CSharpPrinterParityTest {
         {
         #error Not supported
         }
+        """,
+
+      "erroneous", """
+        #if false
+        ILGenerator Unknown
+        #endif
+        class Incomplete
+        {
+            ILGenerator field
+            void M()
+            {
+                Call(
+            }
+        }
         """
     );
 

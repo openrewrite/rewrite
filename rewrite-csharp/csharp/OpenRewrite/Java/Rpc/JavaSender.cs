@@ -62,6 +62,7 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
             Break brk => VisitBreak(brk, q),
             Continue cont => VisitContinue(cont, q),
             Empty emp => VisitEmpty(emp, q),
+            Erroneous err => VisitErroneous(err, q),
             Literal lit => VisitLiteral(lit, q),
             Identifier id => VisitIdentifier(id, q),
             FieldAccess fa => VisitFieldAccess(fa, q),
@@ -285,6 +286,12 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
     public override J VisitEmpty(Empty empty, RpcSendQueue q)
     {
         return empty;
+    }
+
+    public override J VisitErroneous(Erroneous erroneous, RpcSendQueue q)
+    {
+        q.GetAndSend(erroneous, e => e.Text);
+        return erroneous;
     }
 
     public override J VisitEnumValue(EnumValue enumValue, RpcSendQueue q)
