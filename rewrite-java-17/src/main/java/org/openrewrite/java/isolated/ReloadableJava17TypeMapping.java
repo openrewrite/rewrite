@@ -37,6 +37,7 @@ import java.util.function.Consumer;
 import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
+import static org.openrewrite.internal.StringUtils.escapeUnpairedSurrogates;
 import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
 
 @RequiredArgsConstructor
@@ -585,11 +586,12 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
         if (methodSymbol.getDefaultValue() != null) {
             if (methodSymbol.getDefaultValue() instanceof Attribute.Array) {
                 defaultValues = ((Attribute.Array) methodSymbol.getDefaultValue()).getValue().stream()
-                        .map(attr -> attr.getValue().toString())
+                        .map(attr -> escapeUnpairedSurrogates(attr.getValue().toString()))
                         .collect(toList());
             } else {
                 try {
-                    defaultValues = singletonList(methodSymbol.getDefaultValue().getValue().toString());
+                    defaultValues = singletonList(
+                            escapeUnpairedSurrogates(methodSymbol.getDefaultValue().getValue().toString()));
                 } catch (UnsupportedOperationException e) {
                     // not all Attribute implementations define `getValue()`
                 }
@@ -705,7 +707,12 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
     }
 
     private Object annotationElementValue(Object value) {
-        if (value instanceof String || value instanceof Number || value instanceof Boolean || value instanceof Character) {
+        if (value instanceof String) {
+            return escapeUnpairedSurrogates((String) value);
+        } else if (value instanceof Character && Character.isSurrogate((Character) value)) {
+            // The escape of a lone surrogate takes six chars, so the value becomes a String
+            return escapeUnpairedSurrogates(value.toString());
+        } else if (value instanceof Number || value instanceof Boolean || value instanceof Character) {
             return value;
         } else if (value instanceof Symbol.VarSymbol) {
             JavaType.Variable mapped = variableType((Symbol.VarSymbol) value);
