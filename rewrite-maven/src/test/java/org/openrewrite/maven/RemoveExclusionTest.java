@@ -16,6 +16,8 @@
 package org.openrewrite.maven;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -215,6 +217,92 @@ class RemoveExclusionTest implements RewriteTest {
                         <artifactId>spring-jcl</artifactId>
                       </exclusion>
                     </exclusions>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @CsvSource({"*,*", "org.bouncycastle,*", "org.bouncycastle,bcprov-*"})
+    void keepsEffectiveWildcardExclusion(String exclusionGroupId, String exclusionArtifactId) {
+        // https://github.com/openrewrite/rewrite/issues/10139
+        rewriteRun(
+          spec -> spec.recipe(new RemoveExclusion(
+            "*",
+            "*",
+            "*",
+            "*",
+            true
+          )),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>org.bouncycastle</groupId>
+                    <artifactId>bcpkix-jdk18on</artifactId>
+                    <version>1.78.1</version>
+                    <exclusions>
+                      <exclusion>
+                        <groupId>%s</groupId>
+                        <artifactId>%s</artifactId>
+                      </exclusion>
+                    </exclusions>
+                  </dependency>
+                </dependencies>
+              </project>
+              """.formatted(exclusionGroupId, exclusionArtifactId)
+          )
+        );
+    }
+
+    @Test
+    void removesIneffectiveWildcardExclusion() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveExclusion(
+            "*",
+            "*",
+            "*",
+            "*",
+            true
+          )),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>org.bouncycastle</groupId>
+                    <artifactId>bcpkix-jdk18on</artifactId>
+                    <version>1.78.1</version>
+                    <exclusions>
+                      <exclusion>
+                        <groupId>com.google.*</groupId>
+                        <artifactId>*</artifactId>
+                      </exclusion>
+                    </exclusions>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>org.bouncycastle</groupId>
+                    <artifactId>bcpkix-jdk18on</artifactId>
+                    <version>1.78.1</version>
                   </dependency>
                 </dependencies>
               </project>
