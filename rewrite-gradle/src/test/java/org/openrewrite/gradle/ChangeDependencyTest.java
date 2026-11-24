@@ -15,6 +15,7 @@
  */
 package org.openrewrite.gradle;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
@@ -41,6 +42,7 @@ import static org.openrewrite.maven.MavenCentralMirrorExtension.withMavenCentral
 import static org.openrewrite.properties.Assertions.properties;
 import static org.openrewrite.toml.Assertions.toml;
 
+@Disabled("2026-11-24 temporarily disabled: JBoss Maven repo is down, which stalls missing-artifact lookups")
 class ChangeDependencyTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
