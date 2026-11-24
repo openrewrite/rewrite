@@ -1363,6 +1363,92 @@ class ChangeDependencyTest implements RewriteTest {
     }
 
     @Test
+    void dedupesAndUpgradesSurvivorWhenNewGroupIdOmitted() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi())
+            .recipe(new ChangeDependency(
+                "org.hibernate",
+                "hibernate-entitymanager",
+                null,
+                "hibernate-core",
+                "5.6.x",
+                null,
+                null,
+                null
+            )),
+          buildGradle(
+            //language=gradle
+            """
+              plugins {
+                  id("java-library")
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  implementation("org.hibernate:hibernate-core:5.1.17.Final")
+                  implementation("org.hibernate:hibernate-entitymanager:5.1.17.Final")
+              }
+              """,
+            """
+              plugins {
+                  id("java-library")
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  implementation("org.hibernate:hibernate-core:5.6.15.Final")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void dedupesAndUpgradesSurvivorWhenNewArtifactIdOmitted() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi())
+            .recipe(new ChangeDependency(
+                "org.codehaus.groovy",
+                "groovy",
+                "org.apache.groovy",
+                null,
+                "4.0.20",
+                null,
+                null,
+                null
+            )),
+          buildGradle(
+            //language=gradle
+            """
+              plugins {
+                  id("java-library")
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  implementation("org.apache.groovy:groovy:4.0.0")
+                  implementation("org.codehaus.groovy:groovy:3.0.9")
+              }
+              """,
+            """
+              plugins {
+                  id("java-library")
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  implementation("org.apache.groovy:groovy:4.0.20")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void dedupeKeepsSiblingNotationsAndUpgradesSurvivorAmongThem() {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependency(
@@ -2385,5 +2471,6 @@ class ChangeDependencyTest implements RewriteTest {
               )
             );
         }
+
     }
 }

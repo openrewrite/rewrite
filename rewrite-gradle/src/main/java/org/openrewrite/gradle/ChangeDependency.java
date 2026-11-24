@@ -161,6 +161,14 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
         ));
     }
 
+    private String newGroupPattern() {
+        return StringUtils.isBlank(newGroupId) ? oldGroupId : newGroupId;
+    }
+
+    private String newArtifactPattern() {
+        return StringUtils.isBlank(newArtifactId) ? oldArtifactId : newArtifactId;
+    }
+
     private boolean isGlobPattern() {
         return oldGroupId.contains("*") || oldGroupId.contains("?") ||
                 oldArtifactId.contains("*") || oldArtifactId.contains("?");
@@ -241,8 +249,8 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                     // Also resolve for NEW-coord deps so survivor-upgrade can rewrite a variable that
                     // only the survivor references (the OLD dep might use a literal version).
                     new GradleDependency.Matcher()
-                            .groupId(newGroupId)
-                            .artifactId(newArtifactId)
+                            .groupId(newGroupPattern())
+                            .artifactId(newArtifactPattern())
                             .get(dep.getCursor())
                             .ifPresent(newDep -> resolveAndRecordVersion(varName, m, newDep, ctx));
                 }));
@@ -277,7 +285,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
     public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator acc) {
         TreeVisitor<?, ExecutionContext> gradleVisitor = Preconditions.check(new FindGradleProject(FindGradleProject.SearchCriteria.Marker).getVisitor(), new JavaIsoVisitor<ExecutionContext>() {
             final DependencyMatcher depMatcher = requireNonNull(DependencyMatcher.build(oldGroupId + ":" + oldArtifactId).getValue());
-            final DependencyMatcher existingMatcher = requireNonNull(DependencyMatcher.build(newGroupId + ":" + newArtifactId).getValue());
+            final DependencyMatcher existingMatcher = requireNonNull(DependencyMatcher.build(newGroupPattern() + ":" + newArtifactPattern()).getValue());
             final ExtraProperty.Matcher extraPropertyMatcher = new ExtraProperty.Matcher();
 
             @SuppressWarnings("NotNullFieldNotInitialized")
@@ -362,8 +370,8 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                 // configuration where dedupe removed the old coord, upgrade its version to newVersion.
                 if (!StringUtils.isBlank(newVersion) && !configurationsWithSurvivorUpgrade.isEmpty()) {
                     Optional<GradleDependency> maybeSurvivor = new GradleDependency.Matcher()
-                            .groupId(newGroupId)
-                            .artifactId(newArtifactId)
+                            .groupId(newGroupPattern())
+                            .artifactId(newArtifactPattern())
                             .get(notation.getCursor());
                     if (maybeSurvivor.isPresent() &&
                             configurationsWithSurvivorUpgrade.contains(maybeSurvivor.get().getConfigurationName())) {
