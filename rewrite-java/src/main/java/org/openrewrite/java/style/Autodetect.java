@@ -29,6 +29,7 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.marker.TrailingComma;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.style.LineWrapSetting;
@@ -1443,7 +1444,11 @@ public class Autodetect extends NamedStyles {
                 // followed or preceded by a line break says nothing about brace padding
                 if (!(elements.get(0) instanceof J.Empty)) {
                     Space afterOpen = elements.get(0).getPrefix();
-                    Space beforeClose = initializer.getPadding().getElements().get(elements.size() - 1).getAfter();
+                    JRightPadded<Expression> last = initializer.getPadding().getElements().get(elements.size() - 1);
+                    // With a trailing comma, the space before the brace follows the comma
+                    Space beforeClose = last.getMarkers().findFirst(TrailingComma.class)
+                            .map(TrailingComma::getSuffix)
+                            .orElse(last.getAfter());
                     if (!hasLineBreak(afterOpen.getWhitespace())) {
                         stats.withinArrayInitializerBraces += hasSpace(afterOpen);
                     }

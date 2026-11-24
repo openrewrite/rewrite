@@ -1111,6 +1111,55 @@ class AutodetectTest implements RewriteTest {
         assertThat(spacesStyle.getWithin().getArrayInitializerBraces()).isTrue();
     }
 
+    @Test
+    void trailingCommaVotesOnSpaceBeforeClosingBrace() {
+        var cus = jp().parse(
+          """
+            class T {
+                int[] a = { 1, 2, };
+                int[] b = { 3, 4, };
+                int[] c = { 5, 6, };
+                int[] d = {7, 8};
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
+
+        assertThat(spacesStyle.getWithin().getArrayInitializerBraces()).isTrue();
+    }
+
+    @Test
+    void multiLineArrayInitializersWithTrailingCommaDoNotVoteOnSpacesWithinBraces() {
+        var cus = jp().parse(
+          """
+            class T {
+                int[] a = { 1, 2 };
+                int[] b = {
+                    3,
+                    4,
+                };
+                int[] c = {
+                    5,
+                    6,
+                };
+                int[] d = {
+                    7,
+                    8,
+                };
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
+
+        assertThat(spacesStyle.getWithin().getArrayInitializerBraces()).isTrue();
+    }
+
     @SuppressWarnings("StatementWithEmptyBody")
     @Test
     void detectBeforeForSemicolon() {
