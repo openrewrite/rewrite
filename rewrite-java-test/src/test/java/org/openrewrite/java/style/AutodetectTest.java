@@ -1167,6 +1167,100 @@ class AutodetectTest implements RewriteTest {
         assertThat(tabsAndIndents.getContinuationIndent()).isEqualTo(12);
     }
 
+    private WrappingAndBracesStyle.KeepWhenFormatting detectKeepWhenFormatting(String source) {
+        var cus = jp().parse(source);
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        return detector.build().getStyle(WrappingAndBracesStyle.class).getKeepWhenFormatting();
+    }
+
+    @Test
+    void detectEmptyMethodsOnOneLine() {
+        var keep = detectKeepWhenFormatting(
+          """
+            class T {
+                T() {}
+                void a() {}
+                void b() { }
+                void c() {
+                }
+            }
+            """
+        );
+        assertThat(keep.getSimpleMethodsInOneLine()).isTrue();
+    }
+
+    @Test
+    void detectEmptyMethodsOnSeparateLines() {
+        var keep = detectKeepWhenFormatting(
+          """
+            class T {
+                void a() {
+                }
+                void b() {
+                }
+                void c() {}
+            }
+            """
+        );
+        assertThat(keep.getSimpleMethodsInOneLine()).isFalse();
+    }
+
+    @Test
+    void detectEmptyClassesOnOneLine() {
+        var keep = detectKeepWhenFormatting(
+          """
+            class T {
+                static class A {}
+                static class B {}
+                static class C {
+                }
+            }
+            """
+        );
+        assertThat(keep.getSimpleClassesInOneLine()).isTrue();
+        // The enclosing class has a body, and methods are not part of this
+        assertThat(keep.getSimpleMethodsInOneLine()).isFalse();
+    }
+
+    @Test
+    void detectEmptyLambdasAndBlocksOnOneLine() {
+        var keep = detectKeepWhenFormatting(
+          """
+            class T {
+                Runnable a = () -> {};
+                Runnable b = () -> {};
+                static {}
+                void m(boolean x) {
+                    if (x) {}
+                    try {} finally {}
+                }
+            }
+            """
+        );
+        assertThat(keep.getSimpleLambdasInOneLine()).isTrue();
+        assertThat(keep.getSimpleBlocksInOneLine()).isTrue();
+    }
+
+    @Test
+    void emptyBodiesWithCommentsAndNoEvidenceKeepDefaults() {
+        var keep = detectKeepWhenFormatting(
+          """
+            class T {
+                void a() { /* nothing */ }
+                void b() {
+                    // nothing
+                }
+                int c() { return 1; }
+            }
+            """
+        );
+        assertThat(keep.getSimpleMethodsInOneLine()).isFalse();
+        assertThat(keep.getSimpleClassesInOneLine()).isFalse();
+        assertThat(keep.getSimpleLambdasInOneLine()).isFalse();
+        assertThat(keep.getSimpleBlocksInOneLine()).isFalse();
+    }
+
     @Nested
     class ContinuationIndentForAnnotations {
         @Issue("https://github.com/openrewrite/rewrite/issues/3568")
