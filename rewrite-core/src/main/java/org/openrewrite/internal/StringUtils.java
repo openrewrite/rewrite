@@ -375,6 +375,29 @@ public class StringUtils {
         }
     }
 
+    /**
+     * Writes each UTF-16 surrogate that has no partner as a backslash-u escape with four lower-case hex
+     * digits, because the LST writer can't encode one. A surrogate pair stays as it is.
+     */
+    public static String escapeUnpairedSurrogates(CharSequence s) {
+        int i = 0;
+        while (i < s.length() && !Character.isSurrogate(s.charAt(i))) {
+            i++;
+        }
+        if (i == s.length()) {
+            return s.toString();
+        }
+        StringBuilder out = new StringBuilder(s.length());
+        s.codePoints().forEach(codePoint -> {
+            if (codePoint >= Character.MIN_SURROGATE && codePoint <= Character.MAX_SURROGATE) {
+                out.append(String.format("\\u%04x", codePoint));
+            } else {
+                out.appendCodePoint(codePoint);
+            }
+        });
+        return out.toString();
+    }
+
     public static String repeat(String s, int count) {
         if (count == 1) {
             return s;
