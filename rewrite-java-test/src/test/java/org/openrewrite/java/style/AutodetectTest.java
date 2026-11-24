@@ -808,6 +808,109 @@ class AutodetectTest implements RewriteTest {
 
     @SuppressWarnings("StatementWithEmptyBody")
     @Test
+    void detectNoSpaceAfterForSemicolon() {
+        var cus = jp().parse(
+          """
+            class T {
+                void m(int x) {
+                    for (int i = 0;i < x;i++) {}
+                    for (int j = 0;j < x;j++) {}
+                    for (int k = 0; k < x; k++) {}
+                }
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
+
+        assertThat(spacesStyle.getOther().getAfterForSemicolon()).isFalse();
+    }
+
+    @SuppressWarnings("StatementWithEmptyBody")
+    @Test
+    void emptyForLoopPartsDoNotVoteOnSemicolonSpacing() {
+        var cus = jp().parse(
+          """
+            class T {
+                void m(int x) {
+                    for (;;) { break; }
+                    for (int i = 0; i < x; i++) {}
+                }
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
+
+        assertThat(spacesStyle.getOther().getBeforeForSemicolon()).isFalse();
+        assertThat(spacesStyle.getOther().getAfterForSemicolon()).isTrue();
+    }
+
+    @Test
+    void detectSpaceBeforeArrayInitializerBrace() {
+        var cus = jp().parse(
+          """
+            class T {
+                int[] a = new int[] {1, 2};
+                int[] b = new int[] {3, 4};
+                int[] c = new int[]{5, 6};
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
+
+        assertThat(spacesStyle.getBeforeLeftBrace().getArrayInitializerLeftBrace()).isTrue();
+    }
+
+    @Test
+    void detectNoSpaceBeforeArrayInitializerBraceAndSpacesWithinBraces() {
+        var cus = jp().parse(
+          """
+            class T {
+                int[] a = new int[]{ 1, 2 };
+                int[] b = new int[]{ 3, 4 };
+                int[] c = { 5, 6 };
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
+
+        assertThat(spacesStyle.getBeforeLeftBrace().getArrayInitializerLeftBrace()).isFalse();
+        assertThat(spacesStyle.getWithin().getArrayInitializerBraces()).isTrue();
+    }
+
+    @Test
+    void arrayInitializerSpacingDefaultsWithoutEvidence() {
+        var cus = jp().parse(
+          """
+            class T {
+                int[] a = new int[] {
+                    1,
+                    2
+                };
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
+
+        assertThat(spacesStyle.getWithin().getArrayInitializerBraces()).isFalse();
+    }
+
+    @SuppressWarnings("StatementWithEmptyBody")
+    @Test
     void detectBeforeForSemicolon() {
         var cus = jp().parse(
           """
