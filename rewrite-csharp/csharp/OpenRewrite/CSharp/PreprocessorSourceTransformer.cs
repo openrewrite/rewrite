@@ -117,7 +117,10 @@ public static class PreprocessorSourceTransformer
                 var condition = afterHash.StartsWith("elif(") ? afterHash[4..] : afterHash[5..];
                 condition = StripLineComment(condition);
                 var (groupActive, _, anyTaken) = stack.Pop();
-                bool branchActive = groupActive && !anyTaken && EvaluateCondition(condition, localDefines);
+                bool condResult = EvaluateCondition(condition, localDefines);
+                if (invertedLines != null && invertedLines.Contains(i))
+                    condResult = !condResult;
+                bool branchActive = groupActive && !anyTaken && condResult;
                 stack.Push((groupActive, branchActive, anyTaken || branchActive));
                 result[i] = GhostForDirective(i, directiveLineToIndex);
             }
@@ -373,12 +376,13 @@ public static class PreprocessorSourceTransformer
                 if (dir.Kind == PreprocessorDirectiveKind.Endif)
                     continue;
 
-                if (dir.Kind == PreprocessorDirectiveKind.If)
+                if (dir.Kind is PreprocessorDirectiveKind.If or PreprocessorDirectiveKind.Elif)
                 {
                     var condition = StripLineComment(ExtractConditionFromDirectiveText(dir.Text));
-                    if (IsTautologicalCondition(condition) && groupDirs.Count > 2)
+                    if (IsTautologicalCondition(condition) &&
+                        (!EvaluateCondition(condition, []) ||
+                         groupDirs.Any(d => d.LineNumber > dir.LineNumber && d.Kind != PreprocessorDirectiveKind.Endif)))
                     {
-                        // This #if has a literal condition and there are other branches
                         tautologicalIfLines.Add(dir.LineNumber);
                         hasTautologicalIf = true;
                     }
@@ -728,13 +732,14 @@ public static class PreprocessorSourceTransformer
     }
 
     /// <summary>
-    /// Checks if a stripped condition is a boolean literal that always evaluates the same
+    /// Checks if a stripped condition references no symbols, so it always evaluates the same
     /// regardless of symbol definitions.
     /// </summary>
     private static bool IsTautologicalCondition(string strippedCondition)
     {
-        var trimmed = strippedCondition.Trim();
-        return trimmed == "true" || trimmed == "false";
+        var symbols = new HashSet<string>();
+        ExtractIdentifiers(strippedCondition, symbols);
+        return symbols.Count == 0;
     }
 
     private static bool IsIdentifier(string s)
