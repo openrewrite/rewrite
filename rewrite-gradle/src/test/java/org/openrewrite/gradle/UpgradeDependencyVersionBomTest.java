@@ -15,6 +15,7 @@
  */
 package org.openrewrite.gradle;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -28,6 +29,7 @@ import static org.openrewrite.properties.Assertions.properties;
 /**
  * Test cases for UpgradeDependencyVersion with Spring Dependency Management plugin BOM imports.
  */
+@Disabled("2026-11-24 temporarily disabled: JBoss Maven repo is down, which stalls missing-artifact lookups")
 class UpgradeDependencyVersionBomTest implements RewriteTest {
 
     @Override

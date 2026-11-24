@@ -15,6 +15,8 @@
  */
 package org.openrewrite.json.internal;
 
+import static org.openrewrite.internal.StringUtils.escapeUnpairedSurrogates;
+
 /**
  * Converts between a JSON5 string literal as written and the string it stands for.
  */
@@ -90,18 +92,6 @@ public final class JsonString {
             }
         }
         return escapeUnpairedSurrogates(out);
-    }
-
-    private static String escapeUnpairedSurrogates(CharSequence decoded) {
-        StringBuilder out = new StringBuilder(decoded.length());
-        decoded.codePoints().forEach(codePoint -> {
-            if (codePoint >= Character.MIN_SURROGATE && codePoint <= Character.MAX_SURROGATE) {
-                out.append(String.format("\\u%04x", codePoint));
-            } else {
-                out.appendCodePoint(codePoint);
-            }
-        });
-        return out.toString();
     }
 
     private static int hex(String s, int from, int digits) {
