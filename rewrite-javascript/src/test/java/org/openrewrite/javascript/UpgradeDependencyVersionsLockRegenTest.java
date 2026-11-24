@@ -74,7 +74,7 @@ class UpgradeDependencyVersionsLockRegenTest implements RewriteTest {
     @NullSource
     @ValueSource(booleans = false)
     void strictDefaultRejectsStaleLockAndLeavesBothFilesUnchanged(@Nullable Boolean reconcile) {
-        rejected(new UpgradeDependencyVersions(Map.of("builder", "2.0.0", "compiler", "2.0.0"), reconcile), false, "builder");
+        rejected(new UpgradeDependencyVersions(Map.of("builder", "2.0.0", "compiler", "2.0.0"), reconcile), false, "builder", null);
     }
 
     @Test
@@ -99,15 +99,17 @@ class UpgradeDependencyVersionsLockRegenTest implements RewriteTest {
 
     @Test
     void recoveryDoesNotMakeAnIndividualIntermediateUpgradePeerCompatible() {
-        rejected(new UpgradeDependencyVersions(Map.of("compiler", "2.0.0"), true), false, "builder");
+        rejected(new UpgradeDependencyVersions(Map.of("compiler", "2.0.0"), true), false, "builder", null);
     }
 
     @Test
     void realConflictRejectsTheWholeBatchAndNamesTheBlockingPackage() {
-        rejected(new UpgradeDependencyVersions(Map.of("builder", "2.0.0", "compiler", "2.0.0"), true), true, "legacy-consumer");
+        rejected(new UpgradeDependencyVersions(Map.of("builder", "2.0.0", "compiler", "2.0.0"), true), true, "legacy-consumer",
+          "legacy-consumer");
     }
 
-    private void rejected(UpgradeDependencyVersions recipe, boolean blocker, String expectedBlocker) {
+    private void rejected(UpgradeDependencyVersions recipe, boolean blocker, String expectedBlocker,
+                          @Nullable String expectedPackageName) {
         String manifest = manifest("1.0.0", blocker);
         String lock = lock(blocker);
         rewriteRun(
@@ -116,6 +118,9 @@ class UpgradeDependencyVersionsLockRegenTest implements RewriteTest {
               .satisfies(row -> {
                   assertThat(row.getReason()).isEqualTo("PEER_CONFLICT");
                   assertThat(row.getDetail()).contains(expectedBlocker);
+                  if (expectedPackageName != null) {
+                      assertThat(row.getPackageName()).isEqualTo(expectedPackageName);
+                  }
               })),
           packageJson(manifest, null, nodeResolutionResult(PackageManager.Npm), spec -> spec.after(actual -> {
               assertThat(actual).contains("lock regeneration failed").endsWith(manifest);
