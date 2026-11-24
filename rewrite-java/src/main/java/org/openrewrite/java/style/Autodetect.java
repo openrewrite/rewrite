@@ -1435,16 +1435,21 @@ public class Autodetect extends NamedStyles {
             JContainer<Expression> initializer = newArray.getPadding().getInitializer();
             List<Expression> elements = newArray.getInitializer();
             if (elements != null && initializer != null && !elements.isEmpty()) {
-                List<JRightPadded<Expression>> padded = initializer.getPadding().getElements();
-                // `new int[] {1}` vs `new int[]{1}`; for `int[] a = {1}` the space belongs to the `=`
-                if (newArray.getTypeExpression() != null && getCursor().firstEnclosing(J.Annotation.class) == null) {
+                // In `int[] a = {1}` the space before the brace belongs to the `=`
+                if (newArray.getTypeExpression() != null) {
                     stats.arrayInitializerLeftBrace += hasSpace(initializer.getBefore());
                 }
-                // `{ 1, 2 }` vs `{1, 2}`; only single-line initializers say anything about brace padding
-                if (!hasLineBreak(elements.get(0).getPrefix().getWhitespace()) &&
-                    !hasLineBreak(padded.get(padded.size() - 1).getAfter().getWhitespace())) {
-                    stats.withinArrayInitializerBraces += hasSpace(elements.get(0).getPrefix());
-                    stats.withinArrayInitializerBraces += hasSpace(padded.get(padded.size() - 1).getAfter());
+                // `{}` is governed by the separate empty-initializer setting, and a brace
+                // followed or preceded by a line break says nothing about brace padding
+                if (!(elements.get(0) instanceof J.Empty)) {
+                    Space afterOpen = elements.get(0).getPrefix();
+                    Space beforeClose = initializer.getPadding().getElements().get(elements.size() - 1).getAfter();
+                    if (!hasLineBreak(afterOpen.getWhitespace())) {
+                        stats.withinArrayInitializerBraces += hasSpace(afterOpen);
+                    }
+                    if (!hasLineBreak(beforeClose.getWhitespace())) {
+                        stats.withinArrayInitializerBraces += hasSpace(beforeClose);
+                    }
                 }
             }
             if (elements != null && initializer != null && elements.size() > 1) {
