@@ -75,7 +75,8 @@ public class RemovePluginDependency extends Recipe {
             if (!PLUGIN_WITH_DEPENDENCIES_MATCHER.matches(getCursor())) {
                 return plugin;
             }
-            if (!childValueMatches(plugin, "groupId", pluginGroupId) ||
+            // a plugin without a group ID is one of Maven's own
+            if (!matchesGlob(plugin.getChildValue("groupId").orElse("org.apache.maven.plugins"), pluginGroupId) ||
                     !childValueMatches(plugin, "artifactId", pluginArtifactId)) {
                 return plugin;
             }
