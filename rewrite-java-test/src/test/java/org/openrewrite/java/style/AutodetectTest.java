@@ -1274,6 +1274,74 @@ class AutodetectTest implements RewriteTest {
         assertThat(keep.getSimpleBlocksInOneLine()).isFalse();
     }
 
+    @Test
+    void anonymousClassAndEnumConstantBodiesVoteAsBlocks() {
+        var keep = detectKeepWhenFormatting(
+          """
+            class T {
+                Object a = new Object() {};
+                Object b = new Object() {};
+                enum E {
+                    A {},
+                    B {}
+                }
+                static class C {
+                }
+            }
+            """
+        );
+        assertThat(keep.getSimpleBlocksInOneLine()).isTrue();
+        assertThat(keep.getSimpleClassesInOneLine()).isFalse();
+    }
+
+    @Test
+    void recordInterfaceAndEnumDeclarationsVoteAsClasses() {
+        var keep = detectKeepWhenFormatting(
+          """
+            class T {
+                record R(int x) {}
+                interface I {}
+                enum E {}
+                void m() {
+                }
+            }
+            """
+        );
+        assertThat(keep.getSimpleClassesInOneLine()).isTrue();
+        assertThat(keep.getSimpleMethodsInOneLine()).isFalse();
+    }
+
+    @Test
+    void detectEmptyClassesLambdasAndBlocksOnSeparateLines() {
+        var keep = detectKeepWhenFormatting(
+          """
+            class T {
+                static class A {
+                }
+                static class B {
+                }
+                static class C {}
+                Runnable r = () -> {
+                };
+                Runnable s = () -> {
+                };
+                Runnable t = () -> {};
+                void m(boolean x) {
+                    if (x) {
+                    }
+                    try {
+                    } finally {
+                    }
+                    while (x) {}
+                }
+            }
+            """
+        );
+        assertThat(keep.getSimpleClassesInOneLine()).isFalse();
+        assertThat(keep.getSimpleLambdasInOneLine()).isFalse();
+        assertThat(keep.getSimpleBlocksInOneLine()).isFalse();
+    }
+
     @Nested
     class ContinuationIndentForAnnotations {
         @Issue("https://github.com/openrewrite/rewrite/issues/3568")
