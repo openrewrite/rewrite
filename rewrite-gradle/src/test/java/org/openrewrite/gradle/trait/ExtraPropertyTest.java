@@ -273,4 +273,26 @@ class ExtraPropertyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void updatesKotlinExtraDelegate() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new ExtraProperty.Matcher()
+            .propertyName("jacksonVersion")
+            .matchVariableDeclarations(false)
+            .asVisitor((prop, ctx) -> prop.withValue("2.15.0").getTree()))),
+          buildGradleKts(
+            """
+              val jacksonVersion by extra("2.13.3")
+              val guavaVersion by extra("30.0-jre")
+              val lazyVersion by extra { "1.0" }
+              """,
+            """
+              val jacksonVersion by extra("2.15.0")
+              val guavaVersion by extra("30.0-jre")
+              val lazyVersion by extra { "1.0" }
+              """
+          )
+        );
+    }
 }
