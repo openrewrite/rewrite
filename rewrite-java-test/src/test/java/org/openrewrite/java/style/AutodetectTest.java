@@ -1219,7 +1219,6 @@ class AutodetectTest implements RewriteTest {
             """
         );
         assertThat(keep.getSimpleClassesInOneLine()).isTrue();
-        // The enclosing class has a body, and methods are not part of this
         assertThat(keep.getSimpleMethodsInOneLine()).isFalse();
     }
 
@@ -1240,6 +1239,20 @@ class AutodetectTest implements RewriteTest {
         );
         assertThat(keep.getSimpleLambdasInOneLine()).isTrue();
         assertThat(keep.getSimpleBlocksInOneLine()).isTrue();
+    }
+
+    @Test
+    void tiedEmptyBodiesKeepDefaults() {
+        var keep = detectKeepWhenFormatting(
+          """
+            class T {
+                void a() {}
+                void b() {
+                }
+            }
+            """
+        );
+        assertThat(keep.getSimpleMethodsInOneLine()).isFalse();
     }
 
     @Test

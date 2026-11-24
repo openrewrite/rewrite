@@ -1487,7 +1487,6 @@ public class Autodetect extends NamedStyles {
         int enumFieldAnnotationsWrapped = 0;
         int multilineAlignedToFirstArgument = 0;
         int multilineNotAlignedToFirstArgument = 0;
-        // Net votes for empty bodies: +1 for `{}` on one line, -1 for a closing brace on its own line
         int simpleClassesInOneLine = 0;
         int simpleMethodsInOneLine = 0;
         int simpleLambdasInOneLine = 0;
@@ -1579,16 +1578,16 @@ public class Autodetect extends NamedStyles {
             // Mirrors how WrappingAndBracesVisitor decides whether an empty body may stay on one line.
             // A comment in the body is not an "empty" `{}` and says nothing about the preference.
             if (block.getStatements().isEmpty() && block.getEnd().getComments().isEmpty()) {
-                int vote = hasNewLine(block.getEnd());
+                int oneLine = -hasNewLine(block.getEnd());
                 Object parent = getCursor().getParentTreeCursor().getValue();
                 if (parent instanceof J.ClassDeclaration) {
-                    stats.simpleClassesInOneLine -= vote;
+                    stats.simpleClassesInOneLine += oneLine;
                 } else if (parent instanceof J.MethodDeclaration) {
-                    stats.simpleMethodsInOneLine -= vote;
+                    stats.simpleMethodsInOneLine += oneLine;
                 } else if (parent instanceof J.Lambda) {
-                    stats.simpleLambdasInOneLine -= vote;
+                    stats.simpleLambdasInOneLine += oneLine;
                 } else {
-                    stats.simpleBlocksInOneLine -= vote;
+                    stats.simpleBlocksInOneLine += oneLine;
                 }
             }
             return super.visitBlock(block, stats);
