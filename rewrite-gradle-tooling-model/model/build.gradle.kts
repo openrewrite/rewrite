@@ -73,8 +73,8 @@ tasks.named<Test>("test") {
 val testGradle4 = tasks.register<Test>("testGradle4") {
     testClassesDirs = sourceSets.test.get().output.classesDirs
     classpath = sourceSets.test.get().runtimeClasspath
-    filter {
-        includeTestsMatching("org.openrewrite.gradle.toolingapi.Gradle4CompatibilityTest")
+    useJUnitPlatform {
+        includeTags("gradle4")
     }
     systemProperty("org.openrewrite.test.gradleVersion", "4.10")
     jvmArgumentProviders.add(object : CommandLineArgumentProvider {
