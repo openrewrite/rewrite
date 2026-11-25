@@ -280,7 +280,7 @@ public abstract class Recipe implements Cloneable {
                         option.secret()));
             }
         }
-        // Option annotations can be placed on fields, bean-style getters, or on the primary constructor
+        // Recipes compiled before @Option was restricted to fields may still carry it on getters or constructor parameters
         for (Method method : recipe.getClass().getDeclaredMethods()) {
             if (method.getName().startsWith("get") && method.getParameterCount() == 0) {
                 Option option = method.getAnnotation(Option.class);
