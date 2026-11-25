@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.ValidateNpmPackageName;
 import org.openrewrite.javascript.semver.NodeSemver;
 
 import java.util.ArrayList;
@@ -142,10 +143,28 @@ public final class PnpmRelease {
     }
 
     /**
+     * npm-conf takes {@code userconfig}, {@code globalconfig} and {@code prefix}, which name the files it loads as the
+     * user's and the global config, from the command line, the environment, the builtin and the default config alone
+     * from pnpm 10.34.3 (pnpm/pnpm#12328, @pnpm/npm-conf 3.0.3); before, a project's or workspace's .npmrc names them
+     * too (3.0.0 and 3.0.2).
+     */
+    boolean loadsTheUserAndGlobalConfigFromTrustedSettings() {
+        return atLeast(11, 0, 0) || atLeast(10, 34, 3);
+    }
+
+    /**
      * General settings in pnpm-workspace.yaml are read from 10.5.0; before, only packages and catalogs.
      */
     boolean readsSettingsFromWorkspaceManifest() {
         return atLeast(10, 5, 0);
+    }
+
+    /**
+     * minimumReleaseAge and minimumReleaseAgeExclude are settings from 10.16.0 (pnpm/pnpm#9957); before, an .npmrc's
+     * {@code minimum-release-age} is read into no setting.
+     */
+    boolean readsMinimumReleaseAge() {
+        return atLeast(10, 16, 0);
     }
 
     /**
@@ -220,9 +239,10 @@ public final class PnpmRelease {
      * A git-hosted tarball's resolution (codeload.github.com, gitlab.com, bitbucket.org) carries
      * {@code gitHosted: true}, written by toLockfileResolution and added to a lock read without it, from 11.0.7
      * ("Pin the integrity of git-hosted tarballs"); before, there is no such field, and a lock's is not written back.
+     * pnpm 10 marks them from 10.33.4 (pnpm/pnpm#11491).
      */
     boolean marksGitHostedTarballs() {
-        return atLeast(11, 0, 7);
+        return !atLeast(11, 0, 0) ? atLeast(10, 33, 4) : atLeast(11, 0, 7);
     }
 
     /**
@@ -243,17 +263,38 @@ public final class PnpmRelease {
 
     /**
      * A locked registry tarball without an integrity is {@code ERR_PNPM_MISSING_TARBALL_INTEGRITY}, from 11.4.0
-     * (pkgSnapshotToResolution); before, it is resolved as it is.
+     * (pkgSnapshotToResolution); before, it is resolved as it is. pnpm 10 requires it from 10.34.1
+     * (pnpm/pnpm#12007).
      */
     boolean requiresALockedTarballsIntegrity() {
-        return atLeast(11, 4, 0);
+        return !atLeast(11, 0, 0) ? atLeast(10, 34, 1) : atLeast(11, 4, 0);
+    }
+
+    /**
+     * pkgSnapshotToResolution of pnpm 10.34.1 lets any URL of a git host's ({@code https://codeload.github.com/},
+     * {@code https://bitbucket.org/}, {@code https://gitlab.com/}) go without an integrity, as written and without
+     * {@code tar.gz} in it, its own copy of isGitHostedTarballUrl; from 10.34.2 it asks lockfile.utils', as pnpm 11
+     * does.
+     */
+    boolean exemptsAnyGitHostUrlFromTheLockedIntegrity() {
+        return !atLeast(11, 0, 0) && !atLeast(10, 34, 2);
     }
 
     /**
      * A tarball URL is git-hosted in any case ({@code https://CodeLoad.GitHub.com/...}, {@code TAR.GZ}), and
-     * lockfile.fs asks lockfile.utils, from 11.5.3; before, only as written in lower case.
+     * lockfile.fs asks lockfile.utils, from 11.5.3; before, only as written in lower case. pnpm 10 reads the lock so
+     * from 10.34.2 (pnpm/pnpm#12306), the lock written as before ({@link #writesGitHostedTarballUrlsInAnyCase}).
      */
     boolean matchesGitHostedTarballUrlsInAnyCase() {
+        return !atLeast(11, 0, 0) ? atLeast(10, 34, 2) : atLeast(11, 5, 3);
+    }
+
+    /**
+     * toLockfileResolution takes a tarball URL for git-hosted in any case from 11.5.3, as
+     * {@link #matchesGitHostedTarballUrlsInAnyCase}; pnpm 10's (resolve-dependencies' updateLockfile.ts, its own copy
+     * of isGitHostedTarballUrl) only as written in lower case.
+     */
+    boolean writesGitHostedTarballUrlsInAnyCase() {
         return atLeast(11, 5, 3);
     }
 
@@ -547,9 +588,11 @@ public final class PnpmRelease {
      * pnpm resolves and fetches itself (the package manager check and the switch) from {@code
      * packageManagerRegistries}, those of its built-in config, the user's .npmrc and the environment alone, from
      * 11.5.3 (getPackageManagerBootstrapConfig); before, from the install's registries, the project's among them.
+     * pnpm 10 does so from 10.34.2 (pnpm/pnpm#12300, config/config's packageManagerRegistries), where the engine hands
+     * no install over and its getNetworkConfigs fails on no credential.
      */
     boolean resolvesThePackageManagerFromTrustedConfig() {
-        return atLeast(11, 5, 3);
+        return !atLeast(11, 0, 0) ? atLeast(10, 34, 2) : atLeast(11, 5, 3);
     }
 
     // pnpm/src main.ts, syncEnvLockfile.ts, switchCliVersion.ts, packageManagerLockfile.ts
@@ -728,10 +771,39 @@ public final class PnpmRelease {
 
     /**
      * A packument the run already holds, abbreviated and changed after the release-age cutoff, is fetched again in
-     * full, from 11.1.2 (maybeUpgradeAbbreviatedMetaForReleaseAge); before, it is picked from as it is.
+     * full, from 11.1.2 (maybeUpgradeAbbreviatedMetaForReleaseAge); before, it is picked from as it is. pnpm 10 fetches
+     * it again from 10.34.0 (pnpm/pnpm#11630), whatever its {@code modified}
+     * ({@link #readsTheModifiedDateOfAnAbbreviatedPackument}).
      */
     boolean upgradesAHeldPackumentForTheReleaseAge() {
-        return atLeast(11, 1, 2);
+        return !atLeast(11, 0, 0) ? atLeast(10, 34, 0) : atLeast(11, 1, 2);
+    }
+
+    /**
+     * {@code minimumReleaseAgeIgnoreMissingTime}, true by default, lets the picker skip the release-age policy of a
+     * packument without a time field in pnpm 11 (pnpm/pnpm#11293); pnpm 10 has no such setting, and the picker fails
+     * with {@code ERR_PNPM_MISSING_TIME}.
+     */
+    boolean readsMinimumReleaseAgeIgnoreMissingTime() {
+        return atLeast(11, 0, 0);
+    }
+
+    /**
+     * An abbreviated packument without a time field that the registry gives under a release-age cutoff is fetched
+     * again in full, in pnpm 10 from 10.34.0 (pnpm/pnpm#11630, pickPackage); before, it is picked from as it is.
+     */
+    boolean fetchesAFullPackumentForTheReleaseAge() {
+        return atLeast(11, 0, 0) || atLeast(10, 34, 0);
+    }
+
+    /**
+     * An abbreviated packument whose {@code modified} is before the release-age cutoff is mature as it is, and is not
+     * fetched again in full, in pnpm 11; pnpm 10 does not read its {@code modified}: it fetches it in full all the same
+     * ({@link #fetchesAFullPackumentForTheReleaseAge}, {@link #upgradesAHeldPackumentForTheReleaseAge}), and its picker
+     * fails on one without a time field ({@code ERR_PNPM_MISSING_TIME}).
+     */
+    boolean readsTheModifiedDateOfAnAbbreviatedPackument() {
+        return atLeast(11, 0, 0);
     }
 
     /**
@@ -927,10 +999,21 @@ public final class PnpmRelease {
      * A lock entry whose dep path is a registry version ({@code name@version}) but whose resolution is no registry
      * tarball (typed, git-hosted, or a tarball URL neither http nor https) fails the lock's verification with
      * {@code ERR_PNPM_RESOLUTION_SHAPE_MISMATCH}, ahead of any verifier and with none active, from 11.5.3; before, it
-     * is read as it is.
+     * is read as it is. pnpm 10 makes the check where pkgSnapshotToResolution reads the entry
+     * ({@link #rejectsARegistryDepPathWithANonRegistryResolutionOnRead}).
      */
     boolean rejectsARegistryDepPathWithANonRegistryResolution() {
         return atLeast(11, 5, 3);
+    }
+
+    /**
+     * pkgSnapshotToResolution fails on a lock entry whose dep path is a registry version but whose resolution is no
+     * registry tarball ({@code ERR_PNPM_RESOLUTION_SHAPE_MISMATCH}, lockfile.utils' assertRegistryShapedResolution),
+     * in pnpm 10 from 10.34.2 (pnpm/pnpm#12306); pnpm 11 verifies the whole lock instead
+     * ({@link #rejectsARegistryDepPathWithANonRegistryResolution}).
+     */
+    boolean rejectsARegistryDepPathWithANonRegistryResolutionOnRead() {
+        return !atLeast(11, 0, 0) && atLeast(10, 34, 2);
     }
 
     /**
@@ -953,7 +1036,8 @@ public final class PnpmRelease {
 
     /**
      * {@code updateChecksums} makes the install resolve in full, from 11.4.0; before, a lock-only install does not
-     * read it.
+     * read it. pnpm 10 takes it from 10.34.0 (pnpm/pnpm#11985) on the command line alone, which no input gives: an
+     * .npmrc's {@code update-checksums} is no setting there.
      */
     boolean resolvesInFullToUpdateChecksums() {
         return atLeast(11, 4, 0);
@@ -1017,10 +1101,19 @@ public final class PnpmRelease {
 
     /**
      * A dependency name no npm package can have is {@code ERR_PNPM_INVALID_DEPENDENCY_NAME}, in a project's manifest
-     * and a package's, from 11.4.0; before, it is taken as a name.
+     * and a package's, from 11.4.0; before, it is taken as a name. pnpm 10 rejects it from 10.34.0 (pnpm/pnpm
+     * 455cfcd84), with the validate-npm-package-name it bundles ({@link #validateNpmPackageName}).
      */
     boolean rejectsAnInvalidDependencyName() {
-        return atLeast(11, 4, 0);
+        return !atLeast(11, 0, 0) ? atLeast(10, 34, 0) : atLeast(11, 4, 0);
+    }
+
+    /**
+     * The validate-npm-package-name pnpm checks a dependency's name with (validateDependencyAlias.ts,
+     * safeJoinModulesDir): 7.0.2 in pnpm 11, whose {@code -x} and {@code @s/.x} are no names; pnpm 10 bundles 5.0.0.
+     */
+    ValidateNpmPackageName.Release validateNpmPackageName() {
+        return atLeast(11, 0, 0) ? ValidateNpmPackageName.Release.V7_0_2 : ValidateNpmPackageName.Release.V5_0_0;
     }
 
     /**
@@ -1111,10 +1204,10 @@ public final class PnpmRelease {
      * A git-hosted tarball the install fetches for its manifest gives a resolution without an integrity the one it
      * was fetched with, under --lockfile-only too (a store that holds the tarball gives none), from 11.0.7
      * (gitHostedTarballFetcher, the change that marks git-hosted tarballs, {@link #marksGitHostedTarballs}); before,
-     * it is written without one.
+     * it is written without one. pnpm 10 pins it from 10.33.4 (pnpm/pnpm#11491).
      */
     boolean pinsTheIntegrityOfAFetchedGitHostedTarball() {
-        return atLeast(11, 0, 7);
+        return !atLeast(11, 0, 0) ? atLeast(10, 33, 4) : atLeast(11, 0, 7);
     }
 
     /**
@@ -1196,10 +1289,11 @@ public final class PnpmRelease {
     /**
      * A package's directory in the virtual store is safeJoinModulesDir's, which refuses a name
      * validate-npm-package-name rejects ({@code ERR_PNPM_INVALID_DEPENDENCY_NAME}, naming the directory's absolute
-     * path), from 11.11.0; before, any name is joined as it is.
+     * path), from 11.11.0; before, any name is joined as it is. pnpm 10 refuses it from 10.34.5 (pnpm/pnpm#12890),
+     * with the validate-npm-package-name it bundles ({@link #validateNpmPackageName}).
      */
     boolean placesAPackageOnlyUnderAValidName() {
-        return atLeast(11, 11, 0);
+        return !atLeast(11, 0, 0) ? atLeast(10, 34, 5) : atLeast(11, 11, 0);
     }
 
     // @pnpm/installing.deps-resolver src/dedupeInjectedDeps.ts
