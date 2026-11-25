@@ -966,3 +966,96 @@ describe('Space after a comma in a flow sequence', () => {
         expect(await parseAndPrint(text)).toBe(text);
     });
 });
+
+describe('Anchors and tags', () => {
+    const root = async (text: string) => (await parseYaml(text)).documents[0];
+    const entries = async (text: string) => ((await root(text)).block as Yaml.Mapping).entries;
+    const items = (block: Yaml.Block) => (block as Yaml.Sequence).entries.map(e => e.block);
+
+    test('are read in a flow sequence', async () => {
+        const [anchored, alias, tagged] = items((await entries("v: [&x 1, *x, !!str 2]\n"))[0].value) as Yaml.Scalar[];
+        expect(anchored.anchor?.key).toBe("x");
+        expect((alias as unknown as Yaml.Alias).anchor).toBe(anchored.anchor);
+        expect(tagged.tag?.name).toBe("str");
+        expect(tagged.prefix).toBe(" ");
+    });
+
+    test('are read in a flow mapping, on keys and values', async () => {
+        const [a, b] = ((await entries("v: { &k a: &x 1, !!str b: *x }\n"))[0].value as Yaml.Mapping).entries;
+        expect((a.key as Yaml.Scalar).anchor?.key).toBe("k");
+        expect((a.value as Yaml.Scalar).anchor?.key).toBe("x");
+        expect((b.key as Yaml.Scalar).tag?.name).toBe("str");
+        expect((b.value as Yaml.Alias).anchor).toBe((a.value as Yaml.Scalar).anchor);
+    });
+
+    test('are read on a block mapping key', async () => {
+        const [, c] = await entries("b: 1\n&k c: 2\n");
+        expect(c.prefix).toBe("\n");
+        expect((c.key as Yaml.Scalar).anchor).toMatchObject({key: "k", prefix: "", postfix: " "});
+    });
+
+    test('are read on the root of a document', async () => {
+        const document = await root("# c\n&x 1\n");
+        expect(document.prefix).toBe("# c\n");
+        expect((document.block as Yaml.Scalar).anchor).toMatchObject({key: "x", prefix: "", postfix: " "});
+    });
+
+    test('are read after a tag', async () => {
+        const [a] = await entries("a: !!str &x 2\n");
+        const value = a.value as Yaml.Scalar;
+        expect(value.anchor?.key).toBe("x");
+        expect(findMarker(value, Yaml.Markers.TagBeforeAnchor)).toBeDefined();
+    });
+
+    test('are read on an empty value, which keeps the line break after it', async () => {
+        const [a, b] = await entries("a: &x\nb: !!null\nc: 1\n");
+        expect((a.value as Yaml.Scalar).anchor).toMatchObject({key: "x", prefix: "", postfix: ""});
+        expect((b.value as Yaml.Scalar).tag?.name).toBe("null");
+        expect(b.prefix).toBe("\n");
+    });
+
+    test('on a scalar hold the space after them, and the scalar the space before', async () => {
+        const [a] = await entries("a: &x !!str 2\n");
+        const value = a.value as Yaml.Scalar;
+        expect(value.prefix).toBe(" ");
+        expect(value.anchor).toMatchObject({prefix: "", postfix: " "});
+        expect(value.tag).toMatchObject({prefix: "", suffix: " "});
+    });
+
+    test('on a collection hold the space before them, and a tag the rest of its line', async () => {
+        const [a] = await entries("a: &m !!map\n  b: 1\n");
+        const value = a.value as Yaml.Mapping;
+        expect(value.anchor).toMatchObject({prefix: " ", postfix: ""});
+        expect(value.tag).toMatchObject({prefix: " ", suffix: "\n"});
+        expect(value.entries[0].prefix).toBe("  ");
+    });
+
+    test('on a flow collection leave the space after them to the opening bracket', async () => {
+        const [a] = await entries("a: &s [1]\n");
+        const value = a.value as Yaml.Sequence;
+        expect(value.anchor).toMatchObject({prefix: " ", postfix: ""});
+        expect(value.openingBracketPrefix).toBe(" ");
+    });
+
+    test.each([
+        "a: &x\nb: !!null\nc: 1\n",
+        "v: [&x 1, !!str 2, &y !!str 3, *x]\n",
+        "v: [ &x 1 , !!str 2 ]\n",
+        "v: [\n  &x 1, # one\n  !!str 2\n]\n",
+        "v: [&s [1], *s]\n",
+        "v: [&k a: 1, b: &v 2]\n",
+        "v: [&x , !!null ]\nw: { a: &y , b: !!null }\n",
+        "v: { &k a: &x 1, !!str b: *x, c: &m { d: 1 } }\n",
+        "&k a: 1\n!!str b: 2\n",
+        "a: !!str &x 2\nb: [!!str &y 3]\n",
+        "a: &m !!map\n  b: 1\nc: !!map &n # c\n  d: 2\n",
+        "# c\n&x 1\n",
+        "--- &x\na: 1\n",
+        "--- !!map\na: 1\n",
+        "a: &x\n\n  b: 1\n",
+        "a:   &x   1\n",
+        "a: &x |\n  t\nb: !!str >\n  u\n"
+    ])('prints %j as it was', async text => {
+        expect(await parseAndPrint(text)).toBe(text);
+    });
+});
