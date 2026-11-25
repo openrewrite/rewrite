@@ -17,10 +17,12 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 
 import java.util.Map;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -29,12 +31,20 @@ class PnpmAuthHeadersTest {
     private static final String URL = "https://private.example/";
     private static final String KEY = "//private.example/:_authToken=";
 
+    static Stream<String> nativeReleases() {
+        return Stream.concat(Pnpm10Test.pnpm10Releases(),
+          Stream.of("11.0.3", "11.1.2", "11.1.3", "11.5.2", "11.5.3", "11.10.0", "11.16.0"));
+    }
+
+    static Stream<String> placeholderReleases() {
+        return Stream.concat(Pnpm10Test.pnpm10Releases(), Stream.of("11.1.3", "11.5.3", "11.10.0", "11.16.0"));
+    }
+
     @ParameterizedTest
-    @ValueSource(strings = {"10.0.0", "10.11.0", "10.12.1", "10.34.9", "11.0.3", "11.1.2", "11.1.3", "11.5.2",
-      "11.5.3", "11.10.0", "11.16.0"})
+    @MethodSource("nativeReleases")
     void exactNativeSourcePolicyAndPrecedence(String version) {
-        boolean dropsProject = version.equals("10.34.9") || version.equals("11.5.3") ||
-          version.equals("11.10.0") || version.equals("11.16.0");
+        boolean dropsProject = java.util.List.of("10.34.9", "11.5.3", "11.10.0", "11.16.0")
+          .contains(Pnpm10Test.recorded(version));
         PnpmRelease release = PnpmRelease.of(version);
         Map<String, String> env = Map.of("TOKEN", "synthetic-env");
         assertThat(options(KEY + "${TOKEN}", null, env, release).authHeaders().authorization(URL, "@s/p"))
@@ -61,7 +71,7 @@ class PnpmAuthHeadersTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"10.0.0", "10.11.0", "10.12.1", "10.34.9", "11.1.3", "11.5.3", "11.10.0", "11.16.0"})
+    @MethodSource("placeholderReleases")
     void unsetVariablesNeverBecomeAuthorization(String version) {
         PnpmRelease release = PnpmRelease.of(version);
         assertThat(options(KEY + "${MISSING}", null, Map.of(), release).authHeaders().authorization(URL, "p"))
@@ -98,10 +108,10 @@ class PnpmAuthHeadersTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"10.0.0", "10.11.0", "10.12.1", "10.34.9", "11.0.3", "11.1.2", "11.1.3", "11.5.2",
-      "11.5.3", "11.10.0", "11.16.0"})
+    @MethodSource("nativeReleases")
     void defaultUnscopedCredentialsHaveTheNativesPrecedence(String version) {
-        boolean rescoped = java.util.List.of("10.34.9", "11.5.2", "11.5.3", "11.10.0", "11.16.0").contains(version);
+        boolean rescoped = java.util.List.of("10.34.9", "11.5.2", "11.5.3", "11.10.0", "11.16.0")
+          .contains(Pnpm10Test.recorded(version));
         PnpmAuthHeaders auth = options("registry=" + URL + "\n" + KEY + "synthetic-scoped\n" +
           "_authToken=synthetic-default", null, Map.of(), PnpmRelease.of(version)).authHeaders();
         assertThat(auth.authorization(URL, "p"))
