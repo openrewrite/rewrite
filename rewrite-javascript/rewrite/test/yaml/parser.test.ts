@@ -923,3 +923,46 @@ describe('Empty values', () => {
         expect(await parseAndPrint(text)).toBe(text);
     });
 });
+
+describe('Space after a comma in a flow sequence', () => {
+    const items = async (text: string) => {
+        const docs = await parseYaml(text);
+        const value = (docs.documents[0].block as Yaml.Mapping).entries.find(e => (e.key as Yaml.Scalar).value === "v")!.value;
+        return (value as Yaml.Sequence).entries;
+    };
+
+    test('is the prefix of the item, as the Java parser has it', async () => {
+        const [first, second] = await items("v: [8, 10]\n");
+        expect([first.prefix, second.prefix]).toEqual(["", ""]);
+        expect([first.block.prefix, second.block.prefix]).toEqual(["", " "]);
+    });
+
+    test('keeps a comment on the line with the item after it', async () => {
+        const [first, second] = await items("v: [\n  8, # a\n  10\n]\n");
+        expect([first.prefix, second.prefix]).toEqual(["", ""]);
+        expect([first.block.prefix, second.block.prefix]).toEqual(["\n  ", " # a\n  "]);
+    });
+
+    test('is the opening bracket prefix of a nested sequence', async () => {
+        const [first, second] = await items("v: [ [1], [2] ]\n");
+        expect([first.prefix, second.prefix]).toEqual(["", ""]);
+        expect([first.block, second.block].map(s => (s as Yaml.Sequence).openingBracketPrefix)).toEqual([" ", " "]);
+    });
+
+    test('is the prefix of an alias', async () => {
+        const [, alias] = await items("a: &x 1\nv: [1, *x]\n");
+        expect(alias.prefix).toBe("");
+        expect(alias.block.prefix).toBe(" ");
+    });
+
+    test.each([
+        "v: [8, 10]\n",
+        "v: [ 8 , 10 , ]\n",
+        "v: [\n  8, # a\n  10 # b\n]\n",
+        "v: [ [1], [2] ]\n",
+        "a: &x 1\nv: [1, *x]\n",
+        "v: [8,\t10]\r\nw: 1\r\n"
+    ])('prints %j as it was', async text => {
+        expect(await parseAndPrint(text)).toBe(text);
+    });
+});
