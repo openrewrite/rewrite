@@ -226,4 +226,20 @@ describe('a call into parsed source is attributed as the declaration it calls is
         ]);
         expect(calls["test/equals.ts"].at(-1)).toEqual("src/equals#<default> static");
     });
+
+    test('a call of a function a local variable holds is declared on its file, as a nested function declaration is', async () => {
+        // given
+        const files = {
+            "package.json": JSON.stringify({name: "lib", version: "1.0.0", type: "module"}),
+            "tsconfig.json": JSON.stringify({compilerOptions: {module: "nodenext", moduleResolution: "nodenext", strict: true}}),
+            "src/local.ts": `export function outer(cb: () => void) {\n    const arrow = () => 1;\n    const fn = function () {};\n    function nested() {}\n    arrow();\n    fn();\n    nested();\n    cb();\n}`
+        };
+
+        // when
+        const {calls} = await identities(files);
+
+        // then
+        expect(calls["src/local.ts"].slice(0, 3)).toEqual(["src/local#arrow", "src/local#fn", "src/local#nested"]);
+        expect(calls["src/local.ts"][3]).not.toMatch(/^src\/local#/);
+    });
 });

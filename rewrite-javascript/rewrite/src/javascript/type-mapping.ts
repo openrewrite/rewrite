@@ -891,6 +891,7 @@ export class JavaScriptTypeMapping {
      * What a call into a parsed source file calls, as that file's declaration names it: the function
      * the callee is declared as, or the top-level variable holding it, as `const f = () => …` or
      * `const ky = createInstance()` does, where the signature it calls is declared in parsed source too.
+     * A local variable holding a function names it on its file, as a nested function declaration is.
      * A callee bound to a module, by an import or a `require`, calls the declaration its signature
      * resolves to, which may be one a re-export such as `module.exports = require('./lib/express')` leads to.
      */
@@ -908,6 +909,10 @@ export class JavaScriptTypeMapping {
             if (this.isTopLevelVariable(declaration) && !this.moduleBinding(declaration, declaration)) {
                 return {declaringType: this.sourceModuleType(declaration.getSourceFile()), name: declaration.name.text, isStatic: true};
             }
+            if (ts.isVariableDeclaration(declaration) && ts.isIdentifier(declaration.name) &&
+                (ts.isArrowFunction(target) || ts.isFunctionExpression(target)) && this.initializes(declaration, target)) {
+                return {declaringType: this.sourceModuleType(declaration.getSourceFile()), name: declaration.name.text};
+            }
         }
         if (!boundToModule) {
             return undefined;
@@ -917,6 +922,20 @@ export class JavaScriptTypeMapping {
         }
         const name = (ts.isArrowFunction(target) || ts.isFunctionExpression(target)) ? this.functionName(target) : undefined;
         return name ? {declaringType: this.sourceModuleType(target.getSourceFile()), name} : undefined;
+    }
+
+    /** Whether a variable is initialized with a function, also through a cast, as in `const f = (() => …) as F`. */
+    private initializes(variable: ts.VariableDeclaration, fn: ts.ArrowFunction | ts.FunctionExpression): boolean {
+        return this.castTarget(fn) === variable.initializer;
+    }
+
+    private castTarget(fn: ts.ArrowFunction | ts.FunctionExpression): ts.Node {
+        let node: ts.Node = fn;
+        while (ts.isParenthesizedExpression(node.parent) || ts.isAsExpression(node.parent) ||
+            ts.isSatisfiesExpression(node.parent) || ts.isTypeAssertionExpression(node.parent)) {
+            node = node.parent;
+        }
+        return node;
     }
 
     private isTopLevelVariable(declaration: ts.Node): declaration is ts.VariableDeclaration & {name: ts.Identifier} {
@@ -943,11 +962,7 @@ export class JavaScriptTypeMapping {
      * `export default`, `export =` or `module.exports =`, is named `<default>`, as a call of the module is.
      */
     private moduleBindingName(fn: ts.ArrowFunction | ts.FunctionExpression): string | undefined {
-        let node: ts.Node = fn;
-        while (ts.isParenthesizedExpression(node.parent) || ts.isAsExpression(node.parent) ||
-            ts.isSatisfiesExpression(node.parent) || ts.isTypeAssertionExpression(node.parent)) {
-            node = node.parent;
-        }
+        const node = this.castTarget(fn);
         const parent = node.parent;
         if (this.isTopLevelVariable(parent) && parent.initializer === node) {
             return parent.name.text;
