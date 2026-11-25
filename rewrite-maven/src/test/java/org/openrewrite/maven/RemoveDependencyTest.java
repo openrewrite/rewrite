@@ -104,6 +104,121 @@ class RemoveDependencyTest implements RewriteTest {
     }
 
     @Test
+    void removeSystemDependency() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveDependency("com.example.legacy", "local-lib", null)),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.example</groupId>
+                <artifactId>app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>com.example.legacy</groupId>
+                    <artifactId>local-lib</artifactId>
+                    <version>1.0</version>
+                    <scope>system</scope>
+                    <systemPath>${project.basedir}/lib/local-lib.jar</systemPath>
+                  </dependency>
+                  <dependency>
+                    <groupId>com.example.legacy</groupId>
+                    <artifactId>other-lib</artifactId>
+                    <version>1.0</version>
+                    <scope>system</scope>
+                    <systemPath>${project.basedir}/lib/other-lib.jar</systemPath>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.example</groupId>
+                <artifactId>app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>com.example.legacy</groupId>
+                    <artifactId>other-lib</artifactId>
+                    <version>1.0</version>
+                    <scope>system</scope>
+                    <systemPath>${project.basedir}/lib/other-lib.jar</systemPath>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                MavenResolutionResult mavenModel = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                assertThat(mavenModel.getPom().getRequestedDependencies())
+                  .singleElement().satisfies(dependency -> assertThat(dependency.getArtifactId()).isEqualTo("other-lib"));
+            })
+          )
+        );
+    }
+
+    @Test
+    void removeDependencyWithManagedSystemScopeAndPropertyCoordinates() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveDependency("com.example.legacy", "local-lib", "system")),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.example</groupId>
+                <artifactId>app</artifactId>
+                <version>1</version>
+                <properties>
+                  <legacy.group>com.example.legacy</legacy.group>
+                  <legacy.artifact>local-lib</legacy.artifact>
+                </properties>
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>com.example.legacy</groupId>
+                      <artifactId>local-lib</artifactId>
+                      <version>1.0</version>
+                      <scope>system</scope>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+                <dependencies>
+                  <dependency>
+                    <groupId>${legacy.group}</groupId>
+                    <artifactId>${legacy.artifact}</artifactId>
+                    <systemPath>${project.basedir}/lib/local-lib.jar</systemPath>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.example</groupId>
+                <artifactId>app</artifactId>
+                <version>1</version>
+                <properties>
+                  <legacy.group>com.example.legacy</legacy.group>
+                  <legacy.artifact>local-lib</legacy.artifact>
+                </properties>
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>com.example.legacy</groupId>
+                      <artifactId>local-lib</artifactId>
+                      <version>1.0</version>
+                      <scope>system</scope>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
     void shouldRemoveScopedDependency() {
         rewriteRun(
           spec -> spec.recipe(new RemoveDependency("org.junit.jupiter", "junit-jupiter", "compile")),
