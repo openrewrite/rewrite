@@ -620,10 +620,16 @@ public abstract class Recipe implements Cloneable {
         objectMapper.setVisibility(objectMapper.getSerializationConfig().getDefaultVisibilityChecker()
                 .withFieldVisibility(JsonAutoDetect.Visibility.ANY));
         try {
+            Map<String, OptionDescriptor> optionDescriptors = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
             for (OptionDescriptor optionDescriptor : getOptionDescriptors()) {
-                Object value = options.get(optionDescriptor.getName());
-                if (value instanceof String && optionDescriptor.getType().equals("List")) {
-                    m.put(optionDescriptor.getName(), Arrays.asList(((String) value).split(",")));
+                optionDescriptors.put(optionDescriptor.getName(), optionDescriptor);
+            }
+            for (Map.Entry<String, Object> option : options.entrySet()) {
+                OptionDescriptor optionDescriptor = optionDescriptors.get(option.getKey());
+                if (optionDescriptor != null && option.getValue() instanceof String &&
+                    optionDescriptor.getType().equals("List")) {
+                    m.remove(option.getKey());
+                    m.put(optionDescriptor.getName(), Arrays.asList(((String) option.getValue()).split(",")));
                 }
             }
 

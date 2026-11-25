@@ -283,6 +283,13 @@ class RecipeBasicsTest {
     }
 
     @Test
+    void withOptionsSplitsCommaSeparatedListRegardlessOfKeyCase() {
+        Recipe result = new RecipeWithListOption(List.of()).withOptions(Map.of("fieldnames", "firstName,lastName"));
+
+        assertThat(((RecipeWithListOption) result).fieldNames).containsExactly("firstName", "lastName");
+    }
+
+    @Test
     void withOptionsPreservesNonStringOptionValuesInDescriptor() {
         // given
         RecipeWithMixedOptionTypes recipe = new RecipeWithMixedOptionTypes(null, null, null);
