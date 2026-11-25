@@ -881,14 +881,83 @@ export class JavaScriptTypeMapping {
         return moduleOfFile(this.sourceRoot && path.isAbsolute(fileName) ? path.relative(this.sourceRoot, fileName) : fileName);
     }
 
+    /** Whether a declaration is in a parsed source file, which a `.d.ts` file or an installed package is not. */
+    private isParsedSource(declaration: ts.Node): boolean {
+        const sourceFile = declaration.getSourceFile();
+        return !sourceFile.isDeclarationFile && !this.isInstalled(sourceFile.fileName);
+    }
+
     /**
-     * The declaration of a function in a parsed source file. A `.d.ts` file is not parsed, so a
-     * function such as `parseInt` has none.
+     * What a call into a parsed source file calls, as that file's declaration names it: the function
+     * the callee is declared as, or the top-level variable holding it, as `const f = () => …` or
+     * `const ky = createInstance()` does, where the signature it calls is declared in parsed source too.
+     * A callee bound to a module, by an import or a `require`, calls the declaration its signature
+     * resolves to, which may be one a re-export such as `module.exports = require('./lib/express')` leads to.
      */
-    private parsedFunctionDeclaration(symbol: ts.Symbol): ts.FunctionDeclaration | undefined {
-        const declaration = symbol.valueDeclaration;
-        return declaration && ts.isFunctionDeclaration(declaration) && !declaration.getSourceFile().isDeclarationFile ?
-            declaration : undefined;
+    private parsedCallee(symbol: ts.Symbol | undefined, signature: ts.Signature, boundToModule: boolean):
+        {declaringType: Type.FullyQualified, name: string, isStatic?: boolean} | undefined {
+        const target = signature.getDeclaration();
+        if (!target || !this.isParsedSource(target)) {
+            return undefined;
+        }
+        const declaration = symbol?.valueDeclaration;
+        if (declaration && this.isParsedSource(declaration)) {
+            if (ts.isFunctionDeclaration(declaration)) {
+                return {declaringType: this.functionOwner(declaration), name: declaration.name?.text ?? '<anonymous>'};
+            }
+            if (this.isTopLevelVariable(declaration) && !this.moduleBinding(declaration, declaration)) {
+                return {declaringType: this.sourceModuleType(declaration.getSourceFile()), name: declaration.name.text, isStatic: true};
+            }
+        }
+        if (!boundToModule) {
+            return undefined;
+        }
+        if (ts.isFunctionDeclaration(target)) {
+            return {declaringType: this.functionOwner(target), name: target.name?.text ?? '<anonymous>'};
+        }
+        const name = (ts.isArrowFunction(target) || ts.isFunctionExpression(target)) ? this.functionName(target) : undefined;
+        return name ? {declaringType: this.sourceModuleType(target.getSourceFile()), name} : undefined;
+    }
+
+    private isTopLevelVariable(declaration: ts.Node): declaration is ts.VariableDeclaration & {name: ts.Identifier} {
+        return ts.isVariableDeclaration(declaration) && ts.isIdentifier(declaration.name) &&
+            ts.isVariableStatement(declaration.parent.parent) && ts.isSourceFile(declaration.parent.parent.parent);
+    }
+
+    /**
+     * The name of a function expression or arrow function: its own, or else the one a top-level
+     * `const f = …` or an `exports.f = …` assignment gives it.
+     */
+    private functionName(fn: ts.ArrowFunction | ts.FunctionExpression): string | undefined {
+        return fn.name?.text ?? this.moduleBindingName(fn);
+    }
+
+    /**
+     * The name a top-level `const f = …` or an `exports.f = …` assignment gives the function it holds,
+     * also through a cast, as in `const f = (() => …) as F`.
+     */
+    private moduleBindingName(fn: ts.ArrowFunction | ts.FunctionExpression): string | undefined {
+        let node: ts.Node = fn;
+        while (ts.isParenthesizedExpression(node.parent) || ts.isAsExpression(node.parent) ||
+            ts.isSatisfiesExpression(node.parent) || ts.isTypeAssertionExpression(node.parent)) {
+            node = node.parent;
+        }
+        const parent = node.parent;
+        if (this.isTopLevelVariable(parent) && parent.initializer === node) {
+            return parent.name.text;
+        }
+        if (ts.isBinaryExpression(parent) && parent.right === node &&
+            parent.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+            ts.isPropertyAccessExpression(parent.left) && this.isExportsObject(parent.left.expression)) {
+            return parent.left.name.text;
+        }
+        return undefined;
+    }
+
+    private isExportsObject(node: ts.Expression): boolean {
+        return ts.isIdentifier(node) ? node.text === 'exports' :
+            ts.isPropertyAccessExpression(node) && ts.isIdentifier(node.expression) &&
+            node.expression.text === 'module' && node.name.text === 'exports';
     }
 
     /** The namespace whose body holds a declaration, as `namespace moment` holds `function utc`. */
@@ -924,6 +993,9 @@ export class JavaScriptTypeMapping {
         }
         if (ts.isFunctionDeclaration(declaration)) {
             return ts.isSourceFile(declaration.parent) || ts.isModuleBlock(declaration.parent);
+        }
+        if (ts.isArrowFunction(declaration) || ts.isFunctionExpression(declaration)) {
+            return this.moduleBindingName(declaration) !== undefined;
         }
         return (ts.isMethodDeclaration(declaration) || ts.isAccessor(declaration)) &&
             !!(ts.getCombinedModifierFlags(declaration) & ts.ModifierFlags.Static);
@@ -966,17 +1038,17 @@ export class JavaScriptTypeMapping {
      */
     private createMethodType(
         signature: ts.Signature,
-        node: ts.MethodSignature | ts.FunctionDeclaration | ts.MethodDeclaration | ts.AccessorDeclaration | ts.ConstructorDeclaration | ts.FunctionExpression | ts.CallExpression | ts.NewExpression,
+        node: ts.MethodSignature | ts.FunctionDeclaration | ts.MethodDeclaration | ts.AccessorDeclaration | ts.ConstructorDeclaration | ts.FunctionExpression | ts.ArrowFunction | ts.CallExpression | ts.NewExpression,
         declaringType: Type.FullyQualified,
         name: string,
-        declaredFormalTypeNames: string[] = []
+        declaredFormalTypeNames: string[] = [],
+        isStatic: boolean = this.isStatic(signature)
     ): Type.Method {
         // Create composite cache key: declaring type + method name + signature
         // This prevents cache collisions when methods with identical signatures have different names
         // (e.g., util.isString(): any vs util.isArray(): any)
         const declaringTypeSig = Type.signature(declaringType);
         const signatureStr = this.checker.signatureToString(signature);
-        const isStatic = this.isStatic(signature);
         const cacheKey = `${isStatic ? 'static ' : ''}${declaringTypeSig}#${name}${signatureStr}`;
         const cached = this.methodCache.get(cacheKey);
         if (cached) {
@@ -1091,6 +1163,7 @@ export class JavaScriptTypeMapping {
         let methodName: string;
         let declaringType: Type.FullyQualified;
         let declaredFormalTypeNames: string[] = [];
+        let isStatic: boolean | undefined;
 
         if (ts.isCallExpression(node) && this.isImportDefer(node.expression)) {
             return undefined;
@@ -1107,7 +1180,10 @@ export class JavaScriptTypeMapping {
             // Calling a module itself, as in `require('m')()`, calls its default export.
             const calledModule = ts.isCallExpression(node) ? this.loadedModule(node.expression) : undefined;
             if (calledModule) {
-                return this.createMethodType(signature, node, moduleClass(calledModule), '<default>');
+                const callee = this.parsedCallee(undefined, signature, true);
+                return callee ?
+                    this.createMethodType(signature, node, callee.declaringType, callee.name, [], callee.isStatic) :
+                    this.createMethodType(signature, node, moduleClass(calledModule), '<default>');
             }
 
             let symbol = this.checker.getSymbolAtLocation(node.expression);
@@ -1252,10 +1328,11 @@ export class JavaScriptTypeMapping {
                 }
                 moduleSpecifier ??= binding?.module;
 
-                const declared = this.parsedFunctionDeclaration(aliasedSymbol ?? symbol);
-                if (declared) {
-                    declaringType = this.functionOwner(declared);
-                    methodName = declared.name ? declared.name.text : "<anonymous>";
+                const callee = this.parsedCallee(aliasedSymbol ?? symbol, signature, !!moduleSpecifier);
+                if (callee) {
+                    declaringType = callee.declaringType;
+                    methodName = callee.name;
+                    isStatic = callee.isStatic;
                 } else if (moduleSpecifier) {
                     // This is an imported function - use the module specifier as declaring type
                     declaringType = moduleClass(moduleSpecifier);
@@ -1380,7 +1457,7 @@ export class JavaScriptTypeMapping {
                 return undefined;
             }
 
-            methodName = node.name ? node.name.getText() : "<anonymous>";
+            methodName = (ts.isFunctionDeclaration(node) ? node.name?.getText() : this.functionName(node)) ?? "<anonymous>";
 
             declaringType = ts.isFunctionDeclaration(node) ?
                 this.functionOwner(node) :
@@ -1392,13 +1469,24 @@ export class JavaScriptTypeMapping {
                     declaredFormalTypeNames.push(tp.name.getText());
                 }
             }
+        } else if (ts.isArrowFunction(node)) {
+            const name = this.moduleBindingName(node);
+            signature = name ? this.checker.getSignatureFromDeclaration(node) : undefined;
+            if (!name || !signature) {
+                return undefined;
+            }
+            methodName = name;
+            declaringType = this.sourceModuleType(node.getSourceFile());
+            for (const tp of node.typeParameters ?? []) {
+                declaredFormalTypeNames.push(tp.name.getText());
+            }
         } else {
             // For other node types, return undefined
             return undefined;
         }
 
         // Create the method type using the helper
-        return this.createMethodType(signature, node, declaringType, methodName, declaredFormalTypeNames);
+        return this.createMethodType(signature, node, declaringType, methodName, declaredFormalTypeNames, isStatic);
     }
 
 
