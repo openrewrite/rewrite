@@ -18,6 +18,8 @@ package org.openrewrite.java;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.Cursor;
+import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.internal.FormatFirstClassPrefix;
 import org.openrewrite.java.marker.JavaSourceSet;
@@ -141,6 +143,21 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
             Set<String> namesInSource = typeImportMayStay || !force && memberImportOfType ||
                     starImportOfOwner && !otherTypesInPackageUsed.isEmpty() ?
                     namesInSource(cu) : Collections.emptySet();
+            boolean hasRelevantStaticImport = false;
+            for (J.Import cuImport : cu.getImports()) {
+                if (cuImport.isStatic()) {
+                    String typeName = cuImport.getTypeName();
+                    String imported = cuImport.getQualid().getSimpleName();
+                    if (TypeUtils.fullyQualifiedNamesAreEqual(typeName, type) ||
+                            (!force && TypeUtils.fullyQualifiedNamesAreEqual(typeName + "." + imported, type)) ||
+                            ("*".equals(imported) && !owner.isEmpty() && TypeUtils.fullyQualifiedNamesAreEqual(typeName, owner))) {
+                        hasRelevantStaticImport = true;
+                        break;
+                    }
+                }
+            }
+            Set<String> unattributedStaticNames = hasRelevantStaticImport ?
+                    unattributedStaticMemberNames(cu) : Collections.emptySet();
             boolean typeUsed = typeImportMayStay && namesInSource.contains(simpleName);
             otherTypesInPackageUsed.retainAll(namesInSource);
 
@@ -159,22 +176,27 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                 J.Identifier alias = import_.getAlias();
                 if (import_.isStatic()) {
                     String imported = import_.getQualid().getSimpleName();
+                    String memberName = alias != null ? alias.getSimpleName() : imported;
                     if (TypeUtils.fullyQualifiedNamesAreEqual(typeName + "." + imported, type) &&
-                            (force || !methodsAndFieldsUsed.contains(imported) && !fieldNamedLikeTypeUsed)) {
+                            (force || !methodsAndFieldsUsed.contains(imported) && !fieldNamedLikeTypeUsed &&
+                                    !unattributedStaticNames.contains(memberName))) {
                         // e.g. remove java.util.Collections.emptySet when type is java.util.Collections.emptySet
                         spaceForNextImport.set(import_.getPrefix());
                         return null;
                     } else if ("*".equals(imported) && (TypeUtils.fullyQualifiedNamesAreEqual(typeName, type) ||
                             !owner.isEmpty() && TypeUtils.fullyQualifiedNamesAreEqual(typeName, owner))) {
-                        if (methodsAndFieldsUsed.isEmpty() && otherMethodsAndFieldsInTypeUsed.isEmpty()) {
-                            spaceForNextImport.set(import_.getPrefix());
-                            return null;
-                        } else if (!isPackageAlwaysFolded(importLayoutStyle.getPackagesToFold(), import_) &&
-                                methodsAndFieldsUsed.size() + otherMethodsAndFieldsInTypeUsed.size() < importLayoutStyle.getNameCountToUseStarImport()) {
-                            methodsAndFieldsUsed.addAll(otherMethodsAndFieldsInTypeUsed);
-                            return unfoldStarImport(import_, methodsAndFieldsUsed, cu);
+                        if (unattributedStaticNames.isEmpty()) {
+                            if (methodsAndFieldsUsed.isEmpty() && otherMethodsAndFieldsInTypeUsed.isEmpty()) {
+                                spaceForNextImport.set(import_.getPrefix());
+                                return null;
+                            } else if (!isPackageAlwaysFolded(importLayoutStyle.getPackagesToFold(), import_) &&
+                                    methodsAndFieldsUsed.size() + otherMethodsAndFieldsInTypeUsed.size() < importLayoutStyle.getNameCountToUseStarImport()) {
+                                methodsAndFieldsUsed.addAll(otherMethodsAndFieldsInTypeUsed);
+                                return unfoldStarImport(import_, methodsAndFieldsUsed, cu);
+                            }
                         }
-                    } else if (TypeUtils.fullyQualifiedNamesAreEqual(typeName, type) && !methodsAndFieldsUsed.contains(imported)) {
+                    } else if (TypeUtils.fullyQualifiedNamesAreEqual(typeName, type) &&
+                            !methodsAndFieldsUsed.contains(imported) && !unattributedStaticNames.contains(memberName)) {
                         // e.g. remove java.util.Collections.emptySet when type is java.util.Collections
                         spaceForNextImport.set(import_.getPrefix());
                         return null;
@@ -375,6 +397,113 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
 
         // Fall back to creating a ShallowClass
         return JavaType.ShallowClass.build(fqn);
+    }
+
+    /**
+     * Names of unqualified method invocations, identifiers, and static fields lacking declaring-type attribution,
+     * which may resolve through a static import.
+     */
+    private static Set<String> unattributedStaticMemberNames(JavaSourceFile cu) {
+        return new JavaIsoVisitor<Set<String>>() {
+            @Override
+            public J.Import visitImport(J.Import import_, Set<String> names) {
+                return import_;
+            }
+
+            @Override
+            public J.Package visitPackage(J.Package pkg, Set<String> names) {
+                return pkg;
+            }
+
+            @Override
+            protected JavadocVisitor<Set<String>> getJavadocVisitor() {
+                return new JavadocVisitor<Set<String>>(this) {
+                    @Override
+                    public @Nullable Javadoc visit(@Nullable Tree tree, Set<String> names) {
+                        return (Javadoc) tree;
+                    }
+                };
+            }
+
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Set<String> names) {
+                if (method.getSelect() == null) {
+                    JavaType.Method methodType = method.getMethodType();
+                    if (methodType == null || TypeUtils.asFullyQualified(methodType.getDeclaringType()) == null) {
+                        names.add(method.getSimpleName());
+                    }
+                }
+                return super.visitMethodInvocation(method, names);
+            }
+
+            @Override
+            public J.Identifier visitIdentifier(J.Identifier identifier, Set<String> names) {
+                JavaType.Variable fieldType = identifier.getFieldType();
+                if (fieldType != null) {
+                    if (fieldType.hasFlags(Flag.Static) && TypeUtils.asFullyQualified(fieldType.getOwner()) == null) {
+                        names.add(identifier.getSimpleName());
+                    }
+                    return super.visitIdentifier(identifier, names);
+                }
+                if (!isMissingType(identifier.getType())) {
+                    return super.visitIdentifier(identifier, names);
+                }
+                String simpleName = identifier.getSimpleName();
+                if ("this".equals(simpleName) || "super".equals(simpleName) || "default".equals(simpleName)) {
+                    return super.visitIdentifier(identifier, names);
+                }
+                Object parent = getCursor().getParentTreeCursor().getValue();
+                if (parent instanceof J.FieldAccess) {
+                    J.FieldAccess fa = (J.FieldAccess) parent;
+                    if (fa.getName() == identifier || isPackagePrefixOfResolvedAccess(fa, identifier)) {
+                        return super.visitIdentifier(identifier, names);
+                    }
+                } else if (isNonStaticReferenceIdentifier(parent, identifier, simpleName)) {
+                    return super.visitIdentifier(identifier, names);
+                }
+                names.add(simpleName);
+                return super.visitIdentifier(identifier, names);
+            }
+
+            private boolean isNonStaticReferenceIdentifier(Object parent, J.Identifier identifier, String simpleName) {
+                return parent instanceof J.MethodInvocation && ((J.MethodInvocation) parent).getName() == identifier ||
+                       parent instanceof J.MemberReference && ((J.MemberReference) parent).getReference() == identifier ||
+                       parent instanceof J.VariableDeclarations.NamedVariable && ((J.VariableDeclarations.NamedVariable) parent).getName() == identifier ||
+                       parent instanceof J.ClassDeclaration && ((J.ClassDeclaration) parent).getName() == identifier ||
+                       parent instanceof J.MethodDeclaration && ((J.MethodDeclaration) parent).getName() == identifier ||
+                       parent instanceof J.EnumValue && ((J.EnumValue) parent).getName() == identifier ||
+                       parent instanceof J.TypeParameter && ((J.TypeParameter) parent).getName() == identifier ||
+                       parent instanceof J.Label && ((J.Label) parent).getLabel() == identifier ||
+                       parent instanceof J.Break && ((J.Break) parent).getLabel() == identifier ||
+                       parent instanceof J.Continue && ((J.Continue) parent).getLabel() == identifier ||
+                       parent instanceof J.ParameterizedType && ((J.ParameterizedType) parent).getClazz() == identifier &&
+                       !isMissingType(((J.ParameterizedType) parent).getType()) ||
+                       parent instanceof J.NewClass && ((J.NewClass) parent).getClazz() == identifier &&
+                       !isMissingType(((J.NewClass) parent).getType()) ||
+                       parent instanceof J.Annotation && ((J.Annotation) parent).getAnnotationType() == identifier &&
+                       !isMissingType(((J.Annotation) parent).getType()) ||
+                       parent instanceof J.VariableDeclarations && "var".equals(simpleName) ||
+                       parent instanceof J.Assignment && ((J.Assignment) parent).getVariable() == identifier &&
+                       getCursor().firstEnclosing(J.Annotation.class) != null;
+            }
+
+            private boolean isPackagePrefixOfResolvedAccess(J.FieldAccess fa, J.Identifier target) {
+                if (fa.getTarget() != target || "class".equals(fa.getSimpleName())) {
+                    return false;
+                }
+                for (Cursor c = getCursor().getParentTreeCursor(); c != null && c.getValue() instanceof J.FieldAccess; c = c.getParentTreeCursor()) {
+                    J.FieldAccess enclosing = (J.FieldAccess) c.getValue();
+                    if (!"class".equals(enclosing.getSimpleName()) && !isMissingType(enclosing.getType())) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+        }.reduce(cu, new HashSet<>());
+    }
+
+    private static boolean isMissingType(@Nullable JavaType type) {
+        return type == null || type instanceof JavaType.Unknown;
     }
 
     /**
