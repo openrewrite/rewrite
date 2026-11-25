@@ -21,6 +21,7 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.config.RecipeDescriptor;
+import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.text.ChangeText;
 
 import java.util.HashMap;
@@ -49,6 +50,18 @@ class RecipeBasicsTest {
     void instanceName() {
         ChangeText ct = new ChangeText("hi");
         assertThat(ct.getInstanceName()).isEqualTo("Change text to `hi`");
+    }
+
+    @Test
+    void withOptionsRecomputesInstanceName() {
+        Recipe introspected = RecipeIntrospectionUtils.constructRecipe(ChangeText.class);
+        introspected.getDescriptor();
+
+        Recipe configured = introspected.withOptions(Map.of("toText", "hi"));
+
+        assertThat(configured.getDescriptor().getInstanceName()).isEqualTo("Change text to `hi`");
+        assertThat(configured.getDescriptor().getOptions().getFirst().getValue()).isEqualTo("hi");
+        assertThat(introspected.getDescriptor().getOptions().getFirst().getValue()).isNull();
     }
 
 

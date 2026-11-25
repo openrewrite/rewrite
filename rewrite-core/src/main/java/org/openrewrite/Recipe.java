@@ -617,23 +617,30 @@ public abstract class Recipe implements Cloneable {
         objectMapper.setVisibility(objectMapper.getSerializationConfig().getDefaultVisibilityChecker()
                 .withFieldVisibility(JsonAutoDetect.Visibility.ANY));
         try {
-            Recipe clone = clone();
             if (options != null) {
                 m.putAll(options);
-                for (OptionDescriptor optionDescriptor : clone.getDescriptor().getOptions()) {
+                for (OptionDescriptor optionDescriptor : getOptionDescriptors()) {
                     Object value = options.get(optionDescriptor.getName());
-                    if (value != null) {
-                        Map<String, Object> option = new HashMap<>();
-                        option.put("value", value);
-                        objectMapper.updateValue(optionDescriptor, option);
-
-                        if (value instanceof String && optionDescriptor.getType().equals("List")) {
-                            m.put(optionDescriptor.getName(), Arrays.asList(((String) value).split(",")));
-                        }
+                    if (value instanceof String && optionDescriptor.getType().equals("List")) {
+                        m.put(optionDescriptor.getName(), Arrays.asList(((String) value).split(",")));
                     }
                 }
             }
-            return objectMapper.updateValue(clone, m);
+
+            Recipe configured = objectMapper.updateValue(clone(), m);
+            configured.descriptor = null;
+
+            if (options != null) {
+                for (OptionDescriptor optionDescriptor : configured.getDescriptor().getOptions()) {
+                    Object value = options.get(optionDescriptor.getName());
+                    if (value != null && optionDescriptor.getValue() == null) {
+                        Map<String, Object> option = new HashMap<>();
+                        option.put("value", value);
+                        objectMapper.updateValue(optionDescriptor, option);
+                    }
+                }
+            }
+            return configured;
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
