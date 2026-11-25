@@ -2858,6 +2858,26 @@ class JavadocTest implements RewriteTest {
     }
 
     @Test
+    void unicodeEscapeAfterMarginOnPreCodeLine() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  /**
+                   * Text.
+                   * <pre><code>
+                   * \\u0041bc
+                   * </code></pre>
+                   */
+                  void m() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void tabAfterMarginInMultiLineInlineCode() {
         rewriteRun(
           java(
