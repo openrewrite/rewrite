@@ -25,13 +25,16 @@ import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.javascript.rpc.JavaScriptRewriteRpc;
 import org.openrewrite.javascript.tree.JS;
+import org.openrewrite.javascript.tree.JSX;
 
 import java.io.IOException;
 import java.net.URI;
 import java.net.URL;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -94,6 +97,35 @@ class JavaScriptParserTest {
         assertThat(typescript).containsInstanceOf(JS.CompilationUnit.class);
         assertThat(typescript.get()).satisfies(cu ->
           assertThat(cu.getSourcePath()).isEqualTo(input.getPath()));
+    }
+
+    @Test
+    void jsxTagCarriesMethodTypeOfItsComponent() {
+        // given
+        @Language("tsx")
+        String script = """
+          function Counter(props: {n?: number, children?: unknown}) { return null; }
+          const a = <Counter n={1}/>;
+          const b = <Counter><div/></Counter>;
+          """;
+        Parser.Input input = Parser.Input.fromString(Path.of("counter.tsx"), script);
+
+        // when
+        SourceFile tsx = parser.parseInputs(List.of(input), Path.of("counter.tsx").toAbsolutePath().getParent(), ctx)
+          .findFirst().orElseThrow();
+        List<String> tags = new ArrayList<>();
+        new JavaScriptIsoVisitor<Integer>() {
+            @Override
+            public JSX.Tag visitJsxTag(JSX.Tag tag, Integer p) {
+                JavaType.Method methodType = tag.getMethodType();
+                tags.add(methodType == null ? "none" : methodType.getDeclaringType().getFullyQualifiedName() + "#" + methodType.getName());
+                return super.visitJsxTag(tag, p);
+            }
+        }.visit(tsx, 0);
+
+        // then
+        assertThat(tsx).isInstanceOf(JS.CompilationUnit.class);
+        assertThat(tags).containsExactly("counter#Counter", "counter#Counter", "none");
     }
 
     @SuppressWarnings({"TypeScriptUnresolvedReference", "HtmlUnknownAttribute"})

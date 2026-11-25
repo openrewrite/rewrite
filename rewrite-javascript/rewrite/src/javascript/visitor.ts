@@ -163,7 +163,8 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
             selfClosing: element.selfClosing && await this.visitSpace(element.selfClosing, p),
             children: element.children && await mapAsync(element.children, child => this.visit(child, p)),
             closingName: element.closingName && await this.visitLeftPadded(element.closingName, p),
-            afterClosingName: element.afterClosingName && await this.visitSpace(element.afterClosingName, p)
+            afterClosingName: element.afterClosingName && await this.visitSpace(element.afterClosingName, p),
+            methodType: await this.visitType(element.methodType, p) as Type.Method | undefined
         }));
         return updateIfChanged(element, updates);
     }

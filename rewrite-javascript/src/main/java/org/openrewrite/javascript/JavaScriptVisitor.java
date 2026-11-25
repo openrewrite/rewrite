@@ -1105,6 +1105,7 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
             t = t.withAfterClosingName(visitSpace(requireNonNull(t.getAfterClosingName()), Space.Location.LANGUAGE_EXTENSION, p));
         }
 
+        t = t.withMethodType((JavaType.Method) visitType(t.getMethodType(), p));
         return t.withType(visitType(t.getType(), p));
     }
 
