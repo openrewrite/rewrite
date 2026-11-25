@@ -23,8 +23,13 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.toml.internal.TomlKeyParts;
 import org.openrewrite.toml.tree.Toml;
 import org.openrewrite.toml.tree.TomlValue;
+
+import java.util.List;
+
+import static java.util.Objects.requireNonNull;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -60,6 +65,7 @@ public class DeleteTableRow extends Recipe {
             @Override
             public Toml visitDocument(Toml.Document document, ExecutionContext ctx) {
                 Toml.Document doc = (Toml.Document) super.visitDocument(document, ctx);
+                doc = doc.withValues(withoutMatchingRows(doc.getValues()));
                 if (doc != document && !doc.getValues().isEmpty()) {
                     doc = doc.withValues(ListUtils.mapFirst(doc.getValues(), first -> {
                         TomlValue originalFirst = document.getValues().get(0);
@@ -72,15 +78,28 @@ public class DeleteTableRow extends Recipe {
                 return doc;
             }
 
-            @Override
-            public @Nullable Toml visitTable(Toml.Table table, ExecutionContext ctx) {
-                Toml.Table t = (Toml.Table) super.visitTable(table, ctx);
-
-                if (TableRowMatcher.isNamed(t, tableName) && TableRowMatcher.hasMatchingKeyValue(t, identifyingKey, identifyingValue, useRegex)) {
-                    return null; // Delete the table
-                }
-
-                return t;
+            /**
+             * Removes each matching row with the subtables that follow it, such as {@code [bin.meta]} after
+             * {@code [[bin]]}, up to the next row or a table that holds the rows.
+             */
+            private List<TomlValue> withoutMatchingRows(List<TomlValue> values) {
+                List<String> rowName = TomlKeyParts.split(tableName);
+                boolean[] inDeletedRow = {false};
+                return ListUtils.map(values, value -> {
+                    if (!(value instanceof Toml.Table) || ((Toml.Table) value).getName() == null) {
+                        return value;
+                    }
+                    Toml.Table table = (Toml.Table) value;
+                    List<String> name = TomlKeyParts.of(requireNonNull(table.getName()));
+                    if (name.equals(rowName)) {
+                        inDeletedRow[0] = TableRowMatcher.hasMatchingKeyValue(table, identifyingKey, identifyingValue, useRegex);
+                    } else if (TomlKeyParts.startsWith(rowName, name)) {
+                        inDeletedRow[0] = false;
+                    } else if (!TomlKeyParts.startsWith(name, rowName)) {
+                        return value;
+                    }
+                    return inDeletedRow[0] ? null : value;
+                });
             }
         };
     }

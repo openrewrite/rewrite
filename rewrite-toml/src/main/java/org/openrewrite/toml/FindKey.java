@@ -28,7 +28,7 @@ import org.openrewrite.toml.tree.Toml;
 @EqualsAndHashCode(callSuper = false)
 public class FindKey extends Recipe {
     @Option(displayName = "Key path",
-            description = "A TOML path expression to locate keys. Wildcards are supported.",
+            description = "A TOML path expression to locate keys, including the names of tables. Wildcards are supported.",
             example = "**.name")
     String keyPath;
 
@@ -44,6 +44,13 @@ public class FindKey extends Recipe {
             public Toml.KeyValue visitKeyValue(Toml.KeyValue keyValue, ExecutionContext ctx) {
                 Toml.KeyValue kv = super.visitKeyValue(keyValue, ctx);
                 return matcher.matches(getCursor()) ? SearchResult.found(kv) : kv;
+            }
+
+            @Override
+            public Toml.Table visitTable(Toml.Table table, ExecutionContext ctx) {
+                Toml.Table t = super.visitTable(table, ctx);
+                // a [table] or [[table]] header is a key too, one holding a table
+                return t.getName() != null && matcher.matches(getCursor()) ? SearchResult.found(t) : t;
             }
         };
     }

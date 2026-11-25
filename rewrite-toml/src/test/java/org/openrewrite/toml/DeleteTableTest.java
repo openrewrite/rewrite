@@ -241,4 +241,36 @@ class DeleteTableTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void deleteSubtablesWithTheTable() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteTable("dependencies")),
+          toml(
+            """
+              [package]
+              name = "app"
+
+              [dependencies]
+              log = "0.4"
+
+              [dependencies.serde]
+              version = "1"
+
+              [[dependencies.extra]]
+              x = 1
+
+              [dependencies-other]
+              y = 2
+              """,
+            """
+              [package]
+              name = "app"
+
+              [dependencies-other]
+              y = 2
+              """
+          )
+        );
+    }
 }
