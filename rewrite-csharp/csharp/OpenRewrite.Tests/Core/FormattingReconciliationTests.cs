@@ -22,6 +22,9 @@ namespace OpenRewrite.Tests.Core;
 public class FormattingReconciliationTests
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
+    private static readonly CSharpParser Parser = new();
+    private static readonly CompilationUnit Original = Parser.Parse("class C { }");
+    private static readonly CompilationUnit Formatted = Parser.Parse("class C { void M() { } }");
 
     [Theory]
     [InlineData(true)]
@@ -34,7 +37,7 @@ public class FormattingReconciliationTests
         Exception? firstMismatch = null;
         Exception? secondMismatch = null;
 
-        var first = Task.Run(() =>
+        var first = Task.Factory.StartNew(() =>
         {
             try
             {
@@ -49,8 +52,8 @@ public class FormattingReconciliationTests
             {
                 firstFinished.Set();
             }
-        });
-        var second = Task.Run(() =>
+        }, TaskCreationOptions.LongRunning);
+        var second = Task.Factory.StartNew(() =>
         {
             Assert.True(firstEntered.Wait(Timeout));
             new Harness().Run(!firstEnabled, () =>
@@ -59,7 +62,7 @@ public class FormattingReconciliationTests
                 Assert.True(firstFinished.Wait(Timeout));
                 secondMismatch = Record.Exception(() => Reconcile());
             });
-        });
+        }, TaskCreationOptions.LongRunning);
         await Task.WhenAll(first, second);
 
         AssertMismatch(firstEnabled, firstMismatch);
@@ -144,11 +147,8 @@ public class FormattingReconciliationTests
 
     private static void Reconcile(bool? throwOnMismatch = null)
     {
-        var parser = new CSharpParser();
-        var original = parser.Parse("class C { }");
-        var formatted = parser.Parse("class C { void M() { } }");
         var reconciler = new WhitespaceReconciler(throwOnMismatch);
-        reconciler.Reconcile(original, formatted);
+        reconciler.Reconcile(Original, Formatted);
         Assert.False(reconciler.IsCompatible);
     }
 
