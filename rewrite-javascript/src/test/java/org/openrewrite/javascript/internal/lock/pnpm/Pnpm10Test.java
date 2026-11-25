@@ -37,7 +37,7 @@ class Pnpm10Test {
 
     @Test
     void supportsOnlyTheRecordedPnpm10Releases() {
-        for (String version : new String[]{"10.0.0", "10.11.0", "10.34.9"}) {
+        for (String version : new String[]{"10.0.0", "10.11.0", "10.12.1", "10.34.9"}) {
             assertThat(PnpmReleases.runs(version)).hasToString(version);
         }
         for (String version : new String[]{"10.0.1", "10.11.1", "10.34.8", "^10.0.0"}) {
@@ -52,7 +52,7 @@ class Pnpm10Test {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"10.0.0", "10.11.0", "10.34.9"})
+    @ValueSource(strings = {"10.0.0", "10.11.0", "10.12.1", "10.34.9"})
     void keepsLockedPreferredVersionsUnweighted(String version) {
         Map<String, Map<String, PreferredVersions.Selector>> preferred =
           PreferredVersions.getPreferredVersionsFromLockfileAndManifests(
@@ -66,7 +66,7 @@ class Pnpm10Test {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"10.0.0", "10.11.0", "10.34.9"})
+    @ValueSource(strings = {"10.0.0", "10.11.0", "10.12.1", "10.34.9"})
     void refusesUnportedPatchAndRuntimePaths(String version) {
         PnpmScenarios.Scenario scenario = PnpmScenarios.discover().stream()
           .filter(s -> s.getName().equals("pnpm" + version.replace(".", "") + "-upgrade"))
@@ -87,7 +87,7 @@ class Pnpm10Test {
     @ParameterizedTest
     @ValueSource(strings = {"owner/repo", "owner/repo#main", "./pkg", "../pkg", "/tmp/pkg"})
     void refusesNewNonRegistryDependenciesBeforeResolution(String spec) {
-        for (String version : new String[]{"10.0.0", "10.11.0", "10.34.9"}) {
+        for (String version : new String[]{"10.0.0", "10.11.0", "10.12.1", "10.34.9"}) {
             PnpmScenarios.Scenario scenario = PnpmScenarios.discover().stream()
               .filter(s -> s.getName().equals("pnpm" + version.replace(".", "") + "-upgrade"))
               .findFirst().orElseThrow(AssertionError::new);
@@ -103,7 +103,7 @@ class Pnpm10Test {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"10.0.0", "10.11.0", "10.34.9"})
+    @ValueSource(strings = {"10.0.0", "10.11.0", "10.12.1", "10.34.9"})
     void keepsSupportedDependencyFormsWithinTheProfile(String version) {
         PnpmScenarios.Scenario scenario = PnpmScenarios.discover().stream()
           .filter(s -> s.getName().equals("pnpm" + version.replace(".", "") + "-upgrade"))
@@ -120,7 +120,7 @@ class Pnpm10Test {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"10.0.0", "10.11.0", "10.34.9"})
+    @ValueSource(strings = {"10.0.0", "10.11.0", "10.12.1", "10.34.9"})
     void readsNpmrcPeerSettings(String version) {
         PnpmOptions options = PnpmOptions.load(null, "auto-install-peers=false\n", null,
           obj("{'name':'test','version':'1.0.0'}"), Collections.emptyMap(), PnpmRelease.of(version));
@@ -129,7 +129,7 @@ class Pnpm10Test {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"10.0.0", "10.11.0", "10.34.9"})
+    @ValueSource(strings = {"10.0.0", "10.11.0", "10.12.1", "10.34.9"})
     void readsManifestOverrides(String version) {
         PnpmOptions options = PnpmOptions.load(null, null, null,
           obj("{'name':'test','pnpm':{'overrides':{'is-number':'6.0.0'}}}"),
@@ -138,7 +138,7 @@ class Pnpm10Test {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"10.0.0", "10.11.0", "10.34.9"})
+    @ValueSource(strings = {"10.0.0", "10.11.0", "10.12.1", "10.34.9"})
     void reproducesNativeRecordings(String version) {
         String prefix = "pnpm" + version.replace(".", "") + "-";
         int count = 0;
@@ -213,7 +213,7 @@ class Pnpm10Test {
      * the locked version, and moves every project to the range's highest.
      */
     @ParameterizedTest
-    @CsvSource({"10.0.0, false", "10.11.0, false", "10.34.9, true"})
+    @CsvSource({"10.0.0, false", "10.11.0, false", "10.12.1, false", "10.34.9, true"})
     void aNewProjectOfACatalogEntryWhoseLockedVersionIsGone(String version, boolean moves) {
         Map<String, String> manifests = new LinkedHashMap<>();
         manifests.put("", "{\"name\":\"root\",\"version\":\"1.0.0\",\"private\":true}");
@@ -269,7 +269,7 @@ class Pnpm10Test {
      * metadata first; before, the range is invalid, and no resolver takes it.
      */
     @ParameterizedTest
-    @CsvSource({"10.0.0, false", "10.11.0, false", "10.34.9, true"})
+    @CsvSource({"10.0.0, false", "10.11.0, false", "10.12.1, false", "10.34.9, true"})
     void aRangeWithBuildMetadata(String version, boolean resolves) {
         Result result = regenerate(SV_LOCK.formatted("1.0.0"),
           Collections.singletonMap("", "{\"name\":\"b\",\"version\":\"1.0.0\",\"dependencies\":{\"sv\":\"^1+build\"}}"),

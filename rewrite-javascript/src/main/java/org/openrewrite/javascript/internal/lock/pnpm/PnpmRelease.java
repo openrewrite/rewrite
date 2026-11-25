@@ -436,10 +436,10 @@ public final class PnpmRelease {
      * An .npmrc's unscoped credentials ({@code _authToken}, {@code _auth}, {@code username}, {@code _password},
      * {@code tokenHelper}, {@code cert}, {@code key}) are pinned to the registry that .npmrc names, else npm's, and
      * checked with that registry's own, from 11.4.0; before, the merged unscoped ones are checked as the default
-     * registry's. The proven pnpm 10 pin 10.34.9 also rescopes each source; 10.0.0 and 10.11.0 do not.
+     * registry's. pnpm 10 rescopes each source from 10.34.0 (pnpm/pnpm#11986).
      */
     boolean rescopesUnscopedCredentials() {
-        return !atLeast(11, 0, 0) ? atLeast(10, 34, 9) : atLeast(11, 4, 0);
+        return !atLeast(11, 0, 0) ? atLeast(10, 34, 0) : atLeast(11, 4, 0);
     }
 
     /**
@@ -536,11 +536,11 @@ public final class PnpmRelease {
      * The project's own .npmrc expands no environment variable in a request destination (a registry, a {@code //}
      * key, a proxy) or a credential, and its pnpm-workspace.yaml none in {@code registry}, {@code pnprServer},
      * {@code registries} or {@code namedRegistries}: such an entry is left out with a warning, from 11.5.3; before,
-     * each is expanded as any other. Among the proven pnpm 10 pins, 10.34.9 also applies this filter;
-     * 10.0.0 and 10.11.0 do not (config/config's dropUntrustedEnvExpansions).
+     * each is expanded as any other. pnpm 10 applies this filter from 10.34.2 (pnpm/pnpm#12300, config/config's
+     * dropUntrustedEnvExpansions).
      */
     boolean ignoresTheEnvironmentInRepositoryRequestDestinations() {
-        return !atLeast(11, 0, 0) ? atLeast(10, 34, 9) : atLeast(11, 5, 3);
+        return !atLeast(11, 0, 0) ? atLeast(10, 34, 2) : atLeast(11, 5, 3);
     }
 
     /**

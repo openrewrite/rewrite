@@ -30,7 +30,7 @@ class PnpmAuthHeadersTest {
     private static final String KEY = "//private.example/:_authToken=";
 
     @ParameterizedTest
-    @ValueSource(strings = {"10.0.0", "10.11.0", "10.34.9", "11.0.3", "11.1.2", "11.1.3", "11.5.2",
+    @ValueSource(strings = {"10.0.0", "10.11.0", "10.12.1", "10.34.9", "11.0.3", "11.1.2", "11.1.3", "11.5.2",
       "11.5.3", "11.10.0", "11.16.0"})
     void exactNativeSourcePolicyAndPrecedence(String version) {
         boolean dropsProject = version.equals("10.34.9") || version.equals("11.5.3") ||
@@ -61,7 +61,7 @@ class PnpmAuthHeadersTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"10.0.0", "10.11.0", "10.34.9", "11.1.3", "11.5.3", "11.10.0", "11.16.0"})
+    @ValueSource(strings = {"10.0.0", "10.11.0", "10.12.1", "10.34.9", "11.1.3", "11.5.3", "11.10.0", "11.16.0"})
     void unsetVariablesNeverBecomeAuthorization(String version) {
         PnpmRelease release = PnpmRelease.of(version);
         assertThat(options(KEY + "${MISSING}", null, Map.of(), release).authHeaders().authorization(URL, "p"))
@@ -98,7 +98,7 @@ class PnpmAuthHeadersTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"10.0.0", "10.11.0", "10.34.9", "11.0.3", "11.1.2", "11.1.3", "11.5.2",
+    @ValueSource(strings = {"10.0.0", "10.11.0", "10.12.1", "10.34.9", "11.0.3", "11.1.2", "11.1.3", "11.5.2",
       "11.5.3", "11.10.0", "11.16.0"})
     void defaultUnscopedCredentialsHaveTheNativesPrecedence(String version) {
         boolean rescoped = java.util.List.of("10.34.9", "11.5.2", "11.5.3", "11.10.0", "11.16.0").contains(version);
