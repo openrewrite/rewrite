@@ -64,18 +64,6 @@ class RecipeBasicsTest {
         assertThat(introspected.getDescriptor().getOptions().getFirst().getValue()).isNull();
     }
 
-    @Test
-    void withOptionsReportsConstructorParameterOptionValue() {
-        RecipeWithConstructorParameter recipe = new RecipeWithConstructorParameter(null);
-        recipe.getDescriptor();
-
-        Recipe configured = recipe.withOptions(Map.of("option", "configured"));
-
-        assertThat(((RecipeWithConstructorParameter) configured).option).isEqualTo("configured");
-        assertThat(configured.getDescriptor().getOptions().getFirst().getValue()).isEqualTo("configured");
-        assertThat(recipe.getDescriptor().getOptions().getFirst().getValue()).isNull();
-    }
-
 
     static class RecipeBase extends Recipe {
         String option;

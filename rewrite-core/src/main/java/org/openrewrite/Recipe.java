@@ -629,17 +629,7 @@ public abstract class Recipe implements Cloneable {
 
             Recipe configured = clone();
             configured.descriptor = null;
-            configured = objectMapper.updateValue(configured, m);
-
-            for (OptionDescriptor optionDescriptor : configured.getDescriptor().getOptions()) {
-                Object value = options.get(optionDescriptor.getName());
-                if (value != null && optionDescriptor.getValue() == null) {
-                    Map<String, Object> option = new HashMap<>();
-                    option.put("value", value);
-                    objectMapper.updateValue(optionDescriptor, option);
-                }
-            }
-            return configured;
+            return objectMapper.updateValue(configured, m);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
