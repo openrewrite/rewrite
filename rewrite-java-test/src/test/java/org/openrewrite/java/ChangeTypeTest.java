@@ -4932,4 +4932,43 @@ class ChangeTypeTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void changeTypeOfDoublyNestedInnerClass() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("foo.A$B$C", "bar.X$Y$Z", null))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+                """
+                  package foo;
+
+                  public class A {
+                    public static class B {
+                      public static class C {}
+                    }
+                  }
+                  """
+              )
+            ),
+          java(
+            """
+              import foo.A;
+
+              class Test {
+                void test() {
+                    A.B.C x = new A.B.C();
+                }
+              }
+              """,
+            """
+              import bar.X;
+
+              class Test {
+                void test() {
+                    X.Y.Z x = new X.Y.Z();
+                }
+              }
+              """
+          )
+        );
+    }
 }
