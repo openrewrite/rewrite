@@ -243,3 +243,149 @@ describe('a call into parsed source is attributed as the declaration it calls is
         expect(calls["src/local.ts"][3]).not.toMatch(/^src\/local#/);
     });
 });
+
+describe('a function implementing a member of a named type is declared on that member, as a call through the type is', () => {
+    const project = (files: Record<string, string>) => ({
+        "package.json": JSON.stringify({name: "lib", version: "1.0.0", type: "module"}),
+        "tsconfig.json": JSON.stringify({compilerOptions: {module: "nodenext", moduleResolution: "nodenext", strict: true}}),
+        ...files
+    });
+
+    test('a local variable\'s function is declared on its file under the variable\'s name, as a call of it is', async () => {
+        // given
+        const files = project({
+            "src/local.ts": `export function outer() {\n    const arrow = () => 1;\n    const cast = (() => 2) as () => number;\n    const typed: () => number = function () { return 3; };\n    arrow();\n    cast();\n    typed();\n    [1].map(n => n);\n}`
+        });
+
+        // when
+        const {calls, declarations} = await identities(files);
+
+        // then
+        expect(declarations["src/local.ts"]).toEqual([
+            "src/local#outer static",
+            "src/local#arrow",
+            "src/local#cast",
+            "src/local#typed",
+            "∅"
+        ]);
+        expect(calls["src/local.ts"].slice(0, 3)).toEqual(["src/local#arrow", "src/local#cast", "src/local#typed"]);
+    });
+
+    test('a function assigned to a property of an aliased type is declared on the alias, through mapped types and an intersection with any', async () => {
+        // given
+        const files = project({
+            "src/types.ts": `export type Inst = { (input: string): number; create(x: string): Inst; extend: (x: string) => Inst };`,
+            "src/index.ts": `import type {Inst} from './types.js';\ntype Mutable<T> = {-readonly [K in keyof T]: T[K]};\nconst createInstance = (): Inst => {\n    const inst: Partial<Mutable<Inst>> = {};\n    inst.create = (x: string) => createInstance();\n    const loose: Partial<Inst> & any = {};\n    loose.extend = (x: string) => createInstance();\n    return inst as Inst;\n};\nexport default createInstance();`,
+            "test/main.ts": `import inst from '../src/index.js';\ninst.create('a');\ninst.extend('b');`
+        });
+
+        // when
+        const {calls, declarations} = await identities(files);
+
+        // then
+        expect(declarations["src/types.ts"]).toEqual(["∅", "src/types.Inst#create"]);
+        expect(declarations["src/index.ts"]).toEqual([
+            "src/index#createInstance static",
+            "src/types.Inst#create",
+            "src/types.Inst#extend"
+        ]);
+        expect(calls["test/main.ts"]).toEqual(["src/types.Inst#create", "src/types.Inst#extend"]);
+    });
+
+    test('a method or a property function of an object literal is declared on its contextual generic interface, also through a cast', async () => {
+        // given
+        const files = project({
+            "src/types.ts": `export interface StoreApi<T> { setState(v: T): void; getState: () => T }`,
+            "src/index.ts": `import type {StoreApi} from './types.js';\nexport const literalStore = <T>(t: T): StoreApi<T> => ({ setState(v) {}, getState: () => t });\nexport const castStore = () => ({ setState(v: number) {}, getState: function () { return 1; } }) as StoreApi<number>;`,
+            "test/main.ts": `import {literalStore, castStore} from '../src/index.js';\nliteralStore(1).setState(2);\nliteralStore(1).getState();\ncastStore().setState(3);\ncastStore().getState();`
+        });
+
+        // when
+        const {calls, declarations} = await identities(files);
+
+        // then
+        expect(declarations["src/types.ts"]).toEqual(["src/types.StoreApi#setState"]);
+        expect(declarations["src/index.ts"]).toEqual([
+            "src/index#literalStore static",
+            "src/types.StoreApi#setState",
+            "src/types.StoreApi#getState",
+            "src/index#castStore static",
+            "src/types.StoreApi#setState",
+            "src/types.StoreApi#getState"
+        ]);
+        expect(calls["test/main.ts"].filter(call => !call.startsWith("src/index#"))).toEqual([
+            "src/types.StoreApi#setState",
+            "src/types.StoreApi#getState",
+            "src/types.StoreApi#setState",
+            "src/types.StoreApi#getState"
+        ]);
+    });
+
+    test('a local function implements the member its annotation indexes, or the one a contextually typed object literal holds it as', async () => {
+        // given
+        const files = project({
+            "src/types.ts": `export interface StoreApi<T> { setState(v: T): void; getState: () => T }`,
+            "src/vanilla.ts": `import type {StoreApi} from './types.js';\nexport const createStore = <T>(initial: T): StoreApi<T> => {\n    let state = initial;\n    const setState: StoreApi<T>['setState'] = (v) => { state = v; };\n    const getState = () => state;\n    const api: StoreApi<T> = {setState, getState};\n    return api;\n};`,
+            "test/main.ts": `import {createStore} from '../src/vanilla.js';\nconst s = createStore(1);\ns.setState(2);\ns.getState();\nconst {setState, getState} = createStore(1);\nsetState(3);\ngetState();`
+        });
+
+        // when
+        const {calls, declarations} = await identities(files);
+
+        // then
+        expect(declarations["src/vanilla.ts"]).toEqual([
+            "src/vanilla#createStore static",
+            "src/types.StoreApi#setState",
+            "src/types.StoreApi#getState"
+        ]);
+        expect(calls["test/main.ts"].filter(call => !call.startsWith("src/vanilla#"))).toEqual([
+            "src/types.StoreApi#setState",
+            "src/types.StoreApi#getState",
+            "src/types.StoreApi#setState",
+            "src/types.StoreApi#getState"
+        ]);
+    });
+
+    test('a member of a type literal typing a property of a named type is declared on the type and the property', async () => {
+        // given
+        const files = project({
+            "src/types.ts": `export interface Store { persist: { rehydrate: () => void } }\nexport type WithPersist<S> = S extends object ? { persist: { hasHydrated(): boolean } } : never;`,
+            "src/index.ts": `import type {Store, WithPersist} from './types.js';\nexport const store = (): Store => ({ persist: { rehydrate() {} } });\nexport const persisted = () => {\n    const api = {};\n    (api as WithPersist<{}>).persist = { hasHydrated: () => true };\n    return api as WithPersist<{}>;\n};`,
+            "test/main.ts": `import {store, persisted} from '../src/index.js';\nstore().persist.rehydrate();\npersisted().persist.hasHydrated();`
+        });
+
+        // when
+        const {calls, declarations} = await identities(files);
+
+        // then
+        expect(declarations["src/types.ts"]).toEqual(["src/types.WithPersist.persist#hasHydrated"]);
+        expect(declarations["src/index.ts"]).toEqual([
+            "src/index#store static",
+            "src/types.Store.persist#rehydrate",
+            "src/index#persisted static",
+            "src/types.WithPersist.persist#hasHydrated"
+        ]);
+        expect(calls["test/main.ts"].filter(call => !call.startsWith("src/index#"))).toEqual([
+            "src/types.Store.persist#rehydrate",
+            "src/types.WithPersist.persist#hasHydrated"
+        ]);
+    });
+
+    test('an object literal with no contextual type, or one a library declares, keeps its members on its file', async () => {
+        // given
+        const files = project({
+            "src/plain.ts": `export const plain = () => ({ use() {}, arrow: () => 1 });\nexport const iterator: Iterator<number> = { next() { return {done: true, value: 0}; } };`
+        });
+
+        // when
+        const {declarations} = await identities(files);
+
+        // then
+        expect(declarations["src/plain.ts"]).toEqual([
+            "src/plain#plain static",
+            "src/plain#use",
+            "src/plain#arrow",
+            "src/plain#next"
+        ]);
+    });
+});

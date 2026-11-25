@@ -81,6 +81,11 @@ export function moduleClass(fullyQualifiedName: string): Type.Class {
     } as Type.Class;
 }
 
+interface ImplementedMember {
+    owner: Type.FullyQualified;
+    name: string;
+}
+
 export class JavaScriptTypeMapping {
     // Primary cache: Use type signatures (preferring type.id) as cache keys
     // TypeScript assigns stable IDs to all types, so we don't need secondary caches
@@ -102,6 +107,7 @@ export class JavaScriptTypeMapping {
     // gives its own bases in its place, and has none to give until it is done.
     private readonly heritageInProgress = new Map<Type.Class, (() => void)[]>();
 
+    private readonly referencedImplementations = new WeakMap<ts.SourceFile, Map<ts.VariableDeclaration, ImplementedMember | null>>();
 
     /**
      * @param sourceRoot What a parsed file's module is named relative to.
@@ -910,6 +916,8 @@ export class JavaScriptTypeMapping {
      * the callee is declared as, or the top-level variable holding it, as `const f = () => …` or
      * `const ky = createInstance()` does, where the signature it calls is declared in parsed source too.
      * A local variable holding a function names it on its file, as a nested function declaration is.
+     * One destructured from an object, as in `const {setState} = createStore()`, calls the member it is
+     * destructured from, as `store.setState()` does, where a named type in parsed source declares it.
      * A callee bound to a module, by an import or a `require`, calls the declaration its signature
      * resolves to, which may be one a re-export such as `module.exports = require('./lib/express')` leads to.
      */
@@ -927,9 +935,17 @@ export class JavaScriptTypeMapping {
             if (this.isTopLevelVariable(declaration) && !this.moduleBinding(declaration, declaration)) {
                 return {declaringType: this.sourceModuleType(declaration.getSourceFile()), name: declaration.name.text, isStatic: true};
             }
-            if (ts.isVariableDeclaration(declaration) && ts.isIdentifier(declaration.name) &&
-                (ts.isArrowFunction(target) || ts.isFunctionExpression(target)) && this.initializes(declaration, target)) {
-                return {declaringType: this.sourceModuleType(declaration.getSourceFile()), name: declaration.name.text};
+            const destructured = ts.isBindingElement(declaration) ? this.destructuredMember(declaration) : undefined;
+            if (destructured) {
+                return {declaringType: destructured.owner, name: destructured.name};
+            }
+            const fn = ts.isVariableDeclaration(declaration) && declaration.initializer ?
+                this.heldFunction(declaration.initializer) : undefined;
+            if (fn && ts.isVariableDeclaration(declaration) && ts.isIdentifier(declaration.name)) {
+                const local = this.implementedMember(fn);
+                return local ?
+                    {declaringType: local.owner, name: local.name} :
+                    {declaringType: this.sourceModuleType(declaration.getSourceFile()), name: declaration.name.text};
             }
         }
         if (!boundToModule) {
@@ -938,13 +954,8 @@ export class JavaScriptTypeMapping {
         if (ts.isFunctionDeclaration(target)) {
             return {declaringType: this.functionOwner(target), name: this.functionDeclarationName(target)};
         }
-        const name = (ts.isArrowFunction(target) || ts.isFunctionExpression(target)) ? this.functionName(target) : undefined;
-        return name ? {declaringType: this.sourceModuleType(target.getSourceFile()), name} : undefined;
-    }
-
-    /** Whether a variable is initialized with a function, also through a cast, as in `const f = (() => …) as F`. */
-    private initializes(variable: ts.VariableDeclaration, fn: ts.ArrowFunction | ts.FunctionExpression): boolean {
-        return this.castTarget(fn) === variable.initializer;
+        const identity = (ts.isArrowFunction(target) || ts.isFunctionExpression(target)) ? this.functionIdentity(target) : undefined;
+        return identity && {declaringType: identity.owner, name: identity.name};
     }
 
     private castTarget(fn: ts.ArrowFunction | ts.FunctionExpression): ts.Node {
@@ -963,10 +974,172 @@ export class JavaScriptTypeMapping {
 
     /**
      * The name of a function expression or arrow function: its own, or else the one a top-level
-     * `const f = …`, an `exports.f = …` assignment or the property it is assigned to gives it.
+     * `const f = …`, an `exports.f = …` assignment, the property it is assigned to or the local
+     * variable it initializes gives it.
      */
     private functionName(fn: ts.ArrowFunction | ts.FunctionExpression): string | undefined {
-        return fn.name?.text ?? this.moduleBindingName(fn) ?? this.memberFunctionName(fn);
+        return fn.name?.text ?? this.moduleBindingName(fn) ?? this.memberFunctionName(fn) ?? this.localBindingName(fn);
+    }
+
+    /**
+     * What declares a function expression or arrow function: the member of a named type it implements,
+     * where no module binding names it, or else its file, under the name {@link functionName} gives it.
+     */
+    private functionIdentity(fn: ts.ArrowFunction | ts.FunctionExpression): ImplementedMember | undefined {
+        const implemented = this.moduleBindingName(fn) === undefined ? this.implementedMember(fn) : undefined;
+        if (implemented) {
+            return implemented;
+        }
+        const name = this.functionName(fn);
+        return name === undefined ? undefined : {owner: this.sourceModuleType(fn.getSourceFile()), name};
+    }
+
+    private localBindingName(fn: ts.ArrowFunction | ts.FunctionExpression): string | undefined {
+        const node = this.castTarget(fn);
+        const parent = node.parent;
+        return ts.isVariableDeclaration(parent) && parent.initializer === node && ts.isIdentifier(parent.name) ?
+            parent.name.text : undefined;
+    }
+
+    /**
+     * The member of a named type declared in parsed source that a function implements, which is
+     * where a call through that type is declared, as in Java a call is declared on the interface it is
+     * made through. That is the member of an object literal's contextual type, as in
+     * `const api: Store = {setState() {}}`, or of the receiver a function is assigned to a property of,
+     * as in `inst.create = () => …`. A local variable holding a function implements the member its
+     * annotation indexes, as in `const setState: Store['setState'] = …`, or the one an object literal
+     * holding it as a property implements, as `{setState}` does.
+     */
+    private implementedMember(fn: ts.ArrowFunction | ts.FunctionExpression | ts.MethodDeclaration): ImplementedMember | undefined {
+        if (!this.isParsedSource(fn)) {
+            return undefined;
+        }
+        if (ts.isMethodDeclaration(fn)) {
+            return ts.isObjectLiteralExpression(fn.parent) ? this.memberOfContextualType(fn.parent, fn.name) : undefined;
+        }
+        const node = this.castTarget(fn);
+        const parent = node.parent;
+        if (ts.isPropertyAssignment(parent) && parent.initializer === node) {
+            return this.memberOfContextualType(parent.parent, parent.name);
+        }
+        if (ts.isBinaryExpression(parent) && parent.right === node && parent.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+            (ts.isPropertyAccessExpression(parent.left) || ts.isElementAccessExpression(parent.left)) &&
+            !this.isPrototype(parent.left.expression)) {
+            const name = ts.isPropertyAccessExpression(parent.left) ? parent.left.name :
+                ts.isStringLiteralLike(parent.left.argumentExpression) ? parent.left.argumentExpression : undefined;
+            return name && this.receiverTypes(parent.left.expression)
+                .map(type => this.memberOf(type, name.text))
+                .find(member => member !== undefined);
+        }
+        if (ts.isVariableDeclaration(parent) && parent.initializer === node && ts.isIdentifier(parent.name) &&
+            !this.isTopLevelVariable(parent)) {
+            return this.indexedMember(parent.type) ?? this.referencedImplementation(parent);
+        }
+        return undefined;
+    }
+
+    private destructuredMember(element: ts.BindingElement): ImplementedMember | undefined {
+        const name = element.propertyName ?? element.name;
+        if (!ts.isObjectBindingPattern(element.parent) || element.dotDotDotToken ||
+            !(ts.isIdentifier(name) || ts.isStringLiteralLike(name))) {
+            return undefined;
+        }
+        return this.memberOf(this.checker.getTypeAtLocation(element.parent), name.text);
+    }
+
+    private memberOfContextualType(literal: ts.ObjectLiteralExpression, name: ts.PropertyName): ImplementedMember | undefined {
+        if (!ts.isIdentifier(name) && !ts.isStringLiteralLike(name) && !ts.isNumericLiteral(name)) {
+            return undefined;
+        }
+        const type = this.checker.getContextualType(literal);
+        return type && this.memberOf(type, name.text);
+    }
+
+    /**
+     * The types a receiver may be written through: its own, or where that is `any`, as with
+     * `const ky: Partial<KyInstance> & any`, each part of the intersection its declaration is annotated with.
+     */
+    private receiverTypes(receiver: ts.Expression): ts.Type[] {
+        const type = this.checker.getTypeAtLocation(receiver);
+        if (!(type.flags & ts.TypeFlags.Any)) {
+            return [type];
+        }
+        const declaration = ts.isIdentifier(receiver) ? this.checker.getSymbolAtLocation(receiver)?.valueDeclaration : undefined;
+        const annotation = declaration && (ts.isVariableDeclaration(declaration) || ts.isParameter(declaration)) ? declaration.type : undefined;
+        const parts = annotation && ts.isIntersectionTypeNode(annotation) ? annotation.types : [];
+        return parts.map(part => this.checker.getTypeFromTypeNode(part));
+    }
+
+    /** The member an indexed access type with a literal index names, as `Store['setState']` names `setState` of `Store`. */
+    private indexedMember(annotation: ts.TypeNode | undefined): ImplementedMember | undefined {
+        if (!annotation || !ts.isIndexedAccessTypeNode(annotation) || !ts.isLiteralTypeNode(annotation.indexType) ||
+            !ts.isStringLiteral(annotation.indexType.literal)) {
+            return undefined;
+        }
+        return this.memberOf(this.checker.getTypeFromTypeNode(annotation.objectType), annotation.indexType.literal.text);
+    }
+
+    private memberOf(type: ts.Type, name: string): ImplementedMember | undefined {
+        if (type.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) {
+            return undefined;
+        }
+        const member = this.checker.getPropertyOfType(this.checker.getApparentType(this.checker.getNonNullableType(type)), name);
+        if (!member?.declarations?.length || !member.declarations.every(declaration => this.isParsedSource(declaration))) {
+            return undefined;
+        }
+        const owner = this.declaringClassOf(member);
+        return owner && {owner, name: escapeLoneSurrogates(name)};
+    }
+
+    /**
+     * The member a local variable holding a function implements, where an object literal in its file
+     * holds it as a property, as `{setState}` or `{setState: set}` does, and that literal's contextual
+     * type has that member. A variable that literals of different types hold implements none.
+     */
+    private referencedImplementation(variable: ts.VariableDeclaration): ImplementedMember | undefined {
+        const sourceFile = variable.getSourceFile();
+        let implementations = this.referencedImplementations.get(sourceFile);
+        if (!implementations) {
+            implementations = new Map();
+            this.referencedImplementations.set(sourceFile, implementations);
+            const found = implementations;
+            const visit = (node: ts.Node): void => {
+                if (ts.isShorthandPropertyAssignment(node) ||
+                    (ts.isPropertyAssignment(node) && ts.isIdentifier(node.initializer))) {
+                    const symbol = ts.isShorthandPropertyAssignment(node) ?
+                        this.checker.getShorthandAssignmentValueSymbol(node) :
+                        this.checker.getSymbolAtLocation(node.initializer);
+                    const declaration = symbol?.valueDeclaration;
+                    if (declaration && ts.isVariableDeclaration(declaration) && declaration.getSourceFile() === sourceFile &&
+                        declaration.initializer && this.heldFunction(declaration.initializer) && found.get(declaration) !== null) {
+                        const member = this.memberOfContextualType(node.parent, node.name);
+                        const previous = found.get(declaration);
+                        if (member && (!previous || this.sameMember(previous, member))) {
+                            found.set(declaration, member);
+                        } else if (previous || member) {
+                            found.set(declaration, null);
+                        }
+                    }
+                }
+                ts.forEachChild(node, visit);
+            };
+            visit(sourceFile);
+        }
+        return implementations.get(variable) ?? undefined;
+    }
+
+    /** The function an initializer is, also through a cast, as in `(() => …) as F`. */
+    private heldFunction(initializer: ts.Expression): ts.ArrowFunction | ts.FunctionExpression | undefined {
+        let node = initializer;
+        while (ts.isParenthesizedExpression(node) || ts.isAsExpression(node) || ts.isSatisfiesExpression(node) || ts.isTypeAssertionExpression(node)) {
+            node = node.expression;
+        }
+        return ts.isArrowFunction(node) || ts.isFunctionExpression(node) ? node : undefined;
+    }
+
+    private sameMember(a: ImplementedMember, b: ImplementedMember): boolean {
+        return a.name === b.name &&
+            Type.FullyQualified.getFullyQualifiedName(a.owner) === Type.FullyQualified.getFullyQualifiedName(b.owner);
     }
 
     /** Only a default export, as in `export default function () {}`, declares a function without a name. */
@@ -1011,21 +1184,27 @@ export class JavaScriptTypeMapping {
      * A function that an object of no class holds as a member, in a parsed source file: a function
      * expression or arrow assigned to a property, as in `app.use = function () {}` or
      * `{use: function () {}}`, or a method of an object literal. It is declared on its file, as a
-     * function declaration is, under the member's name.
+     * function declaration is, under the member's name, unless it implements a member of a named type.
      */
-    private parsedMemberFunction(declaration: ts.Declaration | undefined): {owner: Type.FullyQualified, name: string} | undefined {
+    private parsedMemberFunction(declaration: ts.Declaration | undefined): ImplementedMember | undefined {
         if (!declaration || !this.isParsedSource(declaration)) {
             return undefined;
         }
         if (ts.isFunctionDeclaration(declaration)) {
             return {owner: this.functionOwner(declaration), name: escapeLoneSurrogates(this.functionDeclarationName(declaration))};
         }
-        let name: string | undefined;
-        if (ts.isMethodDeclaration(declaration) && ts.isObjectLiteralExpression(declaration.parent)) {
-            name = this.checker.getSymbolAtLocation(declaration.name)?.getName();
-        } else if (ts.isFunctionExpression(declaration) || ts.isArrowFunction(declaration)) {
-            name = this.functionName(declaration);
+        if (ts.isFunctionExpression(declaration) || ts.isArrowFunction(declaration)) {
+            const identity = this.functionIdentity(declaration);
+            return identity && {owner: identity.owner, name: escapeLoneSurrogates(identity.name)};
         }
+        if (!ts.isMethodDeclaration(declaration) || !ts.isObjectLiteralExpression(declaration.parent)) {
+            return undefined;
+        }
+        const implemented = this.implementedMember(declaration);
+        if (implemented) {
+            return implemented;
+        }
+        const name = this.checker.getSymbolAtLocation(declaration.name)?.getName();
         return name === undefined ? undefined : {
             owner: this.sourceModuleType(declaration.getSourceFile()),
             name: escapeLoneSurrogates(name)
@@ -1209,29 +1388,81 @@ export class JavaScriptTypeMapping {
      * A union's member has one only when every member type inherits it from the same class.
      */
     private declaringClassOf(member: ts.Symbol): Type.FullyQualified | undefined {
-        let owner: ts.Type | undefined;
+        let owner: Type.FullyQualified | undefined;
+        let ownerSymbol: ts.Symbol | undefined;
         for (const declaration of member.declarations ?? []) {
             const parent = declaration.parent;
             const type = ts.isClassLike(parent) || ts.isInterfaceDeclaration(parent) ?
                 this.checker.getTypeAtLocation(parent) :
-                this.aliasedTypeLiteral(parent);
-            if (!type) {
+                undefined;
+            const declaringType = type ? this.declaringType(type) : this.typeLiteralOwner(parent);
+            if (!declaringType || declaringType === Type.unknownType) {
                 return undefined;
             }
-            if (owner && owner.symbol !== type.symbol) {
+            if (owner && (type ? ownerSymbol !== type.symbol : !this.sameType(owner, declaringType))) {
                 return undefined;
             }
-            owner = type;
+            owner ??= declaringType;
+            ownerSymbol ??= type?.symbol;
         }
-        const declaringType = owner && this.declaringType(owner);
-        return declaringType === Type.unknownType ? undefined : declaringType;
+        return owner;
+    }
+
+    private sameType(a: Type.FullyQualified, b: Type.FullyQualified): boolean {
+        return Type.FullyQualified.getFullyQualifiedName(a) === Type.FullyQualified.getFullyQualifiedName(b);
     }
 
     private memberOwner(parent: ts.Node): Type.FullyQualified {
         const type = ts.isClassLike(parent) || ts.isInterfaceDeclaration(parent) || ts.isObjectLiteralExpression(parent) ?
             this.checker.getTypeAtLocation(parent) :
-            this.aliasedTypeLiteral(parent);
-        return type ? this.declaringType(type) : Type.unknownType as Type.FullyQualified;
+            undefined;
+        return type ? this.declaringType(type) : this.typeLiteralOwner(parent) ?? Type.unknownType as Type.FullyQualified;
+    }
+
+    /**
+     * The type that declares the members of a type literal, as an interface declares its own: the type
+     * alias whose body it is. In parsed source that is also the alias whose conditional body has it as
+     * a branch, as `type StorePersist<S> = S extends … ? {…} : never` does, and a literal that types a
+     * property of a type that declares its members is named after that type and the property, as
+     * `persist` in `interface Store { persist: { rehydrate(): void } }` names `Store.persist`.
+     */
+    private typeLiteralOwner(node: ts.Node): Type.FullyQualified | undefined {
+        const aliased = this.aliasedTypeLiteral(node);
+        if (aliased) {
+            return this.declaringType(aliased);
+        }
+        if (!ts.isTypeLiteralNode(node) || !this.isParsedSource(node)) {
+            return undefined;
+        }
+        const alias = this.conditionalAlias(node);
+        if (alias) {
+            const name = this.getFullyQualifiedNameFromSymbol(alias);
+            return name === 'unknown' ? undefined : {...moduleClass(name), classKind: Type.Class.Kind.Interface} as Type.Class;
+        }
+        const property = node.parent;
+        if (!ts.isPropertySignature(property) || property.type !== node ||
+            !(ts.isIdentifier(property.name) || ts.isStringLiteral(property.name))) {
+            return undefined;
+        }
+        const enclosing = property.parent;
+        const owner = ts.isInterfaceDeclaration(enclosing) ?
+            this.declaringType(this.checker.getTypeAtLocation(enclosing)) :
+            this.typeLiteralOwner(enclosing);
+        return owner && owner !== Type.unknownType ?
+            moduleClass(`${Type.FullyQualified.getFullyQualifiedName(owner)}.${property.name.text}`) :
+            undefined;
+    }
+
+    private conditionalAlias(literal: ts.TypeLiteralNode): ts.Symbol | undefined {
+        let node: ts.Node = literal;
+        let branch = false;
+        while (ts.isParenthesizedTypeNode(node.parent) ||
+            (ts.isConditionalTypeNode(node.parent) && (node.parent.trueType === node || node.parent.falseType === node))) {
+            branch ||= ts.isConditionalTypeNode(node.parent);
+            node = node.parent;
+        }
+        return branch && ts.isTypeAliasDeclaration(node.parent) && node.parent.type === node ?
+            this.checker.getSymbolAtLocation(node.parent.name) : undefined;
     }
 
     /** The type of a type literal that is the body of a type alias, which declares its members as an interface does. */
@@ -1575,11 +1806,12 @@ export class JavaScriptTypeMapping {
                 return undefined;
             }
 
-            methodName = ts.isFunctionDeclaration(node) ? this.functionDeclarationName(node) : this.functionName(node) ?? "<anonymous>";
+            const identity = ts.isFunctionExpression(node) ? this.functionIdentity(node) : undefined;
+            methodName = ts.isFunctionDeclaration(node) ? this.functionDeclarationName(node) : identity?.name ?? "<anonymous>";
 
             declaringType = ts.isFunctionDeclaration(node) ?
                 this.functionOwner(node) :
-                this.sourceModuleType(node.getSourceFile());
+                identity?.owner ?? this.sourceModuleType(node.getSourceFile());
 
             // Get type parameters from node
             if (node.typeParameters) {
@@ -1588,13 +1820,13 @@ export class JavaScriptTypeMapping {
                 }
             }
         } else if (ts.isArrowFunction(node)) {
-            const name = this.functionName(node);
-            signature = name ? this.checker.getSignatureFromDeclaration(node) : undefined;
-            if (!name || !signature) {
+            const identity = this.functionIdentity(node);
+            signature = identity ? this.checker.getSignatureFromDeclaration(node) : undefined;
+            if (!identity || !signature) {
                 return undefined;
             }
-            methodName = name;
-            declaringType = this.sourceModuleType(node.getSourceFile());
+            methodName = identity.name;
+            declaringType = identity.owner;
             for (const tp of node.typeParameters ?? []) {
                 declaredFormalTypeNames.push(tp.name.getText());
             }

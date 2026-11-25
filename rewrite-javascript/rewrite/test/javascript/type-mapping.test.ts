@@ -1106,7 +1106,7 @@ describe('JavaScript type mapping', () => {
             await spec.rewriteRun(src);
         });
 
-        test('a type literal that is not a type alias\'s body declares no type for its members', async () => {
+        test('a type literal typing a property of a named type is named after the property, and one elsewhere declares no type for its members', async () => {
             const spec = new RecipeSpec();
             spec.recipe = markTypes((node, type) =>
                 node?.kind === J.Kind.MethodDeclaration && Type.isMethod(type) ?
@@ -1120,7 +1120,7 @@ describe('JavaScript type mapping', () => {
                 `,
                 //@formatter:off
                 `
-                    export type Wrapped = { nested: { /*~~(<unknown>)~~>*/deep(): void } };
+                    export type Wrapped = { nested: { /*~~(src/main.Wrapped.nested)~~>*/deep(): void } };
                     export type Both = { /*~~(<unknown>)~~>*/a(): void } & { /*~~(<unknown>)~~>*/b(): void };
                     /*~~(src/main)~~>*/function f(o: { /*~~(<unknown>)~~>*/inline(): void }) {}
                 `
@@ -2567,7 +2567,7 @@ describe('JavaScript type mapping', () => {
                     var proto = require('./application');
                     module.exports = createApplication;
                     /*~~(lib/express#createApplication)~~>*/function createApplication() {
-                        var app = /*~~(lib/express#<anonymous>)~~>*/function (req, res, next) {};
+                        var app = /*~~(lib/express#app)~~>*/function (req, res, next) {};
                         return /*~~(Object#assign)~~>*/Object.assign(app, proto);
                     }
                 `
