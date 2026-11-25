@@ -2493,6 +2493,87 @@ describe('JavaScript type mapping', () => {
             test.path = 'test/app.js';
             await withDir(async repo => spec.rewriteRun(npm(repo.path, application, express, test)), {unsafeCleanup: true});
         });
+
+        test('is declared on the function a shorthand or a cast property holds', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markMembers();
+            const plain = javascript(
+                `
+                    module.exports = createApplication;
+                    function createApplication() {
+                        function use(fn) { return this; }
+                        return {
+                            use,
+                            cast: (function (x) { return x; }),
+                            arrow: ((y) => y)
+                        };
+                    }
+                `,
+                //@formatter:off
+                `
+                    module.exports = createApplication;
+                    /*~~(lib/plain#createApplication)~~>*/function createApplication() {
+                        /*~~(lib/plain#use)~~>*/function use(fn) { return this; }
+                        return {
+                            use,
+                            cast: (/*~~(lib/plain#cast)~~>*/function (x) { return x; }),
+                            arrow: (/*~~(lib/plain#arrow)~~>*/(y) => y)
+                        };
+                    }
+                `
+                //@formatter:on
+            );
+            plain.path = 'lib/plain.js';
+            const test = javascript(
+                `
+                    var plain = require('../lib/plain');
+                    plain().use(1);
+                    plain().cast(2);
+                    plain().arrow(3);
+                `,
+                //@formatter:off
+                `
+                    var plain = require('../lib/plain');
+                    /*~~(lib/plain#use)~~>*//*~~(lib/plain#createApplication)~~>*/plain().use(1);
+                    /*~~(lib/plain#cast)~~>*//*~~(lib/plain#createApplication)~~>*/plain().cast(2);
+                    /*~~(lib/plain#arrow)~~>*//*~~(lib/plain#createApplication)~~>*/plain().arrow(3);
+                `
+                //@formatter:on
+            );
+            test.path = 'test/app.js';
+            await withDir(async repo => spec.rewriteRun(npm(repo.path, plain, test)), {unsafeCleanup: true});
+        });
+
+        test('is not taken for a function assigned to a member of a class instance or prototype', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markMembers();
+            const source = javascript(
+                `
+                    function Foo() {}
+                    Foo.prototype.bar = function () {};
+                    class C {
+                        constructor() {
+                            this.h = () => 1;
+                            this.g = function () {};
+                        }
+                    }
+                `,
+                //@formatter:off
+                `
+                    /*~~(lib/a#Foo)~~>*/function Foo() {}
+                    Foo.prototype.bar = /*~~(lib/a#<anonymous>)~~>*/function () {};
+                    class C {
+                        /*~~(C#<constructor>)~~>*/constructor() {
+                            this.h = () => 1;
+                            this.g = /*~~(lib/a#<anonymous>)~~>*/function () {};
+                        }
+                    }
+                `
+                //@formatter:on
+            );
+            source.path = 'lib/a.js';
+            await withDir(async repo => spec.rewriteRun(npm(repo.path, source)), {unsafeCleanup: true});
+        });
     });
 
     test('FindMissingTypes produces no results on a complex class', async () => {

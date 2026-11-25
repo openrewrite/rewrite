@@ -1014,6 +1014,9 @@ export class JavaScriptTypeMapping {
         if (!declaration || !this.isParsedSource(declaration)) {
             return undefined;
         }
+        if (ts.isFunctionDeclaration(declaration)) {
+            return {owner: this.functionOwner(declaration), name: escapeLoneSurrogates(this.functionDeclarationName(declaration))};
+        }
         let name: string | undefined;
         if (ts.isMethodDeclaration(declaration) && ts.isObjectLiteralExpression(declaration.parent)) {
             name = this.checker.getSymbolAtLocation(declaration.name)?.getName();
@@ -1026,14 +1029,17 @@ export class JavaScriptTypeMapping {
         };
     }
 
-    /** The property a function expression is assigned to, as in `app.use = function () {}` or `{use: () => …}`. */
     private memberFunctionName(fn: ts.FunctionExpression | ts.ArrowFunction): string | undefined {
-        const parent = fn.parent;
-        if (ts.isPropertyAssignment(parent) && parent.initializer === fn) {
+        const node = this.castTarget(fn);
+        const parent = node.parent;
+        if (ts.isPropertyAssignment(parent) && parent.initializer === node) {
             return ts.isIdentifier(parent.name) || ts.isStringLiteralLike(parent.name) || ts.isNumericLiteral(parent.name) ?
                 parent.name.text : undefined;
         }
-        if (ts.isBinaryExpression(parent) && parent.right === fn && parent.operatorToken.kind === ts.SyntaxKind.EqualsToken) {
+        if (ts.isBinaryExpression(parent) && parent.right === node && parent.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+            (ts.isPropertyAccessExpression(parent.left) || ts.isElementAccessExpression(parent.left)) &&
+            !this.isPrototype(parent.left.expression) &&
+            this.isAnonymousReceiver(this.checker.getTypeAtLocation(parent.left.expression))) {
             const target = parent.left;
             if (ts.isPropertyAccessExpression(target)) {
                 return target.name.text;
@@ -1045,7 +1051,10 @@ export class JavaScriptTypeMapping {
         return undefined;
     }
 
-    /** A receiver that no class, interface or enum types, such as an object literal, a function or an intersection. */
+    private isPrototype(node: ts.Expression): boolean {
+        return ts.isPropertyAccessExpression(node) && node.name.text === 'prototype';
+    }
+
     private isAnonymousReceiver(type: ts.Type): boolean {
         return !((type.getSymbol()?.flags ?? 0) & (ts.SymbolFlags.Class | ts.SymbolFlags.Interface | ts.SymbolFlags.Enum));
     }
