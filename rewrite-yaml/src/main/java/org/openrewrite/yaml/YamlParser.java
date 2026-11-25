@@ -440,17 +440,7 @@ public class YamlParser implements org.openrewrite.Parser {
                         Yaml.Scalar finalScalar = new Yaml.Scalar(randomId(), fmt, markers, style, anchor, tag, scalarValue);
                         BlockBuilder builder = blockStack.isEmpty() ? null : blockStack.peek();
                         if (builder instanceof SequenceBuilder) {
-                            // Inline sequences like [1, 2] need to keep track of any whitespace between the element
-                            // and its trailing comma.
-                            SequenceBuilder sequenceBuilder = (SequenceBuilder) builder;
-                            String betweenEvents = reader.readStringFromBuffer(event.getEndMark().getIndex(), parser.peekEvent().getStartMark().getIndex() - 1);
-                            int commaIndex = commentAwareIndexOf(',', betweenEvents);
-                            String commaPrefix = null;
-                            if (commaIndex != -1) {
-                                commaPrefix = betweenEvents.substring(0, commaIndex);
-                            }
-                            lastEnd = event.getEndMark().getIndex() + commaIndex + 1;
-                            sequenceBuilder.push(finalScalar, commaPrefix);
+                            lastEnd = pushSequenceItem(reader, parser, (SequenceBuilder) builder, finalScalar, event.getEndMark().getIndex());
                         } else if (builder == null) {
                             if (!"".equals(finalScalar.getValue())) {
                                 // If the "scalar" is just a comment, allow it to accrue to the Document.End rather than create a phantom scalar
@@ -487,6 +477,8 @@ public class YamlParser implements org.openrewrite.Parser {
                         if (blockStack.isEmpty()) {
                             assert document != null;
                             document = document.withBlock(mappingOrSequence);
+                        } else if (blockStack.peek() instanceof SequenceBuilder) {
+                            lastEnd = pushSequenceItem(reader, parser, (SequenceBuilder) blockStack.peek(), mappingOrSequence, lastEnd);
                         } else {
                             blockStack.peek().push(mappingOrSequence);
                         }
@@ -586,8 +578,13 @@ public class YamlParser implements org.openrewrite.Parser {
                                     "found undefined alias " + alias.getAnchor(), event.getStartMark());
                         }
                         BlockBuilder builder = blockStack.peek();
-                        builder.push(new Yaml.Alias(randomId(), fmt, Markers.EMPTY, anchor));
-                        lastEnd = event.getEndMark().getIndex();
+                        Yaml.Alias yamlAlias = new Yaml.Alias(randomId(), fmt, Markers.EMPTY, anchor);
+                        if (builder instanceof SequenceBuilder) {
+                            lastEnd = pushSequenceItem(reader, parser, (SequenceBuilder) builder, yamlAlias, event.getEndMark().getIndex());
+                        } else {
+                            builder.push(yamlAlias);
+                            lastEnd = event.getEndMark().getIndex();
+                        }
                         break;
                     }
                     case StreamEnd: {
@@ -684,6 +681,18 @@ public class YamlParser implements org.openrewrite.Parser {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+    }
+
+    /**
+     * Pushes an item onto a sequence with the whitespace between it and the comma after it, as in {@code [1 , 2]},
+     * and returns where the item ends, past that comma.
+     */
+    private static int pushSequenceItem(FormatPreservingReader reader, Parser parser, SequenceBuilder builder,
+                                        Yaml.Block item, int itemEnd) {
+        String betweenEvents = reader.readStringFromBuffer(itemEnd, parser.peekEvent().getStartMark().getIndex() - 1);
+        int commaIndex = commentAwareIndexOf(',', betweenEvents);
+        builder.push(item, commaIndex == -1 ? null : betweenEvents.substring(0, commaIndex));
+        return itemEnd + commaIndex + 1;
     }
 
     /*
