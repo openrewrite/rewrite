@@ -147,7 +147,8 @@ final class CreateNewStoreController {
         Double minimumReleaseAge = options.getNumber("minimumReleaseAge");
         return new NpmResolver(registry.withOptions(options), options.getRegistries(), namedRegistries(options),
                 options.get("saveWorkspaceProtocol"),
-                !Boolean.FALSE.equals(options.get("minimumReleaseAgeIgnoreMissingTime")), fullMetadata, now, release,
+                !Boolean.FALSE.equals(options.get("minimumReleaseAgeIgnoreMissingTime")) &&
+                release.readsMinimumReleaseAgeIgnoreMissingTime(), fullMetadata, now, release,
                 minimumReleaseAge != null && minimumReleaseAge != 0 && !minimumReleaseAge.isNaN() &&
                 Boolean.TRUE.equals(options.get("minimumReleaseAgeStrict")));
     }

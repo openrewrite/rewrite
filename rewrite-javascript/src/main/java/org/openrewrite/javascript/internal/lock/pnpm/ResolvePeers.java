@@ -21,7 +21,6 @@ import lombok.Setter;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
-import org.openrewrite.javascript.internal.lock.ValidateNpmPackageName;
 import org.openrewrite.javascript.internal.lock.YarnpkgSemverUtils;
 import org.openrewrite.javascript.internal.lock.pnpm.ResolveDependencies.DependenciesTreeNode;
 import org.openrewrite.javascript.internal.lock.pnpm.ResolveDependencies.MissingPeerInfo;
@@ -1133,12 +1132,12 @@ final class ResolvePeers {
         Map<String, PeerDependency> peerDependencies = new LinkedHashMap<>(resolvedPackage.getPeerDependencies());
         DependenciesGraphNode existing = ctx.depGraph.get(depPath);
         if (existing == null || existing.getDepth() > node.getDepth()) {
-            // from 11.11.0 the package's directory is safeJoinModulesDir's, which refuses a name
-            // validate-npm-package-name 7.0.2 rejects (ERR_PNPM_INVALID_DEPENDENCY_NAME), one it accepts staying under
-            // the virtual store; the error names the virtual store's absolute path, which no input holds
+            // from 11.11.0 (pnpm 10.34.5) the package's directory is safeJoinModulesDir's, which refuses a name the
+            // release's validate-npm-package-name rejects (ERR_PNPM_INVALID_DEPENDENCY_NAME), one it accepts staying
+            // under the virtual store; the error names the virtual store's absolute path, which no input holds
             // (PnpmRelease#placesAPackageOnlyUnderAValidName)
-            if (!ValidateNpmPackageName.validForOldPackages(resolvedPackage.getName(),
-                    ValidateNpmPackageName.Release.V7_0_2) && ctx.release.placesAPackageOnlyUnderAValidName()) {
+            if (!ResolveDependencies.isValidPackageName(resolvedPackage.getName(), ctx.release) &&
+                ctx.release.placesAPackageOnlyUnderAValidName()) {
                 throw new CannotKnow("the virtual store directory under which pnpm refuses to place " + depPath +
                                      " with the invalid alias " + Js.jsonStringify(resolvedPackage.getName()) +
                                      " (ERR_PNPM_INVALID_DEPENDENCY_NAME names its absolute path)");

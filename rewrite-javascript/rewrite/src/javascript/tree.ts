@@ -145,6 +145,7 @@ export namespace JS {
         readonly typeParameters?: J.TypeParameters;
         readonly lambda: J.Lambda;
         readonly returnTypeExpression?: TypeTree;
+        readonly methodType?: Type.Method;
     }
 
     /**

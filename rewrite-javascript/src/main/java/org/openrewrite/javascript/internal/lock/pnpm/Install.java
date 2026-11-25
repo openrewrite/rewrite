@@ -388,10 +388,11 @@ final class Install {
                 options.getRelease()));
         Double minimumReleaseAge = options.getNumber("minimumReleaseAge");
         List<String> minimumReleaseAgeExclude = options.getStrings("minimumReleaseAgeExclude");
-        if (minimumReleaseAge != null && minimumReleaseAge != 0) {
+        // from 10.16.0 (PnpmRelease#readsMinimumReleaseAge)
+        if (minimumReleaseAge != null && minimumReleaseAge != 0 && options.getRelease().readsMinimumReleaseAge()) {
             ctx.setMaximumPublishedBy(now.minusMillis((long) (minimumReleaseAge * 60 * 1000)));
         }
-        if (minimumReleaseAgeExclude != null) {
+        if (minimumReleaseAgeExclude != null && options.getRelease().readsMinimumReleaseAge()) {
             ctx.setPublishedByExclude(PackageVersionPolicy.createPackageVersionPolicyOrThrow(minimumReleaseAgeExclude,
                     "minimumReleaseAgeExclude", options.getRelease()));
         }
