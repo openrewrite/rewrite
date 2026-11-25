@@ -20,7 +20,7 @@ namespace OpenRewrite.CSharp;
 
 /// <summary>
 /// Recognizes generated code as Roslyn analyzers do: by the <c>generated_code</c> option, the file's name, the
-/// comment it begins with, or a <c>[GeneratedCode]</c> or <c>[CompilerGenerated]</c> attribute.
+/// comment it begins with, or types that all carry a <c>[GeneratedCode]</c> or <c>[CompilerGenerated]</c> attribute.
 /// </summary>
 public static class GeneratedCode
 {
@@ -38,7 +38,7 @@ public static class GeneratedCode
     ];
 
     /// <summary>
-    /// Whether the whole file is generated. The <c>generated_code</c> option wins over the file's name and header,
+    /// Whether the file is generated. The <c>generated_code</c> option wins over the file's name and header,
     /// as it does in Roslyn; a file that declares nothing but generated types is generated whatever the option says.
     /// </summary>
     public static bool IsGenerated(CompilationUnit cu) =>
@@ -47,21 +47,20 @@ public static class GeneratedCode
         DeclaresOnlyGeneratedTypes(cu);
 
     /// <summary>
-    /// Whether the declaration carries a <c>[GeneratedCode]</c> or <c>[CompilerGenerated]</c> attribute.
+    /// The editor to run for <paramref name="recipe"/>, with the precondition that keeps it out of generated code
+    /// unless the recipe visits it. The host doesn't evaluate this precondition, as one that reads a file's content
+    /// would end the batch of recipes it sends the file with.
     /// </summary>
-    public static bool IsGenerated(Statement declaration) => AttributeListsOf(declaration)
+    internal static ITreeVisitor<Core.ExecutionContext> Gate(Recipe recipe, ITreeVisitor<Core.ExecutionContext> editor) =>
+        recipe.VisitsGeneratedCode || editor is NoopVisitor<Core.ExecutionContext>
+            ? editor
+            : Preconditions.Check(Preconditions.Not(Java.Search.Preconditions.IsGeneratedCode()), editor);
+
+    private static bool IsGeneratedType(Statement declaration) => IsType(declaration) && AttributeListsOf(declaration)
         .SelectMany(list => list.Attributes)
         .Any(attribute => Attributes.Any(matcher => matcher.Matches(attribute.Element)));
 
-    /// <summary>
-    /// Keeps <paramref name="visitor"/> from changing generated code, unless the recipe visits it.
-    /// </summary>
-    internal static ITreeVisitor<Core.ExecutionContext> Guard(Recipe recipe, ITreeVisitor<Core.ExecutionContext> visitor) =>
-        recipe.VisitsGeneratedCode || visitor is NoopVisitor<Core.ExecutionContext>
-            ? visitor
-            : new GeneratedCodeGuard(visitor);
-
-    internal static bool IsType(Statement declaration) => declaration switch
+    private static bool IsType(Statement declaration) => declaration switch
     {
         AnnotatedStatement annotated => IsType(annotated.Statement),
         ClassDeclaration or EnumDeclaration or DelegateDeclaration => true,
@@ -73,10 +72,6 @@ public static class GeneratedCode
         AnnotatedStatement annotated => annotated.AttributeLists.Concat(AttributeListsOf(annotated.Statement)),
         EnumDeclaration { AttributeLists: { } lists } => lists,
         DelegateDeclaration @delegate => @delegate.Attributes,
-        PropertyDeclaration property => property.AttributeLists,
-        EventDeclaration @event => @event.AttributeLists,
-        OperatorDeclaration @operator => @operator.AttributeLists,
-        AccessorDeclaration accessor => accessor.AttributeLists,
         _ => []
     };
 
@@ -120,14 +115,8 @@ public static class GeneratedCode
 
     private static bool DeclaresOnlyGeneratedTypes(CompilationUnit cu)
     {
-        var any = false;
-        foreach (var declaration in Declarations(cu.Members))
-        {
-            if (!IsType(declaration) || !IsGenerated(declaration))
-                return false;
-            any = true;
-        }
-        return any;
+        var declarations = Declarations(cu.Members).ToList();
+        return declarations.Count > 0 && declarations.All(IsGeneratedType);
     }
 
     private static IEnumerable<Statement> Declarations(IEnumerable<JRightPadded<Statement>> members) => members

@@ -113,7 +113,7 @@ public static class RecipeScheduler
                 return s;
             }
 
-            var after = GeneratedCode.Guard(r, visitor).Visit(s, state.Ctx);
+            var after = GeneratedCode.Gate(r, visitor).Visit(s, state.Ctx);
             return after == null ? null : after as SourceFile ?? s;
         });
     }

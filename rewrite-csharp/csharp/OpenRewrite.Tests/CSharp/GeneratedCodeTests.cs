@@ -100,122 +100,79 @@ public class GeneratedCodeTests : RewriteTest
         CSharp("class d { }", "class D { }", "D.cs"));
 
     [Fact]
-    public void GeneratedTypeOfAHandWrittenFileIsLeftAlone() => RewriteRun(
+    public void FileThatIsOnlyPartlyGeneratedIsVisited() => RewriteRun(
         spec => spec.SetRecipe(new UpperCaseNames { Visits = false }),
         CSharp(
             """
-            using System.CodeDom.Compiler;
             class a { }
-            [GeneratedCode("tool", "1.0")]
-            class b { class nested { } }
-            class c
-            {
-                [GeneratedCode("tool", "1.0")]
-                enum d { X }
-            }
-            """,
-            """
-            using System.CodeDom.Compiler;
-            class A { }
-            [GeneratedCode("tool", "1.0")]
-            class b { class nested { } }
-            class C
-            {
-                [GeneratedCode("tool", "1.0")]
-                enum d { X }
-            }
-            """));
-
-    [Fact]
-    public void TypeWhoseGeneratedMemberChangedIsLeftAlone() => RewriteRun(
-        spec => spec.SetRecipe(new UpperCaseNames { Visits = false }),
-        CSharp(
-            """
-            using System.Runtime.CompilerServices;
-            partial class a
-            {
-                [CompilerGenerated]
-                void m() { }
-                void n() { }
-            }
-            class b
-            {
-                [CompilerGenerated]
-                void M() { }
-                void n() { }
-            }
-            """,
-            """
-            using System.Runtime.CompilerServices;
-            partial class a
-            {
-                [CompilerGenerated]
-                void m() { }
-                void n() { }
-            }
-            class B
-            {
-                [CompilerGenerated]
-                void M() { }
-                void N() { }
-            }
-            """));
-
-    [Fact]
-    public void FileIsLeftAloneWhenOnlyItsUsingsAndGeneratedCodeChanged() => RewriteRun(
-        spec => spec.SetRecipe(new UpperCaseNames { Visits = false, AddsUsing = true }),
-        CSharp(
-            """
-            using System;
-
-            class A { }
             [System.CodeDom.Compiler.GeneratedCode("tool", "1.0")]
             class b { }
-            """));
-
-    [Fact]
-    public void FileIsLeftAloneWhenAGeneratedTypeIsRemoved() => RewriteRun(
-        spec => spec.SetRecipe(new RemoveLastMember()),
-        CSharp(
-            """
-            class A { }
-            [System.CodeDom.Compiler.GeneratedCode("tool", "1.0")]
-            class B { }
-            """));
-
-    [Fact]
-    public void PrefixOfAGeneratedDeclarationMayChange() => RewriteRun(
-        spec => spec.SetRecipe(new IndentAnnotated()),
-        CSharp(
-            """
-            class A { }
-            [System.CodeDom.Compiler.GeneratedCode("tool", "1.0")]
-            class B { }
-            class C
-            {
-            [System.CodeDom.Compiler.GeneratedCode("tool", "1.0")]
-            void M() { }
-            }
             """,
             """
             class A { }
-                [System.CodeDom.Compiler.GeneratedCode("tool", "1.0")]
+            [System.CodeDom.Compiler.GeneratedCode("tool", "1.0")]
             class B { }
-            class C
-            {
-                [System.CodeDom.Compiler.GeneratedCode("tool", "1.0")]
-            void M() { }
-            }
             """));
 
+    [Theory]
+    [InlineData("C.g.cs", false)]
+    [InlineData("C.cs", true)]
+    public void FileMarkedByAnEarlierSearch(string path, bool edited)
+    {
+        var cu = SearchResult.Found(Parse("class c { }", path));
+        var recipe = new UpperCaseNames { Visits = false };
+
+        var after = GeneratedCode.Gate(recipe, recipe.GetVisitor()).Visit(cu, new ExecutionContext());
+
+        Assert.Equal(edited, !ReferenceEquals(cu, after));
+    }
+
     [Fact]
-    public async Task EditorsButNotScannersAreGuardedOverRpc()
+    public void PreconditionOfARecipeThatVisitsGeneratedCode() => RewriteRun(
+        spec => spec.SetRecipe(new FindClasses()),
+        CSharp("class c { }", sourcePath: "C.g.cs"),
+        CSharp("class d { }", "class /*~~>*/d { }", "D.cs"));
+
+    [Fact]
+    public async Task HostEvaluatesThePreconditionARecipeDeclares()
+    {
+        var (_, prepared) = await Prepare(new FindClasses());
+
+        Assert.Equivalent(new Precondition
+        {
+            Op = "not",
+            Operands = [new Precondition { VisitorName = "org.openrewrite.csharp.search.FindGeneratedCode", VisitorOptions = [] }]
+        }, prepared.EditPreconditions[0], strict: true);
+    }
+
+    [Fact]
+    public async Task HostDoesNotEvaluateThePreconditionOfARecipeThatSkipsGeneratedCode()
+    {
+        var (server, prepared) = await Prepare(new UpperCaseNames { Visits = false });
+        var ctx = new ExecutionContext();
+        var cu = Parse("class c { }", "C.g.cs");
+
+        Assert.Equal("org.openrewrite.rpc.internal.FindTreesOfType", Assert.Single(prepared.EditPreconditions).VisitorName);
+        Assert.Same(cu, server.VisitorFor(prepared.EditVisitor, ctx).Visit(cu, ctx, new Cursor()));
+    }
+
+    [Fact]
+    public void EditorIsVisitedUnderTheGivenCursor()
+    {
+        var editor = new RecordParent();
+        var parent = new Cursor(new Cursor(), "parent");
+
+        GeneratedCode.Gate(new UpperCaseNames { Visits = false }, editor)
+            .Visit(Parse("class c { }"), new ExecutionContext(), parent);
+
+        Assert.Same(parent, editor.Parent);
+    }
+
+    [Fact]
+    public async Task EditorsButNotScannersSkipGeneratedCodeOverRpc()
     {
         var recipe = new CountFiles();
-        var marketplace = new RecipeMarketplace();
-        marketplace.Install(recipe, new CategoryDescriptor("Test"));
-        var server = new RewriteRpcServer(marketplace);
-        var prepared = await server.PrepareRecipe(new PrepareRecipeRequest { Id = recipe.Name });
+        var (server, prepared) = await Prepare(recipe);
         var cu = Parse("// <auto-generated />\nclass C { }");
         var ctx = new ExecutionContext();
 
@@ -229,60 +186,54 @@ public class GeneratedCodeTests : RewriteTest
     private static CompilationUnit Parse(string source, string path = "source.cs") =>
         new CSharpParser().Parse(source, path);
 
+    private static async Task<(RewriteRpcServer, PrepareRecipeResponse)> Prepare(global::OpenRewrite.Core.Recipe recipe)
+    {
+        var marketplace = new RecipeMarketplace();
+        marketplace.Install(recipe, new CategoryDescriptor("Test"));
+        var server = new RewriteRpcServer(marketplace);
+        return (server, await server.PrepareRecipe(new PrepareRecipeRequest { Id = recipe.Name }));
+    }
+
     private sealed class UpperCaseNames : global::OpenRewrite.Core.Recipe
     {
         public bool Visits { get; init; } = true;
-        public bool AddsUsing { get; init; }
         public override string DisplayName => "Upper case names";
         public override string Description => "Upper cases the names of types and methods.";
         public override bool VisitsGeneratedCode => Visits && base.VisitsGeneratedCode;
-        public override ITreeVisitor<ExecutionContext> GetVisitor() => new Visitor(AddsUsing);
+        public override ITreeVisitor<ExecutionContext> GetVisitor() => new Visitor();
 
-        private sealed class Visitor(bool addsUsing) : CSharpVisitor<ExecutionContext>
+        private sealed class Visitor : CSharpVisitor<ExecutionContext>
         {
             public override J VisitClassDeclaration(ClassDeclaration cd, ExecutionContext ctx)
             {
                 cd = (ClassDeclaration)base.VisitClassDeclaration(cd, ctx);
-                if (addsUsing)
-                    DoAfterVisit(new AddUsing<ExecutionContext>("System.Text.StringBuilder", onlyIfReferenced: false));
                 return cd.WithName(cd.Name.WithSimpleName(cd.Name.SimpleName.ToUpperInvariant()));
             }
-
-            public override J VisitMethodDeclaration(MethodDeclaration md, ExecutionContext ctx)
-            {
-                md = (MethodDeclaration)base.VisitMethodDeclaration(md, ctx);
-                return md.WithName(md.Name.WithSimpleName(md.Name.SimpleName.ToUpperInvariant()));
-            }
         }
     }
 
-    private sealed class RemoveLastMember : global::OpenRewrite.Core.Recipe
+    private sealed class RecordParent : CSharpVisitor<ExecutionContext>
     {
-        public override string DisplayName => "Remove last member";
-        public override string Description => "Removes the last member of each file.";
-        public override bool VisitsGeneratedCode => false;
-        public override ITreeVisitor<ExecutionContext> GetVisitor() => new Visitor();
+        public Cursor? Parent { get; private set; }
 
-        private sealed class Visitor : CSharpVisitor<ExecutionContext>
+        public override J VisitCompilationUnit(CompilationUnit cu, ExecutionContext ctx)
         {
-            public override J VisitCompilationUnit(CompilationUnit cu, ExecutionContext ctx) =>
-                cu.Members.Count > 1 ? cu.WithMembers(cu.Members.SkipLast(1).ToList()) : cu;
+            Parent = Cursor.Parent;
+            return cu;
         }
     }
 
-    private sealed class IndentAnnotated : global::OpenRewrite.Core.Recipe
+    private sealed class FindClasses : global::OpenRewrite.Core.Recipe
     {
-        public override string DisplayName => "Indent annotated declarations";
-        public override string Description => "Indents declarations that carry attributes.";
-        public override bool VisitsGeneratedCode => false;
-        public override ITreeVisitor<ExecutionContext> GetVisitor() => new Visitor();
+        public override string DisplayName => "Find classes";
+        public override string Description => "Finds classes outside of generated code.";
+        public override ITreeVisitor<ExecutionContext> GetVisitor() => Preconditions.Check(
+            Preconditions.Not(global::OpenRewrite.Java.Search.Preconditions.IsGeneratedCode()), new Visitor());
 
         private sealed class Visitor : CSharpVisitor<ExecutionContext>
         {
-            public override J VisitAnnotatedStatement(AnnotatedStatement statement, ExecutionContext ctx) =>
-                statement.Prefix.Whitespace.EndsWith(' ')
-                    ? statement
-                    : statement.WithPrefix(Space.Format(statement.Prefix.Whitespace + "    "));
+            public override J VisitClassDeclaration(ClassDeclaration cd, ExecutionContext ctx) =>
+                cd.WithName(SearchResult.Found(cd.Name));
         }
     }
 

@@ -50,6 +50,20 @@ public static class Preconditions
     }
 
     /// <summary>
+    /// Match generated C# files, as Roslyn analyzers recognize them. Typically negated with
+    /// <see cref="Core.Preconditions.Not"/> so that a recipe leaves them alone. Delegates to
+    /// <c>org.openrewrite.csharp.search.FindGeneratedCode</c> on the Java host. Bundles
+    /// a native <see cref="Search.IsGeneratedCode"/> visitor so unit tests
+    /// without an active RPC connection still see real filtering.
+    /// </summary>
+    public static RecipeRef IsGeneratedCode()
+    {
+        return new RecipeRef(
+            "org.openrewrite.csharp.search.FindGeneratedCode",
+            localVisitor: new IsGeneratedCode());
+    }
+
+    /// <summary>
     /// Match files using a specific type. Delegates to
     /// <c>org.openrewrite.java.search.HasType</c> on the Java host.
     /// Bundles a native <see cref="UsesType"/> visitor so unit tests

@@ -16,7 +16,7 @@
 namespace OpenRewrite.Core;
 
 /// <summary>
-/// Keeps the edits of the assembly's recipes out of generated C# code. A recipe can override
+/// Keeps the edits of the assembly's recipes out of generated C# files. A recipe can override
 /// <see cref="Recipe.VisitsGeneratedCode"/> to opt out.
 /// </summary>
 [AttributeUsage(AttributeTargets.Assembly)]

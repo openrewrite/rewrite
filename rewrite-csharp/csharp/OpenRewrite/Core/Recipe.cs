@@ -49,7 +49,7 @@ public abstract class Recipe
     public virtual bool CausesAnotherCycle => false;
 
     /// <summary>
-    /// Whether this recipe edits generated C# code, and reports what it finds there. Scanners visit it either way.
+    /// Whether this recipe edits generated C# files, and reports what it finds there. Scanners visit them either way.
     /// Defaults to true, except in an assembly marked with <see cref="SkipGeneratedCodeAttribute"/>.
     /// </summary>
     public virtual bool VisitsGeneratedCode =>

@@ -1852,7 +1852,7 @@ public class RewriteRpcServer
         {
             visitor = check.Visitor;
         }
-        return phase == "edit" ? GeneratedCode.Guard(recipe, visitor) : visitor;
+        return phase == "edit" ? GeneratedCode.Gate(recipe, visitor) : visitor;
     }
 
     [JsonRpcMethod("BatchVisit", UseSingleObjectParameterDeserialization = true)]
