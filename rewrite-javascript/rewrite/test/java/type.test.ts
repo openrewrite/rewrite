@@ -51,11 +51,12 @@ describe('Type.isOfTypeWithName', () => {
     test('ends where the heritage cycles back through an interface', () => {
         const request = classType('express.Request');
         const coreRequest = classType('express-serve-static-core.Request');
+        const incomingMessage = classType('http.IncomingMessage');
         request.interfaces.push(coreRequest);
-        coreRequest.interfaces.push(request);
+        coreRequest.interfaces.push(request, incomingMessage);
 
         expect(Type.isOfTypeWithName(request, true, () => false)).toBe(false);
-        expect(Type.isOfTypeWithName(request, true, name => name === 'express-serve-static-core.Request')).toBe(true);
+        expect(Type.isOfTypeWithName(request, true, name => name === 'http.IncomingMessage')).toBe(true);
     });
 
     test('ends where the heritage cycles back through a parameterized supertype', () => {

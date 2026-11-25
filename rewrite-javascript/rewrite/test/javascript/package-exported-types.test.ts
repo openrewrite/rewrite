@@ -171,6 +171,38 @@ export declare class Request {
         }, {unsafeCleanup: true});
     }, 60000);
 
+    test("a class extending a class of its own name takes that class's superclass and interfaces", async () => {
+        await withDir(async (root) => {
+            const {pkg, nodeModules} = writeFiles(root.path, "same-name-fixture", {
+                "package.json": JSON.stringify({name: "same-name-fixture", version: "1.0.0", types: "index.d.ts"}),
+                "index.d.ts": `export { Agent } from "./lib/node/agent";`,
+                "lib/node/agent.d.ts": `
+import { Agent as AgentBase } from "../agent";
+export declare class Agent extends AgentBase {}
+`,
+                "lib/agent.d.ts": `
+import { Base, Closeable } from "./base";
+export declare class Agent extends Base implements Closeable {
+    close(): void;
+}
+`,
+                "lib/base.d.ts": `
+export declare class Base {
+    url: string;
+}
+export interface Closeable {
+    close(): void;
+}
+`,
+            });
+
+            const agent = exportedTypes([pkg], [nodeModules])
+                .find(t => Type.FullyQualified.getFullyQualifiedName(t) === "same-name-fixture.Agent") as Type.Class;
+            expect(agent.supertype?.fullyQualifiedName).toBe("same-name-fixture.Base");
+            expect(fqns(agent.interfaces)).toEqual(["same-name-fixture.Closeable"]);
+        }, {unsafeCleanup: true});
+    }, 60000);
+
     test("resolves the declaration entry from an exports types condition", async () => {
         // Modern package: no top-level `types`, no root index.d.ts; types live only under
         // exports["."].{import,require}.types.
