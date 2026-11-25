@@ -1068,6 +1068,104 @@ describe('JavaScript type mapping', () => {
             await spec.rewriteRun(src);
         });
 
+        test('a member of a type literal that is a type alias\'s body is declared on the alias, as its calls are', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) => {
+                if ((node?.kind === J.Kind.MethodDeclaration || node?.kind === J.Kind.MethodInvocation) && Type.isMethod(type)) {
+                    return FullyQualified.getFullyQualifiedName(type.declaringType);
+                }
+                if (node?.kind === J.Kind.Identifier && (node as J.Identifier).simpleName === 'prop' && node.fieldType) {
+                    return `owner ${FullyQualified.getFullyQualifiedName((node.fieldType as Type.Variable).owner as FullyQualified)}`;
+                }
+                return null;
+            });
+
+            const src = typescript(
+                `
+                    export type Inst = { create(input: string): Inst; prop: (n: number) => string; get size(): number };
+                    export type Api<T> = { get(): T };
+                    declare const i: Inst;
+                    declare const a: Api<string>;
+                    i.create('b');
+                    i.prop(1);
+                    a.get();
+                `,
+                //@formatter:off
+                `
+                    export type Inst = { /*~~(src/main.Inst)~~>*/create(input: string): Inst; /*~~(owner src/main.Inst)~~>*/prop: (n: number) => string; /*~~(src/main.Inst)~~>*/get size(): number };
+                    export type Api<T> = { /*~~(src/main.Api)~~>*/get(): T };
+                    declare const i: Inst;
+                    declare const a: Api<string>;
+                    /*~~(src/main.Inst)~~>*/i.create('b');
+                    /*~~(src/main.Inst)~~>*/i./*~~(owner src/main.Inst)~~>*/prop(1);
+                    /*~~(src/main.Api)~~>*/a.get();
+                `
+                //@formatter:on
+            );
+            src.path = 'src/main.ts';
+            await spec.rewriteRun(src);
+        });
+
+        test('a type literal that is not a type alias\'s body declares no type for its members', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) =>
+                node?.kind === J.Kind.MethodDeclaration && Type.isMethod(type) ?
+                    FullyQualified.getFullyQualifiedName(type.declaringType) : null);
+
+            const src = typescript(
+                `
+                    export type Wrapped = { nested: { deep(): void } };
+                    export type Both = { a(): void } & { b(): void };
+                    function f(o: { inline(): void }) {}
+                `,
+                //@formatter:off
+                `
+                    export type Wrapped = { nested: { /*~~(<unknown>)~~>*/deep(): void } };
+                    export type Both = { /*~~(<unknown>)~~>*/a(): void } & { /*~~(<unknown>)~~>*/b(): void };
+                    /*~~(src/main)~~>*/function f(o: { /*~~(<unknown>)~~>*/inline(): void }) {}
+                `
+                //@formatter:on
+            );
+            src.path = 'src/main.ts';
+            await spec.rewriteRun(src);
+        });
+
+        test('a call or construct signature has no method type, as a call to the value it types is declared on its module', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) => {
+                if (node?.kind === J.Kind.MethodDeclaration) {
+                    return type ? FullyQualified.getFullyQualifiedName((type as Type.Method).declaringType) : 'no method type';
+                }
+                if ((node?.kind === J.Kind.MethodInvocation || node?.kind === JS.Kind.FunctionCall) && Type.isMethod(type)) {
+                    return `${FullyQualified.getFullyQualifiedName(type.declaringType)}{${type.name}}`;
+                }
+                return null;
+            });
+
+            const src = typescript(
+                `
+                    export type Inst = { (input: string): number; new (input: string): Inst };
+                    export interface Callable { (input: string): number }
+                    declare const i: Inst;
+                    declare const c: Callable;
+                    i('a');
+                    c('a');
+                `,
+                //@formatter:off
+                `
+                    export type Inst = { /*~~(no method type)~~>*/(input: string): number; /*~~(no method type)~~>*/new (input: string): Inst };
+                    export interface Callable { /*~~(no method type)~~>*/(input: string): number }
+                    declare const i: Inst;
+                    declare const c: Callable;
+                    /*~~(src/main{i})~~>*/i('a');
+                    /*~~(src/main{c})~~>*/c('a');
+                `
+                //@formatter:on
+            );
+            src.path = 'src/main.ts';
+            await spec.rewriteRun(src);
+        });
+
         test('a call on a union is declared on the class every member inherits the method from, if there is one', async () => {
             const spec = new RecipeSpec();
             spec.recipe = markTypes((node, type) =>

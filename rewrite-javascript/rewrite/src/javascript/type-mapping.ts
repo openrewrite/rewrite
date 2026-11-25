@@ -656,7 +656,10 @@ export class JavaScriptTypeMapping {
         } else {
             // For non-imported variables, check if they belong to a class/interface/namespace
             const parentSymbol = (actualSymbol as any).parent as ts.Symbol | undefined;
-            if (parentSymbol) {
+            const typeLiteral = this.aliasedTypeLiteral(actualSymbol.valueDeclaration?.parent);
+            if (typeLiteral) {
+                ownerType = this.getType(typeLiteral);
+            } else if (parentSymbol) {
                 const parentType = this.checker.getDeclaredTypeOfSymbol(parentSymbol);
                 if (parentType) {
                     ownerType = this.getType(parentType);
@@ -1038,10 +1041,12 @@ export class JavaScriptTypeMapping {
         let owner: ts.Type | undefined;
         for (const declaration of member.declarations ?? []) {
             const parent = declaration.parent;
-            if (!ts.isClassLike(parent) && !ts.isInterfaceDeclaration(parent)) {
+            const type = ts.isClassLike(parent) || ts.isInterfaceDeclaration(parent) ?
+                this.checker.getTypeAtLocation(parent) :
+                this.aliasedTypeLiteral(parent);
+            if (!type) {
                 return undefined;
             }
-            const type = this.checker.getTypeAtLocation(parent);
             if (owner && owner.symbol !== type.symbol) {
                 return undefined;
             }
@@ -1049,6 +1054,22 @@ export class JavaScriptTypeMapping {
         }
         const declaringType = owner && this.declaringType(owner);
         return declaringType === Type.unknownType ? undefined : declaringType;
+    }
+
+    private memberOwner(parent: ts.Node): Type.FullyQualified {
+        const type = ts.isClassLike(parent) || ts.isInterfaceDeclaration(parent) || ts.isObjectLiteralExpression(parent) ?
+            this.checker.getTypeAtLocation(parent) :
+            this.aliasedTypeLiteral(parent);
+        return type ? this.declaringType(type) : Type.unknownType as Type.FullyQualified;
+    }
+
+    /** The type of a type literal that is the body of a type alias, which declares its members as an interface does. */
+    private aliasedTypeLiteral(node: ts.Node | undefined): ts.Type | undefined {
+        if (!node || !ts.isTypeLiteralNode(node)) {
+            return undefined;
+        }
+        const type = this.checker.getTypeAtLocation(node);
+        return type.aliasSymbol ? type : undefined;
     }
 
     private wrapperType(declaringType: (Type.FullyQualified & Type.Primitive) | Type.FullyQualified) {
@@ -1329,14 +1350,8 @@ export class JavaScriptTypeMapping {
 
             methodName = escapeLoneSurrogates(symbol.getName());
 
-            // The declaring type: the class, whether declared or an expression, the interface or the object literal around it
-            const parent = node.parent;
-            if (ts.isClassLike(parent) || ts.isInterfaceDeclaration(parent) || ts.isObjectLiteralExpression(parent)) {
-                const parentType = this.checker.getTypeAtLocation(parent);
-                declaringType = this.declaringType(parentType);
-            } else {
-                declaringType = Type.unknownType as Type.FullyQualified;
-            }
+            // The declaring type: the class, whether declared or an expression, the interface, the object literal or the aliased type literal around it
+            declaringType = this.memberOwner(node.parent);
 
             // Get type parameters from node
             if (node.typeParameters) {
@@ -1353,10 +1368,7 @@ export class JavaScriptTypeMapping {
 
             methodName = escapeLoneSurrogates(symbol.getName());
 
-            const parent = node.parent;
-            declaringType = ts.isClassLike(parent) || ts.isInterfaceDeclaration(parent) || ts.isObjectLiteralExpression(parent) ?
-                this.declaringType(this.checker.getTypeAtLocation(parent)) :
-                Type.unknownType as Type.FullyQualified;
+            declaringType = this.memberOwner(node.parent);
         } else if (ts.isConstructorDeclaration(node)) {
             // For constructor declarations
             signature = this.checker.getSignatureFromDeclaration(node);
