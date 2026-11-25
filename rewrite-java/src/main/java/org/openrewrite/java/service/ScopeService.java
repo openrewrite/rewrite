@@ -227,6 +227,209 @@ public class ScopeService {
     }
 
     /**
+     * Whether code at the position uses the member of a class before the language has initialized it. Java's rules
+     * are those for a forward reference to a field (JLS 8.3.3) and for an enum's static field read while a constant
+     * is constructed (JLS 8.9.2).
+     */
+    public boolean isUsedBeforeInitialized(Scope.Binding member, Cursor position) {
+        return isForwardReference(member, position) || isEnumFieldReadDuringConstruction(member, position);
+    }
+
+    /**
+     * Whether the use of the field at the position is a forward reference (JLS 8.3.3). It is one in an initializer
+     * of the field's own class that stands before the field's declaration or is the field's own, where both are
+     * static or neither is, unless the use is the target of an assignment. A class body between the two lifts the
+     * restriction.
+     */
+    private boolean isForwardReference(Scope.Binding field, Cursor position) {
+        Cursor variable = field.getTree() instanceof J.Identifier ?
+                field.getCursor().getParentTreeCursor() : field.getCursor();
+        if (!(variable.getValue() instanceof J.VariableDeclarations.NamedVariable) || isAssignedAt(position)) {
+            return false;
+        }
+        Cursor declaration = variable.getParentTreeCursor();
+        Cursor body = declaration.getParentTreeCursor();
+        if (!(declaration.getValue() instanceof J.VariableDeclarations && body.getValue() instanceof J.Block)) {
+            return false;
+        }
+        J declarator = null;
+        J member = null;
+        Cursor memberAt = position;
+        for (Cursor c = position; c != null && !isTree(c, body); c = c.getParent()) {
+            if (c.getValue() instanceof J) {
+                if (c.getValue() instanceof J.ClassDeclaration ||
+                    c.getValue() instanceof J.NewClass && member == ((J.NewClass) c.getValue()).getBody()) {
+                    return false;
+                }
+                declarator = member;
+                member = c.getValue();
+                memberAt = c;
+            }
+        }
+        boolean initializesStatic;
+        if (member instanceof J.Block) {
+            initializesStatic = isStaticContext(memberAt);
+        } else if (member instanceof J.VariableDeclarations) {
+            initializesStatic = ((J.VariableDeclarations) member).hasModifier(J.Modifier.Type.Static);
+        } else if (member instanceof J.EnumValueSet) {
+            initializesStatic = true;
+        } else {
+            return false;
+        }
+        J.VariableDeclarations declared = declaration.getValue();
+        if (initializesStatic != declared.hasModifier(J.Modifier.Type.Static)) {
+            return false;
+        }
+        if (member.getId().equals(declared.getId())) {
+            return declarator instanceof J.VariableDeclarations.NamedVariable &&
+                   indexOf(declared.getVariables(), declarator) <=
+                   indexOf(declared.getVariables(), variable.getValue());
+        }
+        List<Statement> members = body.<J.Block>getValue().getStatements();
+        int at = indexOf(members, member);
+        return at >= 0 && at < indexOf(members, declared);
+    }
+
+    private static boolean isAssignedAt(Cursor position) {
+        if (!(position.getValue() instanceof J.Identifier)) {
+            return false;
+        }
+        Object parent = position.getParentTreeCursor().getValue();
+        return parent instanceof J.Assignment &&
+               ((J.Assignment) parent).getVariable().getId().equals(position.<J>getValue().getId());
+    }
+
+    /**
+     * Whether the position reads an enum's own static field while a constant of the enum is constructed, which is
+     * before the field is assigned (JLS 8.9.2). That is in a constructor, an instance initializer or an instance
+     * variable initializer of the enum or of the body of one of its constants, unless the field is a constant
+     * variable. Any other class body in between lifts the restriction.
+     */
+    private boolean isEnumFieldReadDuringConstruction(Scope.Binding field, Cursor position) {
+        Cursor scope = field.getScope().getCursor();
+        if (field.getNamespace() != Scope.Namespace.VARIABLE || !(scope.getValue() instanceof J.ClassDeclaration)) {
+            return false;
+        }
+        J.ClassDeclaration enumClass = scope.getValue();
+        if (enumClass.getKind() != J.ClassDeclaration.Kind.Type.Enum || !isStatic(field, scope) ||
+            isConstantVariable(field)) {
+            return false;
+        }
+        // A field the body does not declare is the enum's own only where attribution says so
+        if (!(field.getTree() instanceof J.Identifier) && !(field.getType() instanceof JavaType.Variable &&
+              TypeUtils.isOfType(((JavaType.Variable) field.getType()).getOwner(), enumClass.getType()))) {
+            return false;
+        }
+        J member = null;
+        Cursor memberAt = position;
+        Cursor body = position;
+        while (!(body.getValue() instanceof J.Block && isClassBody(body))) {
+            if (body.getValue() instanceof J) {
+                member = body.getValue();
+                memberAt = body;
+            }
+            body = body.getParent();
+            if (body == null) {
+                return false;
+            }
+        }
+        Cursor constructed = body.getParentTreeCursor();
+        if (constructed.getValue() instanceof J.NewClass &&
+            constructed.getParentTreeCursor().getValue() instanceof J.EnumValue) {
+            constructed = constructed.dropParentUntil(J.ClassDeclaration.class::isInstance);
+        }
+        if (!isTree(constructed, scope)) {
+            return false;
+        }
+        return member instanceof J.MethodDeclaration && isConstructor((J.MethodDeclaration) member) ||
+               member instanceof J.Block && !isStaticContext(memberAt) ||
+               member instanceof J.VariableDeclarations &&
+               !((J.VariableDeclarations) member).hasModifier(J.Modifier.Type.Static);
+    }
+
+    /**
+     * Whether the member needs no instance of the class binding it, going by its attributed flags or by a static
+     * context between its declaration and that class.
+     */
+    private boolean isStatic(Scope.Binding member, Cursor scope) {
+        JavaType type = member.getType();
+        if (type instanceof JavaType.Variable && ((JavaType.Variable) type).hasFlags(Flag.Static)) {
+            return true;
+        }
+        if (member.getTree() instanceof J.Identifier) {
+            for (Cursor c = member.getCursor().getParent(); c != null && !isTree(c, scope); c = c.getParent()) {
+                if (isStaticContext(c)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean isClassBody(Cursor block) {
+        Object owner = block.getParentTreeCursor().getValue();
+        return owner instanceof J.ClassDeclaration || owner instanceof J.NewClass;
+    }
+
+    /**
+     * Whether the field is a constant variable (JLS 4.12.4): final, of a primitive type or {@code String}, and
+     * initialized with a constant expression. An initializer that names another constant is not taken for one.
+     */
+    private static boolean isConstantVariable(Scope.Binding field) {
+        Cursor variable = field.getDeclaration().orElse(null);
+        if (variable == null || !(variable.getValue() instanceof J.VariableDeclarations.NamedVariable)) {
+            return false;
+        }
+        Object declaration = variable.getParentTreeCursor().getValue();
+        J.VariableDeclarations.NamedVariable named = variable.getValue();
+        return declaration instanceof J.VariableDeclarations &&
+               ((J.VariableDeclarations) declaration).hasModifier(J.Modifier.Type.Final) &&
+               isConstantType(named.getType()) &&
+               named.getInitializer() != null && isConstantExpression(named.getInitializer());
+    }
+
+    private static boolean isConstantType(@Nullable JavaType type) {
+        return type instanceof JavaType.Primitive || TypeUtils.isString(type);
+    }
+
+    /**
+     * Whether the expression is a constant expression (JLS 15.29) that names no variable.
+     */
+    private static boolean isConstantExpression(J expression) {
+        if (expression instanceof J.Literal) {
+            return ((J.Literal) expression).getValue() != null;
+        } else if (expression instanceof J.Parentheses) {
+            return isConstantExpression(((J.Parentheses<?>) expression).getTree());
+        } else if (expression instanceof J.Unary) {
+            return isConstantExpression(((J.Unary) expression).getExpression());
+        } else if (expression instanceof J.Binary) {
+            J.Binary binary = (J.Binary) expression;
+            return isConstantExpression(binary.getLeft()) && isConstantExpression(binary.getRight());
+        } else if (expression instanceof J.Ternary) {
+            J.Ternary ternary = (J.Ternary) expression;
+            return isConstantExpression(ternary.getCondition()) && isConstantExpression(ternary.getTruePart()) &&
+                   isConstantExpression(ternary.getFalsePart());
+        } else if (expression instanceof J.TypeCast) {
+            J.TypeCast cast = (J.TypeCast) expression;
+            return isConstantType(cast.getType()) && isConstantExpression(cast.getExpression());
+        }
+        return false;
+    }
+
+    private static boolean isTree(Cursor cursor, Cursor other) {
+        return cursor.getValue() instanceof J && cursor.<J>getValue().getId().equals(other.<J>getValue().getId());
+    }
+
+    private static int indexOf(List<? extends J> trees, J tree) {
+        for (int i = 0; i < trees.size(); i++) {
+            if (trees.get(i).getId().equals(tree.getId())) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /**
      * The namespace the identifier at the cursor refers into, or null where it declares a name or names a member
      * selected with a dot, an enum constant in a case label, a label or a package. An ambiguous name such as
      * {@code A} in {@code A.b} reads a type only where attribution marks it one and no variable of its name is in

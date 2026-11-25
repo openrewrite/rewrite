@@ -29,18 +29,18 @@ import org.openrewrite.toml.marker.ArrayTable;
 import org.openrewrite.toml.marker.InlineTable;
 import org.openrewrite.toml.tree.*;
 
+import java.math.BigInteger;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeFormatterBuilder;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.BiFunction;
 
+import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
 
@@ -57,11 +57,15 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
     private int codePointCursor = 0;
 
     public TomlParserVisitor(Path path, @Nullable FileAttributes fileAttributes, EncodingDetectingInputStream source) {
+        this(path, fileAttributes, source.readFully(), source.getCharset(), source.isCharsetBomMarked());
+    }
+
+    public TomlParserVisitor(Path path, @Nullable FileAttributes fileAttributes, String source, Charset charset, boolean charsetBomMarked) {
         this.path = path;
         this.fileAttributes = fileAttributes;
-        this.source = source.readFully();
-        this.charset = source.getCharset();
-        this.charsetBomMarked = source.isCharsetBomMarked();
+        this.source = source;
+        this.charset = charset;
+        this.charsetBomMarked = charsetBomMarked;
     }
 
     @Override
@@ -88,12 +92,29 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
     @Override
     public Toml.Document visitDocument(TomlParser.DocumentContext ctx) {
         List<TomlValue> elements = new ArrayList<>();
+        // A table rule matches only its header, so each key-value goes to the table whose header precedes it
+        Toml.@Nullable Table table = null;
+        List<TomlRightPadded<Toml>> tableValues = new ArrayList<>();
         for (TomlParser.ExpressionContext expr: ctx.expression()) {
             TomlValue element = (TomlValue) visit(expr);
             //noinspection ConstantValue
-            if (element != null) {
+            if (element == null) {
+                continue;
+            }
+            if (element instanceof Toml.Table) {
+                if (table != null) {
+                    elements.add(table.getPadding().withValues(tableValues));
+                    tableValues = new ArrayList<>();
+                }
+                table = (Toml.Table) element;
+            } else if (table != null) {
+                tableValues.add(TomlRightPadded.build(element));
+            } else {
                 elements.add(element);
             }
+        }
+        if (table != null) {
+            elements.add(table.getPadding().withValues(tableValues));
         }
 
         return new Toml.Document(
@@ -205,10 +226,10 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
         return convert(ctx, (c, prefix) -> {
             String rawNumber = c.getText();
             String number = rawNumber.replace("_", "");
-            Long numberValue = rawNumber.startsWith("0x") ? Long.parseLong(number.substring(2), 16) :
-                    rawNumber.startsWith("0o") ? Long.parseLong(number.substring(2), 8) :
-                            rawNumber.startsWith("0b") ? Long.parseLong(number.substring(2), 2) :
-                                Long.parseLong(number);
+            int radix = rawNumber.startsWith("0x") ? 16 : rawNumber.startsWith("0o") ? 8 : rawNumber.startsWith("0b") ? 2 : 10;
+            // TOML integers are 64-bit, but Python's tomllib and others accept larger ones, and so must we
+            BigInteger bigValue = new BigInteger(radix == 10 ? number : number.substring(2), radix);
+            Object numberValue = bigValue.bitLength() < 64 ? (Object) bigValue.longValue() : bigValue;
             return new Toml.Literal(
                     randomId(),
                     prefix,
@@ -273,18 +294,25 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
         });
     }
 
-    private static final DateTimeFormatter RFC3339_OFFSET_DATE_TIME;
+    /**
+     * TOML allows a space between date and time, which {@code DateTimeFormatter.ISO_LOCAL_DATE_TIME} rejects,
+     * and fractional seconds beyond the nanoseconds {@code java.time} holds.
+     */
+    private static String isoDateTime(String dateTime) {
+        return truncateFraction(dateTime.substring(0, 10) + 'T' + dateTime.substring(11));
+    }
 
-    static {
-        RFC3339_OFFSET_DATE_TIME = new DateTimeFormatterBuilder()
-                .parseCaseInsensitive()
-                .append(DateTimeFormatter.ISO_LOCAL_DATE)
-                .appendLiteral(' ')
-                .append(DateTimeFormatter.ISO_LOCAL_TIME)
-                .parseLenient()
-                .appendOffsetId()
-                .parseStrict()
-                .toFormatter();
+    // NOTE: TOML requires extra precision to be truncated, not rounded. Literal.source keeps every digit.
+    private static String truncateFraction(String time) {
+        int dot = time.indexOf('.');
+        if (dot < 0) {
+            return time;
+        }
+        int end = dot + 1;
+        while (end < time.length() && Character.isDigit(time.charAt(end))) {
+            end++;
+        }
+        return end - dot - 1 > 9 ? time.substring(0, dot + 10) + time.substring(end) : time;
     }
 
     @Override
@@ -298,7 +326,7 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
                         Markers.EMPTY,
                         TomlType.Primitive.OffsetDateTime,
                         dateTime,
-                        dateTime.contains("T") ? OffsetDateTime.parse(dateTime) : OffsetDateTime.parse(dateTime, RFC3339_OFFSET_DATE_TIME)
+                        OffsetDateTime.parse(isoDateTime(dateTime))
                 );
             } else if (c.LOCAL_DATE_TIME() != null) {
                 return new Toml.Literal(
@@ -307,7 +335,7 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
                         Markers.EMPTY,
                         TomlType.Primitive.LocalDateTime,
                         dateTime,
-                        LocalDateTime.parse(dateTime)
+                        LocalDateTime.parse(isoDateTime(dateTime))
                 );
             } else if (c.LOCAL_DATE() != null) {
                 return new Toml.Literal(
@@ -326,7 +354,7 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
                     Markers.EMPTY,
                     TomlType.Primitive.LocalTime,
                     dateTime,
-                    LocalTime.parse(dateTime)
+                    LocalTime.parse(truncateFraction(dateTime))
             );
         });
     }
@@ -387,6 +415,13 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
                 }
             }
 
+            if (values.isEmpty()) {
+                // As for an empty array, keep the space between { and }
+                elements.add(TomlRightPadded.build(
+                        (Toml) new Toml.Empty(randomId(), Space.EMPTY, Markers.EMPTY)
+                ).withAfter(sourceBefore("}")));
+            }
+
             return new Toml.Table(
                     randomId(),
                     prefix,
@@ -403,19 +438,12 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
             sourceBefore("[");
             Toml.Identifier tableName = visitKey(c.key());
             TomlRightPadded<Toml.Identifier> nameRightPadded = TomlRightPadded.build(tableName).withAfter(sourceBefore("]"));
-
-            List<TomlParser.KeyValueContext> values = c.keyValue();
-            List<TomlRightPadded<Toml>> elements = new ArrayList<>();
-            for (TomlParser.KeyValueContext value : values) {
-                elements.add(TomlRightPadded.build(visit(value)));
-            }
-
             return new Toml.Table(
                     randomId(),
                     prefix,
                     Markers.EMPTY,
                     nameRightPadded,
-                    elements
+                    emptyList()
             );
         });
     }
@@ -426,19 +454,12 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
             sourceBefore("[[");
             Toml.Identifier tableName = visitKey(c.key());
             TomlRightPadded<Toml.Identifier> nameRightPadded = TomlRightPadded.build(tableName).withAfter(sourceBefore("]]"));
-
-            List<TomlParser.KeyValueContext> values = c.keyValue();
-            List<TomlRightPadded<Toml>> elements = new ArrayList<>();
-            for (TomlParser.KeyValueContext value : values) {
-                elements.add(TomlRightPadded.build(visit(value)));
-            }
-
             return new Toml.Table(
                     randomId(),
                     prefix,
                     Markers.build(singletonList(new ArrayTable(randomId()))),
                     nameRightPadded,
-                    elements
+                    emptyList()
             );
         });
     }
@@ -485,7 +506,7 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
         }
 
         Space space = Space.format(source, cursor, delimIndex);
-        advanceCursor(codePointCursor + Character.codePointCount(source, cursor, delimIndex) + untilDelim.length());
+        advanceCursor(codePointCursor + Character.codePointCount(source, cursor, delimIndex) + untilDelim.codePointCount(0, untilDelim.length()));
         return space;
     }
 
@@ -501,7 +522,6 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
             } else {
                 if (source.charAt(delimIndex) == '#') {
                     inSingleLineComment = true;
-                    delimIndex++;
                 }
 
                 if (!inSingleLineComment) {

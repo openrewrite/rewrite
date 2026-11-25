@@ -243,6 +243,21 @@ public class SourceSpecHooksTests : RewriteTest
     }
 
     [Fact]
+    public void BeforeRecipeAdjustsAProjectFileAfterItPrintsAsParsed()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new RenameCalls("Foo", "Bar")),
+            CsProj(
+                    """
+                    <Project>
+                    </Project>
+                    """)
+                .BeforeRecipe((global::OpenRewrite.Xml.Document doc) => doc.WithEof("\n"))
+                .AfterRecipe((global::OpenRewrite.Xml.Document doc) => Assert.Equal("\n", doc.Eof))
+        );
+    }
+
+    [Fact]
     public void BeforeRecipeOfAnotherSourceTypeIsRejected()
     {
         var failure = Assert.Throws<ArgumentException>(() => RewriteRun(

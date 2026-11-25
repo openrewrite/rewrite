@@ -75,6 +75,14 @@ public class RecipeQualityValidation {
     private boolean minimalFormatting = true;
 
     /**
+     * Controls whether the recipe is validated to keep the indentation of the lines it edits in place: a line whose
+     * code the recipe changes, while the lines around it neither multiply nor disappear, keeps its leading whitespace.
+     * Code that replaces the first element on a line takes over the prefix of the element it replaced.
+     */
+    @Builder.Default
+    private boolean keepEditedLineIndentation = true;
+
+    /**
      * Controls whether the recipe is rerun with the code it changed respelled to mean the same (a static import for a
      * qualified call or the reverse, a fully qualified name for an imported type), and must still change it. Skipped
      * when the test doesn't validate the type attribution of the recipe's input and output.
@@ -212,6 +220,7 @@ public class RecipeQualityValidation {
                 .lightweightAccumulators(quality.lightweightAccumulators())
                 .reportingMarkersOnly(quality.reportingMarkersOnly())
                 .minimalFormatting(quality.minimalFormatting())
+                .keepEditedLineIndentation(quality.keepEditedLineIndentation())
                 .matchByTypeNotName(quality.matchByTypeNotName())
                 .importReferencedTypes(quality.importReferencedTypes())
                 .removeUnusedImports(quality.removeUnusedImports())

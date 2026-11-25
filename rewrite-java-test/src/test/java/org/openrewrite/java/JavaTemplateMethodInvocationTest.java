@@ -192,7 +192,7 @@ class JavaTemplateMethodInvocationTest implements RewriteTest {
               class T {
               	void m() {
               		Map<String, ?> map = new HashMap<>();
-                      requireNonNull(map.get("one")).equals("");
+              		requireNonNull(map.get("one")).equals("");
               	}
               }
               """

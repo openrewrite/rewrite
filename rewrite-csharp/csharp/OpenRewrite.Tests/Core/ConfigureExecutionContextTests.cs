@@ -109,6 +109,29 @@ public class ConfigureExecutionContextTests : RewriteTest
         ));
     }
 
+    [Fact]
+    public void AFollowUpRunFindsWhatAnEarlierRunLeftOnTheContext()
+    {
+        var ctx = new ExecutionContext();
+        RewriteRun(
+            spec => spec
+                .SetRecipe(new RenameCallsInProjectsTargeting("net6.0",
+                    c => MSBuildProjectHelper.MarkAttestationStale(c, "src/A/A.csproj")))
+                .ConfigureExecutionContext(CaptureNet6Project)
+                .SetExecutionContext(ctx),
+            CSharp(Calls("Foo"), Calls("Bar"))
+        );
+
+        RewriteRun(
+            spec => spec
+                .SetRecipe(new RenameCallsInProjectsTargeting("net6.0"))
+                .SetExecutionContext(ctx)
+                .ExpectExecutionContext(c =>
+                    Assert.True(MSBuildProjectHelper.IsAttestationStale(c, "src/A/A.csproj"))),
+            CSharp(Calls("Foo"), Calls("Bar"))
+        );
+    }
+
     /// <summary>Renames calls to Foo when the build files of the run name the framework.</summary>
     private class RenameCallsInProjectsTargeting(string framework, Action<ExecutionContext>? onRename = null)
         : global::OpenRewrite.Core.Recipe

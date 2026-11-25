@@ -40,6 +40,7 @@ import java.io.*;
 import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.URL;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -75,6 +76,19 @@ public class MavenPomDownloader {
             .build();
 
     private static final Duration THROTTLE_COOLDOWN = Duration.ofSeconds(60);
+
+    /**
+     * The RFC 9209 proxy error types for a next hop that was never reached, as opposed to one that was reached and
+     * then failed to answer in time ({@code connection_read_timeout}, {@code http_response_*}).
+     */
+    private static final Set<String> NEXT_HOP_NOT_REACHED = new HashSet<>(Arrays.asList(
+            "dns_timeout",
+            "dns_error",
+            "destination_not_found",
+            "destination_unavailable",
+            "destination_ip_unroutable",
+            "connection_refused",
+            "connection_timeout"));
 
     private static final Pattern SNAPSHOT_TIMESTAMP = Pattern.compile("^(.*-)?([0-9]{8}\\.[0-9]{6}-[0-9]+)$");
 
@@ -1102,7 +1116,8 @@ public class MavenPomDownloader {
      */
     private ReachabilityResult reachable(MavenRepository repository, HttpSender.Method method, String url) {
         ReachabilityResult anonymous = reachable(applyTimeoutToRequest(repository, httpSender.newRequest(url).withMethod(method)));
-        if (anonymous.isReachable() || !hasAuthentication(repository)) {
+        if (anonymous.isReachable() || anonymous.getReachability() == Reachability.PROXY_COULD_NOT_CONNECT ||
+            !hasAuthentication(repository)) {
             return anonymous;
         }
         ReachabilityResult authenticated = reachable(applyAuthenticationAndTimeoutToRequest(repository, httpSender.newRequest(url).withMethod(method)));
@@ -1131,23 +1146,72 @@ public class MavenPomDownloader {
     enum Reachability {
         SUCCESS,
         ERROR,
+        PROXY_COULD_NOT_CONNECT,
         UNREACHABLE
     }
 
     private ReachabilityResult reachable(HttpSender.Request.Builder request) {
+        HttpSender.Request built = request.build();
         try {
-            sendRequest(request.build(), probeRetryPolicy);
+            sendRequest(built, probeRetryPolicy);
             return ReachabilityResult.success();
         } catch (Throwable t) {
             if (t instanceof HttpSenderResponseException) {
                 HttpSenderResponseException e = (HttpSenderResponseException) t;
                 // response was returned from the server, but it was not a 200 OK. The server therefore exists.
                 if (e.isServerReached()) {
-                    return new ReachabilityResult(Reachability.ERROR, t);
+                    return new ReachabilityResult(proxyCouldNotConnect(built.getUrl(), e) ?
+                            Reachability.PROXY_COULD_NOT_CONNECT : Reachability.ERROR, t);
                 }
             }
             return new ReachabilityResult(Reachability.UNREACHABLE, t);
         }
+    }
+
+    /**
+     * Whether a proxy answered on its own behalf that it never reached {@code requested}'s host. That is the same
+     * event as failing to connect to the host directly. Only a 502 or 504 qualifies, and only through a
+     * {@code Proxy-Status} member naming that host as its next hop: an aggregating repository may report one of
+     * its upstreams failing alongside an answer of its own, and that must not count against the aggregator.
+     */
+    static boolean proxyCouldNotConnect(URL requested, HttpSenderResponseException e) {
+        Integer code = e.getResponseCode();
+        if (code == null || (code != 502 && code != 504)) {
+            return false;
+        }
+        for (ProxyStatus member : e.getProxyStatus()) {
+            if (NEXT_HOP_NOT_REACHED.contains(member.getError()) &&
+                member.getNextHop() != null && isNextHop(requested, member.getNextHop())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isNextHop(URL requested, String nextHop) {
+        URI hop;
+        try {
+            hop = new URI(nextHop.contains("://") ? nextHop : "//" + nextHop);
+        } catch (URISyntaxException e) {
+            return false;
+        }
+        if (hop.getHost() == null || !hop.getHost().equalsIgnoreCase(requested.getHost())) {
+            return false;
+        }
+        int hopPort = portOrDefault(hop.getPort(), hop.getScheme());
+        int requestedPort = portOrDefault(requested.getPort(), requested.getProtocol());
+        return hopPort == -1 || requestedPort == -1 || hopPort == requestedPort;
+    }
+
+    private static int portOrDefault(int port, @Nullable String scheme) {
+        if (port != -1) {
+            return port;
+        } else if ("https".equalsIgnoreCase(scheme)) {
+            return 443;
+        } else if ("http".equalsIgnoreCase(scheme)) {
+            return 80;
+        }
+        return -1;
     }
 
     private boolean jarExistsForPomUri(MavenRepository repo, String pomUrl) {

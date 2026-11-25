@@ -19,7 +19,7 @@ import {randomId} from "../uuid";
 import {JS} from "./tree";
 import {ResolvedNames} from "./markers";
 import {JavaScriptTypeMapping} from "./type-mapping";
-import {moduleName} from "./package-name";
+import {moduleName, moduleOfFile} from "./package-name";
 
 /** A lone surrogate prints as a six character `\uXXXX` escape in place of its one code unit. */
 const ESCAPED_SURROGATE_GROWTH = 5;
@@ -283,11 +283,17 @@ export class JavaScriptNameResolver {
             return this.declared(symbol);
         }
         const aliased = this.checker.getAliasedSymbol(symbol);
-        if (aliased.declarations?.length) {
+        const bodiless = isBodilessModule(aliased);
+        if (aliased.declarations?.length && !bodiless) {
             return this.declared(aliased);
         }
+        // A module declared with no body declares nothing, so what is bound is the package it stands in for.
         const binding = this.moduleBinding(symbol, new Set());
-        return binding && (this.resolvedModule(binding.specifier) ?? this.unbound(binding.declaration));
+        const resolved = binding && this.resolvedModule(binding.specifier);
+        if (resolved || !bodiless) {
+            return resolved ?? (binding && this.unbound(binding.declaration));
+        }
+        return this.declared(aliased);
     }
 
     /** The declaration that binds a symbol to a module, through whatever assignments and exports stand between them. */
@@ -343,7 +349,7 @@ export class JavaScriptNameResolver {
             return this.resolvedModule(specifier);
         }
         if (ts.isModuleDeclaration(declaration)) {
-            return this.declared(symbol!);
+            return (isBodilessModule(symbol!) ? this.resolvedModule(specifier) : undefined) ?? this.declared(symbol!);
         }
         const place = this.placeOf(declaration.getSourceFile().fileName);
         return place && moduleTarget(place);
@@ -551,7 +557,7 @@ export class JavaScriptNameResolver {
             const relative = path.relative(root, path.resolve(root, file)).replace(/\\/g, "/");
             if (!relative.startsWith("../") && !path.isAbsolute(relative)) {
                 return sourceFile?.isDeclarationFile ? this.mappedPlace(file, root, null, false) :
-                    {module: withoutExtension(relative), file: relative, pkg: null, external: false};
+                    {module: moduleOfFile(relative), file: relative, pkg: null, external: false};
             }
         }
         return undefined;
@@ -563,7 +569,7 @@ export class JavaScriptNameResolver {
             this.mappings.set(root, mapping = new JavaScriptTypeMapping(this.checker, root, true));
         }
         const relative = path.relative(root, file).replace(/\\/g, "/");
-        return {module: withoutExtension(relative), file: relative, pkg, external, mapping};
+        return {module: moduleOfFile(relative), file: relative, pkg, external, mapping};
     }
 
     private packageNameAt(directory: string): string | undefined {
@@ -572,10 +578,6 @@ export class JavaScriptNameResolver {
         }
         return this.packageNames.get(directory);
     }
-}
-
-function withoutExtension(file: string): string {
-    return file.replace(/\.[^/.]+$/, "");
 }
 
 function moduleTarget(place: Place): Target {
@@ -780,6 +782,15 @@ function isModuleSpecifier(node: ts.StringLiteralLike): boolean {
         return ts.isImportTypeNode(parent.parent);
     }
     return ts.isModuleDeclaration(parent) || ts.isCallExpression(parent) && isModuleLoad(parent) && parent.arguments[0] === node;
+}
+
+/**
+ * `declare module "x";`, which says a module exists and nothing of what it declares, so that its package's
+ * own types, installed or not, go unread. TypeScript takes it over the package's files.
+ */
+function isBodilessModule(symbol: ts.Symbol): boolean {
+    const declaration = symbol.valueDeclaration;
+    return declaration !== undefined && ts.isModuleDeclaration(declaration) && declaration.body === undefined;
 }
 
 /** In a module, `declare module` adds to the module it names, and declares none. */

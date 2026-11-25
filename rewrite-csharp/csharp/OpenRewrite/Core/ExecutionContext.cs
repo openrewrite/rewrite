@@ -25,6 +25,8 @@ public class ExecutionContext : IHeavyweight
     public T? GetMessage<T>(string key) where T : class
         => _messages.TryGetValue(key, out var val) ? val as T : null;
 
+    internal IReadOnlyDictionary<string, object> Messages => _messages;
+
     public virtual void PutMessage(string key, object value)
         => _messages[key] = value;
 

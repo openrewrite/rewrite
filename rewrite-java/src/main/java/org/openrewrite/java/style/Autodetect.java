@@ -29,6 +29,7 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.marker.TrailingComma;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.style.LineWrapSetting;
@@ -1239,6 +1240,8 @@ public class Autodetect extends NamedStyles {
         int afterForSemiColon;
         int afterTypeCast;
         int withinMethodCallParentheses;
+        int arrayInitializerLeftBrace;
+        int withinArrayInitializerBraces;
 
         void merge(SpacesStatistics other) {
             beforeIf += other.beforeIf;
@@ -1257,6 +1260,8 @@ public class Autodetect extends NamedStyles {
             afterForSemiColon += other.afterForSemiColon;
             afterTypeCast += other.afterTypeCast;
             withinMethodCallParentheses += other.withinMethodCallParentheses;
+            arrayInitializerLeftBrace += other.arrayInitializerLeftBrace;
+            withinArrayInitializerBraces += other.withinArrayInitializerBraces;
         }
 
         public SpacesStyle getSpacesStyle() {
@@ -1281,8 +1286,11 @@ public class Autodetect extends NamedStyles {
                                     false
                             )
                     )
-                    .withWithin(within.withMethodCallParentheses(
-                            vote(withinMethodCallParentheses, within.getMethodCallParentheses())))
+                    .withBeforeLeftBrace(spaces.getBeforeLeftBrace().withArrayInitializerLeftBrace(
+                            vote(arrayInitializerLeftBrace, spaces.getBeforeLeftBrace().getArrayInitializerLeftBrace())))
+                    .withWithin(within
+                            .withMethodCallParentheses(vote(withinMethodCallParentheses, within.getMethodCallParentheses()))
+                            .withArrayInitializerBraces(vote(withinArrayInitializerBraces, within.getArrayInitializerBraces())))
                     .withOther(new SpacesStyle.Other(
                             vote(beforeComma, other.getBeforeComma()),
                             vote(afterComma, other.getAfterComma()),
@@ -1343,10 +1351,24 @@ public class Autodetect extends NamedStyles {
         @Override
         public J.ForLoop visitForLoop(J.ForLoop forLoop, SpacesStatistics stats) {
             stats.beforeFor += hasSpace(forLoop.getControl().getPrefix());
-            stats.beforeForSemiColon += hasSpace(forLoop.getControl().getPadding().getInit().get(forLoop.getControl().getInit().size() - 1).getAfter());
-            stats.beforeForSemiColon += hasSpace(forLoop.getControl().getPadding().getCondition().getAfter());
-            stats.afterForSemiColon += hasSpace(forLoop.getControl().getInit().get(forLoop.getControl().getInit().size() - 1).getPrefix());
-            stats.afterForSemiColon += hasSpace(forLoop.getControl().getCondition().getPrefix());
+            J.ForLoop.Control control = forLoop.getControl();
+            List<JRightPadded<Statement>> init = control.getPadding().getInit();
+            JRightPadded<Statement> lastInit = init.get(init.size() - 1);
+            JRightPadded<Expression> condition = control.getPadding().getCondition();
+            List<JRightPadded<Statement>> update = control.getPadding().getUpdate();
+            // `for (;;)` has empty placeholders, which carry no spacing information
+            if (!(lastInit.getElement() instanceof J.Empty)) {
+                stats.beforeForSemiColon += hasSpace(lastInit.getAfter());
+            }
+            if (!(condition.getElement() instanceof J.Empty)) {
+                stats.beforeForSemiColon += hasSpace(condition.getAfter());
+                // The space after the first semicolon precedes the condition
+                stats.afterForSemiColon += hasSpace(condition.getElement().getPrefix());
+            }
+            // The space after the second semicolon precedes the first update expression
+            if (!update.isEmpty() && !(update.get(0).getElement() instanceof J.Empty)) {
+                stats.afterForSemiColon += hasSpace(update.get(0).getElement().getPrefix());
+            }
             return super.visitForLoop(forLoop, stats);
         }
 
@@ -1413,6 +1435,28 @@ public class Autodetect extends NamedStyles {
         public J.NewArray visitNewArray(J.NewArray newArray, SpacesStatistics stats) {
             JContainer<Expression> initializer = newArray.getPadding().getInitializer();
             List<Expression> elements = newArray.getInitializer();
+            if (elements != null && initializer != null && !elements.isEmpty()) {
+                // In `int[] a = {1}` the space before the brace belongs to the `=`
+                if (newArray.getTypeExpression() != null) {
+                    stats.arrayInitializerLeftBrace += hasSpace(initializer.getBefore());
+                }
+                // `{}` is governed by the separate empty-initializer setting, and a brace
+                // followed or preceded by a line break says nothing about brace padding
+                if (!(elements.get(0) instanceof J.Empty)) {
+                    Space afterOpen = elements.get(0).getPrefix();
+                    JRightPadded<Expression> last = initializer.getPadding().getElements().get(elements.size() - 1);
+                    // With a trailing comma, the space before the brace follows the comma
+                    Space beforeClose = last.getMarkers().findFirst(TrailingComma.class)
+                            .map(TrailingComma::getSuffix)
+                            .orElse(last.getAfter());
+                    if (!hasLineBreak(afterOpen.getWhitespace())) {
+                        stats.withinArrayInitializerBraces += hasSpace(afterOpen);
+                    }
+                    if (!hasLineBreak(beforeClose.getWhitespace())) {
+                        stats.withinArrayInitializerBraces += hasSpace(beforeClose);
+                    }
+                }
+            }
             if (elements != null && initializer != null && elements.size() > 1) {
                 List<JRightPadded<Expression>> paddedElements = initializer.getPadding().getElements();
                 for (int i = 0; i < paddedElements.size() - 1; i++) {
@@ -1487,6 +1531,10 @@ public class Autodetect extends NamedStyles {
         int enumFieldAnnotationsWrapped = 0;
         int multilineAlignedToFirstArgument = 0;
         int multilineNotAlignedToFirstArgument = 0;
+        int simpleClassesInOneLine = 0;
+        int simpleMethodsInOneLine = 0;
+        int simpleLambdasInOneLine = 0;
+        int simpleBlocksInOneLine = 0;
 
         void merge(WrappingAndBracesStatistics other) {
             elseOnNewLine += other.elseOnNewLine;
@@ -1498,6 +1546,10 @@ public class Autodetect extends NamedStyles {
             enumFieldAnnotationsWrapped += other.enumFieldAnnotationsWrapped;
             multilineAlignedToFirstArgument += other.multilineAlignedToFirstArgument;
             multilineNotAlignedToFirstArgument += other.multilineNotAlignedToFirstArgument;
+            simpleClassesInOneLine += other.simpleClassesInOneLine;
+            simpleMethodsInOneLine += other.simpleMethodsInOneLine;
+            simpleLambdasInOneLine += other.simpleLambdasInOneLine;
+            simpleBlocksInOneLine += other.simpleBlocksInOneLine;
         }
 
         public WrappingAndBracesStyle getWrappingAndBracesStyle() {
@@ -1541,7 +1593,16 @@ public class Autodetect extends NamedStyles {
             return wrappingAndBracesStyle
                     .withMethodDeclarationParameters(wrappingAndBracesStyle.getMethodDeclarationParameters().withAlignWhenMultiline(multilineAlignedToFirstArgument >= multilineNotAlignedToFirstArgument))
                     .withRecordComponents(wrappingAndBracesStyle.getRecordComponents().withAlignWhenMultiline(multilineAlignedToFirstArgument >= multilineNotAlignedToFirstArgument))
-                    .withIfStatement(wrappingAndBracesStyle.getIfStatement().withElseOnNewLine(elseOnNewLine > 0));
+                    .withIfStatement(wrappingAndBracesStyle.getIfStatement().withElseOnNewLine(elseOnNewLine > 0))
+                    .withKeepWhenFormatting(keepWhenFormatting(wrappingAndBracesStyle.getKeepWhenFormatting()));
+        }
+
+        private WrappingAndBracesStyle.KeepWhenFormatting keepWhenFormatting(WrappingAndBracesStyle.KeepWhenFormatting keep) {
+            return keep
+                    .withSimpleClassesInOneLine(vote(simpleClassesInOneLine, Boolean.TRUE.equals(keep.getSimpleClassesInOneLine())))
+                    .withSimpleMethodsInOneLine(vote(simpleMethodsInOneLine, Boolean.TRUE.equals(keep.getSimpleMethodsInOneLine())))
+                    .withSimpleLambdasInOneLine(vote(simpleLambdasInOneLine, Boolean.TRUE.equals(keep.getSimpleLambdasInOneLine())))
+                    .withSimpleBlocksInOneLine(vote(simpleBlocksInOneLine, Boolean.TRUE.equals(keep.getSimpleBlocksInOneLine())));
         }
 
         private LineWrapSetting determineWrapping(int wrapsFound, LineWrapSetting defaultSetting) {
@@ -1556,6 +1617,26 @@ public class Autodetect extends NamedStyles {
     }
 
     private static class FindWrappingAndBracesStyle extends JavaIsoVisitor<WrappingAndBracesStatistics> {
+        @Override
+        public J.Block visitBlock(J.Block block, WrappingAndBracesStatistics stats) {
+            // Mirrors how WrappingAndBracesVisitor decides whether an empty body may stay on one line.
+            // A comment in the body is not an "empty" `{}` and says nothing about the preference.
+            if (block.getStatements().isEmpty() && block.getEnd().getComments().isEmpty()) {
+                int oneLine = -hasNewLine(block.getEnd());
+                Object parent = getCursor().getParentTreeCursor().getValue();
+                if (parent instanceof J.ClassDeclaration) {
+                    stats.simpleClassesInOneLine += oneLine;
+                } else if (parent instanceof J.MethodDeclaration) {
+                    stats.simpleMethodsInOneLine += oneLine;
+                } else if (parent instanceof J.Lambda) {
+                    stats.simpleLambdasInOneLine += oneLine;
+                } else {
+                    stats.simpleBlocksInOneLine += oneLine;
+                }
+            }
+            return super.visitBlock(block, stats);
+        }
+
         @Override
         public J.If.Else visitElse(J.If.Else else_, WrappingAndBracesStatistics stats) {
             stats.elseOnNewLine += hasNewLine(else_.getPrefix());

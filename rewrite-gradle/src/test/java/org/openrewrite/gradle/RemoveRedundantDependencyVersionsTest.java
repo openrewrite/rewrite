@@ -15,6 +15,7 @@
  */
 package org.openrewrite.gradle;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
@@ -25,6 +26,7 @@ import static org.openrewrite.gradle.Assertions.buildGradleKts;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 
 @SuppressWarnings("GroovyAssignabilityCheck")
+@Disabled("2026-11-24 temporarily disabled: JBoss Maven repo is down, which stalls missing-artifact lookups")
 class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {

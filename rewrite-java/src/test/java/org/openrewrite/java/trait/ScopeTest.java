@@ -1841,6 +1841,11 @@ class ScopeTest implements RewriteTest {
                 {
                     use("instanceInitializerBeforeStaticField", LATER);
                 }
+                {
+                    use("instanceInitializerAssignsLaterField", later = 3);
+                    use("instanceInitializerCompoundAssignsLaterField", later += 3);
+                    use("instanceInitializerIncrementsLaterField", later++);
+                }
                 Runnable lambda = () ->
                         use("lambdaInInitializerBeforeField", later);
                 Object anonymous = new Object() {
@@ -1873,11 +1878,131 @@ class ScopeTest implements RewriteTest {
         assertThat(readsRefused(source)).containsExactly(
           "enumConstantBeforeStaticField",
           "fieldInitializerBeforeInstanceField",
+          "instanceInitializerCompoundAssignsLaterField",
+          "instanceInitializerIncrementsLaterField",
           "lambdaInInitializerBeforeField",
           "laterDeclaratorOfOneStatement",
           "ownInitializer",
           "staticInitializerBeforeStaticField");
         assertThat(rowsJavacRejects(source, USE_ROW)).isEqualTo(readsRefused(source));
+    }
+
+    @Test
+    void enumCannotReadItsOwnStaticFieldWhileAConstantIsConstructed() {
+        @Language("java") String source =
+          """
+            interface Shared {
+                Object INHERITED = new Object();
+            }
+            enum E implements Shared {
+                A {
+                    Object inBody =
+                            use("constantBodyFieldInitializer", logger);
+                    int m() {
+                        return use("constantBodyMethod", logger);
+                    }
+                };
+                static int use(String row, Object read) { return 0; }
+                static int helper() { return 0; }
+                static final Object logger = new Object();
+                static final int PRIMITIVE = -1;
+                static final String TEXT = "a" + 1;
+                static final long CONVERTED = (long) (true ? 1 : 2);
+                static final Integer BOXED = 1;
+                static final int COMPUTED = "a".length();
+                static final String NULL = null;
+                static int notFinal = 1;
+                E() {
+                    use("constructor", logger);
+                    use("constructorCallsStaticMethod", helper());
+                    use("constructorReadsEnumConstant", A);
+                    use("constructorReadsConstantPrimitive", PRIMITIVE);
+                    use("constructorReadsConstantString", TEXT);
+                    use("constructorReadsConstantCastOfConditional", CONVERTED);
+                    use("constructorReadsBoxedField", BOXED);
+                    use("constructorReadsComputedField", COMPUTED);
+                    use("constructorReadsNullField", NULL);
+                    use("constructorReadsLiteralFieldThatIsNotFinal", notFinal);
+                    use("constructorReadsInterfaceField", INHERITED);
+                    Runnable lambda = () ->
+                            use("lambdaInConstructor", logger);
+                    new Object() {
+                        int m() {
+                            return use("classBodyInConstructor", logger);
+                        }
+                    };
+                }
+                {
+                    use("instanceInitializer", logger);
+                }
+                int field =
+                        use("instanceFieldInitializer", logger);
+                static {
+                    use("staticInitializer", logger);
+                }
+                int method() {
+                    return use("method", logger);
+                }
+            }
+            class C {
+                static final Object logger = new Object();
+                C() {
+                    E.use("constructorOfAClass", logger);
+                }
+            }
+            """;
+        assertThat(readsRefused(source)).containsExactly(
+          "constantBodyFieldInitializer",
+          "constructor",
+          "constructorReadsBoxedField",
+          "constructorReadsComputedField",
+          "constructorReadsEnumConstant",
+          "constructorReadsLiteralFieldThatIsNotFinal",
+          "constructorReadsNullField",
+          "instanceFieldInitializer",
+          "instanceInitializer",
+          "lambdaInConstructor");
+        assertThat(rowsJavacRejects(source, USE_ROW)).isEqualTo(readsRefused(source));
+    }
+
+    @Test
+    void enumConstructorCannotReadAStaticFieldOnlyAttributionLists() {
+        rewriteRun(
+          spec -> spec.parser(JavaParser.fromJavaVersion().classpath("lombok"))
+            .recipe(atHere(scope -> scope.lookup("log").map(scope::canReference).map(String::valueOf).orElse("unbound"))),
+          java(
+            """
+              import lombok.extern.java.Log;
+
+              @Log
+              enum E {
+                  A;
+                  E() {
+                      here();
+                  }
+                  void m() {
+                      here();
+                  }
+                  void here() {}
+              }
+              """,
+            """
+              import lombok.extern.java.Log;
+
+              @Log
+              enum E {
+                  A;
+                  E() {
+                      /*~~(false)~~>*/here();
+                  }
+                  void m() {
+                      /*~~(true)~~>*/here();
+                  }
+                  void here() {}
+              }
+              """
+          )
+        );
     }
 
     @Test
@@ -2291,7 +2416,10 @@ class ScopeTest implements RewriteTest {
                 if ("use".equals(method.getSimpleName())) {
                     Expression read = method.getArguments().get(1);
                     J.Identifier name = read instanceof J.MethodInvocation call ? call.getName() :
-                      read instanceof J.TypeCast cast ? (J.Identifier) cast.getClazz().getTree() : (J.Identifier) read;
+                      read instanceof J.TypeCast cast ? (J.Identifier) cast.getClazz().getTree() :
+                      read instanceof J.Assignment assignment ? (J.Identifier) assignment.getVariable() :
+                      read instanceof J.AssignmentOperation operation ? (J.Identifier) operation.getVariable() :
+                      read instanceof J.Unary unary ? (J.Identifier) unary.getExpression() : (J.Identifier) read;
                     Cursor at = Scope.cursorTo(getCursor(), name);
                     Scope scope = Scope.at(at);
                     Scope.Binding binding = scope.lookup(name.getSimpleName(), Scope.service(at).namespaceOf(at)).orElseThrow();

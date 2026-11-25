@@ -47,6 +47,7 @@ import static java.util.stream.Collectors.toList;
 public class JavaTemplateParser {
     private static final PropertyPlaceholderHelper placeholderHelper = new PropertyPlaceholderHelper("#{", "}", null);
 
+    // rewrite-test's CheckingScheduler hands a test's cache to every root cursor under this key
     private static final String TEMPLATE_CACHE_MESSAGE_KEY = "__org.openrewrite.java.internal.template.JavaTemplateParser.cache__";
 
     private static final String PACKAGE_STUB = "package #{}; class $Template {}";

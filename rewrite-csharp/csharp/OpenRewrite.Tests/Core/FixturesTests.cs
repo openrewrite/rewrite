@@ -106,6 +106,23 @@ public class FixturesTests : RewriteTest
         );
     }
 
+    [Fact]
+    public void AFixtureKeepsItsByteOrderMark()
+    {
+        var directory = Directory.CreateTempSubdirectory();
+        try
+        {
+            var path = Path.Combine(directory.FullName, "Bom.cs");
+            File.WriteAllBytes(path, [0xEF, 0xBB, 0xBF, ..System.Text.Encoding.UTF8.GetBytes("class Bom { }")]);
+            RewriteRun(CSharpFromFile(path).AfterRecipe(cu => Assert.True(cu.CharsetBomMarked)));
+            RewriteRun(CSharpFromResource("Fixture.cs.txt").AfterRecipe(cu => Assert.False(cu.CharsetBomMarked)));
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
     private class RenameCalls : global::OpenRewrite.Core.Recipe
     {
         public override string DisplayName => "Rename calls";

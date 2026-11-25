@@ -47,7 +47,7 @@ final class NameMatching {
     /**
      * Messages that a recipe run puts on its execution context, which a rerun must not share.
      */
-    private static final Set<String> RUN_STATE = new HashSet<>(Arrays.asList(
+    static final Set<String> RUN_STATE = new HashSet<>(Arrays.asList(
             ExecutionContext.CURRENT_CYCLE,
             ExecutionContext.CURRENT_RECIPE,
             Recipe.PANIC,
@@ -330,7 +330,9 @@ final class NameMatching {
         ctx.putMessage(ExecutionContext.SOURCE_FILE_TIMEOUT, longer(SOURCE_FILE_TIMEOUT, asLongAsTheTest));
         DataTableExecutionContextView.view(ctx).setDataTableStore(DataTableStore.noop());
         try {
-            RecipeRun run = SERIALIZER.read(recipe).run(new InMemoryLargeSourceSet(sources), ctx, cycles, minCycles);
+            LargeSourceSet lss = new InMemoryLargeSourceSet(sources);
+            RecipeRun run = CheckingScheduler.of(lss, ctx)
+                    .scheduleRun(SERIALIZER.read(recipe), lss, ctx, cycles, minCycles);
             Map<UUID, @Nullable SourceFile> changed = new HashMap<>();
             for (Result result : run.getChangeset().getAllResults()) {
                 SourceFile before = result.getBefore();
