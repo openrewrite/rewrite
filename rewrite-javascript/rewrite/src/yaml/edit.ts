@@ -34,13 +34,12 @@ import {
 } from "./pending";
 
 /**
- * Pure, immutable helpers for reading and editing YAML while keeping a document's formatting and comments.
- * Every editing function returns its input (the same reference) when there is nothing to change.
+ * Immutable helpers that edit YAML while keeping its formatting and comments. An edit that changes nothing returns
+ * its input.
  *
- * Some edits also change the space before the node printed after the edited one, such as the line break that a
- * `|` block scalar ends with, or a comment on the line of a removed entry. When that node is outside the mapping or
- * sequence being edited, the change is applied once the result is placed in its parent by these functions or by a
- * `YamlVisitor`, or by the `*At` functions when given a document.
+ * An edit can also change the prefix of the node after the edited one. When that node is outside the edited
+ * mapping or sequence, the change is applied when the result is placed in its parent, by these helpers or by
+ * `YamlVisitor`.
  */
 
 export type YamlRoot = Yaml.Documents | Yaml.Document | Yaml.Block;
@@ -48,25 +47,22 @@ export type YamlRoot = Yaml.Documents | Yaml.Document | Yaml.Block;
 export type YamlPrimitive = string | number | boolean | null;
 
 /**
- * A node, or plain data for a scalar. Plain data given for an existing scalar keeps its quoting where the data allows.
+ * A node, or plain data for a scalar.
  */
 export type YamlValue = Yaml.Block | YamlPrimitive;
 
 export interface SetEntryOptions {
-    /**
-     * Where a new entry goes: `"last"` (the default), `"first"`, or `"sorted"`, which places it before the first
-     * entry whose key sorts after it. An entry that already exists keeps its place.
-     */
+    /** Where a new entry goes; `"sorted"` places it by key. Defaults to `"last"`. */
     position?: "first" | "last" | "sorted";
 }
 
 export interface AppendItemOptions {
-    /** Whether to leave the sequence unchanged if one of its items already holds the same data as the value. */
+    /** Whether to skip a value that an item already holds. */
     unique?: boolean;
 }
 
 /**
- * The key of an entry as text: a plain key as written, a quoted key decoded. `undefined` for an alias key.
+ * The key of an entry, decoded if quoted, or `undefined` for an alias.
  */
 export function entryKey(entry: Yaml.MappingEntry): string | undefined {
     const key = entry.key;
@@ -81,23 +77,19 @@ export function entryKey(entry: Yaml.MappingEntry): string | undefined {
 }
 
 /**
- * The first entry of a mapping with the given key, matched by {@link entryKey}.
+ * The first entry with the given key.
  */
 export function findEntry(mapping: Yaml.Mapping, key: string): Yaml.MappingEntry | undefined {
     return mapping.entries.find(e => entryKey(e) === key);
 }
 
-/**
- * The items of a sequence.
- */
 export function itemsOf(seq: Yaml.Sequence): Yaml.Block[] {
     rememberItemColumns(seq);
     return seq.entries.map(e => e.block);
 }
 
 /**
- * The value at a path of mapping keys, or `undefined` if a step is missing or isn't a mapping.
- * A `Yaml.Documents` is read from its first document.
+ * The value at a path of keys, or `undefined` if the path doesn't resolve. Reads the first of several documents.
  */
 export function valueAt(root: YamlRoot, path: readonly string[]): Yaml.Block | undefined {
     let current = blockOf(root);
@@ -111,17 +103,15 @@ export function valueAt(root: YamlRoot, path: readonly string[]): Yaml.Block | u
 }
 
 /**
- * The plain JavaScript value of a scalar, sequence, mapping or document, as the YAML 1.2 core schema reads it,
- * or `undefined` where it isn't plain data, such as a value with a custom tag or an alias to an anchor outside it.
- * Aliases and merge keys (`<<`) are resolved. A `Yaml.Documents` is read from its first document.
+ * The plain value of a node under the YAML 1.2 core schema, with aliases and `<<` merges resolved, or `undefined`
+ * where it isn't plain data, such as a custom tag. Reads the first of several documents.
  */
 export function toPlain(yaml: Yaml): unknown {
     return plainOf(yaml, new Map());
 }
 
 /**
- * The mapping keys from the document root down to the cursor, or `undefined` if a key on the way can't be read.
- * Sequence items on the way contribute no step.
+ * The keys from the root down to the cursor, skipping sequence items, or `undefined` if a key can't be read.
  */
 export function pathOf(cursor: Cursor): string[] | undefined {
     const path: string[] = [];
@@ -138,7 +128,7 @@ export function pathOf(cursor: Cursor): string[] | undefined {
 }
 
 /**
- * A scalar for plain data: plain where it reads back as the same data, double-quoted otherwise.
+ * A scalar, unquoted where it reads back as the same value.
  */
 export function yamlScalar(value: YamlPrimitive, prefix: string = ""): Yaml.Scalar {
     const {style, text} = written(value, Yaml.ScalarStyle.PLAIN);
@@ -146,10 +136,8 @@ export function yamlScalar(value: YamlPrimitive, prefix: string = ""): Yaml.Scal
 }
 
 /**
- * Replaces the data of a scalar unless it already holds it, keeping its prefix, anchor and quoting where the data
- * allows: a single- or double-quoted string stays quoted, a `|` or `>` block scalar given a string of several lines
- * stays a `|` block scalar, and a value that would read back differently unquoted is double-quoted. A core schema tag such as `!!str`
- * is dropped, since the data now says what it is.
+ * Sets a scalar's value, keeping its quoting where the value allows. A multi-line string keeps a block scalar, and a
+ * core schema tag such as `!!str` is dropped.
  */
 export function setScalarValue(scalar: Yaml.Scalar, value: YamlPrimitive): Yaml.Scalar {
     if (scalarPlain(scalar) === value) {
@@ -170,10 +158,7 @@ export function setScalarValue(scalar: Yaml.Scalar, value: YamlPrimitive): Yaml.
 }
 
 /**
- * Adds an entry, or replaces the value of an existing one unless it already holds the same data.
- *
- * A new entry copies its layout from the entry it is placed next to. In a block mapping, the space before the entry
- * that follows it keeps describing that entry: a comment on the line before an entry stays with it.
+ * Adds an entry laid out like its neighbour, or sets the value of an existing one.
  */
 export function setEntry(mapping: Yaml.Mapping, key: string, value: YamlValue, options: SetEntryOptions = {}): Yaml.Mapping {
     const index = indexOfEntry(mapping, key);
@@ -187,8 +172,7 @@ export function setEntry(mapping: Yaml.Mapping, key: string, value: YamlValue, o
 }
 
 /**
- * Replaces the value of an existing entry with what `fn` makes of it. A node that `fn` derives from the old value
- * keeps the prefix `fn` gives it; a new node without a prefix is placed where the old value was.
+ * Replaces the value of an entry with what `fn` makes of it.
  */
 export function updateEntry(mapping: Yaml.Mapping, key: string, fn: (old: Yaml.Block) => YamlValue): Yaml.Mapping {
     const index = indexOfEntry(mapping, key);
@@ -200,8 +184,7 @@ export function updateEntry(mapping: Yaml.Mapping, key: string, fn: (old: Yaml.B
 }
 
 /**
- * Removes an entry. A comment on the line before the entry stays, and one on the entry's own line goes with it.
- * A block mapping left without entries becomes `{}`.
+ * Removes an entry with the comment on its line. A block mapping left empty becomes `{}`.
  */
 export function removeEntry(mapping: Yaml.Mapping, key: string): Yaml.Mapping {
     const index = indexOfEntry(mapping, key);
@@ -209,9 +192,8 @@ export function removeEntry(mapping: Yaml.Mapping, key: string): Yaml.Mapping {
 }
 
 /**
- * Replaces each item with what `fn` makes of it, or removes it where `fn` returns `undefined`. Plain data given for
- * a scalar item goes through {@link setScalarValue}, so `fn` can return e.g. `"18.x"` for `'12.x'` and get `'18.x'`.
- * Items are removed as {@link removeEntry} removes entries; a block sequence left without items becomes `[]`.
+ * Replaces each item with what `fn` makes of it, or removes it where `fn` returns `undefined`. A block sequence left
+ * empty becomes `[]`.
  */
 export function mapItems(seq: Yaml.Sequence, fn: (item: Yaml.Block, index: number) => YamlValue | undefined): Yaml.Sequence {
     rememberItemColumns(seq);
@@ -232,15 +214,12 @@ export function mapItems(seq: Yaml.Sequence, fn: (item: Yaml.Block, index: numbe
     return updated;
 }
 
-/**
- * Removes the items that `pred` matches, as {@link mapItems} removes them.
- */
 export function removeItems(seq: Yaml.Sequence, pred: (item: Yaml.Block, index: number) => boolean): Yaml.Sequence {
     return mapItems(seq, (item, i) => pred(item, i) ? undefined : item);
 }
 
 /**
- * Adds an item after the last one, laid out like the item before it. An empty sequence `[]` stays inline: `[a]`.
+ * Adds an item laid out like the last one.
  */
 export function appendItem(seq: Yaml.Sequence, value: YamlValue, options: AppendItemOptions = {}): Yaml.Sequence {
     const block = isNode(value) ? value : yamlScalar(value);
@@ -263,24 +242,21 @@ export function appendItem(seq: Yaml.Sequence, value: YamlValue, options: Append
 }
 
 /**
- * Sets the value at a path of mapping keys with {@link setEntry}, rebuilding the mappings along the path.
- * Returns `root` unchanged if the path is empty or a step before the last is missing or isn't a mapping.
- * A `Yaml.Documents` is edited in its first document.
+ * {@link setEntry} at a path of keys. Edits the first of several documents.
  */
 export function setAt<T extends YamlRoot>(root: T, path: readonly string[], value: YamlValue, options: SetEntryOptions = {}): T {
     return editRoot(root, path, mapping => setIn(mapping, path, value, options));
 }
 
 /**
- * Replaces the value at a path of mapping keys with what `fn` makes of it, as {@link updateEntry} does.
- * Returns `root` unchanged if the path doesn't resolve.
+ * {@link updateEntry} at a path of keys.
  */
 export function updateAt<T extends YamlRoot>(root: T, path: readonly string[], fn: (old: Yaml.Block) => YamlValue): T {
     return editRoot(root, path, mapping => updateIn(mapping, path, fn));
 }
 
 /**
- * Removes the entry at a path of mapping keys with {@link removeEntry}. Returns `root` unchanged if the path doesn't resolve.
+ * {@link removeEntry} at a path of keys.
  */
 export function removeAt<T extends YamlRoot>(root: T, path: readonly string[]): T {
     return editRoot(root, path, mapping => removeIn(mapping, path));
@@ -424,8 +400,7 @@ function isCoreTag(tag: Yaml.Tag): boolean {
 }
 
 /**
- * Reads a scalar's source with the `yaml` package, which the parser is built on, so that escapes, folding and the
- * core schema's types are read as YAML defines them.
+ * Decodes a scalar with the `yaml` package, which handles escapes, folding and the core schema's types.
  */
 function decode(style: Yaml.ScalarStyle, value: string, tag?: Yaml.Tag): unknown {
     if (tag !== undefined && !isCoreTag(tag)) {
@@ -450,7 +425,7 @@ function decode(style: Yaml.ScalarStyle, value: string, tag?: Yaml.Tag): unknown
         case Yaml.ScalarStyle.LITERAL:
         case Yaml.ScalarStyle.FOLDED: {
             const lineBreak = value.indexOf("\n");
-            // An indentation indicator counts from the parent's indentation, which a scalar on its own doesn't have.
+            // An indentation indicator is relative to the parent, which isn't known here.
             if (/\d/.test((lineBreak < 0 ? value : value.slice(0, lineBreak)).replace(/#.*$/, ""))) {
                 return undefined;
             }
@@ -507,7 +482,7 @@ function plainText(value: YamlPrimitive): string | undefined {
 }
 
 /**
- * Whether a string can be written unquoted in a block or a flow collection, before checking how it reads back.
+ * Whether a string can be written unquoted, in a block or flow collection.
  */
 function isPlainSafe(s: string): boolean {
     return s.length > 0 &&
@@ -518,8 +493,7 @@ function isPlainSafe(s: string): boolean {
 }
 
 /**
- * The source of a `|` block scalar holding `value`, keeping the old one's indentation, header comment and the line
- * break it ends with, or `undefined` where a block scalar can't hold it as simply.
+ * The source of a `|` block scalar for `value`, laid out like `old`, or `undefined` if it can't be written simply.
  */
 function literalText(old: Yaml.Scalar, value: string): string | undefined {
     const lineBreak = old.value.indexOf("\n");
@@ -551,8 +525,7 @@ function isBlockCollection(node: Yaml): boolean {
 }
 
 /**
- * An empty value, as in `key:`. Before #10155 the TypeScript parser put the line break after it in its prefix, which
- * LSTs built then still have.
+ * An empty value, as in `key:`. LSTs built before #10155 have the line break after it in its prefix.
  */
 function isEmptyValue(node: Yaml): boolean {
     return isScalar(node) && node.style === Yaml.ScalarStyle.PLAIN && node.value === "" &&
@@ -560,13 +533,12 @@ function isEmptyValue(node: Yaml): boolean {
 }
 
 /**
- * What a node prints at its end that belongs to the space before the next node: the line breaks that end a `|` or
- * `>` block scalar, or the prefix of an empty value.
+ * The line breaks a node ends with that belong before the next node: those after a block scalar or an empty value.
  */
 function tailOf(node: Yaml): string {
     if (isScalar(node)) {
         if (node.style === Yaml.ScalarStyle.LITERAL || node.style === Yaml.ScalarStyle.FOLDED) {
-            // The Java parser keeps the blank lines after a block scalar in it, where the TypeScript parser leaves them out.
+            // The Java parser keeps the blank lines after a block scalar in it.
             return /(\r?\n)+$/.exec(node.value)?.[0] ?? "";
         }
         return isEmptyValue(node) ? node.prefix : "";
@@ -596,7 +568,7 @@ function lines(space: string): { head: string, mid: string[], last: string } {
 }
 
 /**
- * The line break that the spaces use, so that one added next to them matches.
+ * The line break the spaces use.
  */
 function eolOf(...spaces: string[]): string {
     return spaces.some(s => s.includes("\r\n")) ? "\r\n" : "\n";
@@ -609,10 +581,8 @@ function lineBreakAt(space: string): number {
 const isNotBlank = (line: string) => line.trim() !== "";
 
 /**
- * The space left between two nodes when what was between them is removed, given the space before and after the
- * removed part. The end of the line before it stays, a comment on the removed part's own line goes with it, and the
- * comment lines before and after it stay. Blank lines come from the space before a removed first entry, and from
- * the space after any other.
+ * The space left when a node between `before` and `after` is removed. The comment on the removed node's line goes;
+ * other comments stay.
  */
 function joinGaps(before: string, after: string, first: boolean): string {
     if (!after.includes("\n")) {
@@ -635,8 +605,7 @@ function withPrefixIfEmpty<T extends Yaml.Block>(block: T, prefix: string): T {
 }
 
 /**
- * Places a new value where an old one was, recording the change to the space after it if what the value ends with
- * differs. A value derived from the old one with these functions has recorded that already.
+ * Places a new value where an old one was. A value derived from the old one is kept as it is.
  */
 function placedAs<T extends Yaml.Block>(value: T, old: Yaml.Block): T {
     if (value.id === old.id) {
@@ -724,8 +693,7 @@ function newEntry(mapping: Yaml.Mapping, at: number, key: string, value: YamlVal
 }
 
 /**
- * The columns of block mappings and sequences that start on the line of their item's dash, which their entries
- * don't show until there is a second one.
+ * The columns of collections that start on their item's dash line, which a single entry doesn't show.
  */
 const itemColumns = new WeakMap<Container, number>();
 
@@ -746,7 +714,7 @@ function rememberItemColumns(seq: Yaml.Sequence): void {
 }
 
 /**
- * The line break and indentation that a new entry of a block mapping or sequence starts with.
+ * The line break and indentation for a new entry of a block collection.
  */
 function lineIndentOf(container: Container): string {
     for (let i = container.entries.length - 1; i >= 0; i--) {
@@ -778,7 +746,7 @@ function insertInto<T extends Container>(container: T, at: number, entry: Contai
         const lastTail = tailOf(childOf(entries[entries.length - 1]));
         const added = {...entry, prefix: strip(lastTail, lineIndent)};
         const result = withEntries(container, [...entries, added]);
-        // The line break that ended the old last entry now comes before the added one, so what follows needs its own.
+        // The old last entry's line break now precedes the added one, so what follows needs one too.
         return withPending(result, lastTail === "" ? keepLineComment(added.id) :
             (node, next) => ({node, next: strip(tailAt(node as Container), lastTail + next)}));
     }
@@ -802,8 +770,7 @@ function insertInto<T extends Container>(container: T, at: number, entry: Contai
 }
 
 /**
- * Keeps a comment at the end of the line of the entry before an appended one on that line. The comment is in the
- * prefix of the node after the mapping or sequence, so this is applied once that node is known.
+ * Keeps the comment on the old last entry's line there, after an entry is appended.
  */
 function keepLineComment(id: string): PendingEdit {
     return (node, next) => {
@@ -820,7 +787,7 @@ function keepLineComment(id: string): PendingEdit {
 }
 
 /**
- * The space after the comma between two items of a flow collection, given the spaces after each comma.
+ * The space after a comma in a flow collection.
  */
 function flowSeparator(spaces: string[]): string {
     const sample = spaces[spaces.length - 1];
@@ -831,8 +798,7 @@ function flowSeparator(spaces: string[]): string {
 }
 
 /**
- * Whether an item of a flow sequence can hold the space before it. The TypeScript parser puts that space in the
- * prefix of the entry, and the Java parser in the prefix of a scalar or alias item.
+ * Whether a flow sequence item can hold the space before it, as the Java parser puts it on a scalar or alias.
  */
 function holdsLead(block: Yaml.Block): boolean {
     return isScalar(block) || block.kind === Yaml.Kind.Alias;
@@ -843,7 +809,7 @@ function leadOf(entry: Yaml.SequenceEntry): string {
 }
 
 /**
- * Whether the items of a flow sequence hold the space before them, as the Java parser lays them out.
+ * Whether a flow sequence uses the Java parser's layout.
  */
 function leadsOnItems(seq: Yaml.Sequence): boolean {
     return seq.entries.some(e => e.prefix === "" && holdsLead(e.block) && e.block.prefix !== "");
@@ -938,7 +904,7 @@ function removeFrom<T extends Container>(container: T, index: number): T {
         return withPending(withEntries(container, entries), (node, next) =>
             ({node, next: strip(tailAt(node as Container), joinGaps(before, removedTail + next, first))}));
     }
-    // What follows an emptied collection that started on the line before goes on the line after it.
+    // What follows an emptied collection goes on the next line.
     return withPending(emptyFlow(container, before.includes("\n") ? " " : before), (node, next) =>
         ({node, next: joinGaps(before.includes("\n") ? before : eolOf(next), removedTail + next, true)}));
 }

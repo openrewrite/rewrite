@@ -16,10 +16,8 @@
 import {isMapping, isMappingEntry, Yaml} from "./tree";
 
 /**
- * Some edits also change the prefix of the node printed after the edited one: a `|` block scalar and an empty value
- * print the line break that ends them, and a comment at the end of an entry's line is in the prefix of what follows
- * it. When that node isn't in the same mapping or sequence, the edit is recorded on the edited node and applied by
- * whichever parent places it next to what follows: the editing functions in `edit.ts`, `YamlVisitor`, or the document.
+ * A change to the prefix of the node after an edited one, such as the line break a block scalar ends with or the
+ * comment on a removed entry's line. Recorded on the edited node, it is applied by the parent that places it.
  */
 export type PendingEdit = (node: Yaml, next: string) => { node: Yaml, next: string };
 
@@ -48,7 +46,7 @@ export function carryPending<T extends Yaml>(from: Yaml, to: T): T {
 }
 
 /**
- * Applies the edits recorded on a node, given the prefix of the node printed after it.
+ * Applies a node's edits, given the prefix of the node after it.
  */
 export function applyPending(node: Yaml, next: string): { node: Yaml, next: string } {
     const edits = pendingEdits.get(node);
@@ -92,8 +90,8 @@ export function withEntries<T extends Container>(container: T, entries: Containe
 }
 
 /**
- * Applies the edits recorded on the children of a mapping or sequence to the entries after them. The edits of
- * the last child of a block mapping or sequence are recorded on the result instead, for its own parent to apply.
+ * Applies the children's edits to the entries after them. The last child's edits in a block collection pass to the
+ * result, for its parent to apply.
  */
 export function settleChildren<T extends Container>(container: T): T {
     const entries: ContainerEntry[] = [...container.entries];
@@ -142,7 +140,7 @@ export function settleChildren<T extends Container>(container: T): T {
 }
 
 /**
- * Applies the edits recorded on a document's block to the space before the document's end.
+ * Applies the block's edits to the prefix of the document end.
  */
 export function settleDocument(document: Yaml.Document): Yaml.Document {
     const result = applyPending(document.block, document.end.prefix);
