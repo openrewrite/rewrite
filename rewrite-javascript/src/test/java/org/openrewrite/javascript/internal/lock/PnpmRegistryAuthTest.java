@@ -57,7 +57,7 @@ class PnpmRegistryAuthTest {
     static Stream<Arguments> nativePolicies() {
         List<Arguments> cases = new ArrayList<>();
         // Exact install controls, not pnpm view: npm-conf's view command differs on 10.34.9.
-        for (String version : List.of("10.0.0", "10.11.0", "10.34.9", "11.0.3", "11.1.2", "11.1.3",
+        for (String version : List.of("10.0.0", "10.11.0", "10.12.1", "10.34.9", "11.0.3", "11.1.2", "11.1.3",
           "11.5.2", "11.5.3", "11.10.0", "11.16.0")) {
             boolean ignoresProjectEnv = List.of("10.34.9", "11.5.3", "11.10.0", "11.16.0").contains(version);
             boolean bounded10 = version.startsWith("10.");
@@ -87,7 +87,7 @@ class PnpmRegistryAuthTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"10.0.0", "10.11.0", "10.34.9", "11.0.3", "11.5.3", "11.10.0", "11.16.0"})
+    @ValueSource(strings = {"10.0.0", "10.11.0", "10.12.1", "10.34.9", "11.0.3", "11.5.3", "11.10.0", "11.16.0"})
     void globalConfigIsReadOnlyByPnpm10(String version, @TempDir Path home) {
         check(version, null, null, true, version.startsWith("10.") ? "Bearer synthetic-env" : null,
           false, home, "${LOCK_VALIDATION_TOKEN}");

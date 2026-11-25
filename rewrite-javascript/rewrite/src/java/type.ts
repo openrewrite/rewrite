@@ -333,9 +333,19 @@ export namespace Type {
         if (matches(FullyQualified.getFullyQualifiedName(type))) {
             return true;
         }
+        return matchOverride && isSubtypeWithName(type, matches, new Set());
+    }
+
+    // Heritage that cycles back to a type already walked adds no name, so the walk stops there.
+    function isSubtypeWithName(type: FullyQualified, matches: (fullyQualifiedName: string) => boolean,
+                               walked: Set<Type>): boolean {
         const c = isParameterized(type) ? type.type : type;
-        return matchOverride && isClass(c) &&
-            (isOfTypeWithName(c.supertype, true, matches) || c.interfaces.some(i => isOfTypeWithName(i, true, matches)));
+        if (!isClass(c) || walked.has(c)) {
+            return false;
+        }
+        walked.add(c);
+        return [c.supertype, ...(c.interfaces ?? [])].some(t => isFullyQualified(t) &&
+            (matches(FullyQualified.getFullyQualifiedName(t)) || isSubtypeWithName(t, matches, walked)));
     }
 
     // Track type variable names and parameterized types to prevent infinite recursion

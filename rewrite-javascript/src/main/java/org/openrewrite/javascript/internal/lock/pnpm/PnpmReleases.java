@@ -35,12 +35,12 @@ import java.util.List;
 public final class PnpmReleases {
 
     /**
-     * The releases the engine reproduces, a node-semver range. The three pnpm 10 releases have a bounded profile
+     * The releases the engine reproduces, a node-semver range. The four pnpm 10 releases have a bounded profile
      * ({@link Pnpm10Profile}); inputs outside it remain cannot-know. Recorded outcomes are replayed as each release
      * ({@code PnpmScenarioTest} with {@code REWRITE_LOCK_EVERY_RELEASE}), with an explicit refusal outside that
      * profile. Differences from 11.2.2 in supported paths are questions of {@link PnpmRelease}.
      */
-    public static final String PROVEN = "10.0.0 || 10.11.0 || 10.34.9 || 11.0.3 - 11.16.0";
+    public static final String PROVEN = "10.0.0 || 10.11.0 || 10.12.1 || 10.34.9 || 11.0.3 - 11.16.0";
 
     private static final List<String> ALL = load();
 

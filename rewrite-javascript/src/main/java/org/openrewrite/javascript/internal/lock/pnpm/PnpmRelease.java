@@ -163,10 +163,18 @@ public final class PnpmRelease {
     }
 
     /**
-     * package-requester seeds the preferred version from currentPkg from 10.12.1.
+     * package-requester seeds the preferred version from currentPkg from 10.11.1 (pnpm/pnpm#9588).
      */
     boolean prefersTheCurrentPackageVersion() {
-        return atLeast(10, 12, 1);
+        return atLeast(10, 11, 1);
+    }
+
+    /**
+     * A catalog entry's locked version is requested as the catalog's range, with that version its only preferred
+     * one, from 10.27.0 (pnpm/pnpm#10370); before, the locked version itself is requested.
+     */
+    boolean requestsTheCatalogRangeOfALockedVersion() {
+        return atLeast(10, 27, 0);
     }
 
     /**
@@ -428,10 +436,10 @@ public final class PnpmRelease {
      * An .npmrc's unscoped credentials ({@code _authToken}, {@code _auth}, {@code username}, {@code _password},
      * {@code tokenHelper}, {@code cert}, {@code key}) are pinned to the registry that .npmrc names, else npm's, and
      * checked with that registry's own, from 11.4.0; before, the merged unscoped ones are checked as the default
-     * registry's. The proven pnpm 10 pin 10.34.9 also rescopes each source; 10.0.0 and 10.11.0 do not.
+     * registry's. pnpm 10 rescopes each source from 10.34.0 (pnpm/pnpm#11986).
      */
     boolean rescopesUnscopedCredentials() {
-        return !atLeast(11, 0, 0) ? atLeast(10, 34, 9) : atLeast(11, 4, 0);
+        return !atLeast(11, 0, 0) ? atLeast(10, 34, 0) : atLeast(11, 4, 0);
     }
 
     /**
@@ -528,11 +536,11 @@ public final class PnpmRelease {
      * The project's own .npmrc expands no environment variable in a request destination (a registry, a {@code //}
      * key, a proxy) or a credential, and its pnpm-workspace.yaml none in {@code registry}, {@code pnprServer},
      * {@code registries} or {@code namedRegistries}: such an entry is left out with a warning, from 11.5.3; before,
-     * each is expanded as any other. Among the proven pnpm 10 pins, 10.34.9 also applies this filter;
-     * 10.0.0 and 10.11.0 do not (config/config's dropUntrustedEnvExpansions).
+     * each is expanded as any other. pnpm 10 applies this filter from 10.34.2 (pnpm/pnpm#12300, config/config's
+     * dropUntrustedEnvExpansions).
      */
     boolean ignoresTheEnvironmentInRepositoryRequestDestinations() {
-        return !atLeast(11, 0, 0) ? atLeast(10, 34, 9) : atLeast(11, 5, 3);
+        return !atLeast(11, 0, 0) ? atLeast(10, 34, 2) : atLeast(11, 5, 3);
     }
 
     /**
@@ -1306,12 +1314,15 @@ public final class PnpmRelease {
      * {@code includePrerelease}; 7.8.4 from 11.7.0, which takes an x-range with a number after a wildcard
      * ({@code 1.x.3}) for no range and leaves a caret range below 1.0.0 without the {@code -0} includePrerelease adds;
      * 7.8.1 from 11.3.0, which strips build metadata from a whole range; 7.8.0 from 11.2.0, and before, 7.7.4, which
-     * answers as 7.8.0 does (7.8.0 adds only {@code truncate}).
+     * answers as 7.8.0 does (7.8.0 adds only {@code truncate}). pnpm 10 bundles 7.7.3 from 10.29.0 and 7.7.4 from
+     * 10.31.0, which answer as 7.8.0 does; before, 7.6.2, 7.7.0, 7.7.1 or 7.7.2, which answer as 7.7.2 does and keep
+     * a comparator's build metadata, so that {@code ^1+build} is no range.
      */
     NodeSemver.Release semver() {
         return atLeast(11, 9, 0) ? NodeSemver.Release.V7_8_5 :
                 atLeast(11, 7, 0) ? NodeSemver.Release.V7_8_4 :
-                        atLeast(11, 3, 0) ? NodeSemver.Release.V7_8_1 : NodeSemver.Release.V7_8_0;
+                        atLeast(11, 3, 0) ? NodeSemver.Release.V7_8_1 :
+                                atLeast(10, 29, 0) ? NodeSemver.Release.V7_8_0 : NodeSemver.Release.V7_7_2;
     }
 
     /**

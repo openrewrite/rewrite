@@ -88,7 +88,8 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         a = a.withModifiers(requireNonNull(ListUtils.map(a.getModifiers(), m -> visitAndCast(m, p))));
         a = a.withTypeParameters(visitAndCast(a.getTypeParameters(), p));
         a = a.withLambda(requireNonNull(visitAndCast(a.getLambda(), p)));
-        return a.withReturnTypeExpression(visitAndCast(a.getReturnTypeExpression(), p));
+        a = a.withReturnTypeExpression(visitAndCast(a.getReturnTypeExpression(), p));
+        return a.withMethodType((JavaType.Method) visitType(a.getMethodType(), p));
     }
 
     public J visitAwait(JS.Await await, P p) {
