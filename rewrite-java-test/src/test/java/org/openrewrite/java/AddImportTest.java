@@ -233,7 +233,6 @@ class AddImportTest implements RewriteTest {
               package com.acme.bank;
 
               import com.acme.bank.*;
-
               import com.acme.bank.Record;
 
               class Foo {
@@ -1940,4 +1939,218 @@ class AddImportTest implements RewriteTest {
         );
     }
 
+    @Test
+    void explicitOnlyAddsImportNextToStarImportOfSamePackageWithoutPackageDeclaration() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false, true))),
+          //language=java
+          java(
+            """
+              import java.io.*;
+              import java.util.*;
+
+              class A {
+              }
+              """,
+            """
+              import java.io.*;
+              import java.util.*;
+              import java.util.List;
+
+              class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void forcedRecordImportIsNotFoldedIntoStarImportOfItsPackage() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new AddImport<>("com.acme.bank.Record", null, false)))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+              "package com.acme.a; public class X {}",
+              "package com.acme.bank; public class Record {}",
+              "package com.acme.bank; public class A {}",
+              "package com.acme.bank; public class B {}",
+              "package com.acme.bank; public class C {}"
+            )),
+          //language=java
+          java(
+            """
+              package com.acme.other;
+
+              import com.acme.a.X;
+              import com.acme.bank.*;
+              import com.acme.bank.A;
+              import com.acme.bank.B;
+              import com.acme.bank.C;
+
+              class Foo {
+              }
+              """,
+            """
+              package com.acme.other;
+
+              import com.acme.a.X;
+              import com.acme.bank.*;
+              import com.acme.bank.A;
+              import com.acme.bank.B;
+              import com.acme.bank.C;
+              import com.acme.bank.Record;
+
+              class Foo {
+              }
+              """,
+            spec -> spec.markers(javaVersion(17))
+          )
+        );
+    }
+
+    @Test
+    void explicitOnlyAddsImportNextToStarImportOfSamePackageInUnsortedImports() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false, true))),
+          //language=java
+          java(
+            """
+              package com.acme;
+
+              import java.util.concurrent.Future;
+              import java.util.*;
+
+              class A {
+              }
+              """,
+            """
+              package com.acme;
+
+              import java.util.concurrent.Future;
+              import java.util.*;
+              import java.util.List;
+
+              class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void explicitOnlyKeepsImportsOfStarImportedPackageInOrder() {
+        rewriteRun(
+          spec -> spec.recipes(
+            toRecipe(() -> new AddImport<>("java.util.Set", null, false, true)),
+            toRecipe(() -> new AddImport<>("java.util.List", null, false, true)),
+            toRecipe(() -> new AddImport<>("java.util.ArrayList", null, false, true))
+          ),
+          //language=java
+          java(
+            """
+              package com.acme;
+
+              import java.util.*;
+              import java.util.Map.Entry;
+              import java.util.function.Consumer;
+
+              class A {
+              }
+              """,
+            """
+              package com.acme;
+
+              import java.util.*;
+              import java.util.ArrayList;
+              import java.util.List;
+              import java.util.Map.Entry;
+              import java.util.Set;
+              import java.util.function.Consumer;
+
+              class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void explicitOnlyKeepsSeparationBeforeImportFollowingStarImport() {
+        rewriteRun(
+          spec -> spec.recipes(
+            toRecipe(() -> new AddImport<>("javax.swing.JFrame", null, false, true)),
+            toRecipe(() -> new AddImport<>("java.util.List", null, false, true))
+          ),
+          //language=java
+          java(
+            """
+              package com.acme;
+
+              import javax.swing.*;
+              import java.awt.*;
+              import java.util.*;
+
+              import java.io.File;
+
+              class A {
+              }
+              """,
+            """
+              package com.acme;
+
+              import javax.swing.*;
+              import javax.swing.JFrame;
+              import java.awt.*;
+              import java.util.*;
+              import java.util.List;
+
+              import java.io.File;
+
+              class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void explicitOnlyLeavesTrailingCommentsOnStarImportLine() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false, true))),
+          //language=java
+          java(
+            """
+              package com.acme;
+
+              import java.util.*; /* keep */ // NOPMD
+              // the executor API
+              import java.util.concurrent.Future;
+
+              class A {
+              }
+              """,
+            """
+              package com.acme;
+
+              import java.util.*; /* keep */ // NOPMD
+              import java.util.List;
+              // the executor API
+              import java.util.concurrent.Future;
+
+              class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void explicitOnlyLeavesTrailingCommentOnStarImportLineWithCrlf() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false, true))),
+          java(
+            "package com.acme;\r\n\r\nimport java.util.*; // NOPMD\r\nimport java.util.concurrent.Future;\r\n\r\nclass A {\r\n}\r\n",
+            "package com.acme;\r\n\r\nimport java.util.*; // NOPMD\r\nimport java.util.List;\r\nimport java.util.concurrent.Future;\r\n\r\nclass A {\r\n}\r\n"
+          )
+        );
+    }
 }

@@ -81,7 +81,6 @@ class ShortenFullyQualifiedTypeReferencesSafelyTest implements RewriteTest {
               package a;
 
               import java.util.*;
-
               import java.util.List;
 
               class T {

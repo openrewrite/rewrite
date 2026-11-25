@@ -167,6 +167,12 @@ public class ImportLayoutStyle implements JavaStyle {
             }
         }
 
+        // The ideal ordering below folds an import into an existing star import of its own package, so it cannot place it
+        int coveringStar = indexOfCoveringStarImport(originalImports, paddedToAdd);
+        if (coveringStar >= 0) {
+            return addAfterCoveringStarImport(originalImports, paddedToAdd, coveringStar);
+        }
+
         // don't star fold just yet, because we are only going to star fold adjacent imports along with
         // the import to add at most. we don't even want to star fold other non-adjacent imports in the same
         // block that should be star folded according to the layout style (minimally invasive change).
@@ -1018,6 +1024,64 @@ public class ImportLayoutStyle implements JavaStyle {
             s.append(block).append("\n");
         }
         return s.toString();
+    }
+
+    /**
+     * Adds the import after the star import covering it, in order among the explicit imports of that package that
+     * follow it. The next import keeps its prefix, except for comments trailing the previous import's line
+     * (such as {@code // NOPMD}), which stay on that line.
+     */
+    private List<JRightPadded<J.Import>> addAfterCoveringStarImport(List<JRightPadded<J.Import>> imports,
+                                                                    JRightPadded<J.Import> toAdd, int coveringStar) {
+        int insertPosition = coveringStar + 1;
+        while (insertPosition < imports.size() && sortsBeforeInSamePackage(imports.get(insertPosition), toAdd)) {
+            insertPosition++;
+        }
+        Space prefix = Space.format("\n");
+        List<JRightPadded<J.Import>> withAdded = new ArrayList<>(imports);
+        if (insertPosition < imports.size()) {
+            JRightPadded<J.Import> after = imports.get(insertPosition);
+            Space followerPrefix = after.getElement().getPrefix();
+            List<Comment> comments = followerPrefix.getComments();
+            int lineEnd = 0;
+            while (lineEnd < comments.size() && !comments.get(lineEnd).getSuffix().contains("\n")) {
+                lineEnd++;
+            }
+            if (!followerPrefix.getWhitespace().contains("\n") && lineEnd < comments.size()) {
+                Comment last = comments.get(lineEnd);
+                List<Comment> onPreviousLine = new ArrayList<>(comments.subList(0, lineEnd));
+                onPreviousLine.add(last.withSuffix(last.getSuffix().contains("\r\n") ? "\r\n" : "\n"));
+                prefix = Space.build(followerPrefix.getWhitespace(), onPreviousLine);
+                withAdded.set(insertPosition, after.withElement(after.getElement().withPrefix(
+                        Space.build(last.getSuffix(), comments.subList(lineEnd + 1, comments.size())))));
+            }
+        }
+        withAdded.add(insertPosition, toAdd.withElement(toAdd.getElement().withPrefix(prefix)));
+        return withAdded;
+    }
+
+    private boolean sortsBeforeInSamePackage(JRightPadded<J.Import> anImport, JRightPadded<J.Import> toAdd) {
+        return !anImport.getElement().isStatic() &&
+               !"*".equals(anImport.getElement().getQualid().getSimpleName()) &&
+               anImport.getElement().getPackageName().equals(toAdd.getElement().getPackageName()) &&
+               block(anImport) == block(toAdd) &&
+               Block.ImportPackage.IMPORT_SORTING.compare(anImport, toAdd) < 0;
+    }
+
+    private static int indexOfCoveringStarImport(List<JRightPadded<J.Import>> imports, JRightPadded<J.Import> toAdd) {
+        if (toAdd.getElement().isStatic() || "*".equals(toAdd.getElement().getQualid().getSimpleName())) {
+            return -1;
+        }
+        String owner = packageOrOuterClassName(toAdd);
+        for (int i = 0; i < imports.size(); i++) {
+            J.Import anImport = imports.get(i).getElement();
+            if (!anImport.isStatic() &&
+                "*".equals(anImport.getQualid().getSimpleName()) &&
+                owner.equals(packageOrOuterClassName(imports.get(i)))) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     private static String packageOrOuterClassName(JRightPadded<J.Import> anImport) {
