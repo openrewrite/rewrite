@@ -134,6 +134,43 @@ export declare class Request {
         }, {unsafeCleanup: true});
     }, 60000);
 
+    test("a base of the class's own name gives its bases once they are mapped", async () => {
+        await withDir(async (root) => {
+            // `Holder` maps the class `Test` first. Its base `Request` reaches the interface `Test`
+            // while the class's own bases are still being mapped.
+            const {pkg, nodeModules} = writeFiles(root.path, "same-name-fixture", {
+                "package.json": JSON.stringify({name: "same-name-fixture", version: "1.0.0", types: "index.d.ts"}),
+                "index.d.ts": `
+import STest = require("./lib/test");
+declare const fixture: fixture.Holder;
+declare namespace fixture {
+    interface Holder {
+        test: STest;
+    }
+    interface Test extends STest {}
+}
+export = fixture;
+`,
+                "lib/test.d.ts": `
+import { Request } from "./request";
+declare class Test extends Request {}
+export = Test;
+`,
+                "lib/request.d.ts": `
+import fixture = require("../index");
+export declare class Request {
+    redirect: fixture.Test;
+}
+`,
+            });
+
+            const test = exportedTypes([pkg], [nodeModules])
+                .find(t => Type.FullyQualified.getFullyQualifiedName(t) === "same-name-fixture.Test") as Type.Class;
+            expect(test.classKind).toBe(Type.Class.Kind.Interface);
+            expect(fqns(test.interfaces)).toEqual(["same-name-fixture.Request"]);
+        }, {unsafeCleanup: true});
+    }, 60000);
+
     test("resolves the declaration entry from an exports types condition", async () => {
         // Modern package: no top-level `types`, no root index.d.ts; types live only under
         // exports["."].{import,require}.types.

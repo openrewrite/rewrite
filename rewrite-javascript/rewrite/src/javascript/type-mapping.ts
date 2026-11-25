@@ -98,6 +98,10 @@ export class JavaScriptTypeMapping {
     // instantiation has a type id of its own that the type cache cannot match.
     private readonly functionTypesInProgress = new Set<ts.Symbol>();
 
+    // Classes whose bases are being mapped, each with what waits to read them. A namesake base
+    // gives its own bases in its place, and has none to give until it is done.
+    private readonly heritageInProgress = new Map<Type.Class, (() => void)[]>();
+
 
     /**
      * @param sourceRoot What a parsed file's module is named relative to.
@@ -1641,10 +1645,19 @@ export class JavaScriptTypeMapping {
         } as Type.Class;
     }
 
-    private bases(classType: Type.Class, baseType: ts.Type): Heritage {
-        const mapped = this.getType(baseType);
-        const base = Type.isParameterized(mapped) ? mapped.type : mapped;
-        return Type.isClass(base) ? this.heritageFrom(classType, base, new Set()) : {interfaces: []};
+    private bases(classType: Type.Class, baseType: ts.Type, apply: (heritage: Heritage) => void): void {
+        const base = asClass(this.getType(baseType));
+        if (!base) {
+            return;
+        }
+        const inherit = () => apply(this.heritageFrom(classType, base, new Set()));
+        const waiting = base.fullyQualifiedName === classType.fullyQualifiedName ?
+            this.heritageInProgress.get(base) : undefined;
+        if (waiting) {
+            waiting.push(inherit);
+        } else {
+            inherit();
+        }
     }
 
     private heritageFrom(classType: Type.Class, base: Type.Class, seen: Set<Type.Class>): Heritage {
@@ -1688,8 +1701,8 @@ export class JavaScriptTypeMapping {
     }
 
     private addInterface(classType: Type.Class, baseType: ts.Type): void {
-        const {supertype, interfaces} = this.bases(classType, baseType);
-        this.addInterfaces(classType, supertype ? [supertype, ...interfaces] : interfaces);
+        this.bases(classType, baseType, ({supertype, interfaces}) =>
+            this.addInterfaces(classType, supertype ? [supertype, ...interfaces] : interfaces));
     }
 
     private addInterfaces(classType: Type.Class, interfaces: Type.Class[]): void {
@@ -1705,6 +1718,18 @@ export class JavaScriptTypeMapping {
      * Since the shell is already in the cache, any recursive references will find it
      */
     private populateClassType(classType: Type.Class, type: ts.Type): void {
+        this.heritageInProgress.set(classType, []);
+        try {
+            this.populateHeritage(classType, type);
+        } finally {
+            const waiting = this.heritageInProgress.get(classType) ?? [];
+            this.heritageInProgress.delete(classType);
+            waiting.forEach(inherit => inherit());
+        }
+        this.populateMembers(classType, type);
+    }
+
+    private populateHeritage(classType: Type.Class, type: ts.Type): void {
         const symbol = type.getSymbol?.();
         const classSymbol = symbol && symbol.flags & ts.SymbolFlags.Alias ?
             this.checker.getAliasedSymbol(symbol) : symbol;
@@ -1755,11 +1780,12 @@ export class JavaScriptTypeMapping {
                 let interfaces = baseTypes;
                 if (classType.classKind === Type.Class.Kind.Class && (!classDeclaration ||
                     classDeclaration.heritageClauses?.some(c => c.token === ts.SyntaxKind.ExtendsKeyword))) {
-                    const inherited = this.bases(classType, baseTypes[0]);
-                    if (inherited.supertype) {
-                        classType.supertype = inherited.supertype;
-                    }
-                    this.addInterfaces(classType, inherited.interfaces);
+                    this.bases(classType, baseTypes[0], ({supertype, interfaces}) => {
+                        if (supertype) {
+                            classType.supertype = supertype;
+                        }
+                        this.addInterfaces(classType, interfaces);
+                    });
                     interfaces = baseTypes.slice(1);
                 }
                 for (const baseType of interfaces) {
@@ -1776,7 +1802,10 @@ export class JavaScriptTypeMapping {
                 }
             }
         }
+    }
 
+    private populateMembers(classType: Type.Class, type: ts.Type): void {
+        const symbol = type.getSymbol?.();
         // Extract type parameters from declarations (not provided by getBaseTypes)
         if (symbol?.declarations) {
             for (const declaration of symbol.declarations) {
