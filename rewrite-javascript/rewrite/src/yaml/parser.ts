@@ -395,7 +395,8 @@ class YamlCstReader {
                 value = this.prependWhitespaceToValue(value, afterColonWhitespace);
             }
         } else {
-            value = this.createEmptyScalar(afterColonWhitespace);
+            value = this.createEmptyScalar();
+            valueTrailing = afterColonWhitespace;
         }
 
         return {
@@ -514,7 +515,8 @@ class YamlCstReader {
                 block = this.prependWhitespaceToValue(block, afterDashSpace);
             }
         } else {
-            block = this.createEmptyScalar(afterDashSpace);
+            block = this.createEmptyScalar();
+            trailing = afterDashSpace;
         }
 
         return {
