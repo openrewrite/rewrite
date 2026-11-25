@@ -395,8 +395,6 @@ class YamlCstReader {
                 value = this.prependWhitespaceToValue(value, afterColonWhitespace);
             }
         } else {
-            // As in the Java parser, an empty value takes no space: what follows the colon, up to and including the
-            // line break and any comment, is the prefix of the next node.
             value = this.createEmptyScalar();
             valueTrailing = afterColonWhitespace;
         }
