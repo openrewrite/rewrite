@@ -80,20 +80,30 @@ class AddDependencyCatalogTest implements RewriteTest {
         recording.assertEveryVisitOrder(new AddDependency(name, version, null));
     }
 
-    // recorded with pnpm 9.15.9, whose add writes the version, and 10.34.6, which follows the default catalog as 11
-    // and writes pnpm-workspace.yaml sorted at every level
+    // recorded with pnpm 9.15.9, whose add writes the version, and whose lock the engine does not reproduce
+    @Test
+    void addedAsPnpm9AddsIt() {
+        CatalogRecording recording = new CatalogRecording("pnpm", "catalog-add-pnpm9");
+        rewriteRun(
+          spec -> spec.recipe(new AddDependency("is-number", "6.0.0", null)).executionContext(recording.ctx()),
+          recording.sourcesWhoseInstallFails("the lock pnpm 9.15.9 writes")
+        );
+    }
+
+    // recorded with pnpm 10.34.6, which follows the default catalog as 11 and writes pnpm-workspace.yaml sorted at
+    // every level
     @ParameterizedTest
     @CsvSource(delimiter = '|', textBlock = """
-      catalog-add-pnpm9           | 9.15.9  | 6.0.0
-      catalog-add-pnpm10          | 10.34.6 | 6.0.0
-      catalog-add-pnpm10-unsorted | 10.34.6 | 7.0.0
+      catalog-add-pnpm10          | 6.0.0
+      catalog-add-pnpm10-unsorted | 7.0.0
       """)
-    void addedAsTheReleaseTheProjectNamesAddsIt(String scenario, String release, String version) {
+    void addedAsPnpm10AddsIt(String scenario, String version) {
         CatalogRecording recording = new CatalogRecording("pnpm", scenario);
         rewriteRun(
           spec -> spec.recipe(new AddDependency("is-number", version, null)).executionContext(recording.ctx()),
-          recording.sourcesWhoseInstallFails("the lock pnpm " + release + " writes")
+          recording.sources()
         );
+        recording.assertEveryVisitOrder(new AddDependency("is-number", version, null));
     }
 
     // recorded with Yarn 4.10.3 and Bun 1.3.10, which have no catalog setting for add: the version, the field sorted

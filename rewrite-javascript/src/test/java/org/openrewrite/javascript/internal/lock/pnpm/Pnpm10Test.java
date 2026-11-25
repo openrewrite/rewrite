@@ -51,16 +51,21 @@ class Pnpm10Test {
      * recordings test it: pnpm's lock-relevant code, the libraries it bundles included, does not change between them,
      * and no question of {@link PnpmRelease} tells them apart ({@link #anAliasAnswersEveryQuestionAsItsRecording}).
      */
-    private static final Map<String, String> RECORDED_AS = Map.of(
+    private static final Map<String, String> RECORDED_AS = Map.ofEntries(
       // v10.12.0..v10.12.1 holds one commit, which makes @pnpm/tsconfig private
-      "10.12.0", "10.12.1"
+      Map.entry("10.12.0", "10.12.1"),
+      // v10.33.0..v10.33.3: self-update, npm passthrough, global bin shim, fork-bomb guard and picomatch 4.0.3 to 4.0.4
+      Map.entry("10.33.1", "10.33.0"), Map.entry("10.33.2", "10.33.0"), Map.entry("10.33.3", "10.33.0"),
+      // v10.34.5..v10.34.9: self-update, signing keys, headless and modules-cleaner, Node 24 for @pnpm/exe
+      Map.entry("10.34.5", "10.34.9"), Map.entry("10.34.6", "10.34.9"), Map.entry("10.34.7", "10.34.9"),
+      Map.entry("10.34.8", "10.34.9")
     );
 
     static Stream<String> pnpm10Releases() {
         return PnpmReleases.all().stream().filter(r -> r.startsWith("10.") && PnpmReleases.isProven(r));
     }
 
-    private static String recorded(String version) {
+    static String recorded(String version) {
         return RECORDED_AS.getOrDefault(version, version);
     }
 
@@ -144,7 +149,7 @@ class Pnpm10Test {
         for (String version : pnpm10Releases().collect(Collectors.toList())) {
             assertThat(PnpmReleases.runs(version)).hasToString(version);
         }
-        for (String version : new String[]{"10.0.1", "10.11.1", "10.34.8", "^10.0.0"}) {
+        for (String version : new String[]{"10.0.1", "10.11.1", "10.34.4", "^10.0.0"}) {
             assertThatThrownBy(() -> PnpmReleases.installs(version))
               .isInstanceOf(org.openrewrite.javascript.internal.lock.CannotKnow.class);
         }
@@ -311,7 +316,8 @@ class Pnpm10Test {
      * the locked version, and moves every project to the range's highest.
      */
     @ParameterizedTest
-    @CsvSource({"10.0.0, false", "10.11.0, false", "10.12.0, false", "10.12.1, false", "10.34.9, true"})
+    @CsvSource({"10.0.0, false", "10.11.0, false", "10.12.0, false", "10.12.1, false", "10.33.0, true",
+      "10.33.4, true", "10.34.9, true"})
     void aNewProjectOfACatalogEntryWhoseLockedVersionIsGone(String version, boolean moves) {
         Map<String, String> manifests = new LinkedHashMap<>();
         manifests.put("", "{\"name\":\"root\",\"version\":\"1.0.0\",\"private\":true}");
@@ -367,7 +373,8 @@ class Pnpm10Test {
      * metadata first; before, the range is invalid, and no resolver takes it.
      */
     @ParameterizedTest
-    @CsvSource({"10.0.0, false", "10.11.0, false", "10.12.0, false", "10.12.1, false", "10.34.9, true"})
+    @CsvSource({"10.0.0, false", "10.11.0, false", "10.12.0, false", "10.12.1, false", "10.33.0, true",
+      "10.33.4, true", "10.34.9, true"})
     void aRangeWithBuildMetadata(String version, boolean resolves) {
         Result result = regenerate(SV_LOCK.formatted("1.0.0"),
           Collections.singletonMap("", "{\"name\":\"b\",\"version\":\"1.0.0\",\"dependencies\":{\"sv\":\"^1+build\"}}"),

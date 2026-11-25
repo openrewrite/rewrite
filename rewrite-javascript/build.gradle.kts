@@ -477,7 +477,7 @@ extensions.configure<LicenseExtension> {
 // The lock regeneration test fixtures (recorded package-manager output, ~37000 files including binary tarballs)
 // live in openrewrite/rewrite-javascript-lock-fixtures. A change that needs new fixtures moves the pin with it.
 // Gradle reruns this task when a fixture goes missing, and the rerun extracts the downloaded archive again.
-val lockFixturesCommit = "8995330f6b25608a6f6a4044b010137bfa16ee32"
+val lockFixturesCommit = "13f41024e42da772360f9883dddd6eafdd148e2c"
 val lockFixturesDir = layout.buildDirectory.dir("lock-fixtures")
 val syncLockFixtures = tasks.register("syncLockFixtures") {
     inputs.property("commit", lockFixturesCommit)

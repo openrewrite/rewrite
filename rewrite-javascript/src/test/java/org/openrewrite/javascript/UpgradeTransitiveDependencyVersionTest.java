@@ -399,7 +399,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
 
     @Test
     void pnpm10NullPnpmFieldBesideResolutionsWritesResolutions() {
-        otherPnpmRelease("pnpm/override-pnpm10-recipe-null-pnpm-resolutions", null, "10.34.6");
+        recordedPnpm10Release("pnpm/override-pnpm10-recipe-null-pnpm-resolutions", null);
     }
 
     @Test
@@ -566,22 +566,22 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
 
     @Test
     void pnpm10WritesTheWorkspaceManifestAndTheLockIsCannotKnow() {
-        otherPnpmRelease("pnpm/override-pnpm10-recipe-workspace", "is-odd", "10.34.6");
+        recordedPnpm10Release("pnpm/override-pnpm10-recipe-workspace", "is-odd");
     }
 
     @Test
     void pnpm10WithAPnpmFieldWritesPnpmOverrides() {
-        otherPnpmRelease("pnpm/override-pnpm10-recipe-pnpm-field", null, "10.34.6");
+        recordedPnpm10Release("pnpm/override-pnpm10-recipe-pnpm-field", null);
     }
 
     @Test
     void pnpm10BesideResolutionsWritesPnpmOverrides() {
-        otherPnpmRelease("pnpm/override-pnpm10-recipe-beside-resolutions", null, "10.34.6");
+        recordedPnpm10Release("pnpm/override-pnpm10-recipe-beside-resolutions", null);
     }
 
     @Test
     void pnpm10WithAPnpmFieldBesideWorkspaceOverridesWritesTheWorkspaceManifest() {
-        otherPnpmRelease("pnpm/override-pnpm10-recipe-pnpm-field-workspace-overrides", null, "10.34.6");
+        recordedPnpm10Release("pnpm/override-pnpm10-recipe-pnpm-field-workspace-overrides", null);
     }
 
     @Test
@@ -947,6 +947,19 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
             }
         }
         return orders;
+    }
+
+    // the edit as pnpm 10.34.6 made it, the release the project names and the one that built the LST
+    private void recordedPnpm10Release(String scenario, @Nullable String path) {
+        Scenario s = new Scenario(scenario);
+        s.release = "10.34.6";
+        List<SourceSpecs> sources = new ArrayList<>();
+        sources.add(s.root(PackageManager.Pnpm, s.file("pkg")));
+        if (s.file("workspace-before") != null) {
+            sources.add(s.workspace());
+        }
+        sources.add(s.lock(PackageManager.Pnpm, s.file("after")));
+        rewriteRun(spec -> s.spec(spec, "7.0.0", path), sources.toArray(new SourceSpecs[0]));
     }
 
     // the edit is declined and the lock warned: pnpm 11.2.2 hands the install to the release the project names

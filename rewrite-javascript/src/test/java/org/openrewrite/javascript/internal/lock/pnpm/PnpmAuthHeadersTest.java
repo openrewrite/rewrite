@@ -43,8 +43,8 @@ class PnpmAuthHeadersTest {
     @ParameterizedTest
     @MethodSource("nativeReleases")
     void exactNativeSourcePolicyAndPrecedence(String version) {
-        boolean dropsProject = version.equals("10.34.9") || version.equals("11.5.3") ||
-          version.equals("11.10.0") || version.equals("11.16.0");
+        boolean dropsProject = java.util.List.of("10.34.9", "11.5.3", "11.10.0", "11.16.0")
+          .contains(Pnpm10Test.recorded(version));
         PnpmRelease release = PnpmRelease.of(version);
         Map<String, String> env = Map.of("TOKEN", "synthetic-env");
         assertThat(options(KEY + "${TOKEN}", null, env, release).authHeaders().authorization(URL, "@s/p"))
@@ -110,7 +110,8 @@ class PnpmAuthHeadersTest {
     @ParameterizedTest
     @MethodSource("nativeReleases")
     void defaultUnscopedCredentialsHaveTheNativesPrecedence(String version) {
-        boolean rescoped = java.util.List.of("10.34.9", "11.5.2", "11.5.3", "11.10.0", "11.16.0").contains(version);
+        boolean rescoped = java.util.List.of("10.34.9", "11.5.2", "11.5.3", "11.10.0", "11.16.0")
+          .contains(Pnpm10Test.recorded(version));
         PnpmAuthHeaders auth = options("registry=" + URL + "\n" + KEY + "synthetic-scoped\n" +
           "_authToken=synthetic-default", null, Map.of(), PnpmRelease.of(version)).authHeaders();
         assertThat(auth.authorization(URL, "p"))
