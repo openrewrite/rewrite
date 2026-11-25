@@ -145,7 +145,7 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
                     prefix,
                     Markers.EMPTY,
                     source,
-                    keyName(source)
+                    TomlKeyParts.unquote(source)
             );
         });
     }
@@ -167,23 +167,6 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
                 text.toString(),
                 key.toString()
         );
-    }
-
-    /**
-     * The name a simple key stands for. A basic-string key reads its escapes as a string value does, and a
-     * literal-string key reads none.
-     */
-    private static String keyName(String source) {
-        if (source.length() < 2) {
-            return source;
-        }
-        char first = source.charAt(0);
-        if (first == '"' && source.endsWith("\"")) {
-            return TomlString.decodeBasic(source.substring(1, source.length() - 1), false);
-        } else if (first == '\'' && source.endsWith("'")) {
-            return source.substring(1, source.length() - 1);
-        }
-        return source;
     }
 
     @Override
