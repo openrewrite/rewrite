@@ -903,7 +903,7 @@ export class JavaScriptTypeMapping {
         const declaration = symbol?.valueDeclaration;
         if (declaration && this.isParsedSource(declaration)) {
             if (ts.isFunctionDeclaration(declaration)) {
-                return {declaringType: this.functionOwner(declaration), name: declaration.name?.text ?? '<anonymous>'};
+                return {declaringType: this.functionOwner(declaration), name: this.functionDeclarationName(declaration)};
             }
             if (this.isTopLevelVariable(declaration) && !this.moduleBinding(declaration, declaration)) {
                 return {declaringType: this.sourceModuleType(declaration.getSourceFile()), name: declaration.name.text, isStatic: true};
@@ -913,7 +913,7 @@ export class JavaScriptTypeMapping {
             return undefined;
         }
         if (ts.isFunctionDeclaration(target)) {
-            return {declaringType: this.functionOwner(target), name: target.name?.text ?? '<anonymous>'};
+            return {declaringType: this.functionOwner(target), name: this.functionDeclarationName(target)};
         }
         const name = (ts.isArrowFunction(target) || ts.isFunctionExpression(target)) ? this.functionName(target) : undefined;
         return name ? {declaringType: this.sourceModuleType(target.getSourceFile()), name} : undefined;
@@ -932,9 +932,15 @@ export class JavaScriptTypeMapping {
         return fn.name?.text ?? this.moduleBindingName(fn);
     }
 
+    /** Only a default export, as in `export default function () {}`, declares a function without a name. */
+    private functionDeclarationName(declaration: ts.FunctionDeclaration): string {
+        return declaration.name?.text ?? '<default>';
+    }
+
     /**
      * The name a top-level `const f = …` or an `exports.f = …` assignment gives the function it holds,
-     * also through a cast, as in `const f = (() => …) as F`.
+     * also through a cast, as in `const f = (() => …) as F`. One a module exports as its default, by
+     * `export default`, `export =` or `module.exports =`, is named `<default>`, as a call of the module is.
      */
     private moduleBindingName(fn: ts.ArrowFunction | ts.FunctionExpression): string | undefined {
         let node: ts.Node = fn;
@@ -946,17 +952,25 @@ export class JavaScriptTypeMapping {
         if (this.isTopLevelVariable(parent) && parent.initializer === node) {
             return parent.name.text;
         }
-        if (ts.isBinaryExpression(parent) && parent.right === node &&
-            parent.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
-            ts.isPropertyAccessExpression(parent.left) && this.isExportsObject(parent.left.expression)) {
-            return parent.left.name.text;
+        if (ts.isExportAssignment(parent)) {
+            return '<default>';
         }
-        return undefined;
+        if (!ts.isBinaryExpression(parent) || parent.right !== node ||
+            parent.operatorToken.kind !== ts.SyntaxKind.EqualsToken || !ts.isPropertyAccessExpression(parent.left)) {
+            return undefined;
+        }
+        if (this.isModuleExports(parent.left)) {
+            return '<default>';
+        }
+        return this.isExportsObject(parent.left.expression) ? parent.left.name.text : undefined;
     }
 
     private isExportsObject(node: ts.Expression): boolean {
-        return ts.isIdentifier(node) ? node.text === 'exports' :
-            ts.isPropertyAccessExpression(node) && ts.isIdentifier(node.expression) &&
+        return ts.isIdentifier(node) ? node.text === 'exports' : this.isModuleExports(node);
+    }
+
+    private isModuleExports(node: ts.Expression): boolean {
+        return ts.isPropertyAccessExpression(node) && ts.isIdentifier(node.expression) &&
             node.expression.text === 'module' && node.name.text === 'exports';
     }
 
@@ -1457,7 +1471,7 @@ export class JavaScriptTypeMapping {
                 return undefined;
             }
 
-            methodName = (ts.isFunctionDeclaration(node) ? node.name?.getText() : this.functionName(node)) ?? "<anonymous>";
+            methodName = ts.isFunctionDeclaration(node) ? this.functionDeclarationName(node) : this.functionName(node) ?? "<anonymous>";
 
             declaringType = ts.isFunctionDeclaration(node) ?
                 this.functionOwner(node) :

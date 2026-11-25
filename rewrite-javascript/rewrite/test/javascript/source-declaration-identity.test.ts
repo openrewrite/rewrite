@@ -177,4 +177,53 @@ describe('a call into parsed source is attributed as the declaration it calls is
             "lib/fns#own static"
         ]);
     });
+
+    test('an anonymous default export is declared and called as its file\'s default', async () => {
+        // given
+        const files = {
+            "package.json": JSON.stringify({name: "lib", version: "1.0.0", type: "module"}),
+            "tsconfig.json": JSON.stringify({compilerOptions: {module: "nodenext", moduleResolution: "nodenext", strict: true}}),
+            "src/arrow.ts": `export default (x: number) => x;`,
+            "src/fn.ts": `export default function (x: number) { return x; }`,
+            "src/named.ts": `export default function named(x: number) { return x; }`,
+            "test/main.ts": `import arrow from '../src/arrow.js';\nimport fn from '../src/fn.js';\nimport named from '../src/named.js';\narrow(1);\nfn(2);\nnamed(3);`
+        };
+
+        // when
+        const {calls, declarations} = await identities(files);
+
+        // then
+        expect(declarations["src/arrow.ts"]).toEqual(["src/arrow#<default> static"]);
+        expect(declarations["src/fn.ts"]).toEqual(["src/fn#<default> static"]);
+        expect(declarations["src/named.ts"]).toEqual(["src/named#named static"]);
+        expect(calls["test/main.ts"]).toEqual(["src/arrow#<default> static", "src/fn#<default> static", "src/named#named static"]);
+    });
+
+    test('a function assigned to module.exports or export = is declared and called as its file\'s default', async () => {
+        // given
+        const files = {
+            "package.json": JSON.stringify({name: "lib", version: "1.0.0"}),
+            "lib/fn.js": `module.exports = function () {};`,
+            "lib/arrow.js": `exports = module.exports = () => {};`,
+            "lib/own.js": `module.exports = function own() {};`,
+            "src/equals.ts": `export = (x: number) => x;`,
+            "test/main.js": `const fn = require('../lib/fn');\nconst arrow = require('../lib/arrow');\nconst own = require('../lib/own');\nfn();\narrow();\nown();`,
+            "test/equals.ts": `import equals = require('../src/equals');\nequals(1);`
+        };
+
+        // when
+        const {calls, declarations} = await identities(files);
+
+        // then
+        expect(declarations["lib/fn.js"]).toEqual(["lib/fn#<default> static"]);
+        expect(declarations["lib/arrow.js"]).toEqual(["lib/arrow#<default> static"]);
+        expect(declarations["lib/own.js"]).toEqual(["lib/own#own static"]);
+        expect(declarations["src/equals.ts"]).toEqual(["src/equals#<default> static"]);
+        expect(calls["test/main.js"].filter(call => !call.endsWith("#require"))).toEqual([
+            "lib/fn#<default> static",
+            "lib/arrow#<default> static",
+            "lib/own#own static"
+        ]);
+        expect(calls["test/equals.ts"].at(-1)).toEqual("src/equals#<default> static");
+    });
 });
