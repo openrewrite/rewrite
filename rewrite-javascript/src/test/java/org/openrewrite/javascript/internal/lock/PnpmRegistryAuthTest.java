@@ -21,10 +21,10 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Request;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
+import org.openrewrite.javascript.internal.lock.pnpm.PnpmReleases;
 import org.openrewrite.javascript.internal.registry.Environment;
 import org.openrewrite.javascript.internal.registry.NpmRegistryClient;
 import org.openrewrite.javascript.internal.registry.NodeRegistryException;
@@ -41,6 +41,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -54,11 +55,19 @@ class PnpmRegistryAuthTest {
         check("11.10.0", "${LOCK_VALIDATION_TOKEN}", null, true, null, false, home);
     }
 
+    private static Stream<String> pnpm10Releases() {
+        return PnpmReleases.all().stream().filter(r -> r.startsWith("10.") && PnpmReleases.isProven(r));
+    }
+
+    static Stream<String> globalConfigReleases() {
+        return Stream.concat(pnpm10Releases(), Stream.of("11.0.3", "11.5.3", "11.10.0", "11.16.0"));
+    }
+
     static Stream<Arguments> nativePolicies() {
         List<Arguments> cases = new ArrayList<>();
         // Exact install controls, not pnpm view: npm-conf's view command differs on 10.34.9.
-        for (String version : List.of("10.0.0", "10.11.0", "10.12.1", "10.34.9", "11.0.3", "11.1.2", "11.1.3",
-          "11.5.2", "11.5.3", "11.10.0", "11.16.0")) {
+        for (String version : Stream.concat(pnpm10Releases(), Stream.of("11.0.3", "11.1.2", "11.1.3", "11.5.2",
+          "11.5.3", "11.10.0", "11.16.0")).collect(Collectors.toList())) {
             boolean ignoresProjectEnv = List.of("10.34.9", "11.5.3", "11.10.0", "11.16.0").contains(version);
             boolean bounded10 = version.startsWith("10.");
             cases.add(Arguments.of(version, "${LOCK_VALIDATION_TOKEN}", null, true,
@@ -87,7 +96,7 @@ class PnpmRegistryAuthTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"10.0.0", "10.11.0", "10.12.1", "10.34.9", "11.0.3", "11.5.3", "11.10.0", "11.16.0"})
+    @MethodSource("globalConfigReleases")
     void globalConfigIsReadOnlyByPnpm10(String version, @TempDir Path home) {
         check(version, null, null, true, version.startsWith("10.") ? "Bearer synthetic-env" : null,
           false, home, "${LOCK_VALIDATION_TOKEN}");

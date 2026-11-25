@@ -19,14 +19,25 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Kind;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.semver.NodeSemver;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -35,9 +46,102 @@ import static org.openrewrite.javascript.internal.lock.pnpm.PnpmTestSupport.obj;
 
 class Pnpm10Test {
 
+    /**
+     * The supported pnpm 10 releases without native recordings of their own, each with the recorded release whose
+     * recordings test it: pnpm's lock-relevant code, the libraries it bundles included, does not change between them,
+     * and no question of {@link PnpmRelease} tells them apart ({@link #anAliasAnswersEveryQuestionAsItsRecording}).
+     */
+    private static final Map<String, String> RECORDED_AS = Map.of(
+      // v10.12.0..v10.12.1 holds one commit, which makes @pnpm/tsconfig private
+      "10.12.0", "10.12.1"
+    );
+
+    static Stream<String> pnpm10Releases() {
+        return PnpmReleases.all().stream().filter(r -> r.startsWith("10.") && PnpmReleases.isProven(r));
+    }
+
+    private static String recorded(String version) {
+        return RECORDED_AS.getOrDefault(version, version);
+    }
+
+    private static PnpmScenarios.Scenario upgrade(String version) {
+        String name = "pnpm" + recorded(version).replace(".", "") + "-upgrade";
+        return PnpmScenarios.discover().stream()
+          .filter(s -> s.getName().equals(name))
+          .findFirst().orElseThrow(() -> new AssertionError("no scenario " + name));
+    }
+
+    // the questions of PnpmRelease that releases answer differently, asked of them as one release they may be
+    private static List<String> questionsTellingApart(String... versions) {
+        List<String> releases = new ArrayList<>(PnpmReleases.all());
+        releases.retainAll(Arrays.asList(versions));
+        PnpmRelease either = PnpmRelease.oneOf(String.join(" || ", versions), releases);
+        List<String> differing = new ArrayList<>();
+        int asked = 0;
+        for (Method question : PnpmRelease.class.getDeclaredMethods()) {
+            if (Modifier.isStatic(question.getModifiers()) || question.getParameterCount() != 0 ||
+                question.getReturnType() != boolean.class && question.getReturnType() != NodeSemver.Release.class) {
+                continue;
+            }
+            asked++;
+            question.setAccessible(true);
+            try {
+                question.invoke(either);
+            } catch (InvocationTargetException e) {
+                if (!(e.getCause() instanceof CannotKnow)) {
+                    throw new AssertionError(question.getName(), e.getCause());
+                }
+                differing.add(question.getName());
+            } catch (IllegalAccessException e) {
+                throw new AssertionError(question.getName(), e);
+            }
+        }
+        assertThat(asked).as("questions asked").isGreaterThan(100);
+        return differing;
+    }
+
+    // the recording's inputs as a project that names the release it is replayed as, which its recording names
+    private static PnpmLockRegenerator.Inputs pinnedTo(PnpmLockRegenerator.Inputs inputs, String version) {
+        String recorded = recorded(version);
+        if (recorded.equals(version)) {
+            return inputs;
+        }
+        String pin = "\"packageManager\": \"pnpm@" + recorded + "\"";
+        assertThat(inputs.getManifests().get("")).contains(pin);
+        Map<String, String> manifests = new LinkedHashMap<>();
+        for (Map.Entry<String, String> manifest : inputs.getManifests().entrySet()) {
+            manifests.put(manifest.getKey(), manifest.getValue().replace(pin,
+              "\"packageManager\": \"pnpm@" + version + "\""));
+        }
+        return inputs.toBuilder().clearManifests().manifests(manifests).build();
+    }
+
+    @Test
+    void everySupportedReleaseIsRecordedOrAliasedToARecording() {
+        for (Map.Entry<String, String> alias : RECORDED_AS.entrySet()) {
+            assertThat(PnpmReleases.isProven(alias.getKey())).as(alias.getKey()).isTrue();
+            assertThat(RECORDED_AS).as(alias.getValue()).doesNotContainKey(alias.getValue());
+        }
+        for (String version : pnpm10Releases().collect(Collectors.toList())) {
+            assertThat(PnpmScenarios.discover()).as(version)
+              .filteredOn(s -> s.getName().startsWith("pnpm" + version.replace(".", "") + "-"))
+              .hasSize(RECORDED_AS.containsKey(version) ? 0 : 8);
+        }
+    }
+
+    @Test
+    void anAliasAnswersEveryQuestionAsItsRecording() {
+        assertThat(questionsTellingApart("10.11.0", "10.12.1")).contains("prefersTheCurrentPackageVersion");
+        for (Map.Entry<String, String> alias : RECORDED_AS.entrySet()) {
+            assertThat(PnpmRelease.of(alias.getKey()).atLeast(11, 0, 0))
+              .isEqualTo(PnpmRelease.of(alias.getValue()).atLeast(11, 0, 0));
+            assertThat(questionsTellingApart(alias.getKey(), alias.getValue())).as(alias.getKey()).isEmpty();
+        }
+    }
+
     @Test
     void supportsOnlyTheRecordedPnpm10Releases() {
-        for (String version : new String[]{"10.0.0", "10.11.0", "10.12.1", "10.34.9"}) {
+        for (String version : pnpm10Releases().collect(Collectors.toList())) {
             assertThat(PnpmReleases.runs(version)).hasToString(version);
         }
         for (String version : new String[]{"10.0.1", "10.11.1", "10.34.8", "^10.0.0"}) {
@@ -52,7 +156,7 @@ class Pnpm10Test {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"10.0.0", "10.11.0", "10.12.1", "10.34.9"})
+    @MethodSource("pnpm10Releases")
     void keepsLockedPreferredVersionsUnweighted(String version) {
         Map<String, Map<String, PreferredVersions.Selector>> preferred =
           PreferredVersions.getPreferredVersionsFromLockfileAndManifests(
@@ -66,11 +170,9 @@ class Pnpm10Test {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"10.0.0", "10.11.0", "10.12.1", "10.34.9"})
+    @MethodSource("pnpm10Releases")
     void refusesUnportedPatchAndRuntimePaths(String version) {
-        PnpmScenarios.Scenario scenario = PnpmScenarios.discover().stream()
-          .filter(s -> s.getName().equals("pnpm" + version.replace(".", "") + "-upgrade"))
-          .findFirst().orElseThrow(AssertionError::new);
+        PnpmScenarios.Scenario scenario = upgrade(version);
         for (String manifest : new String[]{
           "{\"name\":\"test\",\"pnpm\":{\"patchedDependencies\":{\"ms\":\"patches/ms.patch\"}}}",
           "{\"name\":\"test\",\"devEngines\":{\"runtime\":{\"name\":\"node\",\"version\":\"22\"}}}"
@@ -87,10 +189,8 @@ class Pnpm10Test {
     @ParameterizedTest
     @ValueSource(strings = {"owner/repo", "owner/repo#main", "./pkg", "../pkg", "/tmp/pkg"})
     void refusesNewNonRegistryDependenciesBeforeResolution(String spec) {
-        for (String version : new String[]{"10.0.0", "10.11.0", "10.12.1", "10.34.9"}) {
-            PnpmScenarios.Scenario scenario = PnpmScenarios.discover().stream()
-              .filter(s -> s.getName().equals("pnpm" + version.replace(".", "") + "-upgrade"))
-              .findFirst().orElseThrow(AssertionError::new);
+        for (String version : pnpm10Releases().collect(Collectors.toList())) {
+            PnpmScenarios.Scenario scenario = upgrade(version);
             String manifest = "{\"name\":\"test\",\"dependencies\":{\"new-dependency\":\"" + spec + "\"}}";
             PnpmLockRegenerator.Inputs inputs = PnpmScenarioTest.inputs(scenario, scenario.file("before"),
               Collections.emptyMap(), version).toBuilder().manifests(Collections.singletonMap("", manifest)).build();
@@ -103,11 +203,9 @@ class Pnpm10Test {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"10.0.0", "10.11.0", "10.12.1", "10.34.9"})
+    @MethodSource("pnpm10Releases")
     void keepsSupportedDependencyFormsWithinTheProfile(String version) {
-        PnpmScenarios.Scenario scenario = PnpmScenarios.discover().stream()
-          .filter(s -> s.getName().equals("pnpm" + version.replace(".", "") + "-upgrade"))
-          .findFirst().orElseThrow(AssertionError::new);
+        PnpmScenarios.Scenario scenario = upgrade(version);
         for (String spec : new String[]{"latest", "next", "1.0.0", "^1.0.0", ">=1 <3", "*",
           "npm:ms@^2", "npm:@scope/package@^1", "workspace:*", "workspace:../pkg", "catalog:",
           "catalog:default", "link:./pkg"}) {
@@ -120,7 +218,7 @@ class Pnpm10Test {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"10.0.0", "10.11.0", "10.12.1", "10.34.9"})
+    @MethodSource("pnpm10Releases")
     void readsNpmrcPeerSettings(String version) {
         PnpmOptions options = PnpmOptions.load(null, "auto-install-peers=false\n", null,
           obj("{'name':'test','version':'1.0.0'}"), Collections.emptyMap(), PnpmRelease.of(version));
@@ -129,7 +227,7 @@ class Pnpm10Test {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"10.0.0", "10.11.0", "10.12.1", "10.34.9"})
+    @MethodSource("pnpm10Releases")
     void readsManifestOverrides(String version) {
         PnpmOptions options = PnpmOptions.load(null, null, null,
           obj("{'name':'test','pnpm':{'overrides':{'is-number':'6.0.0'}}}"),
@@ -138,9 +236,9 @@ class Pnpm10Test {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"10.0.0", "10.11.0", "10.12.1", "10.34.9"})
+    @MethodSource("pnpm10Releases")
     void reproducesNativeRecordings(String version) {
-        String prefix = "pnpm" + version.replace(".", "") + "-";
+        String prefix = "pnpm" + recorded(version).replace(".", "") + "-";
         int count = 0;
         for (PnpmScenarios.Scenario scenario : PnpmScenarios.discover()) {
             if (!scenario.getName().startsWith(prefix)) {
@@ -148,9 +246,9 @@ class Pnpm10Test {
             }
             count++;
             ScenarioRegistry registry = new ScenarioRegistry(scenario, "after");
-            Result result = new PnpmLockRegenerator(PnpmScenarioTest.inputs(scenario, scenario.file("before"),
+            Result result = new PnpmLockRegenerator(pinnedTo(PnpmScenarioTest.inputs(scenario, scenario.file("before"),
               scenario.otherLocks(org.openrewrite.javascript.internal.lock.LockScenario.Phase.BEFORE), version),
-              registry).regenerate();
+              version), registry).regenerate();
             assertThat(result.isSuccess()).as(scenario.getName() + ": " + result.getErrorMessage()).isTrue();
             assertThat(result.getLockFileContent()).as(scenario.getName()).isEqualTo(scenario.file("after"));
         }
@@ -213,7 +311,7 @@ class Pnpm10Test {
      * the locked version, and moves every project to the range's highest.
      */
     @ParameterizedTest
-    @CsvSource({"10.0.0, false", "10.11.0, false", "10.12.1, false", "10.34.9, true"})
+    @CsvSource({"10.0.0, false", "10.11.0, false", "10.12.0, false", "10.12.1, false", "10.34.9, true"})
     void aNewProjectOfACatalogEntryWhoseLockedVersionIsGone(String version, boolean moves) {
         Map<String, String> manifests = new LinkedHashMap<>();
         manifests.put("", "{\"name\":\"root\",\"version\":\"1.0.0\",\"private\":true}");
@@ -269,7 +367,7 @@ class Pnpm10Test {
      * metadata first; before, the range is invalid, and no resolver takes it.
      */
     @ParameterizedTest
-    @CsvSource({"10.0.0, false", "10.11.0, false", "10.12.1, false", "10.34.9, true"})
+    @CsvSource({"10.0.0, false", "10.11.0, false", "10.12.0, false", "10.12.1, false", "10.34.9, true"})
     void aRangeWithBuildMetadata(String version, boolean resolves) {
         Result result = regenerate(SV_LOCK.formatted("1.0.0"),
           Collections.singletonMap("", "{\"name\":\"b\",\"version\":\"1.0.0\",\"dependencies\":{\"sv\":\"^1+build\"}}"),
