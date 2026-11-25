@@ -960,11 +960,15 @@ export class JavaScriptTypeMapping {
 
     private castTarget(fn: ts.ArrowFunction | ts.FunctionExpression): ts.Node {
         let node: ts.Node = fn;
-        while (ts.isParenthesizedExpression(node.parent) || ts.isAsExpression(node.parent) ||
-            ts.isSatisfiesExpression(node.parent) || ts.isTypeAssertionExpression(node.parent)) {
+        while (this.isCast(node.parent)) {
             node = node.parent;
         }
         return node;
+    }
+
+    private isCast(node: ts.Node): node is ts.ParenthesizedExpression | ts.AsExpression | ts.SatisfiesExpression | ts.TypeAssertion {
+        return ts.isParenthesizedExpression(node) || ts.isAsExpression(node) ||
+            ts.isSatisfiesExpression(node) || ts.isTypeAssertionExpression(node);
     }
 
     private isTopLevelVariable(declaration: ts.Node): declaration is ts.VariableDeclaration & {name: ts.Identifier} {
@@ -973,24 +977,18 @@ export class JavaScriptTypeMapping {
     }
 
     /**
-     * The name of a function expression or arrow function: its own, or else the one a top-level
+     * What declares a function expression or arrow function: the member of a named type it implements,
+     * where no module binding names it, or else its file, under its own name, or else the one a top-level
      * `const f = …`, an `exports.f = …` assignment, the property it is assigned to or the local
      * variable it initializes gives it.
      */
-    private functionName(fn: ts.ArrowFunction | ts.FunctionExpression): string | undefined {
-        return fn.name?.text ?? this.moduleBindingName(fn) ?? this.memberFunctionName(fn) ?? this.localBindingName(fn);
-    }
-
-    /**
-     * What declares a function expression or arrow function: the member of a named type it implements,
-     * where no module binding names it, or else its file, under the name {@link functionName} gives it.
-     */
     private functionIdentity(fn: ts.ArrowFunction | ts.FunctionExpression): ImplementedMember | undefined {
-        const implemented = this.moduleBindingName(fn) === undefined ? this.implementedMember(fn) : undefined;
+        const bound = this.moduleBindingName(fn);
+        const implemented = bound === undefined ? this.implementedMember(fn) : undefined;
         if (implemented) {
             return implemented;
         }
-        const name = this.functionName(fn);
+        const name = fn.name?.text ?? bound ?? this.memberFunctionName(fn) ?? this.localBindingName(fn);
         return name === undefined ? undefined : {owner: this.sourceModuleType(fn.getSourceFile()), name};
     }
 
@@ -1022,20 +1020,28 @@ export class JavaScriptTypeMapping {
         if (ts.isPropertyAssignment(parent) && parent.initializer === node) {
             return this.memberOfContextualType(parent.parent, parent.name);
         }
-        if (ts.isBinaryExpression(parent) && parent.right === node && parent.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
-            (ts.isPropertyAccessExpression(parent.left) || ts.isElementAccessExpression(parent.left)) &&
-            !this.isPrototype(parent.left.expression)) {
-            const name = ts.isPropertyAccessExpression(parent.left) ? parent.left.name :
-                ts.isStringLiteralLike(parent.left.argumentExpression) ? parent.left.argumentExpression : undefined;
-            return name && this.receiverTypes(parent.left.expression)
-                .map(type => this.memberOf(type, name.text))
-                .find(member => member !== undefined);
+        if (ts.isBinaryExpression(parent) && parent.right === node) {
+            return this.assignedMember(parent);
         }
         if (ts.isVariableDeclaration(parent) && parent.initializer === node && ts.isIdentifier(parent.name) &&
             !this.isTopLevelVariable(parent)) {
             return this.indexedMember(parent.type) ?? this.referencedImplementation(parent);
         }
         return undefined;
+    }
+
+    private assignedMember(assignment: ts.BinaryExpression): ImplementedMember | undefined {
+        const target = assignment.left;
+        if (assignment.operatorToken.kind !== ts.SyntaxKind.EqualsToken ||
+            !(ts.isPropertyAccessExpression(target) || ts.isElementAccessExpression(target)) ||
+            this.isPrototype(target.expression)) {
+            return undefined;
+        }
+        const name = ts.isPropertyAccessExpression(target) ? target.name :
+            ts.isStringLiteralLike(target.argumentExpression) ? target.argumentExpression : undefined;
+        return name && this.receiverTypes(target.expression)
+            .map(type => this.memberOf(type, name.text))
+            .find(member => member !== undefined);
     }
 
     private destructuredMember(element: ts.BindingElement): ImplementedMember | undefined {
@@ -1094,7 +1100,8 @@ export class JavaScriptTypeMapping {
     /**
      * The member a local variable holding a function implements, where an object literal in its file
      * holds it as a property, as `{setState}` or `{setState: set}` does, and that literal's contextual
-     * type has that member. A variable that literals of different types hold implements none.
+     * type has that member, or where it is assigned to such a member, as in `inst.setState = set`.
+     * A variable held as members of different types implements none.
      */
     private referencedImplementation(variable: ts.VariableDeclaration): ImplementedMember | undefined {
         const sourceFile = variable.getSourceFile();
@@ -1103,23 +1110,26 @@ export class JavaScriptTypeMapping {
             implementations = new Map();
             this.referencedImplementations.set(sourceFile, implementations);
             const found = implementations;
+            const hold = (symbol: ts.Symbol | undefined, member: () => ImplementedMember | undefined): void => {
+                const declaration = symbol?.valueDeclaration;
+                if (!declaration || !ts.isVariableDeclaration(declaration) || declaration.getSourceFile() !== sourceFile ||
+                    !declaration.initializer || !this.heldFunction(declaration.initializer) || found.get(declaration) === null) {
+                    return;
+                }
+                const implemented = member();
+                if (implemented) {
+                    const previous = found.get(declaration);
+                    found.set(declaration, !previous || this.sameMember(previous, implemented) ? implemented : null);
+                }
+            };
             const visit = (node: ts.Node): void => {
-                if (ts.isShorthandPropertyAssignment(node) ||
-                    (ts.isPropertyAssignment(node) && ts.isIdentifier(node.initializer))) {
-                    const symbol = ts.isShorthandPropertyAssignment(node) ?
-                        this.checker.getShorthandAssignmentValueSymbol(node) :
-                        this.checker.getSymbolAtLocation(node.initializer);
-                    const declaration = symbol?.valueDeclaration;
-                    if (declaration && ts.isVariableDeclaration(declaration) && declaration.getSourceFile() === sourceFile &&
-                        declaration.initializer && this.heldFunction(declaration.initializer) && found.get(declaration) !== null) {
-                        const member = this.memberOfContextualType(node.parent, node.name);
-                        const previous = found.get(declaration);
-                        if (member && (!previous || this.sameMember(previous, member))) {
-                            found.set(declaration, member);
-                        } else if (previous || member) {
-                            found.set(declaration, null);
-                        }
-                    }
+                if (ts.isShorthandPropertyAssignment(node)) {
+                    hold(this.checker.getShorthandAssignmentValueSymbol(node), () => this.memberOfContextualType(node.parent, node.name));
+                } else if (ts.isPropertyAssignment(node) && ts.isIdentifier(node.initializer)) {
+                    hold(this.checker.getSymbolAtLocation(node.initializer), () => this.memberOfContextualType(node.parent, node.name));
+                } else if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+                    ts.isIdentifier(node.right) && !ts.isIdentifier(node.left)) {
+                    hold(this.checker.getSymbolAtLocation(node.right), () => this.assignedMember(node));
                 }
                 ts.forEachChild(node, visit);
             };
@@ -1131,15 +1141,14 @@ export class JavaScriptTypeMapping {
     /** The function an initializer is, also through a cast, as in `(() => …) as F`. */
     private heldFunction(initializer: ts.Expression): ts.ArrowFunction | ts.FunctionExpression | undefined {
         let node = initializer;
-        while (ts.isParenthesizedExpression(node) || ts.isAsExpression(node) || ts.isSatisfiesExpression(node) || ts.isTypeAssertionExpression(node)) {
+        while (this.isCast(node)) {
             node = node.expression;
         }
         return ts.isArrowFunction(node) || ts.isFunctionExpression(node) ? node : undefined;
     }
 
     private sameMember(a: ImplementedMember, b: ImplementedMember): boolean {
-        return a.name === b.name &&
-            Type.FullyQualified.getFullyQualifiedName(a.owner) === Type.FullyQualified.getFullyQualifiedName(b.owner);
+        return a.name === b.name && this.sameType(a.owner, b.owner);
     }
 
     /** Only a default export, as in `export default function () {}`, declares a function without a name. */

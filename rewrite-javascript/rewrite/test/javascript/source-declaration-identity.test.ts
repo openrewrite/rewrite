@@ -346,6 +346,41 @@ describe('a function implementing a member of a named type is declared on that m
         ]);
     });
 
+    test('a local function implements the member a typed object literal holds it as, wherever an untyped literal also holds it', async () => {
+        // given
+        const files = project({
+            "src/types.ts": `export interface StoreApi { setState(v: number): void; getState: () => number }`,
+            "src/vanilla.ts": `import type {StoreApi} from './types.js';\nexport const createStore = (): StoreApi => {\n    const setState = (v: number) => {};\n    const getState = () => 1;\n    const debug = {setState};\n    const api: StoreApi = {setState, getState};\n    const trace = {getState};\n    return api;\n};`
+        });
+
+        // when
+        const {declarations} = await identities(files);
+
+        // then
+        expect(declarations["src/vanilla.ts"]).toEqual([
+            "src/vanilla#createStore static",
+            "src/types.StoreApi#setState",
+            "src/types.StoreApi#getState"
+        ]);
+    });
+
+    test('a local function assigned to a property of a named type implements that member', async () => {
+        // given
+        const files = project({
+            "src/types.ts": `export type Inst = { create(x: string): Inst };`,
+            "src/index.ts": `import type {Inst} from './types.js';\nexport const createInstance = (): Inst => {\n    const inst: Partial<Inst> = {};\n    const create = (x: string) => createInstance();\n    inst.create = create;\n    return inst as Inst;\n};`
+        });
+
+        // when
+        const {declarations} = await identities(files);
+
+        // then
+        expect(declarations["src/index.ts"]).toEqual([
+            "src/index#createInstance static",
+            "src/types.Inst#create"
+        ]);
+    });
+
     test('a member of a type literal typing a property of a named type is declared on the type and the property', async () => {
         // given
         const files = project({
