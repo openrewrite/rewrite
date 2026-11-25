@@ -1037,7 +1037,7 @@ describe('JavaScript type mapping', () => {
                         declare function either(): { a: number } | { b: string };
                         const spread = {
                             ...either(),
-                            /*~~(declared by Unknown)~~>*/method(value: string) { return value; }
+                            /*~~(declared by Class)~~>*/method(value: string) { return value; }
                         };
                     `
                 )
@@ -2383,6 +2383,199 @@ describe('JavaScript type mapping', () => {
         await withDir(async repo => spec.rewriteRun(npm(repo.path, util, main)), {unsafeCleanup: true});
     });
 
+    describe('a member call on an object of no class, built in a parsed source', () => {
+        const markMembers = () => markTypes((node, type) =>
+            (node?.kind === J.Kind.MethodDeclaration || node?.kind === J.Kind.MethodInvocation || node?.kind === JS.Kind.ArrowFunction) &&
+            Type.isMethod(type) && type.name !== 'require' ?
+                `${FullyQualified.getFullyQualifiedName(type.declaringType)}#${type.name}` : null);
+
+        test('is declared on the file of the object literal that holds the function', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markMembers();
+            const plain = javascript(
+                `
+                    module.exports = createApplication;
+                    function createApplication() {
+                        return {
+                            use: function (fn) { return this; },
+                            short(x) { return this; },
+                            arrow: (y) => y
+                        };
+                    }
+                `,
+                //@formatter:off
+                `
+                    module.exports = createApplication;
+                    /*~~(lib/plain#createApplication)~~>*/function createApplication() {
+                        return {
+                            use: /*~~(lib/plain#use)~~>*/function (fn) { return this; },
+                            /*~~(lib/plain#short)~~>*/short(x) { return this; },
+                            arrow: /*~~(lib/plain#arrow)~~>*/(y) => y
+                        };
+                    }
+                `
+                //@formatter:on
+            );
+            plain.path = 'lib/plain.js';
+            const test = javascript(
+                `
+                    var plain = require('../lib/plain');
+                    plain().use(1).use(2);
+                    plain().short(3);
+                    plain().arrow(4);
+                `,
+                //@formatter:off
+                `
+                    var plain = require('../lib/plain');
+                    /*~~(lib/plain#use)~~>*//*~~(lib/plain#use)~~>*//*~~(lib/plain#createApplication)~~>*/plain().use(1).use(2);
+                    /*~~(lib/plain#short)~~>*//*~~(lib/plain#createApplication)~~>*/plain().short(3);
+                    /*~~(lib/plain#arrow)~~>*//*~~(lib/plain#createApplication)~~>*/plain().arrow(4);
+                `
+                //@formatter:on
+            );
+            test.path = 'test/app.js';
+            await withDir(async repo => spec.rewriteRun(npm(repo.path, plain, test)), {unsafeCleanup: true});
+        });
+
+        test('is declared on the file that assigns the function to a property of the object', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markMembers();
+            const application = javascript(
+                `
+                    var app = exports = module.exports = {};
+                    app.use = function use(fn) { return this; };
+                    app.listen = function () {};
+                `,
+                //@formatter:off
+                `
+                    var app = exports = module.exports = {};
+                    app.use = /*~~(lib/application#use)~~>*/function use(fn) { return this; };
+                    app.listen = /*~~(lib/application#listen)~~>*/function () {};
+                `
+                //@formatter:on
+            );
+            application.path = 'lib/application.js';
+            const express = javascript(
+                `
+                    var proto = require('./application');
+                    module.exports = createApplication;
+                    function createApplication() {
+                        var app = function (req, res, next) {};
+                        return Object.assign(app, proto);
+                    }
+                `,
+                //@formatter:off
+                `
+                    var proto = require('./application');
+                    module.exports = createApplication;
+                    /*~~(lib/express#createApplication)~~>*/function createApplication() {
+                        var app = /*~~(lib/express#<anonymous>)~~>*/function (req, res, next) {};
+                        return /*~~(Object#assign)~~>*/Object.assign(app, proto);
+                    }
+                `
+                //@formatter:on
+            );
+            express.path = 'lib/express.js';
+            const test = javascript(
+                `
+                    var express = require('../lib/express');
+                    var app = express();
+                    app.use(1).listen();
+                `,
+                //@formatter:off
+                `
+                    var express = require('../lib/express');
+                    var app = /*~~(lib/express#createApplication)~~>*/express();
+                    /*~~(lib/application#listen)~~>*//*~~(lib/application#use)~~>*/app.use(1).listen();
+                `
+                //@formatter:on
+            );
+            test.path = 'test/app.js';
+            await withDir(async repo => spec.rewriteRun(npm(repo.path, application, express, test)), {unsafeCleanup: true});
+        });
+
+        test('is declared on the function a shorthand or a cast property holds', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markMembers();
+            const plain = javascript(
+                `
+                    module.exports = createApplication;
+                    function createApplication() {
+                        function use(fn) { return this; }
+                        return {
+                            use,
+                            cast: (function (x) { return x; }),
+                            arrow: ((y) => y)
+                        };
+                    }
+                `,
+                //@formatter:off
+                `
+                    module.exports = createApplication;
+                    /*~~(lib/plain#createApplication)~~>*/function createApplication() {
+                        /*~~(lib/plain#use)~~>*/function use(fn) { return this; }
+                        return {
+                            use,
+                            cast: (/*~~(lib/plain#cast)~~>*/function (x) { return x; }),
+                            arrow: (/*~~(lib/plain#arrow)~~>*/(y) => y)
+                        };
+                    }
+                `
+                //@formatter:on
+            );
+            plain.path = 'lib/plain.js';
+            const test = javascript(
+                `
+                    var plain = require('../lib/plain');
+                    plain().use(1);
+                    plain().cast(2);
+                    plain().arrow(3);
+                `,
+                //@formatter:off
+                `
+                    var plain = require('../lib/plain');
+                    /*~~(lib/plain#use)~~>*//*~~(lib/plain#createApplication)~~>*/plain().use(1);
+                    /*~~(lib/plain#cast)~~>*//*~~(lib/plain#createApplication)~~>*/plain().cast(2);
+                    /*~~(lib/plain#arrow)~~>*//*~~(lib/plain#createApplication)~~>*/plain().arrow(3);
+                `
+                //@formatter:on
+            );
+            test.path = 'test/app.js';
+            await withDir(async repo => spec.rewriteRun(npm(repo.path, plain, test)), {unsafeCleanup: true});
+        });
+
+        test('is not taken for a function assigned to a member of a class instance or prototype', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markMembers();
+            const source = javascript(
+                `
+                    function Foo() {}
+                    Foo.prototype.bar = function () {};
+                    class C {
+                        constructor() {
+                            this.h = () => 1;
+                            this.g = function () {};
+                        }
+                    }
+                `,
+                //@formatter:off
+                `
+                    /*~~(lib/a#Foo)~~>*/function Foo() {}
+                    Foo.prototype.bar = /*~~(lib/a#<anonymous>)~~>*/function () {};
+                    class C {
+                        /*~~(C#<constructor>)~~>*/constructor() {
+                            this.h = () => 1;
+                            this.g = /*~~(lib/a#<anonymous>)~~>*/function () {};
+                        }
+                    }
+                `
+                //@formatter:on
+            );
+            source.path = 'lib/a.js';
+            await withDir(async repo => spec.rewriteRun(npm(repo.path, source)), {unsafeCleanup: true});
+        });
+    });
+
     test('FindMissingTypes produces no results on a complex class', async () => {
         const findings: string[] = [];
 
@@ -3620,6 +3813,15 @@ function markTypes(predicate: (node: any, type: Type | undefined) => string | nu
                 async visitLambda(lambda: J.Lambda, p: ExecutionContext): Promise<J.Lambda> {
                     const visited = await super.visitLambda(lambda, p) as J.Lambda;
                     const description = predicate(visited, (visited as any).methodType);
+                    if (description) {
+                        return foundSearchResult(visited, description);
+                    }
+                    return visited;
+                }
+
+                async visitArrowFunction(arrowFunction: JS.ArrowFunction, p: ExecutionContext): Promise<JS.ArrowFunction> {
+                    const visited = await super.visitArrowFunction(arrowFunction, p) as JS.ArrowFunction;
+                    const description = predicate(visited, visited.methodType);
                     if (description) {
                         return foundSearchResult(visited, description);
                     }
