@@ -757,13 +757,20 @@ export class JavaScriptTypeMapping {
             this.moduleSpecifierArgument(node) : undefined;
     }
 
-    /** TypeScript tells an intrinsic element (`<div>`, `<my-el>`, `<svg:rect>`) from a component by the tag's spelling alone. */
+    /**
+     * TypeScript tells an intrinsic element (`<div>`, `<my-el>`, `<svg:rect>`) from a component by the tag's spelling,
+     * and a tag holding a string, as `const Tag = 'h1'; <Tag/>`, renders an intrinsic element too.
+     */
     private isJsxComponent(node: ts.Node): node is ts.JsxOpeningLikeElement {
         if (!ts.isJsxOpeningLikeElement(node) || ts.isJsxNamespacedName(node.tagName)) {
             return false;
         }
         const tagName = node.tagName;
-        return !ts.isIdentifier(tagName) || !(/^[a-z]/.test(tagName.text) || tagName.text.includes('-'));
+        if (ts.isIdentifier(tagName) && (/^[a-z]/.test(tagName.text) || tagName.text.includes('-'))) {
+            return false;
+        }
+        const tagType = this.checker.getTypeAtLocation(tagName);
+        return !(tagType.isUnion() ? tagType.types : [tagType]).some(t => t.flags & ts.TypeFlags.StringLike);
     }
 
     private isImportDefer(node: ts.Node): boolean {
@@ -910,8 +917,8 @@ export class JavaScriptTypeMapping {
 
     /** Whether a declaration is in a parsed source file, which a `.d.ts` file or an installed package is not. */
     private isParsedSource(declaration: ts.Node): boolean {
-        const sourceFile = declaration.getSourceFile();
-        return !sourceFile.isDeclarationFile && !this.isInstalled(sourceFile.fileName);
+        const sourceFile = declaration.getSourceFile() as ts.SourceFile | undefined;
+        return !!sourceFile && !sourceFile.isDeclarationFile && !this.isInstalled(sourceFile.fileName);
     }
 
     /**

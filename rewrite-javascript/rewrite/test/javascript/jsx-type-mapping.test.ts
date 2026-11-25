@@ -193,6 +193,10 @@ describe('a JSX tag carries the method type a call of the component it renders w
                 export const a = <div><my-element/><svg:rect/></div>;
                 export const b = <><span/></>;
                 export const c = <Missing/>;
+                const Tag = 'div' as const;
+                export const d = <Tag/>;
+                export function Heading({level}: {level: 1 | 2}) { const H = level === 1 ? 'h1' : 'h2'; return <H/>; }
+                export function Dynamic({as: As}: {as: string}) { return <As/>; }
             `,
         });
 
@@ -204,6 +208,9 @@ describe('a JSX tag carries the method type a call of the component it renders w
             '<>': '∅',
             span: '∅',
             Missing: '∅',
+            Tag: '∅',
+            H: '∅',
+            As: '∅',
         });
     });
 });
