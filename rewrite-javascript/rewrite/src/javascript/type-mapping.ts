@@ -757,6 +757,15 @@ export class JavaScriptTypeMapping {
             this.moduleSpecifierArgument(node) : undefined;
     }
 
+    /** TypeScript tells an intrinsic element (`<div>`, `<my-el>`, `<svg:rect>`) from a component by the tag's spelling alone. */
+    private isJsxComponent(node: ts.Node): node is ts.JsxOpeningLikeElement {
+        if (!ts.isJsxOpeningLikeElement(node) || ts.isJsxNamespacedName(node.tagName)) {
+            return false;
+        }
+        const tagName = node.tagName;
+        return !ts.isIdentifier(tagName) || !(/^[a-z]/.test(tagName.text) || tagName.text.includes('-'));
+    }
+
     private isImportDefer(node: ts.Node): boolean {
         return ts.isMetaProperty(node) && node.keywordToken === ts.SyntaxKind.ImportKeyword && node.name.text === 'defer';
     }
@@ -1140,7 +1149,7 @@ export class JavaScriptTypeMapping {
      */
     private createMethodType(
         signature: ts.Signature,
-        node: ts.MethodSignature | ts.FunctionDeclaration | ts.MethodDeclaration | ts.AccessorDeclaration | ts.ConstructorDeclaration | ts.FunctionExpression | ts.ArrowFunction | ts.CallExpression | ts.NewExpression,
+        node: ts.MethodSignature | ts.FunctionDeclaration | ts.MethodDeclaration | ts.AccessorDeclaration | ts.ConstructorDeclaration | ts.FunctionExpression | ts.ArrowFunction | ts.CallExpression | ts.NewExpression | ts.JsxOpeningLikeElement,
         declaringType: Type.FullyQualified,
         name: string,
         declaredFormalTypeNames: string[] = [],
@@ -1290,11 +1299,17 @@ export class JavaScriptTypeMapping {
         }
 
         // Handle different kinds of nodes that represent methods or method invocations
-        if (ts.isCallOrNewExpression(node)) {
+        if (ts.isCallOrNewExpression(node) || this.isJsxComponent(node)) {
             // For method invocations (e.g., _.map(...))
             signature = this.checker.getResolvedSignature(node);
             if (!signature) {
                 return undefined;
+            }
+            const calleeExpression = ts.isCallOrNewExpression(node) ? node.expression : node.tagName;
+
+            if (ts.isJsxOpeningLikeElement(node) && this.checker.getTypeAtLocation(calleeExpression).getConstructSignatures().length) {
+                const component = this.declaringType(signature.getReturnType());
+                return component === Type.unknownType ? undefined : this.createMethodType(signature, node, component, '<constructor>');
             }
 
             // Calling a module itself, as in `require('m')()`, calls its default export.
@@ -1306,11 +1321,11 @@ export class JavaScriptTypeMapping {
                     this.createMethodType(signature, node, moduleClass(calledModule), '<default>');
             }
 
-            let symbol = this.checker.getSymbolAtLocation(node.expression);
+            let symbol = this.checker.getSymbolAtLocation(calleeExpression);
             const declaringNamespace = this.enclosingNamespace(signature.getDeclaration());
 
 
-            if (!symbol && ts.isPropertyAccessExpression(node.expression)) {
+            if (!symbol && ts.isPropertyAccessExpression(calleeExpression)) {
                 // For property access expressions where we couldn't get a symbol,
                 // try to get the symbol from the signature's declaration
                 const declaration = signature?.getDeclaration();
@@ -1322,14 +1337,14 @@ export class JavaScriptTypeMapping {
                 if (!symbol && signature) {
                     // For cases like util.isArray where the module is 'any' type
                     // We'll construct a basic method type from the signature
-                    methodName = node.expression.name.getText();
+                    methodName = calleeExpression.name.getText();
 
                     // When there's no symbol but we have a signature, we need to work harder
                     // to find the declaring type. This happens with CommonJS require() calls
                     // where the module is typed as 'any' but methods still have signatures
 
                     // Trace back through the AST to the require() call or import binding the receiver comes from
-                    const moduleName = this.moduleOfExpression(node.expression.expression);
+                    const moduleName = this.moduleOfExpression(calleeExpression.expression);
 
                     // Use the inferred type or fall back to unknown
                     declaringType = moduleName ? moduleClass(moduleName) : Type.unknownType as Type.FullyQualified;
@@ -1344,11 +1359,11 @@ export class JavaScriptTypeMapping {
             }
 
             // Get the method name
-            if (ts.isPropertyAccessExpression(node.expression)) {
-                methodName = node.expression.name.getText();
+            if (ts.isPropertyAccessExpression(calleeExpression)) {
+                methodName = calleeExpression.name.getText();
 
                 // Check if the object is an imported symbol
-                const objSymbol = this.checker.getSymbolAtLocation(node.expression.expression);
+                const objSymbol = this.checker.getSymbolAtLocation(calleeExpression.expression);
                 let isImport = false;
                 if (objSymbol) {
                     // Only call getAliasedSymbol if the symbol is actually an alias
@@ -1358,7 +1373,7 @@ export class JavaScriptTypeMapping {
                     }
                 }
 
-                const exprType = this.checker.getTypeAtLocation(node.expression.expression);
+                const exprType = this.checker.getTypeAtLocation(calleeExpression.expression);
                 const mappedType = this.getType(exprType);
 
                 // A namespace import of an ES module is typed as its anonymous namespace object, so the
@@ -1366,7 +1381,7 @@ export class JavaScriptTypeMapping {
                 // declared as a TypeScript namespace (`export = React`) keeps that namespace's name.
                 // An installed module's object is named after its package, so where the receiver is an
                 // import's alias, which resolves to the module its specifier names, the specifier wins.
-                const receiverBinding = this.bindingOf(node.expression.expression);
+                const receiverBinding = this.bindingOf(calleeExpression.expression);
                 const anonymous = !mappedType || mappedType.kind !== Type.Kind.Class ||
                     (mappedType as Type.Class).fullyQualifiedName.startsWith('{') ||
                     (isImport && this.isInstalledModuleObject(exprType));
@@ -1424,12 +1439,12 @@ export class JavaScriptTypeMapping {
                     }
                 }
 
-            } else if (ts.isIdentifier(node.expression)) {
-                methodName = node.expression.getText();
+            } else if (ts.isIdentifier(calleeExpression)) {
+                methodName = calleeExpression.getText();
 
                 // Check if this is an import first
-                const exprSymbol = this.checker.getSymbolAtLocation(node.expression);
-                const binding = this.moduleBinding(exprSymbol?.declarations?.[0], node.expression);
+                const exprSymbol = this.checker.getSymbolAtLocation(calleeExpression);
+                const binding = this.moduleBinding(exprSymbol?.declarations?.[0], calleeExpression);
                 let moduleSpecifier: string | undefined;
                 let aliasedSymbol: ts.Symbol | undefined;
 
@@ -1481,7 +1496,7 @@ export class JavaScriptTypeMapping {
                     methodName = ts.getNameOfDeclaration(signature.getDeclaration())?.getText() ?? methodName;
                 } else {
                     // Fall back to the original logic for non-imported functions
-                    const exprType = this.checker.getTypeAtLocation(node.expression);
+                    const exprType = this.checker.getTypeAtLocation(calleeExpression);
                     const funcType = this.getType(exprType);
 
                     if (funcType && funcType.kind === Type.Kind.Class) {
