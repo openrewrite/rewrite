@@ -48,6 +48,17 @@ interface ModuleBinding {
     exportName?: string;
 }
 
+/** What a heritage clause gives a class. */
+interface Heritage {
+    supertype?: Type.Class;
+    interfaces: Type.Class[];
+}
+
+function asClass(type: Type): Type.Class | undefined {
+    const unwrapped = Type.isParameterized(type) ? type.type : type;
+    return Type.isClass(unwrapped) ? unwrapped : undefined;
+}
+
 function isGlobalAugmentation(declaration: ts.Declaration): boolean {
     return ts.isModuleDeclaration(declaration) && (declaration.flags & ts.NodeFlags.GlobalAugmentation) !== 0;
 }
@@ -86,6 +97,10 @@ export class JavaScriptTypeMapping {
     // unknown, since `type Rec<T> = (x: T) => Rec<T[]>` instantiates without end and each
     // instantiation has a type id of its own that the type cache cannot match.
     private readonly functionTypesInProgress = new Set<ts.Symbol>();
+
+    // Classes whose bases are being mapped, each with what waits to read them. A namesake base
+    // gives its own bases in its place, and has none to give until it is done.
+    private readonly heritageInProgress = new Map<Type.Class, (() => void)[]>();
 
 
     /**
@@ -1630,12 +1645,47 @@ export class JavaScriptTypeMapping {
         } as Type.Class;
     }
 
-    private baseClass(classType: Type.Class, baseType: ts.Type): Type.Class | undefined {
-        const mapped = this.getType(baseType);
-        const base = Type.isParameterized(mapped) ? mapped.type : mapped;
+    private bases(classType: Type.Class, baseType: ts.Type, apply: (heritage: Heritage) => void): void {
+        const base = asClass(this.getType(baseType));
+        if (!base) {
+            return;
+        }
+        const inherit = () => apply(this.heritageFrom(classType, base, new Set()));
+        const waiting = base.fullyQualifiedName === classType.fullyQualifiedName ?
+            this.heritageInProgress.get(base) : undefined;
+        if (waiting) {
+            waiting.push(inherit);
+        } else {
+            inherit();
+        }
+    }
+
+    private heritageFrom(classType: Type.Class, base: Type.Class, seen: Set<Type.Class>): Heritage {
         // TypeScript accepts heritage cycles (`class A implements A`). Whichever edge closes one,
         // in mapping order, is dropped.
-        return Type.isClass(base) && !this.inheritsFrom(base, classType, new Set()) ? base : undefined;
+        if (this.inheritsFrom(base, classType, new Set())) {
+            return {interfaces: []};
+        }
+        if (base.fullyQualifiedName !== classType.fullyQualifiedName) {
+            return {supertype: base, interfaces: []};
+        }
+        // Another type of the class's own name, such as the class that `export =` gives in
+        // @types/supertest's lib/test.d.ts, which its index.d.ts interface `Test` extends. A store
+        // that keys types by name keeps one of the two, and reads this edge as the class extending
+        // itself. Its own bases stand in for it.
+        if (seen.has(base)) {
+            return {interfaces: []};
+        }
+        seen.add(base);
+        const superclass = base.supertype && asClass(base.supertype);
+        const inherited: Heritage = superclass ? this.heritageFrom(classType, superclass, seen) : {interfaces: []};
+        const interfaces = [...inherited.interfaces];
+        for (const iface of base.interfaces) {
+            const baseInterface = asClass(iface);
+            const h: Heritage = baseInterface ? this.heritageFrom(classType, baseInterface, seen) : {interfaces: []};
+            interfaces.push(...(h.supertype ? [h.supertype] : []), ...h.interfaces);
+        }
+        return {supertype: inherited.supertype, interfaces};
     }
 
     private inheritsFrom(type: Type.Class, ancestor: Type.Class, seen: Set<Type.Class>): boolean {
@@ -1651,9 +1701,15 @@ export class JavaScriptTypeMapping {
     }
 
     private addInterface(classType: Type.Class, baseType: ts.Type): void {
-        const iface = this.baseClass(classType, baseType);
-        if (iface && !classType.interfaces.includes(iface)) {
-            classType.interfaces.push(iface);
+        this.bases(classType, baseType, ({supertype, interfaces}) =>
+            this.addInterfaces(classType, supertype ? [supertype, ...interfaces] : interfaces));
+    }
+
+    private addInterfaces(classType: Type.Class, interfaces: Type.Class[]): void {
+        for (const iface of interfaces) {
+            if (!classType.interfaces.includes(iface)) {
+                classType.interfaces.push(iface);
+            }
         }
     }
 
@@ -1662,6 +1718,18 @@ export class JavaScriptTypeMapping {
      * Since the shell is already in the cache, any recursive references will find it
      */
     private populateClassType(classType: Type.Class, type: ts.Type): void {
+        this.heritageInProgress.set(classType, []);
+        try {
+            this.populateHeritage(classType, type);
+        } finally {
+            const waiting = this.heritageInProgress.get(classType) ?? [];
+            this.heritageInProgress.delete(classType);
+            waiting.forEach(inherit => inherit());
+        }
+        this.populateMembers(classType, type);
+    }
+
+    private populateHeritage(classType: Type.Class, type: ts.Type): void {
         const symbol = type.getSymbol?.();
         const classSymbol = symbol && symbol.flags & ts.SymbolFlags.Alias ?
             this.checker.getAliasedSymbol(symbol) : symbol;
@@ -1712,10 +1780,12 @@ export class JavaScriptTypeMapping {
                 let interfaces = baseTypes;
                 if (classType.classKind === Type.Class.Kind.Class && (!classDeclaration ||
                     classDeclaration.heritageClauses?.some(c => c.token === ts.SyntaxKind.ExtendsKeyword))) {
-                    const supertype = this.baseClass(classType, baseTypes[0]);
-                    if (supertype) {
-                        classType.supertype = supertype;
-                    }
+                    this.bases(classType, baseTypes[0], ({supertype, interfaces}) => {
+                        if (supertype) {
+                            classType.supertype = supertype;
+                        }
+                        this.addInterfaces(classType, interfaces);
+                    });
                     interfaces = baseTypes.slice(1);
                 }
                 for (const baseType of interfaces) {
@@ -1732,7 +1802,10 @@ export class JavaScriptTypeMapping {
                 }
             }
         }
+    }
 
+    private populateMembers(classType: Type.Class, type: ts.Type): void {
+        const symbol = type.getSymbol?.();
         // Extract type parameters from declarations (not provided by getBaseTypes)
         if (symbol?.declarations) {
             for (const declaration of symbol.declarations) {
