@@ -235,8 +235,7 @@ public abstract class RewriteTest
                     $"Cycles={cycles} has to be at least 1 and at least ExpectedCyclesThatMakeChanges={expectedCycles}");
             }
 
-            var prevThrow = WhitespaceReconciler.ThrowOnMismatchDefault;
-            WhitespaceReconciler.ThrowOnMismatchDefault = validations.FormattingReconciliation;
+            using var reconciliation = WhitespaceReconciler.UseThrowOnMismatch(validations.FormattingReconciliation);
             var checks = new RunChecks(validations);
             var runCtx = checks.Ctx;
             if (recipeSpec.GivenExecutionContext is { } given)
@@ -364,7 +363,6 @@ public abstract class RewriteTest
             }
             finally
             {
-                WhitespaceReconciler.ThrowOnMismatchDefault = prevThrow;
                 if (recipeSpec.GivenExecutionContext is { } carried)
                 {
                     foreach (var (key, value) in runCtx.Messages)
