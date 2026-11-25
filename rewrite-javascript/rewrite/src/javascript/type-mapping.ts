@@ -960,10 +960,10 @@ export class JavaScriptTypeMapping {
 
     /**
      * The name of a function expression or arrow function: its own, or else the one a top-level
-     * `const f = …` or an `exports.f = …` assignment gives it.
+     * `const f = …`, an `exports.f = …` assignment or the property it is assigned to gives it.
      */
     private functionName(fn: ts.ArrowFunction | ts.FunctionExpression): string | undefined {
-        return fn.name?.text ?? this.moduleBindingName(fn);
+        return fn.name?.text ?? this.moduleBindingName(fn) ?? this.memberFunctionName(fn);
     }
 
     /** Only a default export, as in `export default function () {}`, declares a function without a name. */
@@ -1002,6 +1002,52 @@ export class JavaScriptTypeMapping {
     private isModuleExports(node: ts.Expression): boolean {
         return ts.isPropertyAccessExpression(node) && ts.isIdentifier(node.expression) &&
             node.expression.text === 'module' && node.name.text === 'exports';
+    }
+
+    /**
+     * A function that an object of no class holds as a member, in a parsed source file: a function
+     * expression or arrow assigned to a property, as in `app.use = function () {}` or
+     * `{use: function () {}}`, or a method of an object literal. It is declared on its file, as a
+     * function declaration is, under the member's name.
+     */
+    private parsedMemberFunction(declaration: ts.Declaration | undefined): {owner: Type.FullyQualified, name: string} | undefined {
+        if (!declaration || !this.isParsedSource(declaration)) {
+            return undefined;
+        }
+        let name: string | undefined;
+        if (ts.isMethodDeclaration(declaration) && ts.isObjectLiteralExpression(declaration.parent)) {
+            name = this.checker.getSymbolAtLocation(declaration.name)?.getName();
+        } else if (ts.isFunctionExpression(declaration) || ts.isArrowFunction(declaration)) {
+            name = this.functionName(declaration);
+        }
+        return name === undefined ? undefined : {
+            owner: this.sourceModuleType(declaration.getSourceFile()),
+            name: escapeLoneSurrogates(name)
+        };
+    }
+
+    /** The property a function expression is assigned to, as in `app.use = function () {}` or `{use: () => …}`. */
+    private memberFunctionName(fn: ts.FunctionExpression | ts.ArrowFunction): string | undefined {
+        const parent = fn.parent;
+        if (ts.isPropertyAssignment(parent) && parent.initializer === fn) {
+            return ts.isIdentifier(parent.name) || ts.isStringLiteralLike(parent.name) || ts.isNumericLiteral(parent.name) ?
+                parent.name.text : undefined;
+        }
+        if (ts.isBinaryExpression(parent) && parent.right === fn && parent.operatorToken.kind === ts.SyntaxKind.EqualsToken) {
+            const target = parent.left;
+            if (ts.isPropertyAccessExpression(target)) {
+                return target.name.text;
+            }
+            if (ts.isElementAccessExpression(target) && ts.isStringLiteralLike(target.argumentExpression)) {
+                return target.argumentExpression.text;
+            }
+        }
+        return undefined;
+    }
+
+    /** A receiver that no class, interface or enum types, such as an object literal, a function or an intersection. */
+    private isAnonymousReceiver(type: ts.Type): boolean {
+        return !((type.getSymbol()?.flags ?? 0) & (ts.SymbolFlags.Class | ts.SymbolFlags.Interface | ts.SymbolFlags.Enum));
     }
 
     /** The namespace whose body holds a declaration, as `namespace moment` holds `function utc`. */
@@ -1296,8 +1342,14 @@ export class JavaScriptTypeMapping {
                     (isImport && this.isInstalledModuleObject(exprType));
 
                 const declaringClass = this.declaringClassOf(symbol);
+                const memberFunction = !declaringClass && !declaringNamespace &&
+                    (!receiverBinding || receiverBinding.kind === 'named') && this.isAnonymousReceiver(exprType) ?
+                    this.parsedMemberFunction(signature.getDeclaration()) : undefined;
                 if (declaringClass) {
                     declaringType = declaringClass;
+                } else if (memberFunction) {
+                    declaringType = memberFunction.owner;
+                    methodName = memberFunction.name;
                 } else if (declaringNamespace) {
                     // A callable module's receiver is typed as its function, which names no declaration
                     declaringType = moduleClass(this.namespaceName(declaringNamespace));
@@ -1452,7 +1504,10 @@ export class JavaScriptTypeMapping {
 
             // The declaring type: the class, whether declared or an expression, the interface or the object literal around it
             const parent = node.parent;
-            if (ts.isClassLike(parent) || ts.isInterfaceDeclaration(parent) || ts.isObjectLiteralExpression(parent)) {
+            const memberFunction = this.parsedMemberFunction(node);
+            if (memberFunction) {
+                declaringType = memberFunction.owner;
+            } else if (ts.isClassLike(parent) || ts.isInterfaceDeclaration(parent) || ts.isObjectLiteralExpression(parent)) {
                 const parentType = this.checker.getTypeAtLocation(parent);
                 declaringType = this.declaringType(parentType);
             } else {
@@ -1514,7 +1569,7 @@ export class JavaScriptTypeMapping {
                 }
             }
         } else if (ts.isArrowFunction(node)) {
-            const name = this.moduleBindingName(node);
+            const name = this.functionName(node);
             signature = name ? this.checker.getSignatureFromDeclaration(node) : undefined;
             if (!name || !signature) {
                 return undefined;
