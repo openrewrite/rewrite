@@ -133,6 +133,13 @@ final class Pnpm10Profile {
                             "dedupe-peers").contains(key)) {
                         return reason("advanced .npmrc setting " + key);
                     }
+                    // the file npm-conf then loads as the user's or global config is no input
+                    // (PnpmRelease#loadsTheUserAndGlobalConfigFromTrustedSettings)
+                    if (Arrays.asList("userconfig", "globalconfig", "prefix").contains(key) &&
+                        !release.loadsTheUserAndGlobalConfigFromTrustedSettings()) {
+                        return reason("a project .npmrc naming " + key + ", which names the file loaded as the " +
+                                      ("userconfig".equals(key) ? "user's" : "global") + " config");
+                    }
                 }
             }
         }
