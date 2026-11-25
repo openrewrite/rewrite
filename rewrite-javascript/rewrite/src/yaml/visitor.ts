@@ -17,6 +17,7 @@ import {mapAsync, updateIfChanged} from "../util";
 import {TreeVisitor} from "../visitor";
 import {SourceFile} from "../tree";
 import {isYaml, Yaml} from "./tree";
+import {settleChildren, settleDocument} from "./pending";
 
 export class YamlVisitor<P> extends TreeVisitor<Yaml, P> {
     async isAcceptable(sourceFile: SourceFile): Promise<boolean> {
@@ -38,7 +39,8 @@ export class YamlVisitor<P> extends TreeVisitor<Yaml, P> {
             block: await this.visitDefined(document.block, p),
             end: await this.visitDefined(document.end, p)
         };
-        return updateIfChanged(document, updates);
+        const updated = updateIfChanged(document, updates);
+        return updated === document ? document : settleDocument(updated);
     }
 
     protected async visitDirective(directive: Yaml.Directive, p: P): Promise<Yaml | undefined> {
@@ -62,7 +64,8 @@ export class YamlVisitor<P> extends TreeVisitor<Yaml, P> {
             anchor: mapping.anchor ? await this.visit(mapping.anchor, p) : undefined,
             entries: await mapAsync(mapping.entries, entry => this.visitDefined(entry, p) as Promise<Yaml.MappingEntry>)
         };
-        return updateIfChanged(mapping, updates);
+        const updated = updateIfChanged(mapping, updates);
+        return updated === mapping ? mapping : settleChildren(updated);
     }
 
     protected async visitMappingEntry(entry: Yaml.MappingEntry, p: P): Promise<Yaml | undefined> {
@@ -90,7 +93,8 @@ export class YamlVisitor<P> extends TreeVisitor<Yaml, P> {
             anchor: sequence.anchor ? await this.visit(sequence.anchor, p) : undefined,
             entries: await mapAsync(sequence.entries, entry => this.visitDefined(entry, p) as Promise<Yaml.SequenceEntry>)
         };
-        return updateIfChanged(sequence, updates);
+        const updated = updateIfChanged(sequence, updates);
+        return updated === sequence ? sequence : settleChildren(updated);
     }
 
     protected async visitSequenceEntry(entry: Yaml.SequenceEntry, p: P): Promise<Yaml | undefined> {
