@@ -1129,6 +1129,112 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
         );
     }
 
+    @Test
+    void shouldPreserveWildcardStaticImport() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("foo1.Bar.QUX1", "foo2.Bar.QUX1")),
+          java(
+            """
+              package foo1;
+
+              public class Bar {
+                  public static final String QUX1 = "QUX1_FROM_FOO1";
+                  public static final String QUX2 = "QUX2_FROM_FOO1";
+                  public static final String QUX3 = "QUX3_FROM_FOO1";
+              }
+              """
+          ),
+          java(
+            """
+              package foo2;
+
+              public class Bar {
+                  public static final String QUX1 = "QUX1_FROM_FOO2";
+              }
+              """
+          ),
+          java(
+            """
+              package app;
+
+              import foo1.Bar;
+
+              import static foo1.Bar.*;
+
+              public class WildcardImportUser {
+                  public String pickDefault() {
+                      return QUX2;
+                  }
+                  public boolean isAny(String s) {
+                      return s.equals(QUX1) || s.equals(QUX3);
+                  }
+              }
+              """,
+            """
+              package app;
+
+              import foo2.Bar;
+
+              import static foo1.Bar.*;
+
+              public class WildcardImportUser {
+                  public String pickDefault() {
+                      return QUX2;
+                  }
+                  public boolean isAny(String s) {
+                      return s.equals(Bar.QUX1) || s.equals(QUX3);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepStaticStarImportThatStillProvidesOtherConstants() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("foo1.Bar.QUX1", "foo2.Bar.QUX1")),
+          java(
+            """
+              package foo1;
+
+              public class Bar {
+                  public static final String QUX1 = "QUX1_FROM_FOO1";
+                  public static final String QUX2 = "QUX2_FROM_FOO1";
+              }
+              """
+          ),
+          java(
+            """
+              package foo2;
+
+              public class Bar {
+                  public static final String QUX1 = "QUX1_FROM_FOO2";
+              }
+              """
+          ),
+          java(
+            """
+              import static foo1.Bar.*;
+
+              class Test {
+                  String a = QUX1;
+                  String b = QUX2;
+              }
+              """,
+            """
+              import static foo1.Bar.*;
+              import static foo2.Bar.QUX1;
+
+              class Test {
+                  String a = QUX1;
+                  String b = QUX2;
+              }
+              """
+          )
+        );
+    }
+
     private static final String OLD = """
       package a;
       public class Old {
