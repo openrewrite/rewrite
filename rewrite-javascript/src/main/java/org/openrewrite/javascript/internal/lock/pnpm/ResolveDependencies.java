@@ -2047,7 +2047,8 @@ final class ResolveDependencies {
                                                                    ResolveDependencyOptions options,
                                                                    @Nullable InfoFromLockfile currentPkg,
                                                                    Runnable finishPackageResolution) {
-        PreferredVersions.ByName preferredVersions = !options.updateRequested && options.preferredVersion != null ?
+        PreferredVersions.ByName preferredVersions = !options.updateRequested && options.preferredVersion != null &&
+                                                     ctx.getRelease().requestsTheCatalogRangeOfALockedVersion() ?
                 getExactSinglePreferredVersions(wanted, options.preferredVersion) :
                 options.preferredVersions;
         return Promise.async(ctx.getLoop(), () -> requestPackage(wanted, ctx, options, currentPkg, preferredVersions))
@@ -2133,6 +2134,12 @@ final class ResolveDependencies {
             currentPkg.getPkgId().endsWith("@" + currentPkg.getVersion()) && !calcSpecifier) {
             wantedDependency.setBareSpecifier(replaceVersionInBareSpecifier(wantedDependency.getBareSpecifier(),
                     currentPkg.getVersion(), namedRegistryPrefixes(ctx, wantedDependency.getBareSpecifier()),
+                    ctx.getRelease()));
+        }
+        if (!options.updateRequested && options.preferredVersion != null &&
+            !ctx.getRelease().requestsTheCatalogRangeOfALockedVersion()) {
+            wantedDependency.setBareSpecifier(replaceVersionInBareSpecifier(wantedDependency.getBareSpecifier(),
+                    options.preferredVersion, namedRegistryPrefixes(ctx, wantedDependency.getBareSpecifier()),
                     ctx.getRelease()));
         }
         PackageRequester.RequestPackageOptions request = new PackageRequester.RequestPackageOptions();
