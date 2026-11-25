@@ -603,7 +603,10 @@ public abstract class Recipe implements Cloneable {
 
     @Incubating(since = "8.67.0")
     public Recipe withOptions(@Nullable Map<String, Object> options) {
-        Map<String, Object> m = new HashMap<>();
+        if (options == null) {
+            return clone();
+        }
+        Map<String, Object> m = new HashMap<>(options);
         m.put("@c", getName());
         ObjectMapper objectMapper = JsonMapper.builder()
                 .constructorDetector(ConstructorDetector.USE_PROPERTIES_BASED)
@@ -617,27 +620,23 @@ public abstract class Recipe implements Cloneable {
         objectMapper.setVisibility(objectMapper.getSerializationConfig().getDefaultVisibilityChecker()
                 .withFieldVisibility(JsonAutoDetect.Visibility.ANY));
         try {
-            if (options != null) {
-                m.putAll(options);
-                for (OptionDescriptor optionDescriptor : getOptionDescriptors()) {
-                    Object value = options.get(optionDescriptor.getName());
-                    if (value instanceof String && optionDescriptor.getType().equals("List")) {
-                        m.put(optionDescriptor.getName(), Arrays.asList(((String) value).split(",")));
-                    }
+            for (OptionDescriptor optionDescriptor : getOptionDescriptors()) {
+                Object value = options.get(optionDescriptor.getName());
+                if (value instanceof String && optionDescriptor.getType().equals("List")) {
+                    m.put(optionDescriptor.getName(), Arrays.asList(((String) value).split(",")));
                 }
             }
 
-            Recipe configured = objectMapper.updateValue(clone(), m);
+            Recipe configured = clone();
             configured.descriptor = null;
+            configured = objectMapper.updateValue(configured, m);
 
-            if (options != null) {
-                for (OptionDescriptor optionDescriptor : configured.getDescriptor().getOptions()) {
-                    Object value = options.get(optionDescriptor.getName());
-                    if (value != null && optionDescriptor.getValue() == null) {
-                        Map<String, Object> option = new HashMap<>();
-                        option.put("value", value);
-                        objectMapper.updateValue(optionDescriptor, option);
-                    }
+            for (OptionDescriptor optionDescriptor : configured.getDescriptor().getOptions()) {
+                Object value = options.get(optionDescriptor.getName());
+                if (value != null && optionDescriptor.getValue() == null) {
+                    Map<String, Object> option = new HashMap<>();
+                    option.put("value", value);
+                    objectMapper.updateValue(optionDescriptor, option);
                 }
             }
             return configured;
