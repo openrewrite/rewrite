@@ -1,0 +1,70 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    dependencies:
+      alias-b:
+        specifier: npm:dlb@1.0.0
+        version: dlb@1.0.0(dla@1.0.0(dlb@2.0.0)(dlc@1.0.0))(dlc@1.0.0)
+      alias-c:
+        specifier: npm:dlc@1.0.0
+        version: dlc@1.0.0(dla@1.0.0(dlb@2.0.0)(dlc@1.0.0))
+      dla:
+        specifier: 1.0.0
+        version: 1.0.0(dlb@2.0.0)(dlc@1.0.0)
+      dlb:
+        specifier: 2.0.0
+        version: 2.0.0
+      other:
+        specifier: 1.0.0
+        version: 1.0.0
+
+packages:
+
+  dla@1.0.0:
+    resolution: {integrity: sha512-cUQLRB8d7AsG9JacoZrPkULwrF4rctMn3a8CCGbSnGNEjcv/S3CS2TXZFxjtVV1Z4SfSkACDq/eUpvEJH2prIw==}
+    peerDependencies:
+      dlb: 1.0.0
+      dlc: 1.0.0
+
+  dlb@1.0.0:
+    resolution: {integrity: sha512-ols5w5zsRtTLCy2Th+vd7fNnMdTaKnuJns4ep45flxdsYIWZOuLCYhMstrTRF0jS5+T20I6p3Kf7GNuAy7DSfQ==}
+    peerDependencies:
+      dla: '*'
+      dlc: 2.0.0
+
+  dlb@2.0.0:
+    resolution: {integrity: sha512-FT6ZxlxY1aYOL44mhFExXUCwDr0t8xl0TRsYue3ene1hxSOAk/F6xmF9/6rf+2RLny/yVucoUxPvWOs2DLXLmA==}
+
+  dlc@1.0.0:
+    resolution: {integrity: sha512-rw8sR+RkTy1py2F6QjLN9YLv7qFFIEU7Q/HR0L+Ey4gbgWmcNDygA3S0aRlOgR6q+GPIkGzmosCJa9SskWk8Jg==}
+    peerDependencies:
+      dla: '*'
+
+  other@1.0.0:
+    resolution: {integrity: sha512-2rIGHtpVVbZDHOOUIT09k2hG3wEqJ4dO3OrpI0ET8WtrhdHQ0RzK5Q3550C2P4tV3h6cQF/S1h/NXR/m37DK/A==}
+
+snapshots:
+
+  dla@1.0.0(dlb@2.0.0)(dlc@1.0.0):
+    dependencies:
+      dlb: 2.0.0
+      dlc: 1.0.0(dla@1.0.0(dlb@2.0.0)(dlc@1.0.0))
+
+  dlb@1.0.0(dla@1.0.0(dlb@2.0.0)(dlc@1.0.0))(dlc@1.0.0):
+    dependencies:
+      dla: 1.0.0(dlb@2.0.0)(dlc@1.0.0)
+      dlc: 1.0.0(dla@1.0.0(dlb@2.0.0)(dlc@1.0.0))
+
+  dlb@2.0.0: {}
+
+  dlc@1.0.0(dla@1.0.0(dlb@2.0.0)(dlc@1.0.0)):
+    dependencies:
+      dla: 1.0.0(dlb@2.0.0)(dlc@1.0.0)
+
+  other@1.0.0: {}

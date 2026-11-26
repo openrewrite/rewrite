@@ -59,7 +59,7 @@
  * (https://sindresorhus.com)) with @pnpm/util.lex-comparator 3.0.2 and comver-to-semver 2.0.0 (Copyright (c)
  * 2022-2026 Zoltan Kochan); {@code ObjectHasher}, object-hash 3.0.0 (Copyright (c) 2014 object-hash contributors);
  * version-selector-type 3.0.0 (Copyright (c) 2017-2020 Zoltan Kochan &lt;z@kochan.io&gt;); parse-npm-tarball-url
- * 5.0.0 and normalize-registry-url 2.0.1 (Copyright (c) 2017-2026 Zoltan Kochan); get-npm-tarball-url 2.1.0
+ * 5.0.0 and normalize-registry-url 2.0.1 and 2.0.0 (Copyright (c) 2017-2026 Zoltan Kochan); get-npm-tarball-url 2.1.0
  * (Copyright (c) 2017-2023 Zoltan Kochan &lt;z@kochan.io&gt;); @pnpm/config.env-replace 4.1.0;
  * {@code SemverRangeIntersect}, semver-range-intersect 0.3.1 (Copyright (c) 2019 sounisi5011); {@code GraphCycles},
  * graph-cycles 3.0.0 and rotated-array-set 3.0.0 (Copyright (c) 2021 Gustaf Räntilä); {@code Tinyglobby},

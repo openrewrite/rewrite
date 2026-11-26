@@ -1,0 +1,30 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    dependencies:
+      other:
+        specifier: 1.0.0
+        version: 1.0.0
+
+  packages/b:
+    dependencies:
+      wsa:
+        specifier: ^1.0.0
+        version: link:../wsa
+
+  packages/wsa: {}
+
+packages:
+
+  other@1.0.0:
+    resolution: {integrity: sha512-UDb2DLTnxn2yIVANGXhYJRUzlDYJ3QwHITTeW4BG3VknLeb32CF2BGRNvf82sLc8mSH4SIe1V2ZKCe3r5lYNYQ==}
+
+snapshots:
+
+  other@1.0.0: {}

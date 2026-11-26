@@ -1,0 +1,7 @@
+Progress: resolved 1, reused 0, downloaded 0, added 0
+ ERR_PNPM_TRUST_DOWNGRADE  High-risk trust downgrade for "dep@1.1.0" (possible package takeover)
+
+This error happened while installing a direct dependency of <project>
+
+Trust checks are based solely on publish date, not semver. A package cannot be installed if any earlier-published version had stronger trust evidence. Earlier versions had provenance attestation, but this version has no trust evidence. A trust downgrade may indicate a supply chain incident.
+exit 1

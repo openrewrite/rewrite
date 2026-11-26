@@ -1,0 +1,34 @@
+{
+ "dep": {
+  "name": "dep",
+  "dist-tags": {
+   "latest": "2.0.0"
+  },
+  "versions": {
+   "1.0.0": {
+    "name": "dep",
+    "version": "1.0.0",
+    "dist": {
+     "tarball": "http://localhost:4881/dep/-/dep-1.0.0.tgz",
+     "integrity": "sha512-UXBaQ9HDjVhatbwme+7x2NAmqLdqs2qfEuCu9Gm40ImHTsOyA8mnLhsYwbE/wcuAdo0NUo+vgOOLpmXuxrUEWw==",
+     "shasum": "804965b1d276aeccf70d15a0298fa5481eda54ef"
+    }
+   },
+   "2.0.0": {
+    "name": "dep",
+    "version": "2.0.0",
+    "dist": {
+     "tarball": "http://localhost:4881/dep/-/dep-2.0.0.tgz",
+     "integrity": "sha512-Hk/YR7ecROAeDhD0ejeNe54RGg+dTrSPxz1x95+oB+3MTfdmwRtg90ov0KctSPZjCZ0PkEp7ir3lrhxdFGhZqw==",
+     "shasum": "f0c8757f0423858b3ce69e8623059c9dd4bdd1d7"
+    }
+   }
+  },
+  "time": {
+   "created": "2020-01-01T00:00:00.000Z",
+   "modified": "2020-01-01T00:00:00.000Z",
+   "1.0.0": "2020-01-01T00:00:00.000Z",
+   "2.0.0": "2020-01-01T00:00:00.000Z"
+  }
+ }
+}

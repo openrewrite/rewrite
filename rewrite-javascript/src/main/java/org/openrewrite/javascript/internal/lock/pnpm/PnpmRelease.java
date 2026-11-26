@@ -160,6 +160,15 @@ public final class PnpmRelease {
     }
 
     /**
+     * pnpm bundles normalize-registry-url 2.0.1 from 10.28.1 (pnpm/pnpm#10470), which serializes a registry URL as
+     * WHATWG URL does (a default port dropped, the host lowercased) before it adds the trailing slash; before, 2.0.0
+     * adds the slash alone.
+     */
+    boolean normalizesTheRegistryUrlAsAUrl() {
+        return atLeast(11, 0, 0) || atLeast(10, 28, 1);
+    }
+
+    /**
      * minimumReleaseAge and minimumReleaseAgeExclude are settings from 10.16.0 (pnpm/pnpm#9957); before, an .npmrc's
      * {@code minimum-release-age} is read into no setting.
      */
@@ -175,7 +184,45 @@ public final class PnpmRelease {
     }
 
     /**
-     * Optional dependencies request full metadata for libc from 10.28.2 (pnpm/pnpm#9950).
+     * pnpm 10's store controller fetches full metadata where minimumReleaseAge is set and the registry has no time
+     * field, from 10.16.0 (pnpm/pnpm#9957); pnpm 11, which defaults the age to a day, does not.
+     */
+    boolean fetchesFullMetadataUnderAReleaseAge() {
+        return !atLeast(11, 0, 0) && atLeast(10, 16, 0);
+    }
+
+    /**
+     * A minimumReleaseAge pnpm 10 reads from 10.16.0 to 10.32.x: what it excludes, how it falls back on dist-tags,
+     * and how an optional dependency without a mature version fails, changed in 10.17.0 (pnpm/pnpm#9984,
+     * pnpm/pnpm#9988), 10.17.1 (pnpm/pnpm#10004), 10.19.0 (pnpm/pnpm#10059), 10.20.0 (pnpm/pnpm#10118,
+     * pnpm/pnpm#10130) and 10.25.0 (pnpm/pnpm#10289). The port has the rules of 10.33.0, so that the versions
+     * those releases resolve under a release age are cannot-know.
+     */
+    boolean readsAReleaseAgeThePortDoesNot() {
+        return !atLeast(11, 0, 0) && atLeast(10, 16, 0) && !atLeast(10, 33, 0);
+    }
+
+    /**
+     * trustPolicy, trustPolicyExclude and trustPolicyIgnoreAfter are read from 10.21.0 (pnpm/pnpm#10103); before,
+     * no setting.
+     */
+    boolean readsTrustPolicy() {
+        return atLeast(11, 0, 0) || atLeast(10, 21, 0);
+    }
+
+    /**
+     * A trustPolicy pnpm 10 reads from 10.21.0 to 10.32.x: trustPolicyExclude from 10.22.0 (pnpm/pnpm#10168), an
+     * optional dependency that fails the check fails the install from 10.23.0 (pnpm/pnpm#10211), a prerelease's
+     * evidence is ignored for a stable version from 10.24.0 (pnpm/pnpm#10227), an excluded package needs no time
+     * from 10.25.0 (pnpm/pnpm#10292), and trustPolicyIgnoreAfter is read from 10.27.0 (pnpm/pnpm#10359). The port
+     * has the rules of 10.33.0, so that the versions those releases resolve under no-downgrade are cannot-know.
+     */
+    boolean readsATrustPolicyThePortDoesNot() {
+        return !atLeast(11, 0, 0) && atLeast(10, 21, 0) && !atLeast(10, 33, 0);
+    }
+
+    /**
+     * Optional dependencies request full metadata for libc from 10.28.2 (pnpm/pnpm#10455).
      */
     boolean fetchesFullMetadataForOptionalDependencies() {
         return atLeast(10, 28, 2);
@@ -186,6 +233,15 @@ public final class PnpmRelease {
      */
     boolean prefersTheCurrentPackageVersion() {
         return atLeast(10, 11, 1);
+    }
+
+    /**
+     * resolvePeersOfChildren adds the peer edges of an npm-aliased child under its package's name too from 10.12.4
+     * (pnpm/pnpm#9675); before, under its alias alone, so that a cycle through the package's name is not found and
+     * its dependency paths wait for each other forever.
+     */
+    boolean findsPeerCyclesUnderTheNameOfAnAlias() {
+        return atLeast(10, 12, 4);
     }
 
     /**
@@ -204,10 +260,27 @@ public final class PnpmRelease {
     }
 
     /**
+     * satisfiesPackageManifest takes an importer whose locked version its unchanged range does not admit for one out
+     * of date from 10.15.0 (pnpm/pnpm#9832); before, it is up to date.
+     */
+    boolean checksTheLockedVersionOfAnImporter() {
+        return atLeast(10, 15, 0);
+    }
+
+    /**
      * hoistPeers reads a weighted preferred selector's type and omits a null maximum from 10.33.0.
      */
     boolean readsWeightedRequiredPeerSelectors() {
         return atLeast(10, 33, 0);
+    }
+
+    /**
+     * hoistPeers takes the highest preferred version an exact peer version (an override's, say) names from 10.30.2
+     * (pnpm/pnpm#10655), and under autoInstallPeers the version itself where none does; before, the highest
+     * preferred version.
+     */
+    boolean hoistsAnExactPeerVersion() {
+        return atLeast(11, 0, 0) || atLeast(10, 30, 2);
     }
 
     /**
@@ -223,6 +296,25 @@ public final class PnpmRelease {
      */
     boolean detectsDotPrefixedWorkspaceManifests() {
         return atLeast(10, 29, 0);
+    }
+
+    /**
+     * A bare {@code workspace:} is read as {@code workspace:*}, a prerelease workspace version among those it takes,
+     * from 10.29.0 (pnpm/pnpm#10436); before, its range is {@code ''}, which takes no prerelease.
+     */
+    boolean readsABareWorkspaceSpecAsAny() {
+        return atLeast(11, 0, 0) || atLeast(10, 29, 0);
+    }
+
+    /**
+     * getConfig takes the root alone ({@code ['.']}) for a pnpm-workspace.yaml without packages, but in 10.29.0 to
+     * 10.29.1 (1dbbffb6a, put back by 595cd414f) and 10.31.0 to 10.32.0 (pnpm/pnpm#10127, put back by
+     * pnpm/pnpm#10927) leaves the patterns unset, so that findPackages takes every package.json
+     * ({@code ['.', '**']}).
+     */
+    boolean takesEveryManifestOfAWorkspaceWithoutPackages() {
+        return !atLeast(11, 0, 0) && (atLeast(10, 29, 0) && !atLeast(10, 29, 2) ||
+                                     atLeast(10, 31, 0) && !atLeast(10, 32, 1));
     }
 
     /**
@@ -1153,7 +1245,42 @@ public final class PnpmRelease {
     }
 
     /**
-     * The install command passes supportedArchitectures.libc to getFetchFullMetadata from 10.14.0.
+     * A package whose manifest names no bin keeps the hasBin the lock gives it from 10.18.3 (pnpm/pnpm#10065), an
+     * abbreviated packument holding no {@code directories}; before, hasBin comes from the manifest alone.
+     */
+    boolean keepsTheLockedHasBinOfAManifestWithoutBin() {
+        return atLeast(11, 0, 0) || atLeast(10, 18, 3);
+    }
+
+    /**
+     * A resolved package's {@code engines.runtime} becomes a {@code runtime:} dependency from 10.21.0
+     * (pnpm/pnpm#10141); before, it is an engines field like any other.
+     */
+    boolean convertsTheEnginesRuntimeOfADependency() {
+        return atLeast(11, 0, 0) || atLeast(10, 21, 0);
+    }
+
+    /**
+     * The npm resolver serializes a packument's tarball URL as WHATWG URL does (a default port dropped, the host
+     * lowercased) from 10.26.0 (pnpm/pnpm#10273); before, it takes the URL as the packument gives it.
+     */
+    boolean normalizesATarballUrl() {
+        return atLeast(11, 0, 0) || atLeast(10, 26, 0);
+    }
+
+    /**
+     * Where the registry has no version of a dependency, the npm resolver falls back on a workspace package within
+     * the dependency's range from 10.31.0 (pnpm/pnpm#10704); before, it passes the install's update to the fallback,
+     * which a dependency without a locked version has, and takes any version of the workspace package.
+     */
+    boolean fallsBackOnAWorkspacePackageWithinTheRange() {
+        return atLeast(11, 0, 0) || atLeast(10, 31, 0);
+    }
+
+    /**
+     * The install command passes getFetchFullMetadata's {@code supportedArchitectures.libc}, the root manifest's as a
+     * fallback, from 10.14.0 (pnpm/pnpm#9745); before, the root manifest's {@code pnpm.supportedArchitectures.libc}
+     * alone.
      */
     boolean fetchesFullMetadataForConfiguredLibc() {
         return atLeast(10, 14, 0);

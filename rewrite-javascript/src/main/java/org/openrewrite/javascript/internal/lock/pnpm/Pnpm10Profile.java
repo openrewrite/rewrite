@@ -103,6 +103,10 @@ final class Pnpm10Profile {
                 Object workspace = JsYaml.load(file.getValue());
                 if (workspace instanceof Map) {
                     String unsupported = settings((Map<String, @Nullable Object>) workspace);
+                    if (unsupported == null) {
+                        unsupported = policy(((Map<?, ?>) workspace).get("minimumReleaseAge"),
+                                ((Map<?, ?>) workspace).get("trustPolicy"), release);
+                    }
                     if (unsupported != null) {
                         return unsupported;
                     }
@@ -127,7 +131,14 @@ final class Pnpm10Profile {
                 }
                 // Advanced .npmrc settings use npm-conf/nopt in pnpm 10, rather than pnpm 11's schema parser.
                 for (String line : file.getValue().split("\n")) {
-                    String key = line.trim().split("=", 2)[0].trim();
+                    String[] pair = line.trim().split("=", 2);
+                    String key = pair[0].trim();
+                    String unsupported = pair.length < 2 ? null : policy(
+                            "minimum-release-age".equals(key) ? pair[1].trim() : null,
+                            "trust-policy".equals(key) ? pair[1].trim() : null, release);
+                    if (unsupported != null) {
+                        return unsupported;
+                    }
                     if (Arrays.asList("shared-workspace-lockfile", "global", "pnpmfile", "pnpmfiles",
                             "use-node-version", "node-version", "resolution-mode", "inject-workspace-packages",
                             "dedupe-peers").contains(key)) {
@@ -168,6 +179,20 @@ final class Pnpm10Profile {
                     }
                 }
             }
+        }
+        return null;
+    }
+
+    // the release age and trust rules pnpm 10.16.0 to 10.32.x change (PnpmRelease#readsAReleaseAgeThePortDoesNot,
+    // PnpmRelease#readsATrustPolicyThePortDoesNot)
+    private static @Nullable String policy(@Nullable Object minimumReleaseAge, @Nullable Object trustPolicy,
+                                           PnpmRelease release) {
+        if (minimumReleaseAge != null && Js.toNumber(minimumReleaseAge) != 0 &&
+            release.readsAReleaseAgeThePortDoesNot()) {
+            return reason("minimumReleaseAge, whose rules changed six times from 10.16.0 to 10.32.x");
+        }
+        if ("no-downgrade".equals(trustPolicy) && release.readsATrustPolicyThePortDoesNot()) {
+            return reason("trustPolicy no-downgrade, whose rules changed five times from 10.21.0 to 10.32.x");
         }
         return null;
     }

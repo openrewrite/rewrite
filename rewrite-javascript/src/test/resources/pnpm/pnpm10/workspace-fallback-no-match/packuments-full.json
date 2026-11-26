@@ -1,0 +1,46 @@
+{
+ "other": {
+  "name": "other",
+  "dist-tags": {
+   "latest": "1.0.0"
+  },
+  "versions": {
+   "1.0.0": {
+    "name": "other",
+    "version": "1.0.0",
+    "dist": {
+     "tarball": "http://localhost:4881/other/-/other-1.0.0.tgz",
+     "integrity": "sha512-UDb2DLTnxn2yIVANGXhYJRUzlDYJ3QwHITTeW4BG3VknLeb32CF2BGRNvf82sLc8mSH4SIe1V2ZKCe3r5lYNYQ==",
+     "shasum": "5188c4352a144b374439b5e776afef327d1454ca"
+    }
+   }
+  },
+  "time": {
+   "created": "2020-01-01T00:00:00.000Z",
+   "modified": "2020-01-01T00:00:00.000Z",
+   "1.0.0": "2020-01-01T00:00:00.000Z"
+  }
+ },
+ "wsb": {
+  "name": "wsb",
+  "dist-tags": {
+   "latest": "3.0.0"
+  },
+  "versions": {
+   "3.0.0": {
+    "name": "wsb",
+    "version": "3.0.0",
+    "dist": {
+     "tarball": "http://localhost:4881/wsb/-/wsb-3.0.0.tgz",
+     "integrity": "sha512-PaD5W73CN4ARiQG5emnAf8OPS1FEjfiddRVzlxfFmx5NAlk6KysG7O5n8463m/VhlNva+EOBXdTXhjE1UFeMcg==",
+     "shasum": "370b55f9a4e48ac51f126c3c7609e44eb7607cbe"
+    }
+   }
+  },
+  "time": {
+   "created": "2020-01-01T00:00:00.000Z",
+   "modified": "2020-01-01T00:00:00.000Z",
+   "3.0.0": "2020-01-01T00:00:00.000Z"
+  }
+ }
+}

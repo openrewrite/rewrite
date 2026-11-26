@@ -125,7 +125,7 @@ final class ProjectsGraph {
         try {
             if (isWorkspaceSpec) {
                 PickPackageFromMeta.RegistryPackageSpec parsed = PickPackageFromMeta.parseBareSpecifier(
-                        NpmResolver.workspacePrefToNpm(rawSpec), depName, "latest", "", release);
+                        NpmResolver.workspacePrefToNpm(rawSpec, release), depName, "latest", "", release);
                 if (parsed == null) {
                     return null;
                 }

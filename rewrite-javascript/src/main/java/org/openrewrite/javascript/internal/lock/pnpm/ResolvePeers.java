@@ -1398,6 +1398,8 @@ final class ResolvePeers {
         }
         List<Consumer<List<List<String>>>> calculateDepPaths = new ArrayList<>();
         Map<String, List<String>> graph = new LinkedHashMap<>();
+        Map<String, List<String>> aliasGraph = ctx.release.findsPeerCyclesUnderTheNameOfAnAlias() ? null :
+                new LinkedHashMap<>();
         Map<String, ParentPkgInfo> parentDepPaths = new LinkedHashMap<>();
         for (Map.Entry<String, ParentRef> entry : parentPkgs.entrySet()) {
             if (!ctx.allPeerDepNames.contains(entry.getKey())) {
@@ -1432,6 +1434,9 @@ final class ResolvePeers {
                 edges.add(peer.getKey());
             }
             addEdgesToGraph(graph, currentAlias, edges);
+            if (aliasGraph != null) {
+                addEdgesToGraph(aliasGraph, currentAlias, new ArrayList<>(edges));
+            }
             DependenciesTreeNode node = ctx.dependenciesTree.get(childNodeId);
             if (!currentAlias.equals(node.getResolvedPackage().getName())) {
                 addEdgesToGraph(graph, node.getResolvedPackage().getName(), edges);
@@ -1440,6 +1445,10 @@ final class ResolvePeers {
         }
         if (!calculateDepPaths.isEmpty()) {
             List<List<String>> cycles = GraphCycles.cycles(graph);
+            if (aliasGraph != null && !cycles.equals(GraphCycles.cycles(aliasGraph))) {
+                throw new CannotKnow("the lock pnpm writes where a cycle of peers runs through an npm alias's " +
+                                     "package name, whose dependency paths pnpm before 10.12.4 waits for forever");
+            }
             for (Consumer<List<List<String>>> calculateDepPath : calculateDepPaths) {
                 calculateDepPath.accept(cycles);
             }
