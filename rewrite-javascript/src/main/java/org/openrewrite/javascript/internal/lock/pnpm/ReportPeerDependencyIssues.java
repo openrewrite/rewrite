@@ -15,6 +15,7 @@
  */
 package org.openrewrite.javascript.internal.lock.pnpm;
 
+import lombok.Getter;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.pnpm.ResolvePeers.BadPeerIssue;
@@ -60,9 +61,16 @@ final class ReportPeerDependencyIssues {
     static final class PeerDependencyIssuesError extends PnpmError {
         private final Map<String, PeerDependencyIssues> issuesByProjects;
 
-        PeerDependencyIssuesError(Map<String, PeerDependencyIssues> issuesByProjects) {
+        /**
+         * Whether pnpm prints the error: the reporter renders none where its rules leave no issue.
+         */
+        @Getter
+        private final boolean printed;
+
+        PeerDependencyIssuesError(Map<String, PeerDependencyIssues> issuesByProjects, boolean printed) {
             super("PEER_DEP_ISSUES", "Unmet peer dependencies");
             this.issuesByProjects = issuesByProjects;
+            this.printed = printed;
         }
 
         /**
@@ -90,21 +98,54 @@ final class ReportPeerDependencyIssues {
     static void reportPeerDependencyIssues(Map<String, PeerDependencyIssues> peerDependencyIssuesByProjects,
                                            @Nullable PeerDependencyRules rules, boolean strictPeerDependencies,
                                            PnpmRelease release) {
+        reportPeerDependencyIssues(peerDependencyIssuesByProjects, rules, strictPeerDependencies, release, rules);
+    }
+
+    /**
+     * Below 10.11.0 the rules filter only what the reporter renders, {@code reporterRules} being those it reads.
+     */
+    static void reportPeerDependencyIssues(Map<String, PeerDependencyIssues> peerDependencyIssuesByProjects,
+                                           @Nullable PeerDependencyRules rules, boolean strictPeerDependencies,
+                                           PnpmRelease release, @Nullable PeerDependencyRules reporterRules) {
         Map<String, PeerDependencyIssues> newPeerDependencyIssuesByProjects =
-                filterPeerDependencyIssues(peerDependencyIssuesByProjects, rules, release);
+                release.filtersPeerIssuesByTheRules() ?
+                        filterPeerDependencyIssues(peerDependencyIssuesByProjects, rules, release) :
+                        peerDependencyIssuesByProjects;
+        if (nothingToReport(newPeerDependencyIssuesByProjects)) {
+            return;
+        }
+        if (strictPeerDependencies) {
+            throw new PeerDependencyIssuesError(newPeerDependencyIssuesByProjects,
+                    release.filtersPeerIssuesByTheRules() ||
+                    rendersAnIssue(filterPeerDependencyIssues(peerDependencyIssuesByProjects, reporterRules, release)));
+        }
+    }
+
+    private static boolean nothingToReport(Map<String, PeerDependencyIssues> peerDependencyIssuesByProjects) {
         boolean nothingToReport = true;
-        for (PeerDependencyIssues peerIssuesOfProject : newPeerDependencyIssuesByProjects.values()) {
+        for (PeerDependencyIssues peerIssuesOfProject : peerDependencyIssuesByProjects.values()) {
             nothingToReport &= peerIssuesOfProject.getBad().isEmpty() &&
                                (peerIssuesOfProject.getMissing().isEmpty() ||
                                 peerIssuesOfProject.getConflicts().isEmpty() &&
                                 peerIssuesOfProject.getIntersections().isEmpty());
         }
-        if (nothingToReport) {
-            return;
+        return nothingToReport;
+    }
+
+    // @pnpm/render-peer-issues renderPeerIssues (pnpm 10.10.0) renders a missing peer only where it conflicts or
+    // intersects
+    private static boolean rendersAnIssue(Map<String, PeerDependencyIssues> peerDependencyIssuesByProjects) {
+        for (PeerDependencyIssues issues : peerDependencyIssuesByProjects.values()) {
+            if (!issues.getBad().isEmpty()) {
+                return true;
+            }
+            for (String peerName : issues.getMissing().keySet()) {
+                if (issues.getConflicts().contains(peerName) || issues.getIntersections().containsKey(peerName)) {
+                    return true;
+                }
+            }
         }
-        if (strictPeerDependencies) {
-            throw new PeerDependencyIssuesError(newPeerDependencyIssuesByProjects);
-        }
+        return false;
     }
 
     static Map<String, PeerDependencyIssues> filterPeerDependencyIssues(
@@ -137,7 +178,8 @@ final class ReportPeerDependencyIssues {
                 for (MissingPeerIssue issue : missing.getValue()) {
                     allOptional &= issue.isOptional();
                 }
-                if (ignoreMissingMatcher.test(missing.getKey()) || allOptional) {
+                if (ignoreMissingMatcher.test(missing.getKey()) ||
+                    allOptional && release.leavesOutAMissingOptionalPeer()) {
                     continue;
                 }
                 filtered.getMissing().put(missing.getKey(), missing.getValue());

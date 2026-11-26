@@ -126,8 +126,10 @@ final class Pnpm10Recording {
     }
 
     /**
-     * The pnpm error code {@code version} failed with, or its message where it gave no code.
+     * The pnpm error code {@code version} failed with, or its message where it gave no code, null where it printed
+     * no error.
      */
+    @Nullable
     String error(String version) {
         String err = read(dir.resolve("outcomes/" + version + ".err"));
         Matcher m = PNPM_ERROR.matcher(err);
@@ -135,10 +137,7 @@ final class Pnpm10Recording {
             return m.group();
         }
         Matcher message = PNPM_MESSAGE.matcher(err);
-        if (!message.find()) {
-            throw new IllegalStateException("no pnpm error recorded for " + version + " in " + dir);
-        }
-        return message.group(1).trim();
+        return message.find() ? message.group(1).trim() : null;
     }
 
     @SuppressWarnings("unchecked")

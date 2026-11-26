@@ -446,7 +446,9 @@ final class Install {
             written = lockFile.writeWantedLockfile(newLockfile, options.getRelease());
         }
         ReportPeerDependencyIssues.reportPeerDependencyIssues(result.getPeerDependencyIssuesByProjects(),
-                options.getPeerDependencyRules(), options.isTrue("strictPeerDependencies"), options.getRelease());
+                options.getPeerDependencyRules(), options.isTrue("strictPeerDependencies"), options.getRelease(),
+                options.getRelease().reportsTheRulesOfTheConfig() ? options.getConfigPeerDependencyRules() :
+                        options.getRootManifestPeerDependencyRules());
         return written;
     }
 

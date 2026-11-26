@@ -52,7 +52,8 @@ public final class WorkspaceRootFinder {
     private static @Nullable String findWorkspaceManifest(Predicate<String> holds, String cwd, PnpmRelease release) {
         for (String dir = cwd; ; dir = RootRelativePath.dirname(dir)) {
             for (String name : WORKSPACE_MANIFEST_FILENAMES) {
-                if (name.startsWith(".") && !release.detectsDotPrefixedWorkspaceManifests()) {
+                if (name.startsWith(".") && !release.detectsDotPrefixedWorkspaceManifests() ||
+                    name.contains("workspaces") && !release.detectsMisspelledWorkspaceManifests()) {
                     continue;
                 }
                 String path = dir.isEmpty() ? name : dir + "/" + name;

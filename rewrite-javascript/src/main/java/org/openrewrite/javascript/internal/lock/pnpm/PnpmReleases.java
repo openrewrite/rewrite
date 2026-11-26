@@ -35,20 +35,20 @@ import java.util.List;
 public final class PnpmReleases {
 
     /**
-     * The releases the engine reproduces, a node-semver range. The pnpm 10 releases have a bounded profile
-     * ({@link Pnpm10Profile}); inputs outside it remain cannot-know. Recorded outcomes are replayed as each release
-     * ({@code PnpmScenarioTest} with {@code REWRITE_LOCK_EVERY_RELEASE}), with an explicit refusal outside that
-     * profile. Differences from 11.2.2 in supported paths are questions of {@link PnpmRelease}. A pnpm 10 release
-     * without native recordings of its own differs from a recorded one by no lock-relevant upstream change outside
-     * the inputs it refuses, and its recordings test it ({@code Pnpm10Test}): 10.11.1 and 10.12.0 to 10.12.3 by
-     * 10.12.1's, 10.13.0 to 10.13.1 by 10.12.4's, 10.16.0 to 10.18.2 by 10.17.0's, 10.18.3 to 10.19.0 by 10.20.0's,
-     * 10.21.0 to 10.25.0 by 10.24.0's, 10.26.0 and 10.26.2 by 10.26.1's, 10.27.0 by 10.28.0's, 10.29.2 to 10.30.1 by
-     * 10.29.3's, 10.30.2 by 10.30.3's, 10.33.1 to 10.33.3 by 10.33.0's, 10.34.3 by 10.34.4's, 10.34.5 to 10.34.8 by
-     * 10.34.9's.
+     * The releases the engine reproduces, a node-semver range. The pnpm 10 releases have a bounded profile ({@link
+     * Pnpm10Profile}); inputs outside it remain cannot-know. Recorded outcomes are replayed as each release ({@code
+     * PnpmScenarioTest} with {@code REWRITE_LOCK_EVERY_RELEASE}), with an explicit refusal outside that profile.
+     * Differences from 11.2.2 in supported paths are questions of {@link PnpmRelease}. A pnpm 10 release without native
+     * recordings of its own differs from a recorded one by no lock-relevant upstream change outside the inputs it
+     * refuses, and its recordings test it ({@code Pnpm10Test}): 10.2.1 by 10.3.0's, 10.4.0 by 10.4.1's, 10.5.1 by
+     * 10.5.2's, 10.6.0 by 10.6.1's, 10.6.2 to 10.6.3 by 10.6.4's, 10.6.5 to 10.9.0 by 10.10.0's, 10.11.1 and 10.12.0 to
+     * 10.12.3 by 10.12.1's, 10.13.0 to 10.13.1 by 10.12.4's, 10.16.0 to 10.18.2 by 10.17.0's, 10.18.3 to 10.19.0 by
+     * 10.20.0's, 10.21.0 to 10.25.0 by 10.24.0's, 10.26.0 and 10.26.2 by 10.26.1's, 10.27.0 by 10.28.0's, 10.29.2 to
+     * 10.30.1 by 10.29.3's, 10.30.2 by 10.30.3's, 10.33.1 to 10.33.3 by 10.33.0's, 10.34.3 by 10.34.4's, 10.34.5 to
+     * 10.34.8 by 10.34.9's.
      */
-    public static final String PROVEN = "10.0.0 || 10.11.0 - 10.11.1 || 10.12.0 - 10.14.0 || 10.15.1 - 10.28.2 || " +
-                                        "10.29.2 - 10.30.3 || 10.32.0 - 10.33.4 || 10.34.1 || 10.34.3 - 10.34.9 || " +
-                                        "11.0.3 - 11.16.0";
+    public static final String PROVEN = "10.0.0 - 10.14.0 || 10.15.1 - 10.28.2 || 10.29.2 - 10.30.3 || " +
+                                        "10.32.0 - 10.33.4 || 10.34.1 || 10.34.3 - 10.34.9 || 11.0.3 - 11.16.0";
 
     private static final List<String> ALL = load();
 
