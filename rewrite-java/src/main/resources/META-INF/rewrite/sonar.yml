@@ -21,6 +21,8 @@ displayName: Sonar rules for Java
 description: Fixes or flags code reported by SonarQube Java rules, grouped by the default Sonar severity of each rule.
 preconditions:
   - org.openrewrite.Singleton
+  - org.openrewrite.FindSourceFiles:
+      filePattern: "**/*.java"
 recipeList:
   - org.openrewrite.java.sonar.Critical
   - org.openrewrite.java.sonar.Major
@@ -32,6 +34,8 @@ displayName: Sonar critical rules for Java
 description: Fixes or flags code reported by SonarQube Java rules whose default Sonar severity is Critical.
 preconditions:
   - org.openrewrite.Singleton
+  - org.openrewrite.FindSourceFiles:
+      filePattern: "**/*.java"
 recipeList:
   - org.openrewrite.java.format.WrappingAndBraces
   - org.openrewrite.java.search.FindEmptyMethods
@@ -42,6 +46,8 @@ displayName: Sonar major rules for Java
 description: Fixes or flags code reported by SonarQube Java rules whose default Sonar severity is Major.
 preconditions:
   - org.openrewrite.Singleton
+  - org.openrewrite.FindSourceFiles:
+      filePattern: "**/*.java"
 recipeList:
   - org.openrewrite.java.format.WrappingAndBraces
 ---
@@ -51,6 +57,8 @@ displayName: Sonar minor rules for Java
 description: Fixes or flags code reported by SonarQube Java rules whose default Sonar severity is Minor.
 preconditions:
   - org.openrewrite.Singleton
+  - org.openrewrite.FindSourceFiles:
+      filePattern: "**/*.java"
 recipeList:
   - org.openrewrite.java.format.EmptyNewlineAtEndOfFile
   - org.openrewrite.java.RemoveUnusedImports
