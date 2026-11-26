@@ -1670,6 +1670,33 @@ class TypeUtilsTest implements RewriteTest {
     }
 
     @Test
+    void isAssignableToLeavesTheTypesItResolvesUnchanged() {
+        rewriteRun(
+          java(
+            """
+              import java.util.List;
+
+              abstract class Box<T> implements Comparable<List<? extends T>> {
+                  void test(Box<? extends T> other) {
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                J.ClassDeclaration box = cu.getClasses().get(0);
+                JavaType.FullyQualified comparable = box.getType().getInterfaces().get(0);
+                J.MethodDeclaration test = (J.MethodDeclaration) box.getBody().getStatements().get(0);
+                JavaType other = test.getMethodType().getParameterTypes().get(0);
+
+                TypeUtils.isAssignableTo(comparable, other);
+
+                assertThat(comparable).hasToString("java.lang.Comparable<java.util.List<Generic{? extends Generic{T}}>>");
+                assertThat(other).hasToString("Box<Generic{? extends Generic{T}}>");
+            })
+          )
+        );
+    }
+
+    @Test
     void isAssignableToGenericTypeVariable() {
         rewriteRun(
           java(

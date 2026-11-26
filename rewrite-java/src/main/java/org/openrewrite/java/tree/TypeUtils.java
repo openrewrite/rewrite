@@ -17,6 +17,7 @@ package org.openrewrite.java.tree;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Incubating;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.java.internal.JavaReflectionTypeMapping;
 import org.openrewrite.java.internal.JavaTypeCache;
@@ -780,7 +781,8 @@ public class TypeUtils {
             public JavaType visitGenericTypeVariable(JavaType.GenericTypeVariable generic, Map<JavaType.GenericTypeVariable, JavaType> replacements) {
                 if (!replacements.containsKey(generic)) {
                     replacements.put(generic, generic);
-                    JavaType.GenericTypeVariable resolved = (JavaType.GenericTypeVariable) super.visitGenericTypeVariable(generic, replacements);
+                    JavaType.GenericTypeVariable resolved = generic.withBounds(
+                            ListUtils.map(generic.getBounds(), bound -> visit(bound, replacements)));
                     replacements.put(generic, resolved);
                     return resolved;
                 } else {
@@ -789,8 +791,45 @@ public class TypeUtils {
             }
 
             @Override
+            public JavaType visitParameterized(JavaType.Parameterized parameterized, Map<JavaType.GenericTypeVariable, JavaType> replacements) {
+                return parameterized.withTypeParameters(
+                        ListUtils.map(parameterized.getTypeParameters(), t -> visit(t, replacements)));
+            }
+
+            @Override
+            public JavaType visitArray(JavaType.Array array, Map<JavaType.GenericTypeVariable, JavaType> replacements) {
+                return array.withElemType(visit(array.getElemType(), replacements));
+            }
+
+            @Override
+            public JavaType visitIntersection(JavaType.Intersection intersection, Map<JavaType.GenericTypeVariable, JavaType> replacements) {
+                return intersection.withBounds(
+                        ListUtils.map(intersection.getBounds(), bound -> visit(bound, replacements)));
+            }
+
+            @Override
             public JavaType visitClass(JavaType.Class aClass, Map<JavaType.GenericTypeVariable, JavaType> replacements) {
                 return aClass;
+            }
+
+            @Override
+            public JavaType visitAnnotation(JavaType.Annotation annotation, Map<JavaType.GenericTypeVariable, JavaType> replacements) {
+                return annotation;
+            }
+
+            @Override
+            public JavaType visitMultiCatch(JavaType.MultiCatch multiCatch, Map<JavaType.GenericTypeVariable, JavaType> replacements) {
+                return multiCatch;
+            }
+
+            @Override
+            public JavaType visitMethod(JavaType.Method method, Map<JavaType.GenericTypeVariable, JavaType> replacements) {
+                return method;
+            }
+
+            @Override
+            public JavaType visitVariable(JavaType.Variable variable, Map<JavaType.GenericTypeVariable, JavaType> replacements) {
+                return variable;
             }
         }.visit(type, replacements));
     }
