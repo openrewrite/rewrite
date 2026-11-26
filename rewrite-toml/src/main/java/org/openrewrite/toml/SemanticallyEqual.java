@@ -31,7 +31,10 @@ public class SemanticallyEqual {
     private SemanticallyEqual() {
     }
 
-    public static boolean areEqual(Toml first, Toml second) {
+    public static boolean areEqual(@Nullable Toml first, @Nullable Toml second) {
+        if (first == null || second == null) {
+            return first == second;
+        }
         SemanticallyEqualVisitor sme = new SemanticallyEqualVisitor();
         sme.visit(first, second);
         return sme.areEqual;

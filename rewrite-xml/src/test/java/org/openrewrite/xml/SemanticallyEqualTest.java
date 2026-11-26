@@ -158,6 +158,23 @@ class SemanticallyEqualTest implements RewriteTest {
         );
     }
 
+    @Test
+    void nullIsNotEqualToNonNull() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(sources -> {
+              Xml xml = (Xml) sources.getFirst();
+              assertThat(SemanticallyEqual.areEqual(null, xml)).isFalse();
+              assertThat(SemanticallyEqual.areEqual(xml, null)).isFalse();
+          }),
+          xml("<foo></foo>")
+        );
+    }
+
+    @Test
+    void nullIsEqualToNull() {
+        assertThat(SemanticallyEqual.areEqual(null, null)).isTrue();
+    }
+
     private static Consumer<RecipeSpec> semanticallyEqual(boolean isEqual) {
         return spec -> spec.beforeRecipe(sources ->
           assertThat(SemanticallyEqual.areEqual((Xml) sources.getFirst(), (Xml) sources.get(1))).isEqualTo(isEqual));
