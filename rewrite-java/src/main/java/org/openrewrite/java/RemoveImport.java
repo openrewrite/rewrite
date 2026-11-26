@@ -271,8 +271,7 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
 
     /// A name qualified like `Outer.Inner` does not rely on an import of `Inner`.
     private static boolean usesUnqualifiedName(JavaSourceFile cu, String name) {
-        AtomicBoolean used = new AtomicBoolean();
-        new JavaIsoVisitor<AtomicBoolean>() {
+        return new JavaIsoVisitor<AtomicBoolean>() {
             @Override
             public J.Import visitImport(J.Import import_, AtomicBoolean found) {
                 return import_;
@@ -291,8 +290,7 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                 }
                 return identifier;
             }
-        }.visit(cu, used);
-        return used.get();
+        }.reduce(cu, new AtomicBoolean()).get();
     }
 
     private long countTrailingLinebreaks(Space space) {
