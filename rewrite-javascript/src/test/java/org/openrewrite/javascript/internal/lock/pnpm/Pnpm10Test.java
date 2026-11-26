@@ -927,7 +927,7 @@ class Pnpm10Test {
     @ParameterizedTest
     @ValueSource(strings = {"10.16.0", "10.26.2", "10.28.2"})
     void refusesAReleaseAgeOfTheReleasesThatChangedIt(String version) {
-        assertCannotKnow("release-age-libc", version, "minimumReleaseAge from 10.16.0 to 10.32.x");
+        assertCannotKnow("release-age-libc", version, "pnpm 10 native profile for minimumReleaseAge");
     }
 
     /**
@@ -995,7 +995,7 @@ class Pnpm10Test {
     @CsvSource({"trust-policy-npmrc, 10.21.0", "trust-policy-npmrc, 10.26.2", "trust-policy-workspace, 10.21.0",
       "trust-policy-workspace, 10.26.2"})
     void refusesATrustPolicyOfTheReleasesThatChangedIt(String recording, String version) {
-        assertCannotKnow(recording, version, "trustPolicy no-downgrade from 10.21.0 to 10.32.x");
+        assertCannotKnow(recording, version, "pnpm 10 native profile for trustPolicy no-downgrade");
     }
 
     /**
