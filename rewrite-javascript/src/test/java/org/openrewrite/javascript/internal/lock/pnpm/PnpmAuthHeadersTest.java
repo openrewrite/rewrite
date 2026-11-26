@@ -43,7 +43,7 @@ class PnpmAuthHeadersTest {
     @ParameterizedTest
     @MethodSource("nativeReleases")
     void exactNativeSourcePolicyAndPrecedence(String version) {
-        boolean dropsProject = java.util.List.of("10.34.9", "11.5.3", "11.10.0", "11.16.0")
+        boolean dropsProject = java.util.List.of("10.34.4", "10.34.9", "11.5.3", "11.10.0", "11.16.0")
           .contains(Pnpm10Test.recorded(version));
         PnpmRelease release = PnpmRelease.of(version);
         Map<String, String> env = Map.of("TOKEN", "synthetic-env");
@@ -110,7 +110,7 @@ class PnpmAuthHeadersTest {
     @ParameterizedTest
     @MethodSource("nativeReleases")
     void defaultUnscopedCredentialsHaveTheNativesPrecedence(String version) {
-        boolean rescoped = java.util.List.of("10.34.9", "11.5.2", "11.5.3", "11.10.0", "11.16.0")
+        boolean rescoped = java.util.List.of("10.34.1", "10.34.4", "10.34.9", "11.5.2", "11.5.3", "11.10.0", "11.16.0")
           .contains(Pnpm10Test.recorded(version));
         PnpmAuthHeaders auth = options("registry=" + URL + "\n" + KEY + "synthetic-scoped\n" +
           "_authToken=synthetic-default", null, Map.of(), PnpmRelease.of(version)).authHeaders();

@@ -70,7 +70,7 @@ class PnpmReleaseTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"11.0.2", "10.34.4", "12.0.0", "11.6.0-rc.0", "13.0.0"})
+    @ValueSource(strings = {"11.0.2", "10.34.2", "12.0.0", "11.6.0-rc.0", "13.0.0"})
     void aReleaseOutsideTheProvenOnesIsCannotKnow(String version) {
         assertThatThrownBy(() -> PnpmReleases.runs(version))
           .isInstanceOf(CannotKnow.class)
