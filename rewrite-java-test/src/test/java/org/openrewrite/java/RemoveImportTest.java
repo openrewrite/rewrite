@@ -1443,6 +1443,31 @@ class RemoveImportTest implements RewriteTest {
     }
 
     @Test
+    void removeStaticImportOfNestedTypeUsedOnlyQualified() {
+        rewriteRun(
+          spec -> spec.recipe(removeImport("java.util.Map$Entry")),
+          java(
+            """
+              import java.util.Map;
+
+              import static java.util.Map.Entry;
+
+              class C {
+                  Map.Entry<String, String> entry;
+              }
+              """,
+            """
+              import java.util.Map;
+
+              class C {
+                  Map.Entry<String, String> entry;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void keepStaticImportOfAFieldNamedLikeTheRemovedNestedType() {
         rewriteRun(
           spec -> spec.recipe(removeImport("a.Outer$Inner")),

@@ -338,4 +338,60 @@ class RemoveImportTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void keepUsedNestedTypeImport() {
+        rewriteRun(
+          spec -> spec.recipe(removeTypeImportRecipe("java.util.Map$Entry")),
+          kotlin(
+            """
+              import java.util.Map.Entry
+
+              class A {
+                  val e: Entry<String, String>? = null
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepUsedAliasedNestedTypeImport() {
+        rewriteRun(
+          spec -> spec.recipe(removeTypeImportRecipe("java.util.Map$Entry")),
+          kotlin(
+            """
+              import java.util.Map.Entry as E
+
+              class A {
+                  val e: E<String, String>? = null
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeNestedTypeImportUsedOnlyQualified() {
+        rewriteRun(
+          spec -> spec.recipe(removeTypeImportRecipe("java.util.Map$Entry")),
+          kotlin(
+            """
+              import java.util.Map
+              import java.util.Map.Entry
+
+              class A {
+                  val e: Map.Entry<String, String>? = null
+              }
+              """,
+            """
+              import java.util.Map
+
+              class A {
+                  val e: Map.Entry<String, String>? = null
+              }
+              """
+          )
+        );
+    }
 }
