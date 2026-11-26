@@ -17,7 +17,13 @@ package org.openrewrite.java.search;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.FindSourceFiles;
 import org.openrewrite.Issue;
+import org.openrewrite.Preconditions;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
@@ -41,7 +47,7 @@ class UsesMethodTest implements RewriteTest {
               }
               """,
             """
-              /*~~>*/class Test {
+              /*~~(A singleArg(String))~~>*/class Test {
                   void test() {
                       new java.util.ArrayList<String>().forEach(new A()::singleArg);
                   }
@@ -91,7 +97,7 @@ class UsesMethodTest implements RewriteTest {
               }
               """,
             """
-              /*~~>*/package abc;
+              /*~~(abc.Thing newConcurrentHashSet())~~>*/package abc;
 
               import java.util.Set;
               class Test {
@@ -114,7 +120,7 @@ class UsesMethodTest implements RewriteTest {
               }
               """,
             """
-              /*~~>*/import java.util.Collections;
+              /*~~(java.util.Collections emptyList())~~>*/import java.util.Collections;
               public class A {
                  Object o = Collections.emptyList();
               }
@@ -135,7 +141,7 @@ class UsesMethodTest implements RewriteTest {
               }
               """,
             """
-              /*~~>*/import static java.util.Collections.emptyList;
+              /*~~(java.util.Collections emptyList())~~>*/import static java.util.Collections.emptyList;
               public class A {
                  Object o = emptyList();
               }
@@ -157,7 +163,7 @@ class UsesMethodTest implements RewriteTest {
               }
               """,
             """
-              /*~~>*/public class B {
+              /*~~(A foo(String, Object...))~~>*/public class B {
                  public void test() {
                      new A().foo("s", "a", 1);
                  }
@@ -187,7 +193,7 @@ class UsesMethodTest implements RewriteTest {
               }
               """,
             """
-              /*~~>*/public class A {
+              /*~~(B.C foo())~~>*/public class A {
                  void test() {
                      new B.C().foo();
                  }
@@ -205,4 +211,37 @@ class UsesMethodTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4035")
+    @Test
+    void preconditionMatchesFileAlreadyMarkedBySearch() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new FindSourceFiles("**/*.java"),
+            toRecipe(() -> Preconditions.check(new UsesMethod<>("java.util.Collections emptyList()"), new JavaIsoVisitor<>() {
+                @Override
+                public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                    return SearchResult.found(classDecl, "edited");
+                }
+            }))
+          ),
+          java(
+            """
+              import java.util.Collections;
+
+              class Test {
+                  Object o = Collections.emptyList();
+              }
+              """,
+            """
+              /*~~>*/import java.util.Collections;
+
+              /*~~(edited)~~>*/class Test {
+                  Object o = Collections.emptyList();
+              }
+              """
+          )
+        );
+    }
+
 }

@@ -65,10 +65,13 @@ public class UsesType<P> extends TreeVisitor<Tree, P> {
 
     private final Reference.Matcher referenceMatcher;
 
+    private final String pattern;
+
     @Nullable
     private final Boolean includeImplicit;
 
     public UsesType(String fullyQualifiedType, @Nullable Boolean includeImplicit) {
+        this.pattern = fullyQualifiedType;
         if (fullyQualifiedType.contains("*")) {
             this.fullyQualifiedType = null;
             final int length = fullyQualifiedType.length();
@@ -110,12 +113,12 @@ public class UsesType<P> extends TreeVisitor<Tree, P> {
         if (tree instanceof JavaSourceFile) {
             JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
             Tree found = visitTypes(cu);
-            return found != cu || !importsUnresolvedMatch(cu) ? found : SearchResult.found(cu);
+            return found != cu || !importsUnresolvedMatch(cu) ? found : SearchResult.found(cu, pattern);
         } else if (tree instanceof SourceFileWithReferences) {
             SourceFileWithReferences sourceFile = (SourceFileWithReferences) tree;
             SourceFileWithReferences.References references = sourceFile.getReferences();
             for (Reference ignored : references.findMatches(referenceMatcher)) {
-                return SearchResult.found(sourceFile);
+                return SearchResult.found(sourceFile, pattern);
             }
         }
         return tree;
@@ -164,21 +167,21 @@ public class UsesType<P> extends TreeVisitor<Tree, P> {
         if (TYPES_IN_USE_HAS_TRIE_API) {
             // Exact FQN: O(1) closure lookup on TypesInUse.
             if (fullyQualifiedType != null) {
-                return cu.getTypesInUse().hasType(fullyQualifiedType, implicit) ? SearchResult.found(cu) : cu;
+                return cu.getTypesInUse().hasType(fullyQualifiedType, implicit) ? SearchResult.found(cu, pattern) : cu;
             }
             // Package-shaped wildcards (com.foo.* / com.foo..*): O(prefix-depth) trie lookup.
             if (typePattern instanceof PackagePattern) {
                 return cu.getTypesInUse().hasTypeInPackage(((PackagePattern) typePattern).getName(), implicit)
-                        ? SearchResult.found(cu) : cu;
+                        ? SearchResult.found(cu, pattern) : cu;
             }
             if (typePattern instanceof PackagePrefixPattern) {
                 return cu.getTypesInUse().hasTypeInPackageOrSubpackage(((PackagePrefixPattern) typePattern).getPrefix(), implicit)
-                        ? SearchResult.found(cu) : cu;
+                        ? SearchResult.found(cu, pattern) : cu;
             }
             // GenericPattern (regex-like): one trie walk, memoized per (matcher, implicit).
             if (typePattern instanceof GenericPattern) {
                 return cu.getTypesInUse().hasTypeMatching(((GenericPattern) typePattern).getMatcher(), implicit)
-                        ? SearchResult.found(cu) : cu;
+                        ? SearchResult.found(cu, pattern) : cu;
             }
             return cu;
         }
@@ -231,7 +234,7 @@ public class UsesType<P> extends TreeVisitor<Tree, P> {
         }
         if (typePattern != null && TypeUtils.isAssignableTo(typePattern, type) ||
             fullyQualifiedType != null && TypeUtils.isAssignableTo(fullyQualifiedType, type)) {
-            return SearchResult.found(c);
+            return SearchResult.found(c, pattern);
         }
         return c;
     }

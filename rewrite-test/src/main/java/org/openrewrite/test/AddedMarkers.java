@@ -43,13 +43,6 @@ import static org.assertj.core.api.Assertions.fail;
  */
 final class AddedMarkers {
 
-    /**
-     * Markers that recipes in rewrite add on purpose: to say which method a search matched.
-     */
-    private static final Set<String> REWRITE_RECIPE_MARKERS = new HashSet<>(Arrays.asList(
-            "org.openrewrite.java.search.UsesMethod$MethodMatch"
-    ));
-
     private static final int SNIPPET_LENGTH = 60;
 
     /**
@@ -139,8 +132,7 @@ final class AddedMarkers {
                marker instanceof CommitMessage ||
                marker instanceof RecipesThatMadeChanges ||
                // a recipe that formats with a style it was given passes the style on to later formatting
-               marker instanceof NamedStyles && occurrence.getPlacement().isOnSourceFile() ||
-               REWRITE_RECIPE_MARKERS.contains(marker.getClass().getName());
+               marker instanceof NamedStyles && occurrence.getPlacement().isOnSourceFile();
     }
 
     /**

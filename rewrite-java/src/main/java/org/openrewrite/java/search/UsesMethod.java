@@ -20,6 +20,7 @@ import lombok.Getter;
 import lombok.Value;
 import lombok.With;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.internal.ToBeRemoved;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.internal.TypesInUse;
@@ -30,8 +31,6 @@ import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.SearchResult;
 
 import java.util.UUID;
-
-import static org.openrewrite.Tree.randomId;
 
 public class UsesMethod<P> extends JavaIsoVisitor<P> {
 
@@ -86,7 +85,7 @@ public class UsesMethod<P> extends JavaIsoVisitor<P> {
             if (TYPES_IN_USE_HAS_METHOD_USE
                     ? cu.getTypesInUse().hasMethodUse(methodMatcher)
                     : legacyHasMethodUse(cu)) {
-                return found(cu);
+                return SearchResult.found(cu, methodPattern);
             }
         }
         return tree;
@@ -101,12 +100,10 @@ public class UsesMethod<P> extends JavaIsoVisitor<P> {
         return false;
     }
 
-    private <J2 extends J> J2 found(J2 j) {
-        // also adding a `SearchResult` marker to get a visible diff
-        return SearchResult.found(j.withMarkers(j.getMarkers()
-                .compute(new MethodMatch(randomId(), methodPattern), (s1, s2) -> s1 == null ? s2 : s1)));
-    }
-
+    /// No longer added: `UsesMethod` marks a match with a [SearchResult] described by its method pattern, which
+    /// stays distinct from an earlier search's mark. Kept so older LSTs and recipes still load.
+    @Deprecated
+    @ToBeRemoved(after = "2027-05-20", reason = "UsesMethod marks with a SearchResult described by its method pattern")
     @Value
     @With
     @EqualsAndHashCode(onlyExplicitlyIncluded = true)

@@ -19,7 +19,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.FindSourceFiles;
 import org.openrewrite.Issue;
+import org.openrewrite.Preconditions;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.TypeValidation;
@@ -44,7 +50,7 @@ class UsesTypeTest implements RewriteTest {
               }
               """,
             """
-              /*~~>*/import java.io.File;
+              /*~~(java.util.Collections)~~>*/import java.io.File;
               import java.util.Collections;
 
               class Test {
@@ -66,7 +72,7 @@ class UsesTypeTest implements RewriteTest {
               }
               """,
             """
-              /*~~>*/class Test {
+              /*~~(double)~~>*/class Test {
                   double d = 1d;
               }
               """
@@ -89,7 +95,7 @@ class UsesTypeTest implements RewriteTest {
               }
               """,
             """
-              /*~~>*/import java.util.ArrayList;
+              /*~~(java.util.ArrayList)~~>*/import java.util.ArrayList;
               import java.util.List;
 
               class Test {
@@ -117,7 +123,7 @@ class UsesTypeTest implements RewriteTest {
               }
               """,
             """
-              /*~~>*/import java.io.File;
+              /*~~(java.util.*)~~>*/import java.io.File;
               import static java.util.Collections.singleton;
 
               class Test {
@@ -144,7 +150,7 @@ class UsesTypeTest implements RewriteTest {
               }
               """,
             """
-              /*~~>*/import java.io.File;
+              /*~~(java..*)~~>*/import java.io.File;
               import static java.util.Collections.singleton;
 
               class Test {
@@ -169,7 +175,7 @@ class UsesTypeTest implements RewriteTest {
               }
               """,
             """
-              /*~~>*/import java.util.Set;
+              /*~~(java.util.*)~~>*/import java.util.Set;
               class Test {
                   void test() {
                       Set<String> s = java.util.Collections.singleton("test");
@@ -192,7 +198,7 @@ class UsesTypeTest implements RewriteTest {
               }
               """,
             """
-              /*~~>*/import java.util.List;
+              /*~~(java.util.Collection)~~>*/import java.util.List;
 
               class Test {
               }
@@ -215,7 +221,7 @@ class UsesTypeTest implements RewriteTest {
               }
               """,
             """
-              /*~~>*/import java.util.Collections;
+              /*~~(java.util.List)~~>*/import java.util.Collections;
 
               class Test {
                   int zero = Collections.emptyList().size();
@@ -258,7 +264,7 @@ class UsesTypeTest implements RewriteTest {
               }
               """,
             """
-              /*~~>*/import java.util.Collections;
+              /*~~(java.util.List)~~>*/import java.util.Collections;
 
               class Test {
                   public void foo() {
@@ -301,7 +307,7 @@ class UsesTypeTest implements RewriteTest {
               }
               """,
             """
-              /*~~>*/import java.util.Map.Entry;
+              /*~~(java.util.Map.Entry)~~>*/import java.util.Map.Entry;
 
               class Test {
               }
@@ -322,7 +328,7 @@ class UsesTypeTest implements RewriteTest {
               }
               """,
             """
-              /*~~>*/import java.util.HashMap;
+              /*~~(*..*)~~>*/import java.util.HashMap;
               class Test {
                   HashMap<String, String> map = new HashMap<>();
               }
@@ -343,7 +349,7 @@ class UsesTypeTest implements RewriteTest {
               }
               """,
             """
-              /*~~>*/import java.util.concurrent.ConcurrentHashMap;
+              /*~~(java.util..*)~~>*/import java.util.concurrent.ConcurrentHashMap;
               class Test {
                   ConcurrentHashMap<String, String> m = new ConcurrentHashMap<>();
               }
@@ -379,7 +385,7 @@ class UsesTypeTest implements RewriteTest {
               }
               """,
             """
-              /*~~>*/import java.util.concurrent.ConcurrentHashMap;
+              /*~~(java.util..*Map*)~~>*/import java.util.concurrent.ConcurrentHashMap;
               class Test {
                   ConcurrentHashMap<String, String> m = new ConcurrentHashMap<>();
               }
@@ -417,7 +423,7 @@ class UsesTypeTest implements RewriteTest {
               }
               """,
             """
-              /*~~>*/import java.util.ArrayList;
+              /*~~(java.*.ArrayList)~~>*/import java.util.ArrayList;
               class Test {
                   ArrayList<String> list = new ArrayList<>();
               }
@@ -479,7 +485,7 @@ class UsesTypeTest implements RewriteTest {
               }
               """,
             """
-              /*~~>*/import a.b.Outer;
+              /*~~(a.b.Outer.Inner)~~>*/import a.b.Outer;
               class Test {
                   Outer.Inner i;
               }
@@ -509,7 +515,7 @@ class UsesTypeTest implements RewriteTest {
               }
               """,
             """
-              /*~~>*/import a.b.Outer;
+              /*~~(a.b.Outer$Inner)~~>*/import a.b.Outer;
               class Test {
                   Outer.Inner i;
               }
@@ -542,11 +548,11 @@ class UsesTypeTest implements RewriteTest {
               }
               """,
             """
-              /*~~>*/import a.b.Outer;
+              /*~~(%s)~~>*/import a.b.Outer;
               class Test {
                   Outer.Mid.Inner i;
               }
-              """
+              """.formatted(type)
           )
         );
     }
@@ -592,7 +598,7 @@ class UsesTypeTest implements RewriteTest {
               }
               """,
             """
-              /*~~>*/import a.B.Thing;
+              /*~~(a.B.Thing)~~>*/import a.B.Thing;
               class Test {
                   Thing t;
               }
@@ -613,10 +619,10 @@ class UsesTypeTest implements RewriteTest {
               </beans>
               """,
             """
-              <!--~~>--><beans xsi:schemaLocation="www.springframework.org/schema/beans">
+              <!--~~(%s)~~>--><beans xsi:schemaLocation="www.springframework.org/schema/beans">
                   <bean id="abc" class="a.b.Outer$Inner"/>
               </beans>
-              """
+              """.formatted(type)
           )
         );
     }
@@ -640,7 +646,7 @@ class UsesTypeTest implements RewriteTest {
               }
               """,
             """
-              /*~~>*/import org.aspectj.lang.ProceedingJoinPoint;
+              /*~~(org.aspectj.lang.ProceedingJoinPoint)~~>*/import org.aspectj.lang.ProceedingJoinPoint;
               import org.aspectj.lang.annotation.Around;
 
               class LoggingAspect {
@@ -669,12 +675,12 @@ class UsesTypeTest implements RewriteTest {
               }
               """,
             """
-              /*~~>*/import org.aspectj.lang.annotation.Aspect;
+              /*~~(%s)~~>*/import org.aspectj.lang.annotation.Aspect;
 
               @Aspect
               class LoggingAspect {
               }
-              """
+              """.formatted(pattern)
           )
         );
     }
@@ -704,6 +710,37 @@ class UsesTypeTest implements RewriteTest {
               import java.util.List;
 
               class Test {
+                  List<String> l;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void preconditionMatchesFileAlreadyMarkedBySearch() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new FindSourceFiles("**/*.java"),
+            toRecipe(() -> Preconditions.check(new UsesType<>("java.util.List", false), new JavaIsoVisitor<>() {
+                @Override
+                public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                    return SearchResult.found(classDecl, "edited");
+                }
+            }))
+          ),
+          java(
+            """
+              import java.util.List;
+
+              class Test {
+                  List<String> l;
+              }
+              """,
+            """
+              /*~~>*/import java.util.List;
+
+              /*~~(edited)~~>*/class Test {
                   List<String> l;
               }
               """

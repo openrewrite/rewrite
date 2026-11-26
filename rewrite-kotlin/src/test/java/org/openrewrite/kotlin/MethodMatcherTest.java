@@ -102,7 +102,7 @@ class MethodMatcherTest implements RewriteTest {
               fun mapper() = jacksonObjectMapper()
               """,
             """
-              /*~~>*/import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+              /*~~(com.fasterxml.jackson.module.kotlin.ExtensionsKt jacksonObjectMapper())~~>*/import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 
               fun mapper() = jacksonObjectMapper()
               """
