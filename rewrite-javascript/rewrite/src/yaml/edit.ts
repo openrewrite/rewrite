@@ -809,42 +809,45 @@ function flowSeparator(spaces: string[]): string {
 }
 
 /**
- * Whether a flow sequence item can hold the space before it, as the Java parser puts it on a scalar or alias.
+ * The space before a flow sequence item. Both parsers keep it on the item: on a nested collection's opening bracket,
+ * or on a pair's entry. LSTs from before #10162 keep it on the sequence entry.
  */
-function holdsLead(block: Yaml.Block): boolean {
-    return isScalar(block) || block.kind === Yaml.Kind.Alias;
-}
-
 function leadOf(entry: Yaml.SequenceEntry): string {
-    return entry.prefix + (holdsLead(entry.block) ? entry.block.prefix : "");
+    return entry.prefix + leadIn(entry.block);
 }
 
-/**
- * Whether a flow sequence uses the Java parser's layout.
- */
-function leadsOnItems(seq: Yaml.Sequence): boolean {
-    return seq.entries.some(e => e.prefix === "" && holdsLead(e.block) && e.block.prefix !== "");
-}
-
-function withLead(entry: Yaml.SequenceEntry, lead: string, onItem: boolean): Yaml.SequenceEntry {
-    const block = entry.block;
-    if (!holdsLead(block)) {
-        return {...entry, prefix: lead};
+function leadIn(block: Yaml.Block): string {
+    if (isMapping(block)) {
+        return block.openingBracePrefix ?? block.entries[0]?.prefix ?? "";
     }
-    const itemPrefix = onItem ? lead : "";
-    return {
-        ...entry,
-        prefix: onItem ? "" : lead,
-        block: block.prefix === itemPrefix ? block : carryPending(block, {...block, prefix: itemPrefix})
-    };
+    if (isSequence(block)) {
+        return block.openingBracketPrefix ?? "";
+    }
+    return block.prefix;
+}
+
+function withLead(entry: Yaml.SequenceEntry, lead: string): Yaml.SequenceEntry {
+    const block = entry.block;
+    if (entry.prefix === "" && leadIn(block) === lead) {
+        return entry;
+    }
+    let placed: Yaml.Block;
+    if (isMapping(block)) {
+        placed = block.openingBracePrefix !== undefined ? {...block, openingBracePrefix: lead} :
+            withEntries(block, block.entries.map((e, i) => i === 0 ? {...e, prefix: lead} : e));
+    } else if (isSequence(block)) {
+        placed = {...block, openingBracketPrefix: lead};
+    } else {
+        placed = {...block, prefix: lead};
+    }
+    return {...entry, prefix: "", block: carryPending(block, placed)};
 }
 
 function insertIntoFlowSequence(seq: Yaml.Sequence, at: number, entry: Yaml.SequenceEntry): Yaml.Sequence {
     const entries = [...seq.entries];
     if (entries.length === 0) {
-        return withEntries(seq, [withLead({...entry, trailingCommaPrefix: undefined}, "", false)]);
+        return withEntries(seq, [withLead({...entry, trailingCommaPrefix: undefined}, "")]);
     }
-    const onItem = leadsOnItems(seq);
     let closing = seq.closingBracketPrefix!;
     const separator = flowSeparator(entries.map(leadOf));
     const commaPrefix = entries.find(e => e.trailingCommaPrefix !== undefined)?.trailingCommaPrefix ?? "";
@@ -857,12 +860,12 @@ function insertIntoFlowSequence(seq: Yaml.Sequence, at: number, entry: Yaml.Sequ
             closing = closing.slice(lineBreak);
         }
         entries[entries.length - 1] = {...last, trailingCommaPrefix: last.trailingCommaPrefix ?? commaPrefix};
-        entries.push(withLead({...entry, trailingCommaPrefix: last.trailingCommaPrefix}, lead, onItem));
+        entries.push(withLead({...entry, trailingCommaPrefix: last.trailingCommaPrefix}, lead));
     } else if (at === 0) {
-        entries.unshift(withLead({...entry, trailingCommaPrefix: commaPrefix}, leadOf(entries[0]), onItem));
-        entries[1] = withLead(entries[1], separator, onItem);
+        entries.unshift(withLead({...entry, trailingCommaPrefix: commaPrefix}, leadOf(entries[0])));
+        entries[1] = withLead(entries[1], separator);
     } else {
-        entries.splice(at, 0, withLead({...entry, trailingCommaPrefix: commaPrefix}, separator, onItem));
+        entries.splice(at, 0, withLead({...entry, trailingCommaPrefix: commaPrefix}, separator));
     }
     return withClosing(withEntries(seq, entries), closing);
 }
@@ -927,7 +930,6 @@ function emptyFlow<T extends Container>(container: T, opening: string): T {
 }
 
 function removeFromFlowSequence(seq: Yaml.Sequence, index: number): Yaml.Sequence {
-    const onItem = leadsOnItems(seq);
     const entries = [...seq.entries];
     const removed = entries[index];
     const removedLead = leadOf(removed);
@@ -937,7 +939,7 @@ function removeFromFlowSequence(seq: Yaml.Sequence, index: number): Yaml.Sequenc
         const space = joinGaps(removedLead, closing, true);
         closing = space.includes("#") ? space : "";
     } else if (index < entries.length) {
-        entries[index] = withLead(entries[index], joinGaps(removedLead, leadOf(entries[index]), index === 0), onItem);
+        entries[index] = withLead(entries[index], joinGaps(removedLead, leadOf(entries[index]), index === 0));
     } else {
         entries[index - 1] = {...entries[index - 1], trailingCommaPrefix: removed.trailingCommaPrefix};
         if (closing.includes("\n")) {

@@ -17,6 +17,8 @@ import {
     appendItem,
     entryKey,
     findEntry,
+    isMapping,
+    isSequence,
     itemsOf,
     mapItems,
     pathOf,
@@ -417,15 +419,28 @@ describe("YamlVisitor", () => {
 });
 
 /**
- * The layouts that the Java parser, and the TypeScript parser before #10155, give some nodes, made from what the
- * TypeScript parser gives them now.
+ * The layouts that the Java parser, and the TypeScript parser before #10155 and #10162, give some nodes, made from
+ * what the TypeScript parser gives them now.
  */
 const layouts = {
-    /** The space before each item of a flow sequence is in the item's prefix, not the entry's. */
-    javaFlowSequences: (docs: Yaml.Documents) => rearrange(docs, {
+    asParsed: async (docs: Yaml.Documents) => docs,
+    /** The space before each item of a flow sequence is in the entry's prefix, not the item's. */
+    flowSequencesBefore10162: (docs: Yaml.Documents) => rearrange(docs, {
         sequence: seq => seq.openingBracketPrefix === undefined ? seq : {
             ...seq,
-            entries: seq.entries.map(e => ({...e, prefix: "", block: {...e.block, prefix: e.prefix + e.block.prefix}}))
+            entries: seq.entries.map(e => {
+                const block = e.block;
+                if (isSequence(block) && block.openingBracketPrefix !== undefined) {
+                    return {...e, prefix: e.prefix + block.openingBracketPrefix, block: {...block, openingBracketPrefix: ""}};
+                }
+                if (isMapping(block)) {
+                    if (block.openingBracePrefix === undefined) {
+                        return e;
+                    }
+                    return {...e, prefix: e.prefix + block.openingBracePrefix, block: {...block, openingBracePrefix: ""}};
+                }
+                return {...e, prefix: e.prefix + block.prefix, block: {...block, prefix: ""}};
+            })
         }
     }),
     /** The blank lines after a block scalar are in it, not in the prefix of the next entry. */
@@ -479,9 +494,11 @@ const inSequence = (path: string[], fn: (seq: Yaml.Sequence) => Yaml.Sequence) =
     (docs: Yaml.Documents) => updateAt(docs, path, old => fn(old as Yaml.Sequence));
 
 describe("layouts of other parsers", () => {
-    describe("flow sequences from the Java parser", () => {
+    describe.each([
+        ["as both parsers lay them out", layouts.asParsed],
+        ["in LSTs from before #10162", layouts.flowSequencesBefore10162]
+    ])("flow sequences %s", (_, layout) => {
         test("removes items", async () => {
-            const layout = layouts.javaFlowSequences;
             expect(await editIn(layout, "v: [8.x, 10.x, 18.x, 20.x]\n", inSequence(["v"], seq => removeItems(seq, below(18)))))
                 .toBe("v: [18.x, 20.x]\n");
             expect(await editIn(layout, "v: [8, 10, 12]\n", inSequence(["v"], seq => removeItems(seq, item => toPlain(item) === 12))))
@@ -491,25 +508,34 @@ describe("layouts of other parsers", () => {
                 .toBe("a: [\n  1 # one\n]\n");
         });
 
-        test("keeps the space before an item in the item", async () => {
-            const docs = await layouts.javaFlowSequences(await parse("v: [8.x, 10.x, 18.x, 20.x]\n"));
-            const seq = valueAt(updateAt(docs, ["v"], old => removeItems(old as Yaml.Sequence, below(18))), ["v"]) as Yaml.Sequence;
-            expect(seq.entries.map(e => [e.prefix, e.block.prefix])).toEqual([["", ""], ["", " "]]);
-            const appended = appendItem(seq, "22.x");
-            expect(appended.entries.map(e => [e.prefix, e.block.prefix])).toEqual([["", ""], ["", " "], ["", " "]]);
+        test("removes nested collections and pairs", async () => {
+            expect(await editIn(layout, "v: [ [1], {a: 2}, [3] ]\n", inSequence(["v"], seq => removeItems(seq, (_, i) => i === 0))))
+                .toBe("v: [ {a: 2}, [3] ]\n");
+            expect(await editIn(layout, "v: [[1], [2]]\n", inSequence(["v"], seq => removeItems(seq, (_, i) => i === 0))))
+                .toBe("v: [[2]]\n");
+            expect(await editIn(layout, "v: [a: 1, b: 2]\n", inSequence(["v"], seq => removeItems(seq, (_, i) => i === 0))))
+                .toBe("v: [b: 2]\n");
         });
 
         test("appends items", async () => {
-            const layout = layouts.javaFlowSequences;
             expect(await editIn(layout, "v: [8, 10]\n", inSequence(["v"], seq => appendItem(seq, 18)))).toBe("v: [8, 10, 18]\n");
+            expect(await editIn(layout, "v: [[1]]\n", inSequence(["v"], seq => appendItem(seq, 2)))).toBe("v: [[1], 2]\n");
             expect(await editIn(layout, "a: [\n  1 # one\n]\n", inSequence(["a"], seq => appendItem(seq, 2))))
                 .toBe("a: [\n  1, # one\n  2\n]\n");
         });
 
         test("replaces items keeping their quoting", async () => {
-            expect(await editIn(layouts.javaFlowSequences, "v: [8.x, '10.x']\n", inSequence(["v"], seq => mapItems(seq, () => "18.x"))))
+            expect(await editIn(layout, "v: [8.x, '10.x']\n", inSequence(["v"], seq => mapItems(seq, () => "18.x"))))
                 .toBe("v: [18.x, '18.x']\n");
         });
+    });
+
+    test("writes the space before a flow sequence item on the item, as both parsers do", async () => {
+        const docs = await layouts.flowSequencesBefore10162(await parse("v: [8.x, 10.x, 18.x]\n"));
+        const seq = valueAt(updateAt(docs, ["v"], old => removeItems(old as Yaml.Sequence, below(18))), ["v"]) as Yaml.Sequence;
+        expect(seq.entries.map(e => [e.prefix, e.block.prefix])).toEqual([["", ""]]);
+        const appended = appendItem(seq, "20.x");
+        expect(appended.entries.map(e => [e.prefix, e.block.prefix])).toEqual([["", ""], ["", " "]]);
     });
 
     describe("block scalars from the Java parser", () => {
