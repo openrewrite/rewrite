@@ -608,12 +608,12 @@ class UsesTypeTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new UsesType<>(type, false))),
           xml(
             """
-              <beans xsi:schemaLocation="www.springframework.org/schema/beans">
+              <beans xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="www.springframework.org/schema/beans">
                   <bean id="abc" class="a.b.Outer$Inner"/>
               </beans>
               """,
             """
-              <!--~~>--><beans xsi:schemaLocation="www.springframework.org/schema/beans">
+              <!--~~>--><beans xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="www.springframework.org/schema/beans">
                   <bean id="abc" class="a.b.Outer$Inner"/>
               </beans>
               """

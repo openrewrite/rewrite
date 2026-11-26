@@ -2103,14 +2103,50 @@ class ChangePackageTest implements RewriteTest {
           xml(
             """
               <?xml version="1.0" encoding="UTF-8"?>
-              <beans xsi:schemaLocation="www.springframework.org/schema/beans">
+              <beans xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="www.springframework.org/schema/beans">
                 <bean id="abc" class="test.type.A"/>
               </beans>
               """,
             """
               <?xml version="1.0" encoding="UTF-8"?>
-              <beans xsi:schemaLocation="www.springframework.org/schema/beans">
+              <beans xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="www.springframework.org/schema/beans">
                 <bean id="abc" class="test.test.type.A"/>
+              </beans>
+              """
+          )
+        );
+    }
+
+    @Test
+    void changePackageInSpringXmlLeavesPomAndPropertyKeys() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("test.type", "test.test.type", true)),
+          xml(
+            """
+              <project>
+                <groupId>test.type</groupId>
+                <artifactId>app</artifactId>
+              </project>
+              """,
+            spec -> spec.path("pom.xml")
+          ),
+          xml(
+            """
+              <beans xmlns="http://www.springframework.org/schema/beans">
+                <bean class="test.type.A">
+                  <property name="delegate" value="test.type.B"/>
+                  <property name="messageKey" value="test.type.error.title"/>
+                  <property name="basename" value="test.type.Messages"/>
+                </bean>
+              </beans>
+              """,
+            """
+              <beans xmlns="http://www.springframework.org/schema/beans">
+                <bean class="test.test.type.A">
+                  <property name="delegate" value="test.test.type.B"/>
+                  <property name="messageKey" value="test.type.error.title"/>
+                  <property name="basename" value="test.type.Messages"/>
+                </bean>
               </beans>
               """
           )
