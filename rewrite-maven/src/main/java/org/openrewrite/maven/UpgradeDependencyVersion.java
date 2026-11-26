@@ -168,6 +168,13 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     if (!isProperty(requestedVersion)) {
                         continue;
                     }
+                    String propertyName = requestedVersion.substring(2, requestedVersion.length() - 1);
+                    Path declaringPom = pom.getRequested().getProperties().containsKey(propertyName) ?
+                            sourcePath :
+                            findParentPomDeclaringProperty(getResolutionResult().getParent(), propertyName);
+                    if (declaringPom == null) {
+                        continue;
+                    }
                     String newerVersion;
                     try {
                         newerVersion = MavenDependency.findNewerVersion(bom.getGroupId(), bom.getArtifactId(),
@@ -177,14 +184,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         // mark the LST, since edits made here are discarded.
                         continue;
                     }
-                    if (newerVersion == null) {
-                        continue;
-                    }
-                    String propertyName = requestedVersion.substring(2, requestedVersion.length() - 1);
-                    if (pom.getRequested().getProperties().containsKey(propertyName)) {
-                        accumulator.upgradeProperty(sourcePath, propertyName, newerVersion);
-                    } else {
-                        storeParentPomProperty(getResolutionResult().getParent(), propertyName, newerVersion);
+                    if (newerVersion != null) {
+                        accumulator.upgradeProperty(declaringPom, propertyName, newerVersion);
                     }
                 }
             }
@@ -228,18 +229,24 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
              * @param newerVersion the resolved newer version that any matching parent pom property should be updated to
              */
             private void storeParentPomProperty(@Nullable MavenResolutionResult currentMavenResolutionResult, String propertyName, String newerVersion) {
+                Path declaringPom = findParentPomDeclaringProperty(currentMavenResolutionResult, propertyName);
+                if (declaringPom != null) {
+                    accumulator.upgradeProperty(declaringPom, propertyName, newerVersion);
+                }
+            }
+
+            private @Nullable Path findParentPomDeclaringProperty(@Nullable MavenResolutionResult currentMavenResolutionResult, String propertyName) {
                 if (currentMavenResolutionResult == null) {
-                    return; // No parent contained the property; might then be in the same source file, or an import BOM
+                    return null; // No parent contained the property; might then be in the same source file, or an import BOM
                 }
                 Pom pom = currentMavenResolutionResult.getPom().getRequested();
                 if (pom.getSourcePath() == null) {
-                    return; // Not a source file, so nothing to update
+                    return null; // Not a source file, so nothing to update
                 }
                 if (pom.getProperties().containsKey(propertyName)) {
-                    accumulator.upgradeProperty(pom.getSourcePath(), propertyName, newerVersion);
-                    return; // Property found, so no further searching is needed
+                    return pom.getSourcePath();
                 }
-                storeParentPomProperty(currentMavenResolutionResult.getParent(), propertyName, newerVersion);
+                return findParentPomDeclaringProperty(currentMavenResolutionResult.getParent(), propertyName);
             }
         };
 

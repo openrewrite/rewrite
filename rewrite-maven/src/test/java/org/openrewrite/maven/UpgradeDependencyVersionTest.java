@@ -38,8 +38,10 @@ import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.Parser;
 import org.openrewrite.maven.http.OkHttpSender;
+import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.maven.tree.MavenResolutionResult;
+import org.openrewrite.maven.tree.ResolutionEventListener;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
@@ -48,6 +50,8 @@ import java.net.InetAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -4456,6 +4460,46 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                       <properties>
                           <junit.version>5.10.2</junit.version>
                       </properties>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.junit.jupiter</groupId>
+                              <artifactId>junit-jupiter-api</artifactId>
+                          </dependency>
+                      </dependencies>
+                  </project>
+                  """
+              )
+            );
+        }
+
+        @Test
+        void noMetadataLookupForBomVersionPropertyOnlyDeclaredByRemoteParent(@TempDir Path localRepository) throws IOException {
+            List<GroupArtifactVersion> metadataLookups = new ArrayList<>();
+            ExecutionContext ctx = executionContextWithRemoteParent(localRepository);
+            MavenExecutionContextView.view(ctx).setResolutionListener(new ResolutionEventListener() {
+                @Override
+                public void downloadMetadata(GroupArtifactVersion gav) {
+                    metadataLookups.add(gav);
+                }
+            });
+            rewriteRun(
+              spec -> spec
+                .executionContext(ctx)
+                .recipe(new UpgradeDependencyVersion("org.junit", "junit-bom", "5.10.x", null, null, null))
+                .afterRecipe(run -> assertThat(metadataLookups)
+                  .noneMatch(gav -> "junit-bom".equals(gav.getArtifactId()))),
+              //language=xml
+              pomXml(
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <parent>
+                          <groupId>com.example</groupId>
+                          <artifactId>remote-parent</artifactId>
+                          <version>1.0.0</version>
+                          <relativePath/>
+                      </parent>
+                      <artifactId>app</artifactId>
                       <dependencies>
                           <dependency>
                               <groupId>org.junit.jupiter</groupId>
