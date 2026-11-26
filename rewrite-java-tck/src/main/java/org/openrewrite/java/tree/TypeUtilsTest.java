@@ -1697,6 +1697,34 @@ class TypeUtilsTest implements RewriteTest {
     }
 
     @Test
+    void isAssignableToResolvesRepeatedTypeArguments() {
+        rewriteRun(
+          java(
+            """
+              import java.util.*;
+
+              class Test {
+                  Comparable<Map<List<String>, List<String>>> nested;
+                  Comparable<Map<String, String>> flat;
+                  NestedBox<String> nestedBox;
+                  FlatBox<String> flatBox;
+
+                  static abstract class NestedBox<T> implements Comparable<Map<List<T>, List<T>>> {}
+                  static abstract class FlatBox<T> implements Comparable<Map<T, T>> {}
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                  try (TypeUtilsAssertions assertions = new TypeUtilsAssertions(cu)) {
+                      assertions.isAssignableTo("Comparable<Map<List<String>, List<String>>>", "NestedBox<String>").isTrue();
+                      assertions.isAssignableTo("Comparable<Map<String, String>>", "FlatBox<String>").isTrue();
+                  }
+              }
+            )
+          )
+        );
+    }
+
+    @Test
     void isAssignableToGenericTypeVariable() {
         rewriteRun(
           java(

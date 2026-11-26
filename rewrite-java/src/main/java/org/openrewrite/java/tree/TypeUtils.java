@@ -26,7 +26,6 @@ import java.util.*;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
-import static java.util.Collections.newSetFromMap;
 import static org.openrewrite.java.tree.TypeUtils.ComparisonContext.InferenceDirection.FROM;
 import static org.openrewrite.java.tree.TypeUtils.ComparisonContext.InferenceDirection.TO;
 
@@ -761,20 +760,24 @@ public class TypeUtils {
 
     private static JavaType resolveTypeParameters(JavaType type, Map<JavaType.GenericTypeVariable, JavaType> replacements) {
         return Objects.requireNonNull(new JavaTypeVisitor<Map<JavaType.GenericTypeVariable, JavaType>>() {
-            @Nullable Set<JavaType> visited;
+            @Nullable Map<JavaType, JavaType> visited;
 
             @Override
             public JavaType visit(@Nullable JavaType javaType, Map<JavaType.GenericTypeVariable, JavaType> genericTypeVariableJavaTypeMap) {
-                // Prevent infinite recursion
-                if (javaType != null) {
-                    if (visited == null) {
-                        visited = newSetFromMap(new IdentityHashMap<>());
-                    }
-                    if (!visited.add(javaType)) {
-                        return javaType;
-                    }
+                if (javaType == null) {
+                    return super.visit(javaType, genericTypeVariableJavaTypeMap);
                 }
-                return super.visit(javaType, genericTypeVariableJavaTypeMap);
+                if (visited == null) {
+                    visited = new IdentityHashMap<>();
+                }
+                JavaType seen = visited.get(javaType);
+                if (seen != null) {
+                    return seen;
+                }
+                visited.put(javaType, javaType);
+                JavaType resolved = super.visit(javaType, genericTypeVariableJavaTypeMap);
+                visited.put(javaType, resolved);
+                return resolved;
             }
 
             @Override
