@@ -15,7 +15,7 @@
  */
 
 import {Comment, J, TextComment} from "../java";
-import {create as produce} from "mutative";
+import {create as produce, Draft} from "mutative";
 
 /**
  * Gets the effective last whitespace from a Space.
@@ -34,18 +34,23 @@ export function lastWhitespace(space: J.Space): string {
  * When there are comments, updates the suffix of the last comment.
  * When there are no comments, updates the whitespace property.
  *
- * @param space The Space to modify (Mutative draft)
+ * @param space The Space to copy; to change a Space that is already a Mutative draft, use {@link updateLastWhitespace}
  * @param transform Function that receives the current last whitespace and returns the new value
  */
 export function replaceLastWhitespace(space: J.Space, transform: (ws: string) => string): J.Space {
-    return produce(space, draft => {
-        if (draft.comments.length > 0) {
-            const lastComment = draft.comments[draft.comments.length - 1];
-            lastComment.suffix = transform(lastComment.suffix);
-        } else {
-            draft.whitespace = transform(draft.whitespace);
-        }
-    });
+    return produce(space, draft => updateLastWhitespace(draft, transform));
+}
+
+/**
+ * Like {@link replaceLastWhitespace}, but changes a Space draft in place.
+ */
+export function updateLastWhitespace(space: Draft<J.Space>, transform: (ws: string) => string): void {
+    if (space.comments.length > 0) {
+        const lastComment = space.comments[space.comments.length - 1];
+        lastComment.suffix = transform(lastComment.suffix);
+    } else {
+        space.whitespace = transform(space.whitespace);
+    }
 }
 
 /**

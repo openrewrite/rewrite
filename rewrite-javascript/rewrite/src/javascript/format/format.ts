@@ -15,7 +15,7 @@
  */
 import {JS} from "../tree";
 import {JavaScriptVisitor} from "../visitor";
-import {Comment, J, lastWhitespace, replaceLastWhitespace, Statement} from "../../java";
+import {Comment, J, lastWhitespace, Statement, updateLastWhitespace} from "../../java";
 import {create as produce, Draft} from "mutative";
 import {Cursor, isScope, isSourceFile, Tree} from "../../tree";
 import {BlankLinesStyle, getStyle, PrettierStyle, SpacesStyle, StyleKind, TabsAndIndentsStyle, WrappingAndBracesStyle} from "../style";
@@ -945,7 +945,7 @@ export class WrappingAndBracesVisitor<P> extends JavaScriptVisitor<P> {
             } else {
                 if (!b.end.whitespace.includes("\n")) {
                     return produce(b, draft => {
-                        draft.end = this.withNewlineSpace(draft.end);
+                        draft.end = this.withNewlineSpace(b.end);
                     });
                 }
             }
@@ -953,7 +953,7 @@ export class WrappingAndBracesVisitor<P> extends JavaScriptVisitor<P> {
             // Non-simple blocks: ensure closing brace is on its own line
             if (!b.end.whitespace.includes("\n") && !b.statements[b.statements.length - 1].after.whitespace.includes("\n")) {
                 return produce(b, draft => {
-                    draft.end = this.withNewlineSpace(draft.end);
+                    draft.end = this.withNewlineSpace(b.end);
                 });
             }
         }
@@ -1153,7 +1153,7 @@ export class BlankLinesVisitor<P> extends JavaScriptVisitor<P> {
             const parentKind = this.cursor.parent?.value.kind;
             // Skip newline for object literals (NewClass) and type literals (TypeLiteral)
             if (parentKind != J.Kind.NewClass && parentKind != JS.Kind.TypeLiteral) {
-                draft.end = replaceLastWhitespace(draft.end, ws =>
+                updateLastWhitespace(draft.end, ws =>
                     ws.includes("\n") ? ws : ws.replace(/[ \t]+$/, '') + "\n"
                 );
             }
@@ -1223,7 +1223,7 @@ export class BlankLinesVisitor<P> extends JavaScriptVisitor<P> {
         if (node.kind === JS.Kind.ExpressionStatement) {
             this.ensurePrefixHasNewLine((node as JS.ExpressionStatement).expression);
         } else {
-            node.prefix = replaceLastWhitespace(node.prefix, () => "\n");
+            updateLastWhitespace(node.prefix, () => "\n");
         }
     }
 

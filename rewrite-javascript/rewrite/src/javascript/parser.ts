@@ -51,7 +51,7 @@ import {
 import {JavaScriptTypeMapping} from "./type-mapping";
 import {JavaScriptNameResolver} from "./name-resolver";
 import {TsConfigResolver} from "./tsconfig";
-import {castDraft, create as produce} from "mutative";
+import {castDraft, create as produce, Draft} from "mutative";
 import ComputedPropertyName = JS.ComputedPropertyName;
 import Attribute = JSX.Attribute;
 import SpreadAttribute = JSX.SpreadAttribute;
@@ -1245,7 +1245,7 @@ export class JavaScriptParserVisitor {
 
     visitParameter(node: ts.ParameterDeclaration): J.VariableDeclarations {
         let name: VariableDeclarator = produce(this.convert<VariableDeclarator>(node.name), draft => {
-            draft.markers = this.maybeAddOptionalMarker(draft, node);
+            this.maybeAddOptionalMarker(draft, node);
         });
         if (node.dotDotDotToken) {
             // Wrap in JS.Spread; prefix between ... and identifier stays on the inner expression
@@ -1378,7 +1378,7 @@ export class JavaScriptParserVisitor {
                     prefix: this.prefix(node.name),
                     markers: emptyMarkers,
                     name: produce(this.convert<VariableDeclarator>(node.name), draft => {
-                        draft.markers = this.maybeAddOptionalMarker(draft, node);
+                        this.maybeAddOptionalMarker(draft, node);
                     }) as VariableDeclarator,
                     dimensionsAfterName: [],
                     initializer: initializer && this.leftPadded(this.prefix(node.getChildAt(node.getChildren().indexOf(initializer) - 1)), this.visit(initializer)),
@@ -1405,7 +1405,7 @@ export class JavaScriptParserVisitor {
                     prefix: this.prefix(node.name),
                     markers: emptyMarkers,
                     name: produce(this.convert<VariableDeclarator>(node.name), draft => {
-                        draft.markers = this.maybeAddOptionalMarker(draft, node);
+                        this.maybeAddOptionalMarker(draft, node);
 
                         // This will be mutually exclusive with the optional token
                         if (node.exclamationToken) {
@@ -1440,7 +1440,7 @@ export class JavaScriptParserVisitor {
                 typeParameters: this.mapTypeParametersAsObject(node),
                 returnTypeExpression: this.mapTypeInfo(node),
                 name: produce(this.convert<ComputedPropertyName>(node.name), draft => {
-                    draft.markers = this.maybeAddOptionalMarker(draft, node);
+                    this.maybeAddOptionalMarker(draft, node);
                 }),
                 parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
                 methodType: methodType
@@ -1448,7 +1448,7 @@ export class JavaScriptParserVisitor {
         }
         let name = this.mapMethodName(node, methodType) as J.Identifier;
         name = produce(name, draft => {
-            draft.markers = this.maybeAddOptionalMarker(draft, node);
+            this.maybeAddOptionalMarker(draft, node);
         });
 
         return {
@@ -1483,7 +1483,7 @@ export class JavaScriptParserVisitor {
 
         let name = this.mapMethodName(node, methodType);
         name = produce(name, draft => {
-            draft.markers = this.maybeAddOptionalMarker(draft, node);
+            this.maybeAddOptionalMarker(draft, node);
         });
 
         if (ts.isComputedPropertyName(node.name)) {
@@ -2115,7 +2115,7 @@ export class JavaScriptParserVisitor {
     //  they has no semantics. See https://stackoverflow.com/questions/63629315/what-are-named-or-labeled-tuples-in-typescript.
     visitNamedTupleMember(node: ts.NamedTupleMember): J.VariableDeclarations {
         let name: VariableDeclarator = produce(this.convert<J.Identifier>(node.name), draft => {
-            draft.markers = this.maybeAddOptionalMarker(draft, node);
+            this.maybeAddOptionalMarker(draft, node);
         });
         if (node.dotDotDotToken) {
             // Wrap in JS.Spread; use emptySpace since the whitespace belongs
@@ -4935,18 +4935,16 @@ export class JavaScriptParserVisitor {
         return {kind: J.Kind.Empty, id: randomId(), prefix: prefix, markers: markers ?? emptyMarkers};
     }
 
-    private maybeAddOptionalMarker(t: {
+    private maybeAddOptionalMarker(draft: Draft<{
         markers: Markers
-    }, node: ts.MethodSignature | ts.MethodDeclaration | ts.ParameterDeclaration | ts.PropertySignature | ts.PropertyDeclaration | ts.NamedTupleMember): Markers {
-        return produce(t.markers, draft => {
-            if (node.questionToken) {
-                draft.markers.push({
-                    kind: JS.Markers.Optional,
-                    id: randomId(),
-                    prefix: this.suffix(node.name)
-                } satisfies Optional as Optional);
-            }
-        });
+    }>, node: ts.MethodSignature | ts.MethodDeclaration | ts.ParameterDeclaration | ts.PropertySignature | ts.PropertyDeclaration | ts.NamedTupleMember): void {
+        if (node.questionToken) {
+            draft.markers.markers.push(castDraft({
+                kind: JS.Markers.Optional,
+                id: randomId(),
+                prefix: this.suffix(node.name)
+            } satisfies Optional as Optional));
+        }
     }
 }
 
