@@ -54,6 +54,16 @@ class Pnpm10Test {
     private static final Map<String, String> RECORDED_AS = Map.ofEntries(
       // v10.12.0..v10.12.1 holds one commit, which makes @pnpm/tsconfig private
       Map.entry("10.12.0", "10.12.1"),
+      // v10.16.0..v10.18.2: release-age rules (refused from 10.16.0 to 10.32.x), catalog cleanup on remove, store,
+      // build and reporting changes
+      Map.entry("10.16.0", "10.17.0"), Map.entry("10.16.1", "10.17.0"), Map.entry("10.17.1", "10.17.0"),
+      Map.entry("10.18.0", "10.17.0"), Map.entry("10.18.1", "10.17.0"), Map.entry("10.18.2", "10.17.0"),
+      // v10.18.3..v10.20.0: release-age rules (refused), the CLI switch's re-switch guard, store and reporting changes
+      Map.entry("10.18.3", "10.20.0"), Map.entry("10.19.0", "10.20.0"),
+      // v10.21.0..v10.25.0: trust and release-age rules (refused from 10.21.0 and 10.16.0 to 10.32.x), catalogs in
+      // the outdated-settings check, update of indirect dependencies, store, build and reporting changes
+      Map.entry("10.21.0", "10.24.0"), Map.entry("10.22.0", "10.24.0"), Map.entry("10.23.0", "10.24.0"),
+      Map.entry("10.25.0", "10.24.0"),
       // v10.33.0..v10.33.3: self-update, npm passthrough, global bin shim, fork-bomb guard and picomatch 4.0.3 to 4.0.4
       Map.entry("10.33.1", "10.33.0"), Map.entry("10.33.2", "10.33.0"), Map.entry("10.33.3", "10.33.0"),
       // v10.34.5..v10.34.9: self-update, signing keys, headless and modules-cleaner, Node 24 for @pnpm/exe
