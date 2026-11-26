@@ -51,7 +51,17 @@ public class AppendToSequenceVisitor extends YamlIsoVisitor<ExecutionContext> {
         if (matcher.matches(parent) && checkExistingSequenceValues(existingSeq, parent)) {
             return appendToSequence(existingSeq, this.value, ctx);
         }
-        return super.visitSequence(existingSeq, ctx);
+        return TrailingComments.apply(getCursor(), super.visitSequence(existingSeq, ctx));
+    }
+
+    @Override
+    public Yaml.Mapping visitMapping(Yaml.Mapping mapping, ExecutionContext ctx) {
+        return TrailingComments.apply(getCursor(), super.visitMapping(mapping, ctx));
+    }
+
+    @Override
+    public Yaml.Document visitDocument(Yaml.Document document, ExecutionContext ctx) {
+        return TrailingComments.apply(getCursor(), super.visitDocument(document, ctx));
     }
 
     protected boolean checkExistingSequenceValues(final Yaml.Sequence seq, final Cursor cursor) {
@@ -88,6 +98,7 @@ public class AppendToSequenceVisitor extends YamlIsoVisitor<ExecutionContext> {
         boolean hasDash = false;
         Yaml.Scalar.Style style = Yaml.Scalar.Style.PLAIN;
         String entryPrefix = "";
+        String entryComment = "";
         String entryTrailingCommaPrefix = null;
         String itemPrefix = "";
         if (!entries.isEmpty()) {
@@ -106,15 +117,31 @@ public class AppendToSequenceVisitor extends YamlIsoVisitor<ExecutionContext> {
                 }
             } else if (block instanceof Yaml.Sequence.Scalar) {
                 itemPrefix = block.getPrefix();
-                style = ((Yaml.Sequence.Scalar) block).getStyle();
+                Yaml.Scalar.Style lastStyle = ((Yaml.Sequence.Scalar) block).getStyle();
+                if (lastStyle != Yaml.Scalar.Style.LITERAL && lastStyle != Yaml.Scalar.Style.FOLDED) {
+                    style = lastStyle;
+                }
             }
             if (!existingEntry.isDash()) {
                 entries.set(lastEntryIndex, existingEntry.withTrailingCommaPrefix(""));
+            } else if (TrailingComments.endsWithBlockScalar(existingEntry)) {
+                // The block scalar ending the last item holds the line break before the new item, which now needs
+                // one before what follows it
+                entryPrefix = TrailingComments.stripLeadingLineBreak(TrailingComments.withoutInlineComment(entryPrefix));
+                TrailingComments.breakLineAfter(getCursor());
+            } else {
+                // The comment ending the last item's line stays on that line, which the new item now follows, and
+                // the comment ending the line before it isn't copied
+                entryPrefix = TrailingComments.withoutInlineComment(entryPrefix);
+                String comment = TrailingComments.replace(getCursor(), null);
+                if (comment != null) {
+                    entryComment = comment;
+                }
             }
         }
 
         Yaml.Block newItem = parseYamlValue(value, itemPrefix, entryPrefix, style);
-        Yaml.Sequence.Entry newEntry = new Yaml.Sequence.Entry(randomId(), entryPrefix, Markers.EMPTY, newItem, hasDash, entryTrailingCommaPrefix);
+        Yaml.Sequence.Entry newEntry = new Yaml.Sequence.Entry(randomId(), entryComment + entryPrefix, Markers.EMPTY, newItem, hasDash, entryTrailingCommaPrefix);
         entries.add(newEntry);
         return newSequence;
     }

@@ -266,4 +266,167 @@ class DeleteKeyTest implements RewriteTest {
         );
     }
 
+    @Test
+    void keepsTheCommentsOfTheLinesAround() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteKey("$.b", null)),
+          yaml(
+            """
+              a: 1 # one
+              b: 2 # two
+              c: 3 # three
+              """,
+            """
+              a: 1 # one
+              c: 3 # three
+              """
+          )
+        );
+    }
+
+    @Test
+    void deletesTheCommentOfTheLastEntry() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteKey("$.c", null)),
+          yaml(
+            """
+              a: 1 # one
+              b: 2 # two
+              c: 3 # three
+              """,
+            """
+              a: 1 # one
+              b: 2 # two
+              """
+          )
+        );
+    }
+
+    @Test
+    void deletesTheFirstEntryWithItsComment() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteKey("$.a", null)),
+          yaml(
+            """
+              a: 1 # one
+              b: 2 # two
+              """,
+            """
+              b: 2 # two
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepsTheCommentOfTheKeyLine() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteKey("$.a.x", null)),
+          yaml(
+            """
+              a: # about a
+                x: 1
+                y: 2
+              b: 3
+              """,
+            """
+              a: # about a
+                y: 2
+              b: 3
+              """
+          )
+        );
+    }
+
+    @Test
+    void deletesTheCommentOfANestedLastEntry() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteKey("$.jobs.test.strategy.matrix.os", null)),
+          yaml(
+            """
+              jobs:
+                test:
+                  strategy:
+                    matrix:
+                      node-version: [16, 18]
+                      os:
+                        - ubuntu-latest # LTS runner
+                lint:
+                  runs-on: ubuntu-latest
+              """,
+            """
+              jobs:
+                test:
+                  strategy:
+                    matrix:
+                      node-version: [16, 18]
+                lint:
+                  runs-on: ubuntu-latest
+              """
+          )
+        );
+    }
+
+    @Test
+    void deletesTheLastSequenceItemWithItsComment() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteKey("$.a[?(@ == 'y')]", null)),
+          yaml(
+            """
+              a:
+                - x # one
+                - y # two
+              b: 1
+              """,
+            """
+              a:
+                - x # one
+              b: 1
+              """
+          )
+        );
+    }
+
+    @Test
+    void deletesTheLastEntryAfterABlockScalar() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteKey("$.a.y", null)),
+          yaml(
+            """
+              a:
+                x: |
+                  t
+                y: 2 # y
+              b: 1
+              """,
+            """
+              a:
+                x: |
+                  t
+              b: 1
+              """
+          )
+        );
+    }
+
+    @Test
+    void deletesABlockScalarThatEndsTheMapping() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteKey("$.a.x", null)),
+          yaml(
+            """
+              a:
+                w: 1 # w
+                x: |
+                  t
+              b: 1
+              """,
+            """
+              a:
+                w: 1 # w
+              b: 1
+              """
+          )
+        );
+    }
 }

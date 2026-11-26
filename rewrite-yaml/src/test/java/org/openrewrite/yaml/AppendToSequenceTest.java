@@ -657,4 +657,98 @@ class AppendToSequenceTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void keepsTheCommentOfTheLastItemOnItsLine() {
+        rewriteRun(
+          spec -> spec.recipe(new AppendToSequence("$.jobs.test.strategy.matrix.os", "windows-latest", null, null)),
+          yaml(
+            """
+              jobs:
+                test:
+                  strategy:
+                    matrix:
+                      node-version: [16, 18]
+                      os:
+                        - ubuntu-latest # LTS runner
+                lint:
+                  runs-on: ubuntu-latest
+              """,
+            """
+              jobs:
+                test:
+                  strategy:
+                    matrix:
+                      node-version: [16, 18]
+                      os:
+                        - ubuntu-latest # LTS runner
+                        - windows-latest
+                lint:
+                  runs-on: ubuntu-latest
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotCopyTheCommentOfTheItemBeforeTheLast() {
+        rewriteRun(
+          spec -> spec.recipe(new AppendToSequence("$.a", "z", null, null)),
+          yaml(
+            """
+              a:
+                - x # one
+                - y # two
+              b: 1
+              """,
+            """
+              a:
+                - x # one
+                - y # two
+                - z
+              b: 1
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepsTheCommentOfTheLastItemAtTheEndOfTheFile() {
+        rewriteRun(
+          spec -> spec.recipe(new AppendToSequence("$.a", "y", null, null)),
+          yaml(
+            """
+              a:
+                - x # one
+              """,
+            """
+              a:
+                - x # one
+                - y
+              """
+          )
+        );
+    }
+
+    @Test
+    void appendsAfterABlockScalar() {
+        rewriteRun(
+          spec -> spec.recipe(new AppendToSequence("$.a", "y", null, null)),
+          yaml(
+            """
+              a:
+                - |
+                  t
+              b: 1
+              """,
+            """
+              a:
+                - |
+                  t
+                - y
+              b: 1
+              """
+          )
+        );
+    }
 }
