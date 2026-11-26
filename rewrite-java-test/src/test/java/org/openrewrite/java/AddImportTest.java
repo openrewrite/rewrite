@@ -945,6 +945,44 @@ class AddImportTest implements RewriteTest {
     }
 
     @Test
+    void shortenOnlyTheImportedFieldOfANestedType() {
+        rewriteRun(
+          spec -> spec.recipes(
+            toRecipe(() -> new JavaVisitor<>() {
+                @Override
+                public J visitImport(J.Import anImport, ExecutionContext ctx) {
+                    return anImport;
+                }
+
+                @Override
+                public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
+                    return "BASIC_LATIN".equals(fieldAccess.getSimpleName()) ?
+                      fieldAccess.getName().withPrefix(fieldAccess.getPrefix()) :
+                      super.visitFieldAccess(fieldAccess, ctx);
+                }
+            }),
+            toRecipe(() -> new AddImport<>("java.lang", "Character.UnicodeBlock", "BASIC_LATIN", null, true))
+          ),
+          java(
+            """
+              class A {
+                  Object a = Character.UnicodeBlock.BASIC_LATIN;
+                  Object b = Character.UnicodeBlock.LATIN_1_SUPPLEMENT;
+              }
+              """,
+            """
+              import static java.lang.Character.UnicodeBlock.BASIC_LATIN;
+
+              class A {
+                  Object a = BASIC_LATIN;
+                  Object b = Character.UnicodeBlock.LATIN_1_SUPPLEMENT;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void addNamedStaticImportWhenReferenced2() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {

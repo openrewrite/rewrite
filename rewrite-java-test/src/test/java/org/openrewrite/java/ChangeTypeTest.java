@@ -1509,6 +1509,64 @@ class ChangeTypeTest implements RewriteTest {
     }
 
     @Test
+    void qualifiedConstantNextToStaticImportOfAnotherConstantNestedTarget() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Old", "b.Outer$New", true)),
+          java("package a; public enum Old { A, B }", SourceSpec::skip),
+          java("package b; public class Outer { public enum New { A, B } }", SourceSpec::skip),
+          java(
+            """
+              import a.Old;
+
+              import static a.Old.A;
+
+              class Test {
+                  Object[] values = {A, Old.B};
+              }
+              """,
+            """
+              import b.Outer;
+
+              import static b.Outer.New.A;
+
+              class Test {
+                  Object[] values = {A, Outer.New.B};
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void qualifiedConstantNextToStaticImportOfAnotherConstant() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Old", "b.New", true)),
+          java("package a; public enum Old { A, B }", SourceSpec::skip),
+          java("package b; public enum New { A, B }", SourceSpec::skip),
+          java(
+            """
+              import a.Old;
+
+              import static a.Old.A;
+
+              class Test {
+                  Object[] values = {A, Old.B};
+              }
+              """,
+            """
+              import b.New;
+
+              import static b.New.A;
+
+              class Test {
+                  Object[] values = {A, New.B};
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void declarationKeepsItsNameWhereAMoveKeepsTheSimpleNameAndTheFileHasAnother() {
         rewriteRun(
           spec -> spec.recipe(new ChangeType("a.Foo", "b.Foo", false)),
