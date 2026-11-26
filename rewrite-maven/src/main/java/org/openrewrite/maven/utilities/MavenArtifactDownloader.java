@@ -180,8 +180,7 @@ public class MavenArtifactDownloader {
                                 responseBytes = readAllBytes(body);
                             }
                         }
-                        if (responseBytes != null && endpoint != null) {
-                            // Remember so later artifacts from this host authenticate preemptively
+                        if (endpoint != null && isCredentialsAccepted(responseCode)) {
                             authenticationRequiredEndpoints.add(endpoint);
                         }
                     }
@@ -235,6 +234,17 @@ public class MavenArtifactDownloader {
             return false;
         }
         return responseCode != 408 && responseCode != 425 && responseCode != 429;
+    }
+
+    /**
+     * Whether a credentialed response proves the credentials were accepted, and so that this endpoint may be
+     * authenticated preemptively from here on. A 404 qualifies — the repository simply does not carry this
+     * artifact — and it is the usual answer from every repository but the one an artifact comes from, so arming
+     * only on a 200 would leave most artifacts paying another anonymous round-trip. Mirrors Apache HttpClient,
+     * the layer Maven Resolver's auth cache is built on, which arms on any answer but a fresh challenge.
+     */
+    private static boolean isCredentialsAccepted(int responseCode) {
+        return responseCode >= 100 && (responseCode < 401 || responseCode > 403);
     }
 
     private List<MavenSettings.HttpHeader> resolveHttpHeaders(MavenRepository repository) {

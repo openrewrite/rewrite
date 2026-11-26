@@ -55,7 +55,7 @@ final class RemoteDownload {
         anonymous.close();
 
         HttpSender.Response authenticated = httpSender.send(authenticator.authenticate(uri, httpSender.get(uri.toString())).build());
-        if (authenticated.isSuccessful() && endpoint != null) {
+        if (endpoint != null && isCredentialsAccepted(authenticated.getCode())) {
             authenticationRequiredEndpoints.add(endpoint);
         }
         return authenticated;
@@ -73,6 +73,16 @@ final class RemoteDownload {
     private static @Nullable String endpointOrNull(URI uri) {
         String host = uri.getHost();
         return host == null ? null : host + ':' + uri.getPort();
+    }
+
+    /**
+     * Whether a credentialed response proves the credentials were accepted, and so that this endpoint may be
+     * authenticated preemptively from here on. A 404 qualifies — the resource simply is not there — and must arm
+     * the decision just as a 200 does, or every miss pays another anonymous round-trip. Mirrors Apache HttpClient,
+     * the layer Maven Resolver's auth cache is built on, which arms on any answer but a fresh challenge.
+     */
+    private static boolean isCredentialsAccepted(int responseCode) {
+        return responseCode >= 100 && (responseCode < 401 || responseCode > 403);
     }
 
     /**

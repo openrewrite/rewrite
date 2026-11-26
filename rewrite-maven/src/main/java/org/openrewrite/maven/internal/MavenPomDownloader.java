@@ -1280,18 +1280,31 @@ public class MavenPomDownloader {
     private byte[] retryRequestWithCredentials(MavenRepository repo, String uriString, HttpSenderResponseException anonymousException) throws HttpSenderResponseException, IOException {
         try {
             byte[] responseBody = sendRequest(applyAuthenticationAndTimeoutToRequest(repo, httpSender.get(uriString)).build());
-            // Remember so later requests to this host authenticate preemptively
-            String endpoint = endpointOrNull(URI.create(uriString));
-            if (endpoint != null) {
-                ctx.getAuthenticationRequiredEndpoints().add(endpoint);
-            }
+            rememberAuthenticationRequired(uriString);
             return responseBody;
         } catch (HttpSenderResponseException retryException) {
             if (retryException.isAccessDenied()) {
                 throw anonymousException;
-            } else {
-                throw retryException;
             }
+            if (retryException.isServerReached()) {
+                rememberAuthenticationRequired(uriString);
+            }
+            throw retryException;
+        }
+    }
+
+    /**
+     * A credentialed request that is not met with a fresh challenge proves the credentials were accepted, whatever
+     * the response then goes on to say about the artifact; Apache HttpClient, the layer Maven Resolver's auth cache
+     * is built on, arms that cache on exactly this condition rather than on a 200. The distinction decides how often
+     * the challenge is paid: resolution asks every repository in the list for every artifact, so most credentialed
+     * requests to any one repository answer 404, and arming only on a 200 leaves this set empty for as long as a
+     * repository serves nothing but misses — every one of which then re-probes anonymously.
+     */
+    private void rememberAuthenticationRequired(String uriString) {
+        String endpoint = endpointOrNull(URI.create(uriString));
+        if (endpoint != null) {
+            ctx.getAuthenticationRequiredEndpoints().add(endpoint);
         }
     }
 

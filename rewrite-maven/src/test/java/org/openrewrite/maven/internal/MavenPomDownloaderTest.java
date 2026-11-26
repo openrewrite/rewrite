@@ -1974,6 +1974,45 @@ class MavenPomDownloaderTest implements RewriteTest {
         }
 
         @Test
+        void authenticatesPreemptivelyAfterCredentialsRequiredEvenWhenNothingIsDownloaded() {
+            var downloader = new MavenPomDownloader(emptyMap(), ctx);
+            try (MockWebServer mockRepo = getMockServer()) {
+                List<@Nullable String> getRequestAuthHeaders = synchronizedList(new ArrayList<>());
+                mockRepo.setDispatcher(new Dispatcher() {
+                    @Override
+                    public MockResponse dispatch(RecordedRequest recordedRequest) {
+                        if ("GET".equalsIgnoreCase(recordedRequest.getMethod())) {
+                            getRequestAuthHeaders.add(recordedRequest.getHeaders().get("Authorization"));
+                        }
+                        // Credentials are required and are accepted, but this repository carries none of the
+                        // artifacts asked of it — the ordinary case for all but one repository in a list
+                        return recordedRequest.getHeaders().get("Authorization") == null ?
+                          new MockResponse().setResponseCode(401).setBody("") :
+                          new MockResponse().setResponseCode(404).setBody("");
+                    }
+                });
+                mockRepo.start();
+                var repositories = List.of(MavenRepository.builder()
+                  .id("id")
+                  .uri("http://%s:%d/maven".formatted(mockRepo.getHostName(), mockRepo.getPort()))
+                  .username("user")
+                  .password("pass")
+                  .build());
+
+                for (String artifactId : List.of("first", "second", "third")) {
+                    assertThrows(MavenDownloadingException.class, () -> downloader.download(
+                      new GroupArtifactVersion("fred", artifactId, "1.0.0"), null, null, repositories));
+                }
+
+                // The 404 to the credentialed retry proves the credentials were accepted, so the challenge is paid
+                // once for the repository rather than once per artifact, even though nothing was downloaded from it
+                assertThat(getRequestAuthHeaders.stream().filter(Objects::isNull).count()).isEqualTo(1);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        @Test
         void usesAuthenticationIfRepositoryHasCredentials() {
             var downloader = new MavenPomDownloader(emptyMap(), ctx);
             var gav = new GroupArtifactVersion("fred", "fred", "1.0.0");
