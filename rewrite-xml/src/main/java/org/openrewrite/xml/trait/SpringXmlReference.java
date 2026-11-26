@@ -55,7 +55,7 @@ public class SpringXmlReference extends XmlReference {
                             break;
                         case "key":
                             Cursor keyOwner = cursor.getParentTreeCursor();
-                            String name = localTagName(keyOwner);
+                            String name = new Namespaced(keyOwner).getLocalName().orElse("");
                             if (!("entry".equals(name) && isBeansNamespace(keyOwner)) &&
                                     !("prop".equals(name) && isPropsEntry(keyOwner))) {
                                 return null;
@@ -64,7 +64,7 @@ public class SpringXmlReference extends XmlReference {
                             break;
                         case "value":
                             Cursor parent = cursor.getParentTreeCursor();
-                            String owner = localTagName(parent);
+                            String owner = new Namespaced(parent).getLocalName().orElse("");
                             if (!"property".equals(owner) && !"constructor-arg".equals(owner) &&
                                     !"entry".equals(owner)) {
                                 return null;
@@ -85,7 +85,7 @@ public class SpringXmlReference extends XmlReference {
                     }
                     text = attribute.getValueAsString();
                 } else if (cursor.getValue() instanceof Xml.Tag) {
-                    switch (localTagName(cursor)) {
+                    switch (new Namespaced(cursor).getLocalName().orElse("")) {
                         case "value":
                             typeOnly = false;
                             break;
@@ -110,13 +110,6 @@ public class SpringXmlReference extends XmlReference {
             }
         }
 
-        private static String localTagName(Cursor cursor) {
-            if (!(cursor.getValue() instanceof Xml.Tag)) {
-                return "";
-            }
-            return Namespaced.extractLocalName(((Xml.Tag) cursor.getValue()).getName());
-        }
-
         private static boolean isBeansNamespace(Cursor cursor) {
             Namespaced element = new Namespaced(cursor);
             return element.getNamespaceUri().map(BEANS_NAMESPACE::equals)
@@ -125,7 +118,7 @@ public class SpringXmlReference extends XmlReference {
 
         private static boolean isPropsEntry(Cursor prop) {
             Cursor parent = prop.getParentTreeCursor();
-            String parentName = localTagName(parent);
+            String parentName = new Namespaced(parent).getLocalName().orElse("");
             return isBeansNamespace(prop) && ("props".equals(parentName) && isBeansNamespace(parent) ||
                     "properties".equals(parentName) &&
                             new Namespaced(parent).getNamespaceUri().filter(UTIL_NAMESPACE::equals).isPresent());
@@ -152,15 +145,13 @@ public class SpringXmlReference extends XmlReference {
                 Xml.Document doc = (Xml.Document) sourceFile;
                 Xml.Tag root = doc.getRoot();
                 if (root != null) {
-                    for (Xml.Attribute attrib : root.getAttributes()) {
-                        if ("xsi:schemaLocation".equals(attrib.getKeyAsString()) &&
-                                attrib.getValueAsString().contains("www.springframework.org/schema/beans")) {
-                            return true;
-                        }
+                    Namespaced namespacedRoot = new Namespaced(new Cursor(null, root));
+                    if (namespacedRoot.getSchemaLocations().stream().anyMatch(location ->
+                            location.getValueAsString().contains("www.springframework.org/schema/beans"))) {
+                        return true;
                     }
-                    if ("beans".equals(Namespaced.extractLocalName(root.getName())) &&
-                            new Namespaced(new Cursor(null, root)).getNamespaceUri().filter(BEANS_NAMESPACE::equals)
-                                    .isPresent()) {
+                    if ("beans".equals(namespacedRoot.getLocalName().orElse("")) &&
+                            namespacedRoot.getNamespaceUri().filter(BEANS_NAMESPACE::equals).isPresent()) {
                         return true;
                     }
                     return "beans".equals(root.getName()) && doc.getProlog().getMisc().stream()

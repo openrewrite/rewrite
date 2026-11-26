@@ -2103,13 +2103,13 @@ class ChangePackageTest implements RewriteTest {
           xml(
             """
               <?xml version="1.0" encoding="UTF-8"?>
-              <beans xsi:schemaLocation="www.springframework.org/schema/beans">
+              <beans xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="www.springframework.org/schema/beans">
                 <bean id="abc" class="test.type.A"/>
               </beans>
               """,
             """
               <?xml version="1.0" encoding="UTF-8"?>
-              <beans xsi:schemaLocation="www.springframework.org/schema/beans">
+              <beans xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="www.springframework.org/schema/beans">
                 <bean id="abc" class="test.test.type.A"/>
               </beans>
               """

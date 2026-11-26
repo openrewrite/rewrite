@@ -111,7 +111,7 @@ class SpringXmlReferenceTest implements RewriteTest {
     void unrelatedSpringValues() {
         rewriteRun(xml(
           """
-            <beans xsi:schemaLocation="www.springframework.org/schema/beans" xmlns:other="urn:other">
+            <beans xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="www.springframework.org/schema/beans" xmlns:other="urn:other">
               <other:property value="example.Old"/>
               <other:value>example.Old</other:value>
               <other:props><prop>example.Old</prop></other:props>
@@ -190,6 +190,30 @@ class SpringXmlReferenceTest implements RewriteTest {
           spec -> spec.beforeRecipe(doc -> assertThat(doc.getReferences().getReferences())
             .extracting(Reference::getValue).containsExactly("example.Spring"))
         ));
+    }
+
+    @Test
+    void schemaLocationUnderAnyPrefix() {
+        rewriteRun(
+          xml(
+            """
+              <beans xmlns:schema="http://www.w3.org/2001/XMLSchema-instance"
+                     schema:schemaLocation="http://www.springframework.org/schema/beans">
+                <bean class="example.Bean"/>
+              </beans>
+              """,
+            spec -> spec.beforeRecipe(doc -> assertThat(doc.getReferences().getReferences())
+              .extracting(Reference::getValue).containsExactly("example.Bean"))
+          ),
+          xml(
+            """
+              <beans xmlns:xsi="urn:other" xsi:schemaLocation="http://www.springframework.org/schema/beans">
+                <bean class="example.Bean"/>
+              </beans>
+              """,
+            spec -> spec.beforeRecipe(doc -> assertThat(doc.getReferences().getReferences()).isEmpty())
+          )
+        );
     }
 
     @Test

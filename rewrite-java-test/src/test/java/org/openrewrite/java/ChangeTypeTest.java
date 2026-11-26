@@ -3769,13 +3769,13 @@ class ChangeTypeTest implements RewriteTest {
           xml(
             """
               <?xml version="1.0" encoding="UTF-8"?>
-              <beans xsi:schemaLocation="www.springframework.org/schema/beans">
+              <beans xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="www.springframework.org/schema/beans">
                 <bean id="abc" class="test.type.A"/>
               </beans>
               """,
             """
               <?xml version="1.0" encoding="UTF-8"?>
-              <beans xsi:schemaLocation="www.springframework.org/schema/beans">
+              <beans xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="www.springframework.org/schema/beans">
                 <bean id="abc" class="test.type.B"/>
               </beans>
               """
@@ -3804,7 +3804,7 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void springPropertyValues() {
         String source = """
-          <beans xsi:schemaLocation="www.springframework.org/schema/beans">
+          <beans xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="www.springframework.org/schema/beans">
             <bean class="a.A1">
               <constructor-arg value="a.A1"/>
               <property name="implementation" value="a.A1"/>
