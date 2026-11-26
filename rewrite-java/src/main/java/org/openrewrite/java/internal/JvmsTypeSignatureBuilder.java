@@ -49,6 +49,9 @@ public class JvmsTypeSignatureBuilder implements JavaTypeSignatureBuilder {
     private Set<String> typeVariableNameStack;
 
     @Nullable
+    private Set<JavaType.GenericTypeVariable> wildcardStack;
+
+    @Nullable
     private Set<JavaType> parameterizedStack;
 
     @Override
@@ -102,7 +105,11 @@ public class JvmsTypeSignatureBuilder implements JavaTypeSignatureBuilder {
         if (typeVariableNameStack == null) {
             typeVariableNameStack = new LinkedHashSet<>();
         }
-        if (!"?".equals(gtv.getName()) && !typeVariableNameStack.add(gtv.getName())) {
+        if (wildcardStack == null) {
+            wildcardStack = newSetFromMap(new IdentityHashMap<>());
+        }
+        boolean wildcard = "?".equals(gtv.getName());
+        if (wildcard ? !wildcardStack.add(gtv) : !typeVariableNameStack.add(gtv.getName())) {
             s.append('}');
             return s.toString();
         }
@@ -126,7 +133,11 @@ public class JvmsTypeSignatureBuilder implements JavaTypeSignatureBuilder {
         }
 
         s.append(bounds).append('}');
-        typeVariableNameStack.remove(gtv.getName());
+        if (wildcard) {
+            wildcardStack.remove(gtv);
+        } else {
+            typeVariableNameStack.remove(gtv.getName());
+        }
 
         return s.toString();
     }

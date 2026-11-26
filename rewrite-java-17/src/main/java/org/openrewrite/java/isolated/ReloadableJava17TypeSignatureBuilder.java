@@ -27,13 +27,19 @@ import org.openrewrite.java.tree.JavaType;
 import javax.lang.model.type.NullType;
 import javax.lang.model.type.TypeMirror;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Set;
 import java.util.StringJoiner;
 
+import static java.util.Collections.newSetFromMap;
+
 class ReloadableJava17TypeSignatureBuilder implements JavaTypeSignatureBuilder {
     @Nullable
     private Set<String> typeVariableNameStack;
+
+    @Nullable
+    private Set<Type.CapturedType> capturedTypeStack;
 
     @Override
     public String signature(@Nullable Object t) {
@@ -134,8 +140,13 @@ class ReloadableJava17TypeSignatureBuilder implements JavaTypeSignatureBuilder {
         if (typeVariableNameStack == null) {
             typeVariableNameStack = new HashSet<>();
         }
+        if (capturedTypeStack == null) {
+            capturedTypeStack = newSetFromMap(new IdentityHashMap<>());
+        }
 
-        if (!typeVariableNameStack.add(name)) {
+        if (generic instanceof Type.CapturedType ?
+                !capturedTypeStack.add((Type.CapturedType) generic) :
+                !typeVariableNameStack.add(name)) {
             return "Generic{" + name + "}";
         }
 
@@ -165,7 +176,11 @@ class ReloadableJava17TypeSignatureBuilder implements JavaTypeSignatureBuilder {
             s.append(" extends ").append(boundSigStr);
         }
 
-        typeVariableNameStack.remove(name);
+        if (generic instanceof Type.CapturedType) {
+            capturedTypeStack.remove(generic);
+        } else {
+            typeVariableNameStack.remove(name);
+        }
 
         return s.append("}").toString();
     }

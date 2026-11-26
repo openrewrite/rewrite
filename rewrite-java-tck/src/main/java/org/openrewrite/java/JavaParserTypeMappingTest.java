@@ -242,6 +242,38 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
         );
     }
 
+    @Test
+    void captureBoundedByCaptureOfCapture() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  static class Box<A extends Number, B extends A, C extends B> {
+                      C c() {
+                          return null;
+                      }
+                  }
+
+                  void test(Box<?, ?, ?> box) {
+                      box.c();
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                AtomicReference<JavaType> type = new AtomicReference<>();
+                new JavaIsoVisitor<Integer>() {
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                        type.set(method.getType());
+                        return super.visitMethodInvocation(method, p);
+                    }
+                }.visit(cu, 0);
+                assertThat(type.get()).hasToString("Generic{? extends Generic{? extends Generic{? extends java.lang.Number}}}");
+            })
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1762")
     @MinimumJava11
     @Test
