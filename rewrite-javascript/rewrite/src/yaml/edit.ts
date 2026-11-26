@@ -136,17 +136,19 @@ export function yamlScalar(value: YamlPrimitive, prefix: string = ""): Yaml.Scal
 }
 
 /**
- * Sets a scalar's value, keeping its quoting where the value allows. A multi-line string keeps a block scalar, and a
- * core schema tag such as `!!str` is dropped.
+ * Sets a scalar's value, keeping its quoting where the value allows. A string keeps a block scalar, and a `|` or `>`
+ * block adds the final line break its header implies, as Java's `BlockScalar` does. A core schema tag such as `!!str`
+ * is dropped.
  */
 export function setScalarValue(scalar: Yaml.Scalar, value: YamlPrimitive): Yaml.Scalar {
-    if (scalarPlain(scalar) === value) {
+    const current = scalarPlain(scalar);
+    if (current === value || (isClipBlock(scalar) && current === value + "\n")) {
         return scalar;
     }
     const dropTag = scalar.tag !== undefined && isCoreTag(scalar.tag);
     const tag = dropTag ? undefined : scalar.tag;
     const prefix = (isEmptyValue(scalar) ? " " : scalar.prefix) + (dropTag ? scalar.tag!.prefix : "");
-    if (typeof value === "string" && value.includes("\n") &&
+    if (typeof value === "string" &&
         (scalar.style === Yaml.ScalarStyle.LITERAL || scalar.style === Yaml.ScalarStyle.FOLDED)) {
         const text = literalText(scalar, value);
         if (text !== undefined) {
@@ -506,10 +508,19 @@ function literalText(old: Yaml.Scalar, value: string): string | undefined {
         return undefined;
     }
     const eol = eolOf(old.value);
-    const content = value.endsWith("\n") ? value.slice(0, -1) : value;
-    const text = (value.endsWith("\n") ? "" : "-") + comment.replace(/\r$/, "") + eol +
+    const body = isClipBlock(old) && !value.endsWith("\n") ? value + "\n" : value;
+    const content = body.endsWith("\n") ? body.slice(0, -1) : body;
+    const text = (body.endsWith("\n") ? "" : "-") + comment.replace(/\r$/, "") + eol +
         content.split("\n").map(line => line === "" ? "" : indent + line).join(eol) + tailOf(old);
-    return decode(Yaml.ScalarStyle.LITERAL, text) === value ? text : undefined;
+    return decode(Yaml.ScalarStyle.LITERAL, text) === body ? text : undefined;
+}
+
+/**
+ * A `|` or `>` block scalar, whose header keeps one final line break.
+ */
+function isClipBlock(scalar: Yaml.Scalar): boolean {
+    return (scalar.style === Yaml.ScalarStyle.LITERAL || scalar.style === Yaml.ScalarStyle.FOLDED) &&
+        !/^[-+]/.test(scalar.value);
 }
 
 function isNode(value: YamlValue | undefined): value is Yaml.Block {

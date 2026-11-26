@@ -148,14 +148,24 @@ describe("scalar values", () => {
             .toBe("run: |\n  npm ci\n  npm run build\nnext: 1\n");
     });
 
-    test("rewrites a block scalar without a final line break", async () => {
+    test("keeps the header of a block scalar, as Java's BlockScalar does", async () => {
         expect(await edit("run: |\n  npm ci\nnext: 1\n", docs => setAt(docs, ["run"], "npm ci\nnpm test")))
-            .toBe("run: |-\n  npm ci\n  npm test\nnext: 1\n");
+            .toBe("run: |\n  npm ci\n  npm test\nnext: 1\n");
     });
 
-    test("writes a single line in place of a block scalar as a plain scalar", async () => {
+    test("writes a single line in place of a block scalar as a block scalar", async () => {
         expect(await edit("run: >\n  npm ci\nnext: 1\n", docs => setAt(docs, ["run"], "npm test")))
-            .toBe("run: npm test\nnext: 1\n");
+            .toBe("run: |\n  npm test\nnext: 1\n");
+    });
+
+    test("leaves a block scalar whose value differs only by the final line break its header adds", async () => {
+        const docs = await parse("run: |\n  npm ci\nnext: 1\n");
+        expect(setAt(docs, ["run"], "npm ci")).toBe(docs);
+    });
+
+    test("keeps a block scalar without a final line break", async () => {
+        expect(await edit("run: |-\n  npm ci\nnext: 1\n", docs => setAt(docs, ["run"], "npm test")))
+            .toBe("run: |-\n  npm test\nnext: 1\n");
     });
 
     test("keeps the line break after a block scalar replaced by a plain value", async () => {
@@ -163,13 +173,13 @@ describe("scalar values", () => {
     });
 
     test("keeps the line break after a block scalar that is the last item of a nested sequence", async () => {
-        expect(await editSequence("a:\n  - |\n    x\nb: 1\n", ["a"], seq => mapItems(seq, () => "z")))
-            .toBe("a:\n  - z\nb: 1\n");
+        expect(await editSequence("a:\n  - |\n    x\nb: 1\n", ["a"], seq => mapItems(seq, () => 5)))
+            .toBe("a:\n  - 5\nb: 1\n");
     });
 
     test("keeps the line break after a block scalar in the middle of a sequence", async () => {
-        expect(await editSequence("a:\n  - |\n    x\n  - y\n", ["a"], seq => mapItems(seq, (item, i) => i === 0 ? "z" : item)))
-            .toBe("a:\n  - z\n  - y\n");
+        expect(await editSequence("a:\n  - |\n    x\n  - y\n", ["a"], seq => mapItems(seq, (item, i) => i === 0 ? 5 : item)))
+            .toBe("a:\n  - 5\n  - y\n");
     });
 
     test("yamlScalar writes plain where it reads back the same", () => {
