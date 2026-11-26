@@ -1415,6 +1415,34 @@ class RemoveImportTest implements RewriteTest {
     }
 
     @Test
+    void keepStaticImportOfUsedNestedType() {
+        rewriteRun(
+          spec -> spec.recipe(removeImport("a.Outer$Inner")),
+          java(
+            """
+              package a;
+
+              public class Outer {
+                  public static class Inner {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package c;
+
+              import static a.Outer.Inner;
+
+              class C {
+                  Inner inner;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void keepStaticImportOfAFieldNamedLikeTheRemovedNestedType() {
         rewriteRun(
           spec -> spec.recipe(removeImport("a.Outer$Inner")),

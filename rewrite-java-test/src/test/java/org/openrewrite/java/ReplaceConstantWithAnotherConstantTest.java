@@ -1170,7 +1170,11 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
         }
 
         @ParameterizedTest
-        @CsvSource({"Environment, Environment", "Outer, Outer.Env", "Environment, example.Environment"})
+        @CsvSource({
+          "Environment, Environment",
+          "Outer, Outer.Env",
+          "Environment, example.Environment"
+        })
         void removeUnusedSubtypeImport(String importedType, String qualifier) {
             rewriteRun(
               java(
@@ -1309,6 +1313,28 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
 
                   class Test {
                       String key = Config.NEW;
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void replaceConstantReadThroughThis() {
+            rewriteRun(
+              java(
+                """
+                  import example.Settings;
+
+                  class Test implements Settings {
+                      String key = this.OLD;
+                  }
+                  """,
+                """
+                  import example.Settings;
+
+                  class Test implements Settings {
+                      String key = Settings.NEW;
                   }
                   """
               )

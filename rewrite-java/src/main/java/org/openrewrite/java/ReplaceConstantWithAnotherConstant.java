@@ -123,8 +123,7 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
             } else if (expression instanceof J.FieldAccess) {
                 J.FieldAccess fieldAccess = (J.FieldAccess) expression;
                 Expression target = fieldAccess.getTarget();
-                Expression targetName = target instanceof J.FieldAccess ? ((J.FieldAccess) target).getName() : target;
-                if (targetName instanceof J.Identifier && ((J.Identifier) targetName).getFieldType() == null) {
+                if (isTypeReference(target)) {
                     maybeRemoveTypeImports(TypeUtils.asFullyQualified(target.getType()));
                 }
                 if (hasNoConflictingImport) {
@@ -144,6 +143,14 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
                         .withName(name);
             }
             return expression;
+        }
+
+        private static boolean isTypeReference(Expression target) {
+            J.Identifier name = target instanceof J.FieldAccess ? ((J.FieldAccess) target).getName() :
+                    target instanceof J.Identifier ? (J.Identifier) target : null;
+            JavaType.FullyQualified type = TypeUtils.asFullyQualified(target.getType());
+            return name != null && name.getFieldType() == null && type != null &&
+                   simpleName(type.getFullyQualifiedName()).equals(name.getSimpleName());
         }
 
         private void maybeRemoveTypeImports(JavaType.@Nullable FullyQualified type) {
