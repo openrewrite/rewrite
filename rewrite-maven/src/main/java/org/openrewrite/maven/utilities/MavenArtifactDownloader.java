@@ -171,6 +171,10 @@ public class MavenArtifactDownloader {
                     }
                     // Retry with credentials if the anonymous request failed with a client error
                     if (responseBytes == null && !preemptive && isClientSideError(responseCode) && hasAuthentication(repository)) {
+                        // Only a 401 asks for credentials: a 403 is a decision about credentials already sent,
+                        // and a 407 asks on the proxy's behalf. Without a challenge this endpoint must not be
+                        // remembered, or credentials would go to a repository that serves anonymously.
+                        boolean challenged = responseCode == 401;
                         HttpSender.Request.Builder request = applyAuthentication(repository, httpSender.get(uri));
                         try (HttpSender.Response response = Failsafe.with(retryPolicy).get(() -> httpSender.send(request.build()));
                              InputStream body = response.getBody()) {
@@ -180,7 +184,7 @@ public class MavenArtifactDownloader {
                                 responseBytes = readAllBytes(body);
                             }
                         }
-                        if (endpoint != null && isCredentialsAccepted(responseCode)) {
+                        if (endpoint != null && challenged && isCredentialsAccepted(responseCode)) {
                             authenticationRequiredEndpoints.add(endpoint);
                         }
                     }
@@ -237,11 +241,10 @@ public class MavenArtifactDownloader {
     }
 
     /**
-     * Whether a credentialed response proves the credentials were accepted, and so that this endpoint may be
-     * authenticated preemptively from here on. A 404 qualifies — the repository simply does not carry this
-     * artifact — and it is the usual answer from every repository but the one an artifact comes from, so arming
-     * only on a 200 would leave most artifacts paying another anonymous round-trip. Mirrors Apache HttpClient,
-     * the layer Maven Resolver's auth cache is built on, which arms on any answer but a fresh challenge.
+     * Whether a credentialed response, sent in answer to a challenge, was not refused. A 404 qualifies — the
+     * repository simply does not carry this artifact — and it is the usual answer from every repository but the one
+     * an artifact comes from, so arming only on a 200 would leave most artifacts paying another anonymous
+     * round-trip.
      */
     private static boolean isCredentialsAccepted(int responseCode) {
         return responseCode >= 100 && (responseCode < 401 || responseCode > 403);

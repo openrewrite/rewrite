@@ -2013,6 +2013,53 @@ class MavenPomDownloaderTest implements RewriteTest {
         }
 
         @Test
+        void doesNotRememberAuthenticationForARepositoryThatNeverChallenged() {
+            var downloader = new MavenPomDownloader(emptyMap(), ctx);
+            try (MockWebServer mockRepo = getMockServer()) {
+                List<String> requests = synchronizedList(new ArrayList<>());
+                mockRepo.setDispatcher(new Dispatcher() {
+                    @Override
+                    public MockResponse dispatch(RecordedRequest recordedRequest) {
+                        String path = Objects.requireNonNull(recordedRequest.getPath());
+                        requests.add(recordedRequest.getMethod() + ' ' + path + " credentials=" +
+                                     (recordedRequest.getHeaders().get("Authorization") == null ? "none" : "sent"));
+                        // Serves anonymously and never challenges; it just does not carry "absent"
+                        return path.contains("/present/") ?
+                          new MockResponse().setResponseCode(200).setBody(
+                            //language=xml
+                            """
+                              <project>
+                                  <groupId>fred</groupId>
+                                  <artifactId>present</artifactId>
+                                  <version>1.0.0</version>
+                              </project>
+                              """) :
+                          new MockResponse().setResponseCode(404).setBody("");
+                    }
+                });
+                mockRepo.start();
+                var repositories = List.of(MavenRepository.builder()
+                  .id("id")
+                  .uri("http://%s:%d/maven".formatted(mockRepo.getHostName(), mockRepo.getPort()))
+                  .username("user")
+                  .password("pass")
+                  .build());
+
+                assertThrows(MavenDownloadingException.class, () -> downloader.download(
+                  new GroupArtifactVersion("fred", "absent", "1.0.0"), null, null, repositories));
+                assertDoesNotThrow(() -> downloader.download(
+                  new GroupArtifactVersion("fred", "present", "1.0.0"), null, null, repositories));
+
+                // The miss on "absent" is answered 404, not 401, so this repository has never asked for credentials.
+                // Remembering it off a bare 404 would hand them to a server that serves anonymously — the leak the
+                // first anonymous request exists to prevent.
+                assertThat(requests).contains("GET /maven/fred/present/1.0.0/present-1.0.0.pom credentials=none");
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        @Test
         void usesAuthenticationIfRepositoryHasCredentials() {
             var downloader = new MavenPomDownloader(emptyMap(), ctx);
             var gav = new GroupArtifactVersion("fred", "fred", "1.0.0");

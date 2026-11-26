@@ -52,10 +52,14 @@ final class RemoteDownload {
         if (!isClientSideError(anonymous.getCode())) {
             return anonymous;
         }
+        // Only a 401 asks for credentials: a 403 is a decision about credentials already sent, and a 407 asks on
+        // the proxy's behalf. Without a challenge this endpoint must not be remembered as requiring authentication,
+        // or credentials would be attached to a server that serves anonymously.
+        boolean challenged = anonymous.getCode() == 401;
         anonymous.close();
 
         HttpSender.Response authenticated = httpSender.send(authenticator.authenticate(uri, httpSender.get(uri.toString())).build());
-        if (endpoint != null && isCredentialsAccepted(authenticated.getCode())) {
+        if (endpoint != null && challenged && isCredentialsAccepted(authenticated.getCode())) {
             authenticationRequiredEndpoints.add(endpoint);
         }
         return authenticated;
@@ -76,10 +80,9 @@ final class RemoteDownload {
     }
 
     /**
-     * Whether a credentialed response proves the credentials were accepted, and so that this endpoint may be
-     * authenticated preemptively from here on. A 404 qualifies — the resource simply is not there — and must arm
-     * the decision just as a 200 does, or every miss pays another anonymous round-trip. Mirrors Apache HttpClient,
-     * the layer Maven Resolver's auth cache is built on, which arms on any answer but a fresh challenge.
+     * Whether a credentialed response, sent in answer to a challenge, was not refused. A 404 qualifies — the
+     * resource simply is not there — and must arm the decision just as a 200 does, or every miss pays another
+     * anonymous round-trip.
      */
     private static boolean isCredentialsAccepted(int responseCode) {
         return responseCode >= 100 && (responseCode < 401 || responseCode > 403);

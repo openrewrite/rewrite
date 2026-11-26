@@ -1278,15 +1278,18 @@ public class MavenPomDownloader {
     }
 
     private byte[] retryRequestWithCredentials(MavenRepository repo, String uriString, HttpSenderResponseException anonymousException) throws HttpSenderResponseException, IOException {
+        boolean challenged = anonymousException.isAuthenticationChallenge();
         try {
             byte[] responseBody = sendRequest(applyAuthenticationAndTimeoutToRequest(repo, httpSender.get(uriString)).build());
-            rememberAuthenticationRequired(uriString);
+            if (challenged) {
+                rememberAuthenticationRequired(uriString);
+            }
             return responseBody;
         } catch (HttpSenderResponseException retryException) {
             if (retryException.isAccessDenied()) {
                 throw anonymousException;
             }
-            if (retryException.isServerReached()) {
+            if (challenged && retryException.isServerReached()) {
                 rememberAuthenticationRequired(uriString);
             }
             throw retryException;
@@ -1294,12 +1297,14 @@ public class MavenPomDownloader {
     }
 
     /**
-     * A credentialed request that is not met with a fresh challenge proves the credentials were accepted, whatever
-     * the response then goes on to say about the artifact; Apache HttpClient, the layer Maven Resolver's auth cache
-     * is built on, arms that cache on exactly this condition rather than on a 200. The distinction decides how often
-     * the challenge is paid: resolution asks every repository in the list for every artifact, so most credentialed
-     * requests to any one repository answer 404, and arming only on a 200 leaves this set empty for as long as a
-     * repository serves nothing but misses — every one of which then re-probes anonymously.
+     * Call only once a 401 has been answered with credentials the endpoint did not refuse — the same two halves
+     * Apache HttpClient's {@code AuthCache} arms on, the layer Maven Resolver's auth cache is built on. A 401 must
+     * have happened, or the endpoint never asked for credentials and recording it would attach them to every later
+     * request to a server that serves anonymously. The credentialed request, though, need only avoid a fresh
+     * challenge and not succeed: resolution asks every repository in the list for every artifact, so most
+     * credentialed requests to any one repository answer 404, and arming on a 200 alone would leave this set empty
+     * for as long as a repository serves nothing but misses — every one of which then pays another anonymous
+     * round-trip.
      */
     private void rememberAuthenticationRequired(String uriString) {
         String endpoint = endpointOrNull(URI.create(uriString));
@@ -1449,6 +1454,14 @@ public class MavenPomDownloader {
 
         public boolean isAccessDenied() {
             return responseCode != null && 400 < responseCode && responseCode <= 403;
+        }
+
+        /**
+         * Only a 401 asks for credentials: a 403 is a decision about credentials already sent, and a 407 asks on
+         * the proxy's behalf, which repository credentials would not answer.
+         */
+        public boolean isAuthenticationChallenge() {
+            return responseCode != null && responseCode == 401;
         }
 
         public boolean isThrottled() {
