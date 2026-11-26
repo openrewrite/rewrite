@@ -93,6 +93,7 @@ export class JavaScriptTypeMapping {
     private readonly methodCache: Map<string, Type.Method> = new Map();
 
     private readonly regExpSymbol: ts.Symbol | undefined;
+    private readonly nonNullableSymbol: ts.Symbol | undefined;
     private readonly stringWrapperType: ts.Type | undefined;
     private readonly numberWrapperType: ts.Type | undefined;
     private readonly booleanWrapperType: ts.Type | undefined;
@@ -119,6 +120,7 @@ export class JavaScriptTypeMapping {
         private readonly sourceRoot?: string,
         private readonly sourceIsPackage: boolean = false
     ) {
+        this.nonNullableSymbol = checker.resolveName("NonNullable", undefined, ts.SymbolFlags.TypeAlias, false);
         this.regExpSymbol = checker.resolveName(
             "RegExp",
             undefined,
@@ -304,6 +306,15 @@ export class JavaScriptTypeMapping {
         return type ? this.getType(type) : undefined;
     }
 
+    private nonNullableArgument(type: ts.Type): ts.Type | undefined {
+        const argument = type.aliasTypeArguments?.length === 1 ? type.aliasTypeArguments[0] : undefined;
+        if (!this.nonNullableSymbol || type.aliasSymbol !== this.nonNullableSymbol || !argument || argument.flags & ts.TypeFlags.Instantiable) {
+            return undefined;
+        }
+        const stripped = this.checker.getNonNullableType(argument);
+        return stripped === type ? undefined : stripped;
+    }
+
     private getType(type: ts.Type): Type {
         // Check for error types first - these indicate type-checking failures
         // and should not be processed further
@@ -312,6 +323,13 @@ export class JavaScriptTypeMapping {
             if (intrinsicName === 'error') {
                 return Type.unknownType;
             }
+        }
+
+        // The lib's `NonNullable<T>` is `T & {}`, which the alias naming below would turn into an
+        // empty `NonNullable`, hiding `T` (e.g. the document Mongoose's `orFail()` resolves to).
+        const nonNullable = this.nonNullableArgument(type);
+        if (nonNullable) {
+            return this.getType(nonNullable);
         }
 
         // A type alias to an intersection or a plain anonymous object (e.g. kafkajs's

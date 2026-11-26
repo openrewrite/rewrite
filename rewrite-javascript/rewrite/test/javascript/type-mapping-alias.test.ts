@@ -84,4 +84,31 @@ const cons = kafka.consumer({groupId: 'g'});
         expect(captured.get('prod')).toBe('kafkajs.Producer');
         expect(captured.get('cons')).toBe('kafkajs.Consumer');
     }, 240000);
+
+    // Mongoose's `orFail()` returns `NonNullable<HydratedDocument<...>>`, where the document is an
+    // intersection: `NonNullable<Doc & Extra>` stays an intersection carrying the `NonNullable` alias.
+    test('NonNullable<T> maps to T without null and undefined', async () => {
+        const captured = new Map<string, string>();
+        const spec = new RecipeSpec();
+        spec.recipe = captureIdentifierTypes(['plain', 'stripped', 'found', 'own'], captured);
+
+        await spec.rewriteRun(
+            //language=typescript
+            typescript(`
+                export {};
+                class Doc { name = ''; }
+                interface Extra { id: string; }
+                type NonNullable<T> = T & {brand: true};
+                declare function orFail<T>(value: T): globalThis.NonNullable<T>;
+                declare const plain: Doc & Extra;
+                declare const stripped: globalThis.NonNullable<Doc & Extra>;
+                const found = orFail(null as (Doc & Extra) | null | undefined);
+                declare const own: NonNullable<Doc & Extra>;
+            `)
+        );
+
+        expect(captured.get('stripped')).toBe(captured.get('plain'));
+        expect(captured.get('found')).toBe(captured.get('plain'));
+        expect(captured.get('own')).not.toBe(captured.get('plain'));
+    });
 });
