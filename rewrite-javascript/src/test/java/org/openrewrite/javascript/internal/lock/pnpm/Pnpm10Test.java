@@ -54,6 +54,10 @@ class Pnpm10Test {
     private static final Map<String, String> RECORDED_AS = Map.ofEntries(
       // v10.12.0..v10.12.1 holds one commit, which makes @pnpm/tsconfig private
       Map.entry("10.12.0", "10.12.1"),
+      // v10.12.1..v10.12.3: hoisting, the global virtual store, deploy and refactors
+      Map.entry("10.12.2", "10.12.1"), Map.entry("10.12.3", "10.12.1"),
+      // v10.12.4..v10.13.1: pnpmfiles and patches (refused), the workspace manifest writer's sort, builds, lifecycle
+      Map.entry("10.13.0", "10.12.4"), Map.entry("10.13.1", "10.12.4"),
       // v10.16.0..v10.18.2: release-age rules (refused from 10.16.0 to 10.32.x), catalog cleanup on remove, store,
       // build and reporting changes
       Map.entry("10.16.0", "10.17.0"), Map.entry("10.16.1", "10.17.0"), Map.entry("10.17.1", "10.17.0"),
@@ -64,6 +68,12 @@ class Pnpm10Test {
       // the outdated-settings check, update of indirect dependencies, store, build and reporting changes
       Map.entry("10.21.0", "10.24.0"), Map.entry("10.22.0", "10.24.0"), Map.entry("10.23.0", "10.24.0"),
       Map.entry("10.25.0", "10.24.0"),
+      // v10.27.0..v10.28.0: a filtered install's locked manifests from the store, a pack hook, requiredScripts
+      Map.entry("10.27.0", "10.28.0"),
+      // v10.29.2..v10.30.1: audit, list and why, dlx, deploy, worktree filters, tinyglobby 0.2.15 (globs alike)
+      Map.entry("10.29.2", "10.29.3"), Map.entry("10.30.0", "10.29.3"), Map.entry("10.30.1", "10.29.3"),
+      // v10.30.2..v10.30.3: @pnpm/exe's setup
+      Map.entry("10.30.2", "10.30.3"),
       // v10.33.0..v10.33.3: self-update, npm passthrough, global bin shim, fork-bomb guard and picomatch 4.0.3 to 4.0.4
       Map.entry("10.33.1", "10.33.0"), Map.entry("10.33.2", "10.33.0"), Map.entry("10.33.3", "10.33.0"),
       // v10.34.5..v10.34.9: self-update, signing keys, headless and modules-cleaner, Node 24 for @pnpm/exe
