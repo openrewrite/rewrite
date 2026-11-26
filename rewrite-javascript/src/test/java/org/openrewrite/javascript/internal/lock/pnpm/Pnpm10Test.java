@@ -53,6 +53,9 @@ class Pnpm10Test {
      */
     private static final Map<String, String> RECORDED_AS = Map.ofEntries(
       // v10.12.0..v10.12.1 holds one commit, which makes @pnpm/tsconfig private
+      // v10.11.1..v10.12.1: catalogMode, the catalog resolution rework, the global virtual store, updating catalogs,
+      // the dependency graph hash, tinyglobby 0.2.14, the CI setting (none of them answers otherwise for the lock)
+      Map.entry("10.11.1", "10.12.1"),
       Map.entry("10.12.0", "10.12.1"),
       // v10.12.1..v10.12.3: hoisting, the global virtual store, deploy and refactors
       Map.entry("10.12.2", "10.12.1"), Map.entry("10.12.3", "10.12.1"),
@@ -69,6 +72,9 @@ class Pnpm10Test {
       Map.entry("10.21.0", "10.24.0"), Map.entry("10.22.0", "10.24.0"), Map.entry("10.23.0", "10.24.0"),
       Map.entry("10.25.0", "10.24.0"),
       // v10.27.0..v10.28.0: a filtered install's locked manifests from the store, a pack hook, requiredScripts
+      // v10.26.0..v10.26.2: blockExoticSubdeps on add (no exotic dependency is in the profile), git and binary
+      // fetchers, engine bins, prefer-offline network use, a release-age message
+      Map.entry("10.26.0", "10.26.1"), Map.entry("10.26.2", "10.26.1"),
       Map.entry("10.27.0", "10.28.0"),
       // v10.29.2..v10.30.1: audit, list and why, dlx, deploy, worktree filters, tinyglobby 0.2.15 (globs alike)
       Map.entry("10.29.2", "10.29.3"), Map.entry("10.30.0", "10.29.3"), Map.entry("10.30.1", "10.29.3"),
@@ -77,6 +83,8 @@ class Pnpm10Test {
       // v10.33.0..v10.33.3: self-update, npm passthrough, global bin shim, fork-bomb guard and picomatch 4.0.3 to 4.0.4
       Map.entry("10.33.1", "10.33.0"), Map.entry("10.33.2", "10.33.0"), Map.entry("10.33.3", "10.33.0"),
       // v10.34.5..v10.34.9: self-update, signing keys, headless and modules-cleaner, Node 24 for @pnpm/exe
+      // v10.34.3..v10.34.4: hoisted node_modules aliases, config dependency names and patch-remove contained
+      Map.entry("10.34.3", "10.34.4"),
       Map.entry("10.34.5", "10.34.9"), Map.entry("10.34.6", "10.34.9"), Map.entry("10.34.7", "10.34.9"),
       Map.entry("10.34.8", "10.34.9")
     );
@@ -169,7 +177,7 @@ class Pnpm10Test {
         for (String version : pnpm10Releases().collect(Collectors.toList())) {
             assertThat(PnpmReleases.runs(version)).hasToString(version);
         }
-        for (String version : new String[]{"10.0.1", "10.11.1", "10.34.4", "^10.0.0"}) {
+        for (String version : new String[]{"10.0.1", "10.15.0", "10.31.0", "10.34.2", "^10.0.0"}) {
             assertThatThrownBy(() -> PnpmReleases.installs(version))
               .isInstanceOf(org.openrewrite.javascript.internal.lock.CannotKnow.class);
         }
