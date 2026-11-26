@@ -256,4 +256,20 @@ class SequenceTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void commaAfterSupplementaryCharacterInComment() {
+        rewriteRun(
+          yaml(
+            """
+              [
+                1 # \uD83D\uDE00
+                , [2] # \uD83D\uDE00
+                , a: 3 # \uD83D\uDE00
+                , 4
+              ]
+              """
+          )
+        );
+    }
 }

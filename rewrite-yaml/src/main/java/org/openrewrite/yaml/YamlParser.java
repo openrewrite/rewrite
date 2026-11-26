@@ -683,16 +683,15 @@ public class YamlParser implements org.openrewrite.Parser {
         }
     }
 
-    /**
-     * Pushes an item onto a sequence with the whitespace between it and the comma after it, as in {@code [1 , 2]},
-     * and returns where the item ends, past that comma.
-     */
     private static int pushSequenceItem(FormatPreservingReader reader, Parser parser, SequenceBuilder builder,
                                         Yaml.Block item, int itemEnd) {
         String betweenEvents = reader.readStringFromBuffer(itemEnd, parser.peekEvent().getStartMark().getIndex() - 1);
         int commaIndex = commentAwareIndexOf(',', betweenEvents);
         builder.push(item, commaIndex == -1 ? null : betweenEvents.substring(0, commaIndex));
-        return itemEnd + commaIndex + 1;
+        if (commaIndex == -1) {
+            return itemEnd;
+        }
+        return itemEnd + betweenEvents.codePointCount(0, commaIndex) + 1;
     }
 
     /*
