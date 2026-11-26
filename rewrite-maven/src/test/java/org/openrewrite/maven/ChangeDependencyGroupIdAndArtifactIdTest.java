@@ -4187,6 +4187,87 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/10140")
+    @Test
+    void noSiblingExclusionWhenOldDependencyIsNotDeclared() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "org.bouncycastle",
+            "bcutil-jdk15on",
+            null,
+            "bcutil-jdk18on",
+            null,
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.example</groupId>
+                  <artifactId>example</artifactId>
+                  <version>1.0</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.bouncycastle</groupId>
+                          <artifactId>bcpkix-jdk18on</artifactId>
+                          <version>1.78.1</version>
+                          <exclusions>
+                              <exclusion>
+                                  <groupId>org.bouncycastle</groupId>
+                                  <artifactId>bcutil-jdk15on</artifactId>
+                              </exclusion>
+                          </exclusions>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/10140")
+    @Test
+    void noSiblingExclusionOnStarterWhenOldDependencyIsNotDeclared() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "javax.annotation",
+            "javax.annotation-api",
+            "jakarta.annotation",
+            "jakarta.annotation-api",
+            "1.3.x",
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <parent>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-parent</artifactId>
+                      <version>3.2.12</version>
+                      <relativePath/>
+                  </parent>
+                  <groupId>com.example</groupId>
+                  <artifactId>example</artifactId>
+                  <version>1.0</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.springframework.boot</groupId>
+                          <artifactId>spring-boot-starter</artifactId>
+                          <exclusions>
+                              <exclusion>
+                                  <groupId>javax.annotation</groupId>
+                                  <artifactId>javax.annotation-api</artifactId>
+                              </exclusion>
+                          </exclusions>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
     @Test
     void shouldNotChangeDependencyWithImplicitlyDefinedVersionProperty() {
         rewriteRun(

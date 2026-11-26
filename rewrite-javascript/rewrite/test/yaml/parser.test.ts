@@ -867,3 +867,59 @@ describe('Flow sequence without a trailing entry', () => {
         }
     }));
 });
+
+describe('Empty values', () => {
+    const rootEntries = (docs: Yaml.Documents) => (docs.documents[0].block as Yaml.Mapping).entries;
+
+    test('the line break after an empty value is the prefix of the next entry', async () => {
+        const docs = await parseYaml("a:\nb: 1\n");
+        const [a, b] = rootEntries(docs);
+        expect((a.value as Yaml.Scalar).value).toBe("");
+        expect(a.value.prefix).toBe("");
+        expect(b.prefix).toBe("\n");
+    });
+
+    test('a comment after an empty value is the prefix of the next entry', async () => {
+        const docs = await parseYaml("a: # c\nb: 1\n");
+        const [a, b] = rootEntries(docs);
+        expect(a.value.prefix).toBe("");
+        expect(b.prefix).toBe(" # c\n");
+    });
+
+    test('the line break after an empty last value is the prefix of the document end', async () => {
+        const docs = await parseYaml("a: 1\nb:\n");
+        expect(rootEntries(docs)[1].value.prefix).toBe("");
+        expect(docs.documents[0].end.prefix).toBe("\n");
+    });
+
+    test('the line break after an empty last value of a nested mapping is the prefix of the next entry', async () => {
+        const docs = await parseYaml("on:\n  push:\n  workflow_dispatch:\nnext: 1\n");
+        const [on, next] = rootEntries(docs);
+        const [push, dispatch] = (on.value as Yaml.Mapping).entries;
+        expect(push.value.prefix).toBe("");
+        expect(dispatch.prefix).toBe("\n  ");
+        expect(dispatch.value.prefix).toBe("");
+        expect(next.prefix).toBe("\n");
+    });
+
+    test('the line break after an empty sequence item is the prefix of the next item', async () => {
+        const docs = await parseYaml("a:\n  -\n  - b\n");
+        const [empty, b] = (rootEntries(docs)[0].value as Yaml.Sequence).entries;
+        expect(empty.block.prefix).toBe("");
+        expect(b.prefix).toBe("\n  ");
+    });
+
+    test.each([
+        "a:\nb: 1\n",
+        "a: # c\nb: 1\n",
+        "a: 1\nb:\n",
+        "a:\n  -\n  - b\n",
+        "-\n- a\n",
+        "x: {a: , b: 1}\n",
+        "x: {a:}\n",
+        "a:\r\n  b:\r\nc: 1\r\n",
+        "a:"
+    ])('prints %j as it was', async text => {
+        expect(await parseAndPrint(text)).toBe(text);
+    });
+});

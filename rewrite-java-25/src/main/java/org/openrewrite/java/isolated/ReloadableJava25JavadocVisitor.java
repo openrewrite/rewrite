@@ -1147,6 +1147,9 @@ public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                 if (lineBreak != null) {
                     texts.add(lineBreak);
                 }
+                if (cursor < source.length() && source.charAt(cursor) != c) {
+                    text.append(whitespaceBeforeAsString(ch -> ch != c && isInlineWhitespace(ch)));
+                }
             }
             if (c == '\n') {
                 if (text.length() > 0) {
