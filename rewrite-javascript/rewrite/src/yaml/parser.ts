@@ -732,9 +732,9 @@ class YamlCstReader {
             };
             trailing = entryResult.trailingContent;
         } else if (item.value) {
-            prefix += this.concatenateSources(startTokens);
             const valueResult = this.convertTokenWithTrailing(item.value);
-            block = valueResult.node as Yaml.Block;
+            block = this.prependWhitespaceToValue(valueResult.node as Yaml.Block, prefix + this.concatenateSources(startTokens));
+            prefix = "";
             trailing = valueResult.trailing;
         } else {
             prefix += this.concatenateSources(startTokens);
