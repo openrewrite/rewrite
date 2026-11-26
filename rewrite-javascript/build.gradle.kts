@@ -469,6 +469,8 @@ extensions.configure<LicenseExtension> {
         "**/semver/fixtures-*", "**/semver/release-differences", "**/bun/hosted-git-info-valid", "**/bun/ini-cases",
         "**/npm-resolver/gh-acme-private", "**/npm-resolver/jsr-*"
     ))
+    // Real pnpm's recorded inputs and outcomes, compared byte for byte
+    exclude("**/pnpm/pnpm10/**")
 //    includePatterns.addAll(
 //        listOf("**/*.ts")
 //    )

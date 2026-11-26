@@ -842,6 +842,225 @@ class Pnpm10Test {
         }
     }
 
+    /**
+     * A pnpm-workspace.yaml holding a setting but no packages, beside package.json files in other directories, as
+     * pnpm read it: before 10.5.0 the file needs packages; in 10.29.0 to 10.29.1 and 10.31.0 to 10.32.0 every
+     * package.json outside node_modules is a project; otherwise the root alone.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"10.0.0", "10.11.0", "10.11.1", "10.12.0", "10.12.1", "10.28.2", "10.29.1", "10.29.2",
+      "10.29.3", "10.30.3", "10.31.0", "10.32.0", "10.32.1", "10.33.0", "10.34.9"})
+    void aWorkspaceManifestWithoutPackages(String version) {
+        assertRecorded("workspace-without-packages", version);
+    }
+
+    /**
+     * A lock whose importer version its unchanged range does not admit, as pnpm installed it: from 10.15.0
+     * (pnpm/pnpm#9832) the importer is out of date and resolved again; before, the lock is kept as it is.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"10.0.0", "10.11.0", "10.12.1", "10.14.0", "10.15.0", "10.16.0", "10.34.9"})
+    void anImporterVersionOutsideItsRange(String version) {
+        assertRecorded("importer-version-out-of-range", version);
+    }
+
+    /**
+     * A bare {@code workspace:} of a prerelease workspace package, as pnpm linked it, before and after 10.29.0
+     * (pnpm/pnpm#10436) alike.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"10.12.1", "10.28.2", "10.29.1", "10.34.9"})
+    void aBareWorkspaceSpecOfAPrerelease(String version) {
+        assertRecorded("bare-workspace-prerelease", version);
+    }
+
+    /**
+     * A dependency the registry lacks, or has no version of in range, under link-workspace-packages, beside a workspace
+     * package of a version outside the range, as pnpm resolved it: from 10.31.0 (pnpm/pnpm#10704) the registry's error;
+     * before, the workspace package is linked.
+     */
+    @ParameterizedTest
+    @CsvSource({"workspace-fallback-absent, 10.12.1", "workspace-fallback-absent, 10.30.3",
+      "workspace-fallback-absent, 10.31.0", "workspace-fallback-absent, 10.32.1", "workspace-fallback-absent, 10.34.9",
+      "workspace-fallback-no-match, 10.12.1", "workspace-fallback-no-match, 10.30.3",
+      "workspace-fallback-no-match, 10.31.0", "workspace-fallback-no-match, 10.32.1",
+      "workspace-fallback-no-match, 10.34.9"})
+    void aWorkspaceFallbackOutsideTheRange(String recording, String version) {
+        assertRecorded(recording, version);
+    }
+
+    /**
+     * An npm alias without a range, of a package whose latest is below its highest version, as pnpm resolved it,
+     * before and after 10.27.0 (pnpm/pnpm#10374) alike.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"10.12.1", "10.26.2", "10.27.0", "10.34.9"})
+    void anNpmAliasWithoutARange(String version) {
+        assertRecorded("npm-alias-without-range", version);
+    }
+
+    /**
+     * A registry setting with an uppercase host, as pnpm wrote the packages it resolved: from 10.28.1
+     * (normalize-registry-url 2.0.1, pnpm/pnpm#10470) the registry is the tarballs' own, and they are left out;
+     * before, each tarball is written.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"10.0.0", "10.12.1", "10.26.2", "10.27.0", "10.28.0", "10.28.1", "10.28.2", "10.34.9"})
+    void aRegistryWithAnUppercaseHost(String version) {
+        assertRecorded("registry-uppercase-host", version);
+    }
+
+    /**
+     * A dependency whose full packument alone declares libc, under minimumReleaseAge, as pnpm wrote it: from 10.16.0
+     * (pnpm/pnpm#9957) pnpm 10 fetches full metadata, and the lock has the libc; before, no release age is read.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"10.12.1", "10.15.0", "10.33.0", "10.34.9"})
+    void aReleaseAgeFetchesFullMetadata(String version) {
+        assertRecorded("release-age-libc", version);
+    }
+
+    /**
+     * A minimumReleaseAge from 10.16.0 to 10.32.x, whose rules the port does not have
+     * ({@link PnpmRelease#readsAReleaseAgeThePortDoesNot}).
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"10.16.0", "10.26.2", "10.28.2"})
+    void refusesAReleaseAgeOfTheReleasesThatChangedIt(String version) {
+        assertCannotKnow("release-age-libc", version, "minimumReleaseAge from 10.16.0 to 10.32.x");
+    }
+
+    /**
+     * A root manifest's supportedArchitectures.libc, as pnpm wrote a dependency whose full packument alone declares
+     * libc: every pnpm 10 fetches full metadata for it, from 10.14.0 (pnpm/pnpm#9745) through getFetchFullMetadata.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"10.0.0", "10.11.0", "10.12.1", "10.13.1", "10.14.0", "10.34.9"})
+    void aRootManifestsLibc(String version) {
+        assertRecorded("libc-manifest", version);
+    }
+
+    /**
+     * A pnpm-workspace.yaml's supportedArchitectures.libc, as pnpm wrote a dependency whose full packument alone
+     * declares libc: from 10.14.0 (pnpm/pnpm#9745) full metadata is fetched for it; before, not.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"10.0.0", "10.11.0", "10.13.1", "10.14.0"})
+    void aWorkspaceManifestsLibc(String version) {
+        assertRecorded("libc-workspace-packages", version);
+    }
+
+    /**
+     * A package locked with hasBin whose abbreviated packument names no bin, its full one a directories.bin, beside a
+     * new dependency, as pnpm wrote it: from 10.18.3 (pnpm/pnpm#10065) hasBin is kept; before, it is dropped.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"10.12.1", "10.18.2", "10.18.3", "10.27.0", "10.34.9"})
+    void aLockedHasBinOfAManifestWithoutBin(String version) {
+        assertRecorded("locked-has-bin", version);
+    }
+
+    /**
+     * A packument's tarball URL with a default port, or an uppercase host, as pnpm wrote it: from 10.26.0
+     * (pnpm/pnpm#10273) the URL is serialized as WHATWG URL does; before, written as it is.
+     */
+    @ParameterizedTest
+    @CsvSource({"tarball-url-port80, 10.12.1", "tarball-url-port80, 10.25.0", "tarball-url-port80, 10.26.0",
+      "tarball-url-port80, 10.27.0", "tarball-url-port80, 10.34.9", "tarball-url-upper, 10.12.1",
+      "tarball-url-upper, 10.25.0", "tarball-url-upper, 10.26.0", "tarball-url-upper, 10.27.0",
+      "tarball-url-upper, 10.34.9"})
+    void aTarballUrlNotInItsCanonicalForm(String recording, String version) {
+        assertRecorded(recording, version);
+    }
+
+    /**
+     * trustPolicy no-downgrade, a newer version without the provenance an older has, as pnpm resolved a new dependency:
+     * from 10.21.0 (pnpm/pnpm#10103) {@code ERR_PNPM_TRUST_DOWNGRADE}; before, the setting is no setting. Before
+     * 10.5.0 a pnpm-workspace.yaml needs packages.
+     */
+    @ParameterizedTest
+    @CsvSource({"trust-policy-npmrc, 10.0.0", "trust-policy-npmrc, 10.12.1", "trust-policy-npmrc, 10.20.0",
+      "trust-policy-npmrc, 10.33.0", "trust-policy-npmrc, 10.34.9", "trust-policy-workspace, 10.0.0",
+      "trust-policy-workspace, 10.12.1", "trust-policy-workspace, 10.20.0", "trust-policy-workspace, 10.33.0",
+      "trust-policy-workspace, 10.34.9"})
+    void aTrustPolicy(String recording, String version) {
+        assertRecorded(recording, version);
+    }
+
+    /**
+     * trustPolicy no-downgrade from 10.21.0 to 10.32.x, whose rules the port does not have
+     * ({@link PnpmRelease#readsATrustPolicyThePortDoesNot}).
+     */
+    @ParameterizedTest
+    @CsvSource({"trust-policy-npmrc, 10.21.0", "trust-policy-npmrc, 10.26.2", "trust-policy-workspace, 10.21.0",
+      "trust-policy-workspace, 10.26.2"})
+    void refusesATrustPolicyOfTheReleasesThatChangedIt(String recording, String version) {
+        assertCannotKnow(recording, version, "trustPolicy no-downgrade from 10.21.0 to 10.32.x");
+    }
+
+    /**
+     * A dependency whose manifest has engines.runtime, as pnpm wrote it: before 10.21.0 (pnpm/pnpm#10141) an engines
+     * field like any other; from then a {@code runtime:} dependency, which the pnpm 10 profile does not resolve.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"10.12.1", "10.20.0"})
+    void theEnginesRuntimeOfADependency(String version) {
+        assertRecorded("engines-runtime-of-a-dependency", version);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"10.21.0", "10.27.0", "10.34.9"})
+    void refusesTheRuntimeDependencyOfADependency(String version) {
+        assertCannotKnow("engines-runtime-of-a-dependency", version, "runtime:");
+    }
+
+    /**
+     * A cycle of peers through npm aliases of the packages in it (upstream's deadlock case), as pnpm resolved it:
+     * from 10.12.4 (pnpm/pnpm#9675) the lock; before, pnpm waits forever.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"10.12.4", "10.34.9"})
+    void aPeerCycleThroughNpmAliases(String version) {
+        assertRecorded("aliased-peer-cycle", version);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"10.0.0", "10.11.0", "10.12.1", "10.12.3"})
+    void refusesAPeerCycleThroughNpmAliasesPnpmWaitsForForever(String version) {
+        assertCannotKnow("aliased-peer-cycle", version, "waits for forever");
+    }
+
+    /**
+     * An auto-installed peer an override then pins to an exact version below the locked one, as pnpm wrote it: from
+     * 10.30.2 (pnpm/pnpm#10655) the pinned version; before, the locked one is kept.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"10.12.1", "10.29.3", "10.30.1", "10.30.2", "10.32.1", "10.33.0", "10.34.9"})
+    void anExactPeerVersion(String version) {
+        assertRecorded("exact-peer-version", version);
+    }
+
+    private static void assertRecorded(String name, String version) {
+        Pnpm10Recording recording = Pnpm10Recording.of(name);
+        Result result = recording.regenerate(version);
+        String lock = recording.lock(version);
+        if (lock != null) {
+            assertThat(result.isSuccess()).as(result.getErrorMessage()).isTrue();
+            assertThat(result.getLockFileContent()).isEqualTo(lock);
+        } else {
+            assertThat(result.getFailure()).as(result.getLockFileContent()).isNotNull();
+            assertThat(result.getFailure().getKind()).isNotEqualTo(Kind.CANNOT_KNOW);
+            assertThat(result.getFailure().getDetail()).contains(recording.error(version));
+        }
+    }
+
+    private static void assertCannotKnow(String name, String version, String detail) {
+        Result result = Pnpm10Recording.of(name).regenerate(version);
+        assertThat(result.getFailure()).as(result.getLockFileContent()).isNotNull();
+        assertThat(result.getFailure().getKind()).as(result.getFailure().getDetail()).isEqualTo(Kind.CANNOT_KNOW);
+        assertThat(result.getFailure().getDetail()).contains(detail);
+    }
+
     private static Result regenerate(@Nullable String lock, Map<String, String> manifests, Map<String, String> files,
                                      String version, Map<String, String> full, Map<String, String> abbreviated,
                                      Map<String, String> env) {

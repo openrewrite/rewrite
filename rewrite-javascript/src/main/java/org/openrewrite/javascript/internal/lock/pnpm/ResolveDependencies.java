@@ -2261,7 +2261,8 @@ final class ResolveDependencies {
             pkg = copy;
         }
         Object engines = pkg.get("engines");
-        if (engines instanceof Map && ((Map<?, ?>) engines).get("runtime") != null) {
+        if (engines instanceof Map && ((Map<?, ?>) engines).get("runtime") != null &&
+            ctx.getRelease().convertsTheEnginesRuntimeOfADependency()) {
             PkgManifestUtils.convertEnginesRuntimeToDependencies(pkg, "engines", "dependencies", ctx.getRelease());
         }
         if (!Js.truthy(pkg.get("name"))) {
@@ -2299,12 +2300,13 @@ final class ResolveDependencies {
                 pkg.put("deprecated", dependencyLockfile.getDeprecated());
             }
             Object bin = pkg.get("bin");
-            if (dependencyLockfile != null && dependencyLockfile.getHasBin() != null && !Js.truthy(bin)) {
+            if (dependencyLockfile != null && dependencyLockfile.getHasBin() != null && !Js.truthy(bin) &&
+                ctx.getRelease().keepsTheLockedHasBinOfAManifestWithoutBin()) {
                 hasBin = Js.truthy(dependencyLockfile.getHasBin());
+            } else if (bin == null || bin == Js.UNDEFINED) {
+                hasBin = Js.truthy(asMap(pkg.get("directories")).get("bin"));
             } else {
-                boolean binPresent = Js.truthy(bin) &&
-                                     !("".equals(bin) || bin instanceof Map && ((Map<?, ?>) bin).isEmpty());
-                hasBin = binPresent || Js.truthy(asMap(pkg.get("directories")).get("bin"));
+                hasBin = Js.truthy(bin) && !("".equals(bin) || bin instanceof Map && ((Map<?, ?>) bin).isEmpty());
             }
         }
 
@@ -2769,8 +2771,19 @@ final class ResolveDependencies {
                             legacyNonVersions.add(selector.getKey());
                         }
                     }
-                    String highest = release.underSemver(semver -> NodeSemver.maxSatisfying(legacyVersions, "*",
-                            NodeSemver.Options.INCLUDE_PRERELEASE.release(semver)));
+                    // from 10.30.2 an exact peer version takes a preferred version it names
+                    // (PnpmRelease#hoistsAnExactPeerVersion)
+                    boolean isExactVersion = release.hoistsAnExactPeerVersion() &&
+                                             NodeSemver.valid(range, NodeSemver.Options.DEFAULT) != null;
+                    String satisfying = isExactVersion ? release.underSemver(semver -> NodeSemver.maxSatisfying(
+                            legacyVersions, range, NodeSemver.Options.INCLUDE_PRERELEASE.release(semver))) : null;
+                    if (isExactVersion && satisfying == null && autoInstallPeers) {
+                        dependencies.put(peerName, range);
+                        continue;
+                    }
+                    String highest = satisfying != null ? satisfying : release.underSemver(semver ->
+                            NodeSemver.maxSatisfying(legacyVersions, "*",
+                                    NodeSemver.Options.INCLUDE_PRERELEASE.release(semver)));
                     List<String> parts = new ArrayList<>();
                     parts.add(highest == null ? "" : highest);
                     parts.addAll(legacyNonVersions);

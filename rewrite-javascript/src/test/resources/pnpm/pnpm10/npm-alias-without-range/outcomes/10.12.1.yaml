@@ -1,0 +1,30 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    dependencies:
+      other:
+        specifier: 1.0.0
+        version: 1.0.0
+      x:
+        specifier: npm:dep2
+        version: dep2@1.0.0
+
+packages:
+
+  dep2@1.0.0:
+    resolution: {integrity: sha512-661G/HpiNsKUqLWwKtMiLChjJZdy+EB68EhWwrhYyQ71uHCCnHnV9tw7UB4dTl1eCc+kz2D32//EOU4ftZR7sw==}
+
+  other@1.0.0:
+    resolution: {integrity: sha512-UDb2DLTnxn2yIVANGXhYJRUzlDYJ3QwHITTeW4BG3VknLeb32CF2BGRNvf82sLc8mSH4SIe1V2ZKCe3r5lYNYQ==}
+
+snapshots:
+
+  dep2@1.0.0: {}
+
+  other@1.0.0: {}

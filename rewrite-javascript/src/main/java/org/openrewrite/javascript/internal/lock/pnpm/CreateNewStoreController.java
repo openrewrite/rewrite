@@ -96,8 +96,10 @@ final class CreateNewStoreController {
      * 11.13.0 nothing ({@link PnpmRelease#fetchesFullMetadataForLibcAndNoDowngrade}).
      */
     NpmResolver createInstallStoreController(PnpmOptions options) {
+        Object rootLibc = options.getRootManifestLibc();
         return createNewStoreController(options,
-                options.getRelease().fetchesFullMetadataForConfiguredLibc() ? options.getFetchFullMetadata() : null,
+                options.getRelease().fetchesFullMetadataForConfiguredLibc() ? options.getFetchFullMetadata() :
+                        Js.truthy(rootLibc) ? Boolean.TRUE : rootLibc,
                 options.get("fetchFullMetadata"));
     }
 
@@ -132,12 +134,16 @@ final class CreateNewStoreController {
             openFrozenStore();
         }
         boolean timeBased = "time-based".equals(options.get("resolutionMode"));
-        boolean noDowngrade = "no-downgrade".equals(options.get("trustPolicy"));
+        boolean noDowngrade = "no-downgrade".equals(options.get("trustPolicy")) &&
+                              options.getRelease().readsTrustPolicy();
         boolean noTimeField = !options.isTrue("registrySupportsTimeField");
+        Double releaseAge = options.getNumber("minimumReleaseAge");
+        boolean underAReleaseAge = releaseAge != null && releaseAge != 0 && !releaseAge.isNaN() &&
+                                   options.getRelease().fetchesFullMetadataUnderAReleaseAge();
         Map<String, @Nullable Object> supportedArchitectures = options.getSupportedArchitectures();
         Object libc = supportedArchitectures == null ? null : supportedArchitectures.get("libc");
         boolean before = fetchFullMetadata != null && fetchFullMetadata != Js.UNDEFINED ?
-                Js.truthy(fetchFullMetadata) : (timeBased || noDowngrade) && noTimeField;
+                Js.truthy(fetchFullMetadata) : (timeBased || underAReleaseAge || noDowngrade) && noTimeField;
         boolean after = fetchFullMetadataFrom11130 != null && fetchFullMetadataFrom11130 != Js.UNDEFINED ?
                 Js.truthy(fetchFullMetadataFrom11130) :
                 libc != null && libc != Js.UNDEFINED || noDowngrade || timeBased && noTimeField;
