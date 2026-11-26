@@ -1,0 +1,1 @@
+{"name":"a","version":"1.0.0","dependencies":{"dep":"^1.0.0"},"devDependencies":{"pc":"^1.0.0"},"peerDependencies":{"pc":"^1 || workspace:^"}}

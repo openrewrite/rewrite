@@ -259,9 +259,13 @@ public final class PnpmLockRegenerator {
             return Rejected.discardsLock(String.valueOf(e.getMessage()));
         }
         if (e instanceof ReportPeerDependencyIssues.PeerDependencyIssuesError) {
-            return Rejected.rejects(Reason.PEER_CONFLICT,
-                    ((ReportPeerDependencyIssues.PeerDependencyIssuesError) e).firstPeerName(),
-                    "[ERR_PNPM_PEER_DEP_ISSUES] " + e.getMessage());
+            ReportPeerDependencyIssues.PeerDependencyIssuesError peerIssues =
+                    (ReportPeerDependencyIssues.PeerDependencyIssuesError) e;
+            return peerIssues.isPrinted() ?
+                    Rejected.rejects(Reason.PEER_CONFLICT, peerIssues.firstPeerName(),
+                            "[ERR_PNPM_PEER_DEP_ISSUES] " + e.getMessage()) :
+                    Rejected.crashes(Reason.PEER_CONFLICT, peerIssues.firstPeerName(),
+                            "pnpm fails printing no error: " + e.getMessage());
         }
         if (e instanceof PnpmError) {
             String code = ((PnpmError) e).getCode();

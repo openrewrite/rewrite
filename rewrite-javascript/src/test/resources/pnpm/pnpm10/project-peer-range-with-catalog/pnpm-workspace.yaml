@@ -1,0 +1,4 @@
+packages:
+  - packages/*
+catalog:
+  pc: ^1.0.0

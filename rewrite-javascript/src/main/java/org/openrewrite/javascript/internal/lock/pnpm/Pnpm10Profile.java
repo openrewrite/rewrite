@@ -19,6 +19,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.JsYaml;
 import org.openrewrite.javascript.internal.lock.Spec;
+import org.openrewrite.javascript.semver.NodeSemver;
 
 import java.util.Arrays;
 import java.util.Map;
@@ -71,6 +72,12 @@ final class Pnpm10Profile {
                 if (engines instanceof Map && (((Map<?, ?>) engines).containsKey("runtime") ||
                     "devEngines".equals(field) && ((Map<?, ?>) engines).containsKey("packageManager"))) {
                     return reason(field + " runtime or package manager fields");
+                }
+            }
+            if (entry.getKey().isEmpty()) {
+                String switching = packageManagerSwitch(manifest.get("packageManager"), release);
+                if (switching != null) {
+                    return switching;
                 }
             }
             Object pnpm = manifest.get("pnpm");
@@ -154,6 +161,10 @@ final class Pnpm10Profile {
                 }
             }
         }
+        String pnpmfile = pnpmfile(inputs, release);
+        if (pnpmfile != null) {
+            return pnpmfile;
+        }
         String lock = inputs.getLock();
         if (lock != null) {
             if (lock.contains("\n---\n") || lock.startsWith("---\n")) {
@@ -229,6 +240,55 @@ final class Pnpm10Profile {
         } catch (IllegalArgumentException invalid) {
             return true;
         }
+    }
+
+    // the default pnpmfile, whose hooks pnpm runs but where ignorePnpmfile is set where the release reads it:
+    // .npmrc, or pnpm-workspace.yaml from 10.6.0 (PnpmRelease#readsEverySettingFromTheWorkspaceManifest)
+    private static @Nullable String pnpmfile(PnpmLockRegenerator.Inputs inputs, PnpmRelease release) {
+        String found = null;
+        for (String name : new String[]{".pnpmfile.cjs", ".pnpmfile.mjs"}) {
+            if (inputs.getFiles().containsKey(name)) {
+                found = name;
+                break;
+            }
+        }
+        if (found == null) {
+            return null;
+        }
+        String npmrc = inputs.getFiles().get(".npmrc");
+        if (npmrc != null) {
+            for (String line : npmrc.split("\n")) {
+                String[] pair = line.trim().split("=", 2);
+                if (pair.length == 2 && "ignore-pnpmfile".equals(pair[0].trim()) && "true".equals(pair[1].trim())) {
+                    return null;
+                }
+            }
+        }
+        String workspaceManifest = inputs.getFiles().get("pnpm-workspace.yaml");
+        if (workspaceManifest != null && release.readsEverySettingFromTheWorkspaceManifest()) {
+            Object workspace = JsYaml.load(workspaceManifest);
+            if (workspace instanceof Map && Boolean.TRUE.equals(((Map<?, ?>) workspace).get("ignorePnpmfile"))) {
+                return null;
+            }
+        }
+        return reason("the hooks of " + found);
+    }
+
+    // switchCliVersion switches to a version that is not clean, as semver.valid cleans it from 10.2.1
+    // (pnpm/pnpm#9049), which the engine does not follow; from 10.4.0 the running release installs
+    private static @Nullable String packageManagerSwitch(@Nullable Object packageManager, PnpmRelease release) {
+        if (!(packageManager instanceof String) || !((String) packageManager).startsWith("pnpm@") ||
+            release.keepsTheRunningReleaseForAPackageManagerVersionThatIsNotClean()) {
+            return null;
+        }
+        String version = ((String) packageManager).substring("pnpm@".length()).split("\\+", 2)[0];
+        String clean = release.underSemver(semver -> NodeSemver.valid(version,
+                NodeSemver.Options.DEFAULT.release(semver)));
+        if (clean == null || clean.equals(version) ||
+            release.atLeast(10, 2, 1) && clean.equals(release.toString())) {
+            return null;
+        }
+        return reason("packageManager " + packageManager + ", which pnpm " + release + " switches to");
     }
 
     static String reason(String feature) {

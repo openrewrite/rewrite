@@ -1,0 +1,2 @@
+ ERROR  The workspace manifest file should be named "pnpm-workspace.yaml". File found: pnpm-workspaces.yaml
+exit 1

@@ -1,0 +1,31 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    dependencies:
+      wpc:
+        specifier: 1.0.0
+        version: 1.0.0(pc@1.1.0)
+
+packages:
+
+  pc@1.1.0:
+    resolution: {integrity: sha512-lLGScxDsizBRyGs38iJHUxErdlNpXsQdcsDXM87yWtg6IBTTfoh2e/Y4Trl1/g26/J2fTwv9T1lVeK/jKgzSTg==}
+
+  wpc@1.0.0:
+    resolution: {integrity: sha512-RAwPr1dh/FcGOeSbxjtNr3fncLnSUI3R099qqCnGcy9XHhPGE1O2xgLVaMmQLwgixPZ3DryVxwDS4agjLGatuw==}
+    peerDependencies:
+      pc: ^1.0.0
+
+snapshots:
+
+  pc@1.1.0: {}
+
+  wpc@1.0.0(pc@1.1.0):
+    dependencies:
+      pc: 1.1.0

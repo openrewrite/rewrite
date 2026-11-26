@@ -1,0 +1,1 @@
+{"name":"proj","version":"1.0.0","dependencies":{"other":"1.0.0","mhost":"1.0.0"},"pnpm":{"peerDependencyRules":{"ignoreMissing":["q"]}}}

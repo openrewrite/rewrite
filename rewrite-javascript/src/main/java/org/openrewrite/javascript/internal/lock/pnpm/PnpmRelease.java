@@ -229,6 +229,101 @@ public final class PnpmRelease {
     }
 
     /**
+     * strictPeerDependencies fails over the peer issues peerDependencyRules leave from 10.11.0 (pnpm/pnpm#9505);
+     * before, over all of them, the reporter printing only those its rules leave, and nothing where it leaves none.
+     */
+    boolean filtersPeerIssuesByTheRules() {
+        return atLeast(11, 0, 0) || atLeast(10, 11, 0);
+    }
+
+    /**
+     * Below 10.11.0, the reporter renders the peer issues by the config's peerDependencyRules from 10.6.2
+     * (pnpm/pnpm#9245); before, by the root manifest's {@code pnpm.peerDependencyRules} alone.
+     */
+    boolean reportsTheRulesOfTheConfig() {
+        return atLeast(11, 0, 0) || atLeast(10, 6, 2);
+    }
+
+    /**
+     * peerDependencyRules leave out a missing peer every dependent takes as optional from 10.11.1 (pnpm/pnpm#9567).
+     */
+    boolean leavesOutAMissingOptionalPeer() {
+        return atLeast(11, 0, 0) || atLeast(10, 11, 1);
+    }
+
+    /**
+     * getOptionsFromPnpmSettings reads every setting of pnpm-workspace.yaml from 10.6.0 (pnpm/pnpm#9211); before,
+     * the ones the root manifest's pnpm field holds.
+     */
+    boolean readsEverySettingFromTheWorkspaceManifest() {
+        return atLeast(11, 0, 0) || atLeast(10, 6, 0);
+    }
+
+    /**
+     * getOptionsFromPnpmSettings drops empty overrides from 10.5.1 (pnpm/pnpm#9176); before, the root manifest's
+     * empty ones replace pnpm-workspace.yaml's.
+     */
+    boolean dropsEmptyOverrides() {
+        return atLeast(11, 0, 0) || atLeast(10, 5, 1);
+    }
+
+    /**
+     * workspace.root-finder takes pnpm-workspaces.yaml and pnpm-workspaces.yml for misspellings from 10.5.1
+     * (pnpm/pnpm#9173); before, pnpm-workspace.yml alone.
+     */
+    boolean detectsMisspelledWorkspaceManifests() {
+        return atLeast(11, 0, 0) || atLeast(10, 5, 1);
+    }
+
+    /**
+     * getConfig derives useLockfile after reading pnpm-workspace.yaml from 11.0.0; before, from the lockfile setting
+     * as .npmrc leaves it.
+     */
+    boolean readsTheLockfileSettingFromTheWorkspaceManifest() {
+        return atLeast(11, 0, 0);
+    }
+
+    /**
+     * getConfig derives useGitBranchLockfile after reading pnpm-workspace.yaml from 10.21.0 (pnpm/pnpm#10139);
+     * before, from the gitBranchLockfile setting as .npmrc leaves it.
+     */
+    boolean readsGitBranchLockfileFromTheWorkspaceManifest() {
+        return atLeast(11, 0, 0) || atLeast(10, 21, 0);
+    }
+
+    /**
+     * validatePeerDependencies takes a project peer that holds a {@code workspace:} or {@code catalog:} spec within a
+     * wider range from 10.1.0 (pnpm/pnpm#8946); before, only one that starts with it.
+     */
+    boolean acceptsAWorkspaceOrCatalogPeerWithinARange() {
+        return atLeast(11, 0, 0) || atLeast(10, 1, 0);
+    }
+
+    /**
+     * An override of a peer whose value is no peer range goes to the package's dependencies from 10.2.0
+     * (pnpm/pnpm#9000); before, peers are overridden as the other dependencies are.
+     */
+    boolean movesAnOverrideThatIsNoPeerRangeToDependencies() {
+        return atLeast(11, 0, 0) || atLeast(10, 2, 0);
+    }
+
+    /**
+     * The {@code catalog:} specs of an injected workspace package's dependencies are replaced from 10.6.5
+     * (pnpm/pnpm#9266); before, no resolver supports them.
+     */
+    boolean replacesTheCatalogProtocolOfAnInjectedWorkspacePackage() {
+        return atLeast(11, 0, 0) || atLeast(10, 6, 5);
+    }
+
+    /**
+     * switchCliVersion installs as the running release where the packageManager version is not clean, such as
+     * {@code v10.4.0}, from 10.4.0 (pnpm/pnpm#9057); before, it switches to it.
+     */
+    boolean keepsTheRunningReleaseForAPackageManagerVersionThatIsNotClean() {
+        return atLeast(11, 0, 0) || atLeast(10, 4, 0);
+    }
+
+    /**
      * package-requester seeds the preferred version from currentPkg from 10.11.1 (pnpm/pnpm#9588).
      */
     boolean prefersTheCurrentPackageVersion() {

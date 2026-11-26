@@ -52,6 +52,23 @@ class Pnpm10Test {
      * and no question of {@link PnpmRelease} tells them apart ({@link #anAliasAnswersEveryQuestionAsItsRecording}).
      */
     private static final Map<String, String> RECORDED_AS = Map.ofEntries(
+      // v10.2.1..v10.3.0: strictDepBuilds (a lock-only install builds nothing), build warnings, verify-deps-before-run
+      Map.entry("10.2.1", "10.3.0"),
+      // v10.4.0..v10.4.1: lex-comparator and object.key-sorting for the lock's keys (the same order), init, builds
+      Map.entry("10.4.0", "10.4.1"),
+      // v10.5.1..v10.5.2: config set
+      Map.entry("10.5.1", "10.5.2"),
+      // v10.6.0..v10.6.1: reporting, approve-builds, package.json's patchedDependencies (patches are refused), a
+      // no matching version message
+      Map.entry("10.6.0", "10.6.1"),
+      // v10.6.2..v10.6.4: Node prerelease versions, workers, dlx, deploy, the projects graph of a filtered install (no
+      // filter reaches the engine)
+      Map.entry("10.6.2", "10.6.4"), Map.entry("10.6.3", "10.6.4"),
+      // v10.6.5..v10.10.0: environment placeholders and sharedWorkspaceLockfile in pnpm-workspace.yaml, !/ patterns
+      // and jsr: (refused), the registries refactor, the workspace settings read before the derived ones (none a
+      // --lockfile-only install reads), manifest specifiers of add and update, tilde paths, reporting
+      Map.entry("10.6.5", "10.10.0"), Map.entry("10.7.0", "10.10.0"), Map.entry("10.7.1", "10.10.0"),
+      Map.entry("10.8.0", "10.10.0"), Map.entry("10.8.1", "10.10.0"), Map.entry("10.9.0", "10.10.0"),
       // v10.12.0..v10.12.1 holds one commit, which makes @pnpm/tsconfig private
       // v10.11.1..v10.12.1: catalogMode, the catalog resolution rework, the global virtual store, updating catalogs,
       // the dependency graph hash, tinyglobby 0.2.14, the CI setting (none of them answers otherwise for the lock)
@@ -177,7 +194,7 @@ class Pnpm10Test {
         for (String version : pnpm10Releases().collect(Collectors.toList())) {
             assertThat(PnpmReleases.runs(version)).hasToString(version);
         }
-        for (String version : new String[]{"10.0.1", "10.15.0", "10.31.0", "10.34.2", "^10.0.0"}) {
+        for (String version : new String[]{"10.15.0", "10.29.1", "10.31.0", "10.34.2", "^10.0.0"}) {
             assertThatThrownBy(() -> PnpmReleases.installs(version))
               .isInstanceOf(org.openrewrite.javascript.internal.lock.CannotKnow.class);
         }
@@ -247,6 +264,37 @@ class Pnpm10Test {
               Collections.emptyMap(), version).toBuilder().manifests(Collections.singletonMap("", manifest)).build();
             assertThat(Pnpm10Profile.unsupported(inputs, PnpmRelease.of(version)))
               .as(version + " " + spec).isNull();
+        }
+    }
+
+    /**
+     * A packageManager version that is not clean, as switchCliVersion took it: below 10.4.0 (pnpm/pnpm#9057) a
+     * release to switch to, from 10.2.1 (pnpm/pnpm#9049) cleaned, so that one naming the running release installs.
+     */
+    @ParameterizedTest
+    @CsvSource({"10.0.0, pnpm@v10.11.0, true", "10.0.0, pnpm@v10.0.0, true", "10.2.0, pnpm@v10.2.0, true",
+      "10.2.1, pnpm@v10.2.1, false", "10.2.1, pnpm@v10.11.0, true", "10.3.0, pnpm@v10.11.0+sha512.abc, true",
+      "10.4.0, pnpm@v10.11.0, false", "10.11.0, pnpm@v10.0.0, false", "10.0.0, pnpm@=10.11.0, false",
+      "10.0.0, pnpm@10.11.0, false"})
+    void aPackageManagerVersionThatIsNotClean(String version, String packageManager, boolean refused) {
+        // given
+        Map<String, String> manifests = Collections.singletonMap("",
+          "{\"name\":\"test\",\"packageManager\":\"" + packageManager + "\"}");
+        PnpmLockRegenerator.Inputs inputs = PnpmLockRegenerator.Inputs.builder()
+          .manifests(manifests)
+          .files(Collections.emptyMap())
+          .paths(PnpmScenarios.paths(Collections.emptyMap(), manifests, ""))
+          .release(PnpmRelease.of(version))
+          .build();
+
+        // when
+        String unsupported = Pnpm10Profile.unsupported(inputs, PnpmRelease.of(version));
+
+        // then
+        if (refused) {
+            assertThat(unsupported).contains("packageManager " + packageManager);
+        } else {
+            assertThat(unsupported).isNull();
         }
     }
 
@@ -1068,6 +1116,140 @@ class Pnpm10Test {
         assertRecorded("exact-peer-version", version);
     }
 
+    /**
+     * A project peer whose range holds a {@code workspace:} or {@code catalog:} spec, as pnpm validated it: from
+     * 10.1.0 (pnpm/pnpm#8946) valid; before, only a spec that starts with it is.
+     */
+    @ParameterizedTest
+    @CsvSource({"project-peer-range-with-workspace, 10.0.0", "project-peer-range-with-workspace, 10.1.0",
+      "project-peer-range-with-workspace, 10.11.0", "project-peer-range-with-workspace, 10.34.9",
+      "project-peer-range-with-catalog, 10.0.0", "project-peer-range-with-catalog, 10.1.0",
+      "project-peer-range-with-catalog, 10.11.0", "project-peer-range-with-catalog, 10.34.9"})
+    void aProjectPeerRangeWithAWorkspaceOrCatalogSpec(String recording, String version) {
+        assertRecorded(recording, version);
+    }
+
+    /**
+     * An override of a package's peer by an npm alias or a dist-tag, as pnpm wrote it: from 10.2.0 (pnpm/pnpm#9000)
+     * a dependency of the package, its peer left as it is; before, the peer.
+     */
+    @ParameterizedTest
+    @CsvSource({"override-alias-of-a-peer, 10.0.0", "override-alias-of-a-peer, 10.1.0",
+      "override-alias-of-a-peer, 10.2.0", "override-alias-of-a-peer, 10.11.0", "override-alias-of-a-peer, 10.34.9",
+      "override-tag-of-a-peer, 10.0.0", "override-tag-of-a-peer, 10.1.0", "override-tag-of-a-peer, 10.2.0",
+      "override-tag-of-a-peer, 10.11.0", "override-tag-of-a-peer, 10.34.9"})
+    void anOverrideOfAPeerThatIsNoPeerRange(String recording, String version) {
+        assertRecorded(recording, version);
+    }
+
+    /**
+     * A {@code catalog:} dependency of an injected workspace package, as pnpm resolved it: from 10.6.5
+     * (pnpm/pnpm#9266) the catalog's range; before, no resolver supports it.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"10.0.0", "10.6.4", "10.6.5", "10.7.0", "10.11.0", "10.34.9"})
+    void aCatalogDependencyOfAnInjectedWorkspacePackage(String version) {
+        assertRecorded("injected-workspace-catalog", version);
+    }
+
+    /**
+     * strictPeerDependencies with a peer issue peerDependencyRules excuse, in the root manifest or in
+     * pnpm-workspace.yaml: from 10.11.0 (pnpm/pnpm#9505) the lock; before, pnpm fails, printing the issues the
+     * reporter's rules leave, which are the root manifest's alone before 10.6.2 (pnpm/pnpm#9245), and nothing where
+     * they leave none. Before 10.5.0 a pnpm-workspace.yaml needs packages.
+     */
+    @ParameterizedTest
+    @CsvSource({"strict-peer-rules-bad-manifest, 10.0.0", "strict-peer-rules-bad-manifest, 10.5.2",
+      "strict-peer-rules-bad-manifest, 10.6.1", "strict-peer-rules-bad-manifest, 10.6.2",
+      "strict-peer-rules-bad-manifest, 10.10.0", "strict-peer-rules-bad-manifest, 10.11.0",
+      "strict-peer-rules-bad-manifest, 10.34.9", "strict-peer-rules-bad-workspace, 10.0.0",
+      "strict-peer-rules-bad-workspace, 10.5.2", "strict-peer-rules-bad-workspace, 10.6.0",
+      "strict-peer-rules-bad-workspace, 10.6.1", "strict-peer-rules-bad-workspace, 10.6.2",
+      "strict-peer-rules-bad-workspace, 10.10.0", "strict-peer-rules-bad-workspace, 10.11.0",
+      "strict-peer-rules-bad-workspace, 10.34.9", "strict-peer-rules-missing-manifest, 10.0.0",
+      "strict-peer-rules-missing-manifest, 10.6.1", "strict-peer-rules-missing-manifest, 10.6.2",
+      "strict-peer-rules-missing-manifest, 10.10.0", "strict-peer-rules-missing-manifest, 10.11.0",
+      "strict-peer-rules-missing-manifest, 10.34.9", "strict-peer-rules-missing-workspace, 10.0.0",
+      "strict-peer-rules-missing-workspace, 10.5.2", "strict-peer-rules-missing-workspace, 10.6.1",
+      "strict-peer-rules-missing-workspace, 10.6.2", "strict-peer-rules-missing-workspace, 10.10.0",
+      "strict-peer-rules-missing-workspace, 10.11.0", "strict-peer-rules-missing-workspace, 10.34.9"})
+    void aStrictPeerIssueTheRulesExcuse(String recording, String version) {
+        assertRecorded(recording, version);
+    }
+
+    /**
+     * Overrides in pnpm-workspace.yaml, a root manifest with none, as pnpm wrote it: from 10.5.1 (pnpm/pnpm#9176)
+     * applied; before, the root manifest's empty ones replace them. Before 10.5.0 pnpm-workspace.yaml has no
+     * settings.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"10.0.0", "10.4.1", "10.5.0", "10.5.1", "10.11.0", "10.34.9"})
+    void workspaceOverridesBesideARootManifestWithout(String version) {
+        assertRecorded("workspace-overrides-empty-root", version);
+    }
+
+    /**
+     * overrides and packageExtensions in both the root manifest and pnpm-workspace.yaml, as pnpm wrote it: the root
+     * manifest's replace pnpm-workspace.yaml's whole, as installDeps spreads them over the config again.
+     */
+    @ParameterizedTest
+    @CsvSource({"root-and-workspace-overrides, 10.0.0", "root-and-workspace-overrides, 10.4.1",
+      "root-and-workspace-overrides, 10.5.0", "root-and-workspace-overrides, 10.5.1",
+      "root-and-workspace-overrides, 10.11.0", "root-and-workspace-overrides, 10.20.0",
+      "root-and-workspace-overrides, 10.34.9", "root-and-workspace-package-extensions, 10.0.0",
+      "root-and-workspace-package-extensions, 10.5.0", "root-and-workspace-package-extensions, 10.5.1",
+      "root-and-workspace-package-extensions, 10.11.0", "root-and-workspace-package-extensions, 10.20.0",
+      "root-and-workspace-package-extensions, 10.34.9"})
+    void aSettingOfBothTheRootManifestAndTheWorkspace(String recording, String version) {
+        assertRecorded(recording, version);
+    }
+
+    /**
+     * autoInstallPeers in pnpm-workspace.yaml, as pnpm wrote it: from 10.6.0 (pnpm/pnpm#9211) read; before, only the
+     * settings the root manifest's pnpm field holds are.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"10.5.0", "10.5.2", "10.6.0", "10.11.0", "10.34.9"})
+    void aWorkspaceSettingOutsideThePick(String version) {
+        assertRecorded("workspace-setting-outside-the-pick", version);
+    }
+
+    /**
+     * A pnpm-workspaces.yaml, as pnpm read it: from 10.5.1 (pnpm/pnpm#9173) a misspelling pnpm fails on; before, no
+     * workspace manifest.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"10.0.0", "10.5.0", "10.5.1", "10.11.0", "10.34.9"})
+    void aMisspelledWorkspaceManifest(String version) {
+        assertRecorded("misspelled-workspace-manifest", version);
+    }
+
+    /**
+     * lockfile: false in pnpm-workspace.yaml, as pnpm 10 wrote it: useLockfile is derived before pnpm-workspace.yaml
+     * is read, so the setting is none.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"10.0.0", "10.8.0", "10.8.1", "10.11.0", "10.20.0", "10.21.0", "10.34.9"})
+    void aWorkspaceWithoutALock(String version) {
+        assertRecorded("workspace-lockfile-false", version);
+    }
+
+    /**
+     * gitBranchLockfile in pnpm-workspace.yaml, as pnpm wrote it: before 10.21.0 (pnpm/pnpm#10139) no setting; from
+     * then the lock named after the git branch, which the engine does not know.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"10.0.0", "10.8.0", "10.8.1", "10.11.0", "10.20.0"})
+    void aWorkspaceGitBranchLock(String version) {
+        assertRecorded("workspace-git-branch-lockfile", version);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"10.21.0", "10.34.9"})
+    void refusesAWorkspaceGitBranchLock(String version) {
+        assertCannotKnow("workspace-git-branch-lockfile", version, "the git branch");
+    }
+
     private static void assertRecorded(String name, String version) {
         Pnpm10Recording recording = Pnpm10Recording.of(name);
         Result result = recording.regenerate(version);
@@ -1077,8 +1259,13 @@ class Pnpm10Test {
             assertThat(result.getLockFileContent()).isEqualTo(lock);
         } else {
             assertThat(result.getFailure()).as(result.getLockFileContent()).isNotNull();
-            assertThat(result.getFailure().getKind()).isNotEqualTo(Kind.CANNOT_KNOW);
-            assertThat(result.getFailure().getDetail()).contains(recording.error(version));
+            String error = recording.error(version);
+            if (error == null) {
+                assertThat(result.getFailure().getKind()).as(result.getFailure().getDetail()).isEqualTo(Kind.PM_FAILS);
+            } else {
+                assertThat(result.getFailure().getKind()).isNotEqualTo(Kind.CANNOT_KNOW);
+                assertThat(result.getFailure().getDetail()).contains(error);
+            }
         }
     }
 
