@@ -1974,6 +1974,92 @@ class MavenPomDownloaderTest implements RewriteTest {
         }
 
         @Test
+        void authenticatesPreemptivelyAfterCredentialsRequiredEvenWhenNothingIsDownloaded() {
+            var downloader = new MavenPomDownloader(emptyMap(), ctx);
+            try (MockWebServer mockRepo = getMockServer()) {
+                List<@Nullable String> getRequestAuthHeaders = synchronizedList(new ArrayList<>());
+                mockRepo.setDispatcher(new Dispatcher() {
+                    @Override
+                    public MockResponse dispatch(RecordedRequest recordedRequest) {
+                        if ("GET".equalsIgnoreCase(recordedRequest.getMethod())) {
+                            getRequestAuthHeaders.add(recordedRequest.getHeaders().get("Authorization"));
+                        }
+                        // Credentials are required and are accepted, but this repository carries none of the
+                        // artifacts asked of it — the ordinary case for all but one repository in a list
+                        return recordedRequest.getHeaders().get("Authorization") == null ?
+                          new MockResponse().setResponseCode(401).setBody("") :
+                          new MockResponse().setResponseCode(404).setBody("");
+                    }
+                });
+                mockRepo.start();
+                var repositories = List.of(MavenRepository.builder()
+                  .id("id")
+                  .uri("http://%s:%d/maven".formatted(mockRepo.getHostName(), mockRepo.getPort()))
+                  .username("user")
+                  .password("pass")
+                  .build());
+
+                for (String artifactId : List.of("first", "second", "third")) {
+                    assertThrows(MavenDownloadingException.class, () -> downloader.download(
+                      new GroupArtifactVersion("fred", artifactId, "1.0.0"), null, null, repositories));
+                }
+
+                // The 404 to the credentialed retry proves the credentials were accepted, so the challenge is paid
+                // once for the repository rather than once per artifact, even though nothing was downloaded from it
+                assertThat(getRequestAuthHeaders.stream().filter(Objects::isNull).count()).isEqualTo(1);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        @Test
+        void doesNotRememberAuthenticationForARepositoryThatNeverChallenged() {
+            var downloader = new MavenPomDownloader(emptyMap(), ctx);
+            try (MockWebServer mockRepo = getMockServer()) {
+                List<String> requests = synchronizedList(new ArrayList<>());
+                mockRepo.setDispatcher(new Dispatcher() {
+                    @Override
+                    public MockResponse dispatch(RecordedRequest recordedRequest) {
+                        String path = Objects.requireNonNull(recordedRequest.getPath());
+                        requests.add(recordedRequest.getMethod() + ' ' + path + " credentials=" +
+                                     (recordedRequest.getHeaders().get("Authorization") == null ? "none" : "sent"));
+                        // Serves anonymously and never challenges; it just does not carry "absent"
+                        return path.contains("/present/") ?
+                          new MockResponse().setResponseCode(200).setBody(
+                            //language=xml
+                            """
+                              <project>
+                                  <groupId>fred</groupId>
+                                  <artifactId>present</artifactId>
+                                  <version>1.0.0</version>
+                              </project>
+                              """) :
+                          new MockResponse().setResponseCode(404).setBody("");
+                    }
+                });
+                mockRepo.start();
+                var repositories = List.of(MavenRepository.builder()
+                  .id("id")
+                  .uri("http://%s:%d/maven".formatted(mockRepo.getHostName(), mockRepo.getPort()))
+                  .username("user")
+                  .password("pass")
+                  .build());
+
+                assertThrows(MavenDownloadingException.class, () -> downloader.download(
+                  new GroupArtifactVersion("fred", "absent", "1.0.0"), null, null, repositories));
+                assertDoesNotThrow(() -> downloader.download(
+                  new GroupArtifactVersion("fred", "present", "1.0.0"), null, null, repositories));
+
+                // The miss on "absent" is answered 404, not 401, so this repository has never asked for credentials.
+                // Remembering it off a bare 404 would hand them to a server that serves anonymously — the leak the
+                // first anonymous request exists to prevent.
+                assertThat(requests).contains("GET /maven/fred/present/1.0.0/present-1.0.0.pom credentials=none");
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        @Test
         void usesAuthenticationIfRepositoryHasCredentials() {
             var downloader = new MavenPomDownloader(emptyMap(), ctx);
             var gav = new GroupArtifactVersion("fred", "fred", "1.0.0");
