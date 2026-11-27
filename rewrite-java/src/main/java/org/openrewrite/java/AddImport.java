@@ -37,6 +37,7 @@ import org.openrewrite.style.Style;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Collections.emptyList;
@@ -166,6 +167,12 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
                 }
             }
 
+            // an import would change what the file's other references of the same simple name mean
+            if (member == null && !explicitOnly && typeReference.isPresent() &&
+                    typeReference.get() instanceof JavaType.FullyQualified && isSimpleNameTakenInFile(cu)) {
+                return new FullyQualifyTypeReference<P>((JavaType.FullyQualified) typeReference.get()).visit(cu, p);
+            }
+
             J.Import importToAdd = new J.Import(randomId(),
                     Space.EMPTY,
                     Markers.EMPTY,
@@ -230,6 +237,8 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
     }
 
     private ImportStatus checkImportsForType(List<J.Import> imports) {
+        String dottedName = dottedName();
+        String simpleName = simpleName();
         for (J.Import imp : imports) {
             String ending = imp.getQualid().getSimpleName();
             if (imp.isStatic() ^ member != null) {
@@ -248,15 +257,15 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
                 }
             } else {
                 String impTypeName = imp.getTypeName().replace('$', '.');
-                if (fullyQualifiedName.equals(impTypeName)) {
+                if (dottedName.equals(impTypeName)) {
                     return ImportStatus.EXPLICITLY_IMPORTED;
                 } else if ("*".equals(ending)) {
                     String prefix = impTypeName.substring(0, impTypeName.length() - 1);
-                    if (fullyQualifiedName.startsWith(prefix) && !fullyQualifiedName.substring(prefix.length()).contains(".")) {
+                    if (dottedName.startsWith(prefix) && !dottedName.substring(prefix.length()).contains(".")) {
                         return ImportStatus.IMPLICITLY_IMPORTED;
                     }
                 }
-                if (!"*".equals(ending) && ending.equals(typeName)) {
+                if (!"*".equals(ending) && ending.equals(simpleName)) {
                     return ImportStatus.IMPORT_AMBIGUITY;
                 }
             }
@@ -368,6 +377,58 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
             }
             return identifier;
         }
+    }
+
+    private boolean isReferenceToThisType(@Nullable JavaType type) {
+        JavaType.FullyQualified fq = TypeUtils.asFullyQualified(type);
+        return fq != null && TypeUtils.fullyQualifiedNamesAreEqual(fq.getFullyQualifiedName(), fullyQualifiedName);
+    }
+
+    // a nested type may arrive as a.Outer$Inner, while imports read a.Outer.Inner
+    private String dottedName() {
+        return TypeUtils.toFullyQualifiedName(fullyQualifiedName);
+    }
+
+    private String simpleName() {
+        String dottedName = dottedName();
+        return dottedName.substring(dottedName.lastIndexOf('.') + 1);
+    }
+
+    private boolean isSimpleNameTakenInFile(JavaSourceFile cu) {
+        String simpleName = simpleName();
+        AtomicBoolean taken = new AtomicBoolean();
+        new JavaIsoVisitor<AtomicBoolean>() {
+            @Override
+            public J.Import visitImport(J.Import import_, AtomicBoolean t) {
+                return import_;
+            }
+
+            @Override
+            public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, AtomicBoolean t) {
+                // the name of a qualified reference means the same whatever is imported
+                visit(fieldAccess.getTarget(), t);
+                return fieldAccess;
+            }
+
+            @Override
+            public J.TypeParameter visitTypeParameter(J.TypeParameter typeParam, AtomicBoolean t) {
+                if (typeParam.getName() instanceof J.Identifier && simpleName.equals(((J.Identifier) typeParam.getName()).getSimpleName())) {
+                    t.set(true);
+                }
+                return super.visitTypeParameter(typeParam, t);
+            }
+
+            @Override
+            public J.Identifier visitIdentifier(J.Identifier identifier, AtomicBoolean t) {
+                if (identifier.getFieldType() == null && simpleName.equals(identifier.getSimpleName()) &&
+                        TypeUtils.asFullyQualified(identifier.getType()) != null &&
+                        !(identifier.getType() instanceof JavaType.Unknown) && !isReferenceToThisType(identifier.getType())) {
+                    t.set(true);
+                }
+                return identifier;
+            }
+        }.visit(cu, taken);
+        return taken.get();
     }
 
     @AllArgsConstructor

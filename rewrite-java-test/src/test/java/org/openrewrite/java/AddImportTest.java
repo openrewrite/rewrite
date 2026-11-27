@@ -1940,4 +1940,253 @@ class AddImportTest implements RewriteTest {
         );
     }
 
+
+    @Language("java")
+    private static final String PAGE = """
+      package a;
+      public class Page {
+          public static class Name {}
+      }
+      """;
+    @Language("java")
+    private static final String OTHER_NAME = """
+      package b;
+      public class Name {}
+      """;
+
+    private void insertNameAndImport(String importArg) {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                  maybeAddImport(importArg);
+                  return JavaTemplate.builder("Name inserted = null;")
+                    .javaParser(JavaParser.fromJavaVersion().dependsOn(PAGE))
+                    .imports("a.Page.Name")
+                    .build()
+                    .apply(getCursor(), method.getBody().getCoordinates().firstStatement());
+              }
+          }).withMaxCycles(1)).parser(JavaParser.fromJavaVersion().dependsOn(PAGE, OTHER_NAME)),
+          java(
+            """
+              import b.Name;
+
+              class Test {
+                  Name existing;
+                  void m() {
+                  }
+              }
+              """,
+            """
+              import b.Name;
+
+              class Test {
+                  Name existing;
+                  void m() {
+                      a.Page.Name inserted = null;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void fullyQualifyNestedTypeClashingWithImport() {
+        insertNameAndImport("a.Page$Name");
+    }
+
+    @Test
+    void fullyQualifyDottedNestedTypeClashingWithImport() {
+        insertNameAndImport("a.Page.Name");
+    }
+
+    @Test
+    void fullyQualifyWhenSamePackageTypeOfSameNameIsUsed() {
+        @Language("java") String otherPe = """
+          package other;
+          public class ParseException {}
+          """;
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                  maybeAddImport("other.ParseException");
+                  return JavaTemplate.builder("ParseException inserted = null;")
+                    .javaParser(JavaParser.fromJavaVersion().dependsOn(otherPe))
+                    .imports("other.ParseException")
+                    .build()
+                    .apply(getCursor(), method.getBody().getCoordinates().firstStatement());
+              }
+          }).withMaxCycles(1)).parser(JavaParser.fromJavaVersion().dependsOn(otherPe)),
+          java(
+            """
+              package app;
+              public class ParseException {}
+              """
+          ),
+          java(
+            """
+              package app;
+
+              class Test {
+                  ParseException existing;
+                  void m() {
+                  }
+              }
+              """,
+            """
+              package app;
+
+              class Test {
+                  ParseException existing;
+                  void m() {
+                      other.ParseException inserted = null;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void nestedTypeAlreadyImported() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                  maybeAddImport("a.Page$Name");
+                  return JavaTemplate.builder("Name inserted = null;")
+                    .javaParser(JavaParser.fromJavaVersion().dependsOn(PAGE))
+                    .imports("a.Page.Name")
+                    .build()
+                    .apply(getCursor(), method.getBody().getCoordinates().firstStatement());
+              }
+          }).withMaxCycles(1)).parser(JavaParser.fromJavaVersion().dependsOn(PAGE)),
+          java(
+            """
+              import a.Page.Name;
+
+              class Test {
+                  Name existing;
+                  void m() {
+                  }
+              }
+              """,
+            """
+              import a.Page.Name;
+
+              class Test {
+                  Name existing;
+                  void m() {
+                      Name inserted = null;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void nestedTypeCoveredByStarImport() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                  maybeAddImport("a.Page$Name");
+                  return JavaTemplate.builder("Name inserted = null;")
+                    .javaParser(JavaParser.fromJavaVersion().dependsOn(PAGE))
+                    .imports("a.Page.Name")
+                    .build()
+                    .apply(getCursor(), method.getBody().getCoordinates().firstStatement());
+              }
+          }).withMaxCycles(1)).parser(JavaParser.fromJavaVersion().dependsOn(PAGE)),
+          java(
+            """
+              import a.Page.*;
+
+              class Test {
+                  Name existing;
+                  void m() {
+                  }
+              }
+              """,
+            """
+              import a.Page.*;
+
+              class Test {
+                  Name existing;
+                  void m() {
+                      Name inserted = null;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Language("java")
+    private static final String WRITER = """
+      package lib;
+      public class Writer {
+          public static class Job {}
+      }
+      """;
+
+    private void insertJob(String before, String after) {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                  maybeAddImport("lib.Writer$Job");
+                  return JavaTemplate.builder("Job inserted = null;")
+                    .javaParser(JavaParser.fromJavaVersion().dependsOn(WRITER))
+                    .imports("lib.Writer.Job")
+                    .build()
+                    .apply(getCursor(), method.getBody().getCoordinates().firstStatement());
+              }
+          }).withMaxCycles(1)).parser(JavaParser.fromJavaVersion().dependsOn(WRITER)),
+          java(before, after)
+        );
+    }
+
+    @Test
+    void fullyQualifyWhenTypeParameterHasSameName() {
+        insertJob(
+          """
+            class Test<Job> {
+                void m() {
+                }
+            }
+            """,
+          """
+            class Test<Job> {
+                void m() {
+                    lib.Writer.Job inserted = null;
+                }
+            }
+            """
+        );
+    }
+
+    @Test
+    void fullyQualifyWhenNestedClassHasSameName() {
+        insertJob(
+          """
+            class Test {
+                static class Job {}
+                void m() {
+                }
+            }
+            """,
+          """
+            class Test {
+                static class Job {}
+                void m() {
+                    lib.Writer.Job inserted = null;
+                }
+            }
+            """
+        );
+    }
 }
