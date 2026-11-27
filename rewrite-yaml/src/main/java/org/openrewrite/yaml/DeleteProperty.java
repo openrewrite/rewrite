@@ -124,14 +124,14 @@ public class DeleteProperty extends Recipe {
 
             @Override
             public Yaml.Document visitDocument(Yaml.Document document, ExecutionContext ctx) {
-                Yaml.Document d = super.visitDocument(document, ctx);
+                Yaml.Document d = TrailingComments.visit(getCursor(), () -> super.visitDocument(document, ctx));
                 String comment = trailingComment(d.getBlock());
                 return comment == null ? d : d.withEnd(d.getEnd().withPrefix(comment + d.getEnd().getPrefix()));
             }
 
             @Override
             public Yaml.Sequence visitSequence(Yaml.Sequence sequence, ExecutionContext ctx) {
-                Yaml.Sequence s = super.visitSequence(sequence, ctx);
+                Yaml.Sequence s = TrailingComments.visit(getCursor(), () -> super.visitSequence(sequence, ctx));
                 boolean childModified = (s != sequence);
                 List<Yaml.Sequence.Entry> entries = s.getEntries();
                 if (entries.isEmpty()) {
@@ -140,16 +140,30 @@ public class DeleteProperty extends Recipe {
 
                 boolean changed = false;
                 String[] carried = {null};
+                boolean[] previousRemoved = {false};
                 entries = ListUtils.map(entries, entry -> {
                     if (isToBeRemoved(entry)) {
+                        if (!previousRemoved[0] && carried[0] == null) {
+                            // the comment that ends the line before the removed entry moves to what follows it
+                            carried[0] = TrailingComments.inlineComment(entry.getPrefix());
+                        }
+                        previousRemoved[0] = true;
                         return null;
                     }
-                    Yaml.Sequence.Entry kept = carried[0] == null ? entry :
-                            entry.withPrefix(carried[0] + entry.getPrefix());
+                    String prefix = previousRemoved[0] ? TrailingComments.withoutInlineComment(entry.getPrefix()) : entry.getPrefix();
+                    Yaml.Sequence.Entry kept = carried[0] == null && !previousRemoved[0] ? entry :
+                            entry.withPrefix((carried[0] == null ? "" : carried[0]) + prefix);
                     carried[0] = trailingComment(entry);
+                    previousRemoved[0] = false;
                     return kept;
                 });
-                trailingComment(s, carried[0]);
+                Yaml.Sequence.Entry lastEntry = s.getEntries().get(s.getEntries().size() - 1);
+                if (isToBeRemoved(lastEntry) && s.getOpeningBracketPrefix() == null) {
+                    TrailingComments.afterRemovingLast(new Cursor(getCursor(), lastEntry),
+                            entries.isEmpty() ? null : entries.get(entries.size() - 1), carried[0]);
+                } else {
+                    trailingComment(s, carried[0]);
+                }
                 if (entries.size() != s.getEntries().size()) {
                     changed = true;
                 }
@@ -186,7 +200,7 @@ public class DeleteProperty extends Recipe {
 
             @Override
             public Yaml.Mapping visitMapping(Yaml.Mapping mapping, ExecutionContext ctx) {
-                Yaml.Mapping m = super.visitMapping(mapping, ctx);
+                Yaml.Mapping m = TrailingComments.visit(getCursor(), () -> super.visitMapping(mapping, ctx));
                 boolean childModified = (m != mapping);
 
                 boolean changed = false;
@@ -209,7 +223,9 @@ public class DeleteProperty extends Recipe {
                         changed = true;
                         previousWasDeleted = true;
                     } else {
-                        if (entries.isEmpty() && firstDeletedPrefix != null && containsOnlyWhitespace(entry.getPrefix())) {
+                        if (entries.isEmpty() && firstDeletedPrefix != null &&
+                            containsOnlyWhitespace(TrailingComments.withoutInlineComment(entry.getPrefix()))) {
+                            // the first entry now, without the comment of the deleted line before it
                             entry = entry.withPrefix(firstDeletedPrefix);
                         } else if (previousWasDeleted && !entries.isEmpty() && !containsNewline(entry.getPrefix())) {
                             entry = entry.withPrefix("\n" + entry.getPrefix());
@@ -232,7 +248,15 @@ public class DeleteProperty extends Recipe {
                         carried = trailingComment(entry);
                     }
                 }
-                trailingComment(m, carried);
+                Yaml.Mapping.Entry lastEntry = m.getEntries().isEmpty() ? null : m.getEntries().get(m.getEntries().size() - 1);
+                if (lastEntry != null && isToBeRemoved(lastEntry) && m.getOpeningBracePrefix() == null) {
+                    // the comment that ends the deleted last entry's line goes with it, and the one that ends the
+                    // line of the last kept entry takes its place
+                    TrailingComments.afterRemovingLast(new Cursor(getCursor(), lastEntry),
+                            entries.isEmpty() ? null : entries.get(entries.size() - 1), carried);
+                } else {
+                    trailingComment(m, carried);
+                }
 
                 if (commentMoved && !changed) {
                     m = m.withEntries(entries);
