@@ -523,8 +523,7 @@ public class ChangePackage extends Recipe implements RenamingRecipe {
         }
 
         private String getNewPackageName(String packageName) {
-            return isRecursive() && !newPackageName.endsWith(packageName.substring(oldPackageName.length())) ?
-                    newPackageName + packageName.substring(oldPackageName.length()) : newPackageName;
+            return isRecursive() ? newPackageName + packageName.substring(oldPackageName.length()) : newPackageName;
         }
 
         private boolean isTargetFullyQualifiedType(JavaType.@Nullable FullyQualified fq) {
@@ -537,8 +536,12 @@ public class ChangePackage extends Recipe implements RenamingRecipe {
             return isRecursive() &&
                    packageName.startsWith(oldPackageName + ".") &&
                    !newPackageName.isEmpty() &&
-                   !packageName.equals(newPackageName) &&
-                   !packageName.startsWith(newPackageName + ".");
+                   !isAlreadyInNewSubpackage(packageName);
+        }
+
+        private boolean isAlreadyInNewSubpackage(String packageName) {
+            return newPackageName.startsWith(oldPackageName + ".") &&
+                   (packageName.equals(newPackageName) || packageName.startsWith(newPackageName + "."));
         }
 
     }
