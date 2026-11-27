@@ -27,31 +27,26 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/**
- * An {@link XMLLexer} that tolerates the parts of HTML that XML does not allow, so that the XML grammar and
- * {@link XmlParserVisitor} can parse HTML without a second grammar. The strict {@link XMLLexer} remains in use for
- * everything else. It differs from it in that it:
- * <ul>
- *     <li>reads the content of {@code <script>}, {@code <style>} and {@code <textarea>} as text, since a {@code <}
- *     or {@code &} in it does not begin markup;</li>
- *     <li>reads {@code <} and {@code &} that cannot begin a tag or an entity as text;</li>
- *     <li>reads {@code <} in a quoted attribute value, and unquoted attribute values;</li>
- *     <li>reads any name that does not contain whitespace or one of {@code "'>/=} as an attribute name, which
- *     covers {@code *ngIf}, {@code [title]}, {@code (click)}, {@code @click} and {@code #ref};</li>
- *     <li>supplies the end tags HTML lets an author leave off, as zero-width tokens that
- *     {@link XmlParserVisitor} recognizes: an {@code <li>} ended by the next {@code <li>} or by the enclosing
- *     {@code </ul>}, a {@code <p>} ended by a block element, and so on, including {@code </body></html>} at the
- *     end of the file.</li>
- * </ul>
- * Attributes without a value are admitted by the parser grammar itself.
- */
+/// An [XMLLexer] that tolerates the parts of HTML that XML does not allow, so that the XML grammar and
+/// [XmlParserVisitor] can parse HTML without a second grammar. The strict [XMLLexer] remains in use for
+/// everything else. It differs from it in that it:
+///
+/// - reads the content of `<script>`, `<style>` and `<textarea>` as text, since a `<` or `&` in it does not
+///   begin markup;
+/// - reads `<` and `&` that cannot begin a tag or an entity as text;
+/// - reads `<` in a quoted attribute value, and unquoted attribute values;
+/// - reads any name that does not contain whitespace or one of `"'>/=` as an attribute name, which covers
+///   `*ngIf`, `[title]`, `(click)`, `@click` and `#ref`;
+/// - supplies the end tags HTML lets an author leave off, as zero-width tokens that [XmlParserVisitor]
+///   recognizes: an `<li>` ended by the next `<li>` or by the enclosing `</ul>`, a `<p>` ended by a block
+///   element, and so on, including `</body></html>` at the end of the file.
+///
+/// Attributes without a value are admitted by the parser grammar itself.
 public class HtmlXmlLexer extends XMLLexer {
 
     private static final Set<String> RAW_TEXT_ELEMENTS = new HashSet<>(Arrays.asList("script", "style", "textarea"));
 
-    /**
-     * Elements whose end tag HTML lets an author leave off, when what follows makes it clear where they end.
-     */
+    /// Elements whose end tag HTML lets an author leave off, when what follows makes it clear where they end.
     private static final Set<String> OPTIONAL_END_TAG = new HashSet<>(Arrays.asList(
             "html", "head", "body", "p", "li", "dt", "dd", "tr", "td", "th", "thead", "tbody", "tfoot",
             "option", "optgroup", "colgroup", "caption"));
@@ -61,9 +56,7 @@ public class HtmlXmlLexer extends XMLLexer {
             "figure", "footer", "form", "h1", "h2", "h3", "h4", "h5", "h6", "header", "hgroup", "hr", "main",
             "menu", "nav", "ol", "p", "pre", "section", "table", "ul"));
 
-    /**
-     * The start tags that implicitly end an open element, by the open element's name.
-     */
+    /// The start tags that implicitly end an open element, by the open element's name.
     private static final Map<String, Set<String>> CLOSED_BY_START_TAG = new HashMap<>();
 
     static {
@@ -212,9 +205,7 @@ public class HtmlXmlLexer extends XMLLexer {
         return OPTIONAL_END_TAG.contains(name.toLowerCase());
     }
 
-    /**
-     * An end tag without any width, directly after the last thing in the source that belongs to the element.
-     */
+    /// An end tag without any width, directly after the last thing in the source that belongs to the element.
     private void virtualEndTag(String name, int position) {
         pending.add(virtual(OPEN, "<", position));
         pending.add(virtual(SLASH, "/", position));
@@ -230,9 +221,7 @@ public class HtmlXmlLexer extends XMLLexer {
         return token;
     }
 
-    /**
-     * @return Whether the token is an end tag's that {@link HtmlXmlLexer} supplied rather than found in the source.
-     */
+    /// @return Whether the token is an end tag's that [HtmlXmlLexer] supplied rather than found in the source.
     public static boolean isVirtual(Token token) {
         return token.getStopIndex() < token.getStartIndex();
     }
@@ -284,10 +273,8 @@ public class HtmlXmlLexer extends XMLLexer {
         return null;
     }
 
-    /**
-     * The content of an element such as {@code <script>}, up to its end tag, if what is in it would trip up the XML
-     * lexer. Content that the XML lexer reads just as well, such as a JSP scriptlet, is left to it.
-     */
+    /// The content of an element such as `<script>`, up to its end tag, if what is in it would trip up the XML
+    /// lexer. Content that the XML lexer reads just as well, such as a JSP scriptlet, is left to it.
     private @Nullable Token rawText(String element) {
         int start = _input.index();
         String rest = _input.getText(Interval.of(start, _input.size() - 1));
@@ -312,10 +299,8 @@ public class HtmlXmlLexer extends XMLLexer {
         return false;
     }
 
-    /**
-     * A {@code <} that does not begin a tag, comment, or the like, or an {@code &} that does not begin an entity,
-     * along with the text that follows it.
-     */
+    /// A `<` that does not begin a tag, comment, or the like, or an `&` that does not begin an entity,
+    /// along with the text that follows it.
     private @Nullable Token strayMarkup() {
         int offset = 1;
         while (isWhitespace(_input.LA(offset))) {
@@ -397,9 +382,7 @@ public class HtmlXmlLexer extends XMLLexer {
         return token(TEXT, length);
     }
 
-    /**
-     * A token for the next characters of the input, which are consumed.
-     */
+    /// A token for the next characters of the input, which are consumed.
     private Token token(int type, int length) {
         int start = _input.index();
         int line = getLine();

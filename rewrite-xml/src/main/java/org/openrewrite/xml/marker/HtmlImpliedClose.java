@@ -21,11 +21,9 @@ import org.openrewrite.marker.Marker;
 
 import java.util.UUID;
 
-/**
- * Marks an {@link org.openrewrite.xml.tree.Xml.Tag} whose end tag HTML allows to be left off, such as the
- * {@code <li>} in {@code <ul><li>one<li>two</ul>}, which the next {@code <li>} or the enclosing {@code </ul>}
- * ends. The tag has content and no closing tag, and is printed that way instead of as self-closing.
- */
+/// Marks an [org.openrewrite.xml.tree.Xml.Tag] whose end tag HTML allows to be left off, such as the
+/// `<li>` in `<ul><li>one<li>two</ul>`, which the next `<li>` or the enclosing `</ul>`
+/// ends. The tag has content and no closing tag, and is printed that way instead of as self-closing.
 @Value
 @With
 public class HtmlImpliedClose implements Marker {

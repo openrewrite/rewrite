@@ -21,11 +21,9 @@ import org.openrewrite.marker.Marker;
 
 import java.util.UUID;
 
-/**
- * Marks an {@link org.openrewrite.xml.tree.Xml.Attribute} written the HTML way without a value, such as the
- * {@code disabled} in {@code <input disabled>}. The attribute's {@code Value} is an empty placeholder that is
- * not printed, and neither is the {@code =} that would precede it.
- */
+/// Marks an [org.openrewrite.xml.tree.Xml.Attribute] written the HTML way without a value, such as the
+/// `disabled` in `<input disabled>`. The attribute's `Value` is an empty placeholder that is
+/// not printed, and neither is the `=` that would precede it.
 @Value
 @With
 public class HtmlBooleanAttribute implements Marker {

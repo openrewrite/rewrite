@@ -21,10 +21,8 @@ import org.openrewrite.marker.Marker;
 
 import java.util.UUID;
 
-/**
- * Marks an {@link org.openrewrite.xml.tree.Xml.Attribute.Value} written the HTML way without quotes, such as the
- * {@code main} in {@code <div class=main>}. It is printed as is, between no delimiters.
- */
+/// Marks an [org.openrewrite.xml.tree.Xml.Attribute.Value] written the HTML way without quotes, such as the
+/// `main` in `<div class=main>`. It is printed as is, between no delimiters.
 @Value
 @With
 public class HtmlUnquotedAttributeValue implements Marker {
