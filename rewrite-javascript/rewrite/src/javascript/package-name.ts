@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {isBuiltin} from "module";
+import {builtinModules, isBuiltin} from "module";
 
 /**
  * A module specifier with a redundant `node:` scheme removed, which is the name attribution gives the module.
@@ -22,7 +22,7 @@ import {isBuiltin} from "module";
  */
 export function moduleName(specifier: string): string {
     const bare = specifier.substring('node:'.length);
-    return specifier.startsWith('node:') && isBuiltin(bare) ? bare : specifier;
+    return specifier.startsWith('node:') && isBuiltinModule(bare) ? bare : specifier;
 }
 
 /** A declaration file's whole extension: `.d.ts`, `.d.mts`, `.d.cts`, or `.d.css.ts` for a file of another kind. */
@@ -49,9 +49,17 @@ export function sameModule(a: string, b: string): boolean {
  * A respelling of `like` itself is left as asked.
  */
 export function spelledLike(module: string, like: string): string {
-    return like.startsWith('node:') && !module.startsWith('node:') && isBuiltin(module) && !sameModule(module, like)
+    return like.startsWith('node:') && !module.startsWith('node:') && isBuiltinModule(module) && !sameModule(module, like)
         ? `node:${module}`
         : module;
+}
+
+/**
+ * Node.js before 16.17, 17 or 18.0 to 18.5 might be used to parse, and then `isBuiltin` is missing.
+ * `builtinModules` gives the same answer for the bare names (without `node:`) asked here.
+ */
+function isBuiltinModule(name: string): boolean {
+    return typeof isBuiltin === "function" ? isBuiltin(name) : builtinModules.includes(name);
 }
 
 /**
