@@ -2189,4 +2189,81 @@ class AddImportTest implements RewriteTest {
             """
         );
     }
+
+    @Test
+    void typeParameterOfAnotherClassDoesNotStopImport() {
+        insertJob(
+          """
+            class Test {
+                void m() {
+                }
+            }
+            class Box<Job> {
+            }
+            """,
+          """
+            import lib.Writer.Job;
+
+            class Test {
+                void m() {
+                    Job inserted = null;
+                }
+            }
+            class Box<Job> {
+            }
+            """
+        );
+    }
+
+    @Test
+    void nestedClassOfAnotherClassDoesNotStopImport() {
+        insertJob(
+          """
+            class Test {
+                void m() {
+                }
+            }
+            class Other {
+                static class Job {}
+                Job own;
+            }
+            """,
+          """
+            import lib.Writer.Job;
+
+            class Test {
+                void m() {
+                    Job inserted = null;
+                }
+            }
+            class Other {
+                static class Job {}
+                Job own;
+            }
+            """
+        );
+    }
+
+    @Test
+    void topLevelClassOfSameNameInFileStopsImport() {
+        insertJob(
+          """
+            class Test {
+                void m() {
+                }
+            }
+            class Job {
+            }
+            """,
+          """
+            class Test {
+                void m() {
+                    lib.Writer.Job inserted = null;
+                }
+            }
+            class Job {
+            }
+            """
+        );
+    }
 }
