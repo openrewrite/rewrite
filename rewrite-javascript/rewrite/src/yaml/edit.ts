@@ -592,8 +592,9 @@ function lineBreakAt(space: string): number {
 const isNotBlank = (line: string) => line.trim() !== "";
 
 /**
- * The space left when a node between `before` and `after` is removed. The comment on the removed node's line goes;
- * other comments stay.
+ * The space left when a node between `before` and `after` is removed. The comments on the lines above the removed
+ * node and on its own line go with it, as in Java's `DeleteKey`; the one ending the line before it and those above
+ * the next node stay.
  */
 function joinGaps(before: string, after: string, first: boolean): string {
     if (!after.includes("\n")) {
@@ -606,9 +607,7 @@ function joinGaps(before: string, after: string, first: boolean): string {
         return afterLines.length === 0 ? before :
             before + [afterLines[0].trimStart(), ...afterLines.slice(1), a.last].join(eol);
     }
-    const b = lines(before);
-    const beforeLines = first ? b.mid : b.mid.filter(isNotBlank);
-    return [b.head, ...beforeLines, ...afterLines, a.last].join(eol);
+    return [lines(before).head, ...afterLines, a.last].join(eol);
 }
 
 function withPrefixIfEmpty<T extends Yaml.Block>(block: T, prefix: string): T {

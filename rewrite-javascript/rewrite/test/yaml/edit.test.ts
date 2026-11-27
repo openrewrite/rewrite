@@ -249,9 +249,15 @@ describe("mapping entries", () => {
         expect(setAt(docs, ["x", "b"], 1)).toBe(docs);
     });
 
-    test("keeps comments before and after a removed entry, and drops the one on its line", async () => {
-        expect(await edit("a: 1\n# about b\nb: 2 # bee\n# about c\nc: 3\n", docs => removeAt(docs, ["b"])))
-            .toBe("a: 1\n# about b\n# about c\nc: 3\n");
+    test("removes an entry with the comments above it and on its line, as Java's DeleteKey does", async () => {
+        expect(await edit("a: 1 # one\n# about b\nb: 2 # bee\n# about c\nc: 3\n", docs => removeAt(docs, ["b"])))
+            .toBe("a: 1 # one\n# about c\nc: 3\n");
+        expect(await edit("a: 1\n\n# section\nb: 2\nc: 3\n", docs => removeAt(docs, ["b"]))).toBe("a: 1\nc: 3\n");
+        expect(await edit("p:\n  # about x\n  x: 1\n  y: 2\n", docs => removeAt(docs, ["p", "x"]))).toBe("p:\n  y: 2\n");
+    });
+
+    test("keeps the comments that start the file when it removes the first entry", async () => {
+        expect(await edit("# header\n\n# about a\na: 1\nb: 2\n", docs => removeAt(docs, ["a"]))).toBe("# header\n\n# about a\nb: 2\n");
     });
 
     test("removes the first entry of the root mapping", async () => {
