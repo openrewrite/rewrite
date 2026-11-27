@@ -553,6 +553,7 @@ public class PythonRewriteRpc extends RewriteRpc {
                 emptyList(),
                 resolvedDeps,
                 PythonResolutionResult.PackageManager.Uv,
+                null,
                 null
         );
     }

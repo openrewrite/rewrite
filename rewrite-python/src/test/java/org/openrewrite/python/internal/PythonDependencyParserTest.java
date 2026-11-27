@@ -34,6 +34,7 @@ import java.util.Map;
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.entry;
 
 class PythonDependencyParserTest {
 
@@ -417,5 +418,102 @@ class PythonDependencyParserTest {
         assertThat(parsed).hasSize(1);
         assertThat(parsed.get(0)).isInstanceOf(Toml.Document.class);
         return (Toml.Document) parsed.get(0);
+    }
+
+    @Test
+    void projectUrlsFromProjectTable() {
+        Toml.Document doc = parseToml("""
+          [project]
+          name = "my-project"
+          version = "1.0.0"
+
+          [project.urls]
+          Homepage = "https://example.com"
+          "Bug Tracker" = "https://github.com/example/my-project/issues"
+          Source = "https://github.com/example/my-project"
+          """);
+
+        PythonResolutionResult marker = PythonDependencyParser.createMarker(doc, null);
+
+        assertThat(marker).isNotNull();
+        assertThat(marker.getProjectUrls()).containsExactly(
+          entry("Homepage", "https://example.com"),
+          entry("Bug Tracker", "https://github.com/example/my-project/issues"),
+          entry("Source", "https://github.com/example/my-project"));
+    }
+
+    @Test
+    void projectUrlsFromInlineTable() {
+        Toml.Document doc = parseToml("""
+          [project]
+          name = "my-project"
+          urls = { Repository = "https://github.com/example/my-project" }
+          """);
+
+        PythonResolutionResult marker = PythonDependencyParser.createMarker(doc, null);
+
+        assertThat(marker).isNotNull();
+        assertThat(marker.getProjectUrls())
+          .containsExactly(entry("Repository", "https://github.com/example/my-project"));
+    }
+
+    @Test
+    void projectUrlsFromDottedKeys() {
+        Toml.Document doc = parseToml("""
+          [project]
+          name = "my-project"
+          urls.Homepage = "https://example.com"
+          urls."Bug Tracker" = "https://github.com/example/my-project/issues"
+          urls.Source = "https://github.com/example/my-project.git"
+          scripts.my-project = "my_project:main"
+          """);
+
+        PythonResolutionResult marker = PythonDependencyParser.createMarker(doc, null);
+
+        assertThat(marker).isNotNull();
+        assertThat(marker.getProjectUrls()).containsExactly(
+          entry("Homepage", "https://example.com"),
+          entry("Bug Tracker", "https://github.com/example/my-project/issues"),
+          entry("Source", "https://github.com/example/my-project.git"));
+    }
+
+    @Test
+    void projectUrlsFromPoetry() {
+        Toml.Document doc = parseToml("""
+          [tool.poetry]
+          name = "my-project"
+          version = "1.0.0"
+          homepage = "https://example.com"
+          repository = "https://github.com/example/my-project"
+          documentation = "https://example.com/docs"
+
+          [tool.poetry.urls]
+          "Bug Tracker" = "https://github.com/example/my-project/issues"
+
+          [tool.poetry.dependencies]
+          python = "^3.9"
+          """);
+
+        PythonResolutionResult marker = PythonDependencyParser.createMarker(doc, null);
+
+        assertThat(marker).isNotNull();
+        assertThat(marker.getProjectUrls()).containsExactly(
+          entry("Homepage", "https://example.com"),
+          entry("Repository", "https://github.com/example/my-project"),
+          entry("Documentation", "https://example.com/docs"),
+          entry("Bug Tracker", "https://github.com/example/my-project/issues"));
+    }
+
+    @Test
+    void noProjectUrlsDeclared() {
+        Toml.Document doc = parseToml("""
+          [project]
+          name = "my-project"
+          """);
+
+        PythonResolutionResult marker = PythonDependencyParser.createMarker(doc, null);
+
+        assertThat(marker).isNotNull();
+        assertThat(marker.getProjectUrls()).isNull();
     }
 }

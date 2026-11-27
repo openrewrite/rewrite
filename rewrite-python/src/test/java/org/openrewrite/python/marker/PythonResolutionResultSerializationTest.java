@@ -23,13 +23,21 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.cfg.ConstructorDetector;
 import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.python.marker.PythonResolutionResult.ResolvedDependency;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.UUID;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
+import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.entry;
 
 /**
  * A resolved Python graph is cyclic — packages depend on each other through extras — so it has to survive both a
@@ -85,5 +93,54 @@ class PythonResolutionResultSerializationTest {
 
         assertThat(a.hashCode()).isEqualTo(a.hashCode());
         assertThat(a).isEqualTo(cyclicGraph());
+    }
+
+    private static PythonResolutionResult markerWithProjectUrls() {
+        Map<String, String> dependencyUrls = new LinkedHashMap<>();
+        dependencyUrls.put("Source", "https://github.com/psf/requests");
+        dependencyUrls.put("Documentation", "https://requests.readthedocs.io");
+        ResolvedDependency requests = new ResolvedDependency("requests", "2.31.0", null, null, dependencyUrls);
+        Map<String, String> projectUrls = new LinkedHashMap<>();
+        projectUrls.put("Repository", "https://github.com/example/my-app");
+        projectUrls.put("Homepage", "https://example.com");
+        return new PythonResolutionResult(UUID.randomUUID(), "my-app", "1.0.0", null, null, "pyproject.toml",
+                null, null, emptyList(),
+                singletonList(new PythonResolutionResult.Dependency("requests", ">=2", null, null, requests)),
+                emptyMap(), emptyMap(), emptyList(), emptyList(), singletonList(requests), null, null, projectUrls);
+    }
+
+    @Test
+    void roundTripProjectUrls() throws Exception {
+        ObjectMapper mapper = mapper();
+        PythonResolutionResult marker = markerWithProjectUrls();
+
+        PythonResolutionResult read = mapper.readValue(mapper.writeValueAsString(marker), PythonResolutionResult.class);
+
+        assertThat(read.getProjectUrls()).containsExactly(
+                entry("Repository", "https://github.com/example/my-app"),
+                entry("Homepage", "https://example.com"));
+        assertThat(read.getResolvedDependencies().get(0).getProjectUrls()).containsExactly(
+                entry("Source", "https://github.com/psf/requests"),
+                entry("Documentation", "https://requests.readthedocs.io"));
+        assertThat(read.getDependencies().get(0).getResolved()).isSameAs(read.getResolvedDependencies().get(0));
+    }
+
+    @Test
+    void readsMarkerWrittenBeforeProjectUrls() throws Exception {
+        ObjectMapper mapper = mapper();
+        ObjectNode written = (ObjectNode) mapper.readTree(mapper.writeValueAsString(markerWithProjectUrls()));
+        written.remove("projectUrls");
+        // the declared dependency comes first, so the resolution is written out there
+        ((ObjectNode) written.get("dependencies").get(0).get("resolved")).remove("projectUrls");
+        assertThat(written.toString()).doesNotContain("projectUrls");
+
+        PythonResolutionResult read = mapper.readValue(written.toString(), PythonResolutionResult.class);
+
+        assertThat(read.getName()).isEqualTo("my-app");
+        assertThat(read.getProjectUrls()).isNull();
+        assertThat(read.getResolvedDependencies()).singleElement().satisfies(requests -> {
+            assertThat(requests.getVersion()).isEqualTo("2.31.0");
+            assertThat(requests.getProjectUrls()).isNull();
+        });
     }
 }

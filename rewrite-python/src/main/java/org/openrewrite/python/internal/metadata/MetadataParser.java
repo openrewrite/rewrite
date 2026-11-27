@@ -19,8 +19,10 @@ import org.jspecify.annotations.Nullable;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /**
  * RFC 5322-style parser for Python core metadata (METADATA / PKG-INFO). Parsing stops at the
@@ -40,6 +42,8 @@ public class MetadataParser {
         List<String> requiresDist = new ArrayList<>();
         List<String> providesExtra = new ArrayList<>();
         List<String> dynamic = new ArrayList<>();
+        Map<String, String> projectUrls = new LinkedHashMap<>();
+        String homePage = null;
 
         for (String[] header : headers(new String(utf8, StandardCharsets.UTF_8))) {
             String field = header[0];
@@ -63,6 +67,16 @@ public class MetadataParser {
                 case "requires-python":
                     requiresPython = value;
                     break;
+                case "home-page":
+                    homePage = value;
+                    break;
+                case "project-url":
+                    // "label, URL", and the label holds no comma
+                    int comma = value.indexOf(',');
+                    if (comma > 0 && !value.substring(comma + 1).trim().isEmpty()) {
+                        projectUrls.putIfAbsent(value.substring(0, comma).trim(), value.substring(comma + 1).trim());
+                    }
+                    break;
                 case "provides-extra":
                     providesExtra.add(value);
                     break;
@@ -75,7 +89,18 @@ public class MetadataParser {
                     break;
             }
         }
-        return new CoreMetadata(metadataVersion, name, version, summary, requiresDist, requiresPython, providesExtra, dynamic);
+        // setuptools wrote UNKNOWN for a field the project left out
+        if (homePage != null && !homePage.isEmpty() && !"UNKNOWN".equals(homePage) &&
+            projectUrls.keySet().stream().noneMatch(MetadataParser::isHomepage)) {
+            projectUrls.put("Homepage", homePage);
+        }
+        return new CoreMetadata(metadataVersion, name, version, summary, requiresDist, requiresPython, providesExtra,
+                dynamic, projectUrls);
+    }
+
+    /** Labels are compared as the well-known ones are: without case, punctuation or whitespace. */
+    private static boolean isHomepage(String label) {
+        return "homepage".equals(label.replaceAll("[\\p{Punct}\\s]", "").toLowerCase(Locale.ROOT));
     }
 
     private static List<String[]> headers(String content) {

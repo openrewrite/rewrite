@@ -21,6 +21,7 @@ import java.util.List;
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.entry;
 
 class PipfileParserTest {
 
@@ -145,5 +146,46 @@ class PipfileParserTest {
         PythonResolutionResult marker = PipfileParser.createMarker(pipfile);
         assertThat(marker).isNotNull();
         assertThat(marker.getRequiresPython()).isEqualTo("3.11.4");
+    }
+
+    @Test
+    void lockedDependenciesTakeProjectUrlsFromInstalledEnv(@TempDir Path tempDir) throws Exception {
+        Files.write(tempDir.resolve("Pipfile"), """
+          [packages]
+          requests = "*"
+          """.getBytes());
+        Files.write(tempDir.resolve("Pipfile.lock"), """
+          {
+              "_meta": {"sources": [{"name": "pypi", "url": "https://pypi.org/simple", "verify_ssl": true}]},
+              "default": {
+                  "certifi": {"version": "==2024.2.2"},
+                  "requests": {"version": "==2.31.0"}
+              },
+              "develop": {}
+          }
+          """.getBytes());
+        Path distInfo = Files.createDirectories(
+          tempDir.resolve(".venv/lib/python3.12/site-packages/requests-2.31.0.dist-info"));
+        Files.write(distInfo.resolve("METADATA"), """
+          Metadata-Version: 2.1
+          Name: requests
+          Version: 2.31.0
+          Home-page: https://requests.readthedocs.io
+          Project-URL: Source, https://github.com/psf/requests
+          """.getBytes());
+
+        PythonResolutionResult marker = new PipfileParser(tempDir.resolve(".venv"))
+          .parseInputs(singletonList(Parser.Input.fromFile(tempDir.resolve("Pipfile"))), tempDir,
+            new InMemoryExecutionContext(Throwable::printStackTrace))
+          .findFirst().orElseThrow().getMarkers().findFirst(PythonResolutionResult.class).orElseThrow();
+
+        assertThat(marker.getProjectUrls()).isNull();
+        assertThat(marker.getResolvedDependency("requests").getProjectUrls()).containsExactly(
+          entry("Source", "https://github.com/psf/requests"),
+          entry("Homepage", "https://requests.readthedocs.io"));
+        assertThat(marker.getDependencies().get(0).getResolved()).isSameAs(marker.getResolvedDependency("requests"));
+        assertThat(marker.getResolvedDependency("certifi").getProjectUrls())
+          .as("certifi is locked but not installed in the env")
+          .isNull();
     }
 }

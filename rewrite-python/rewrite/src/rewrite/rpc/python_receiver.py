@@ -2031,6 +2031,7 @@ def _register_python_resolution_result_codecs():
                 rd.dependencies,
                 lambda dep: _receive_resolved_dep(dep, q)
             ),
+            _project_urls=q.receive(rd.project_urls),
         )
 
     def _send_resolved_dep(rd: ResDep, q: RpcSendQueue) -> None:
@@ -2043,12 +2044,13 @@ def _register_python_resolution_result_codecs():
             lambda dep: dep.name + '@' + dep.version,
             lambda dep: _send_resolved_dep(dep, q)
         )
+        q.get_and_send(rd, lambda x: x.project_urls)
 
     register_codec_with_both_names(
         'org.openrewrite.python.marker.PythonResolutionResult$ResolvedDependency',
         ResDep,
         _receive_resolved_dep,
-        lambda: ResDep(_name='', _version='', _source=None, _dependencies=None),
+        lambda: ResDep(_name='', _version='', _source=None, _dependencies=None, _project_urls=None),
         _send_resolved_dep
     )
 
@@ -2119,6 +2121,7 @@ def _register_python_resolution_result_codecs():
             marker.source_indexes,
             lambda si: _receive_source_index(si, q)
         )
+        new_project_urls = q.receive(marker.project_urls)
         return replace(marker,
             _id=new_id,
             _name=new_name,
@@ -2137,6 +2140,7 @@ def _register_python_resolution_result_codecs():
             _resolved_dependencies=new_resolved_deps,
             _package_manager=new_pm,
             _source_indexes=new_source_indexes,
+            _project_urls=new_project_urls,
         )
 
     def _send_resolution_result(marker: PRR, q: RpcSendQueue) -> None:
@@ -2182,6 +2186,7 @@ def _register_python_resolution_result_codecs():
             lambda si: si.name,
             lambda si: _send_source_index(si, q)
         )
+        q.get_and_send(marker, lambda x: x.project_urls)
 
     register_codec_with_both_names(
         'org.openrewrite.python.marker.PythonResolutionResult',
@@ -2193,7 +2198,7 @@ def _register_python_resolution_result_codecs():
             _build_requires=[], _dependencies=[], _optional_dependencies={},
             _dependency_groups={}, _constraint_dependencies=[],
             _override_dependencies=[], _resolved_dependencies=[],
-            _package_manager=None, _source_indexes=None
+            _package_manager=None, _source_indexes=None, _project_urls=None
         ),
         _send_resolution_result
     )

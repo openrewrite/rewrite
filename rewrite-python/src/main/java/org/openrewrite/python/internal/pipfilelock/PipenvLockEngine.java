@@ -1143,7 +1143,7 @@ public final class PipenvLockEngine {
                 if (dist != null && dist.getType() == DistFilename.Type.SDIST) {
                     List<String> requirements = SdistMetadataReader.eggInfoRequirements(http, file.getUrl());
                     return requirements == null ? null : new CoreMetadata("1.0", key, version.toString(), null,
-                            requirements, null, emptyList(), emptyList());
+                            requirements, null, emptyList(), emptyList(), emptyMap());
                 }
             }
             return null;

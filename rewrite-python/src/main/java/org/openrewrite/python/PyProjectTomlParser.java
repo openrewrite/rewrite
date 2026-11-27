@@ -116,6 +116,9 @@ public class PyProjectTomlParser implements Parser {
             pm = PythonResolutionResult.PackageManager.Uv;
         }
         if (!resolvedDeps.isEmpty()) {
+            if (installedEnv != null) {
+                resolvedDeps = InstalledEnvParser.withProjectUrls(resolvedDeps, installedEnv);
+            }
             return PythonResolutionLinker.applyPyproject(marker, resolvedDeps, pm);
         }
         if (lockPresent) {

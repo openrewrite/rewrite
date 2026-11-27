@@ -137,6 +137,7 @@ public class RequirementsTxtParser implements Parser {
                     emptyList(),
                     resolvedDeps,
                     PackageManager.Uv,
+                    null,
                     null
             );
 

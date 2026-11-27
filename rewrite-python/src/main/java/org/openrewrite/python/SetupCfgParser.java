@@ -132,7 +132,8 @@ public class SetupCfgParser implements Parser {
                     emptyList(),
                     resolvedDeps,
                     PackageManager.Uv,
-                    null
+                    null,
+                    DependencyManifest.setupCfgProjectUrls(text.getText())
             );
 
             return text.withMarkers(text.getMarkers().addIfAbsent(marker));
