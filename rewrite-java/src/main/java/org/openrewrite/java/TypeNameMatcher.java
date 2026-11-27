@@ -52,7 +52,7 @@ class ExactTypeNameMatcher implements TypeNameMatcher {
                TypeUtils.fullyQualifiedNamesAreEqual(pattern, withoutArity(typeName));
     }
 
-    private static String withoutArity(String typeName) {
+    static String withoutArity(String typeName) {
         StringBuilder name = new StringBuilder(typeName.length());
         for (int i = 0; i < typeName.length(); i++) {
             char c = typeName.charAt(i);
@@ -134,7 +134,9 @@ class PatternTypeNameMatcher implements TypeNameMatcher {
                 int prefixLen = pattern.length();
                 return text.length() > prefixLen && text.startsWith(pattern) && text.charAt(prefixLen) == '.';
             default:
-                return matchesPattern(pattern, text, 0, 0);
+                return matchesPattern(pattern, text, 0, 0) ||
+                       text.indexOf('`') >= 0 &&
+                       matchesPattern(pattern, ExactTypeNameMatcher.withoutArity(text), 0, 0);
         }
     }
 

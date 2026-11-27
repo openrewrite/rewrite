@@ -579,10 +579,20 @@ public static class AddUsing
             if (!Shadowed
                 && string.Equals(name, simpleName, StringComparison.Ordinal)
                 && TypeUtils.GetFullyQualifiedName(type) is { Length: > 0 } resolved
-                && !TypeUtils.FullyQualifiedNameMatches(resolved, fullyQualifiedName))
+                && !TypeUtils.FullyQualifiedNameMatches(resolved, fullyQualifiedName)
+                && (!HasArity(fullyQualifiedName) || Arity(resolved) == Arity(fullyQualifiedName)))
             {
                 Shadowed = true;
             }
+        }
+
+        // C# tells Box and Box<T> apart, so a type of another arity leaves the name free.
+        private static bool HasArity(string fullyQualifiedName) => Arity(fullyQualifiedName).Length > 0;
+
+        private static string Arity(string fullyQualifiedName)
+        {
+            var tick = fullyQualifiedName.LastIndexOf('`');
+            return tick > fullyQualifiedName.LastIndexOfAny(['.', '$']) ? fullyQualifiedName[tick..] : "";
         }
     }
 }

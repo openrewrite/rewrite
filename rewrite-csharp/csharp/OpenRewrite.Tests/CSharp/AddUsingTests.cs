@@ -98,6 +98,28 @@ public class AddUsingTests : RewriteTest
     }
 
     [Fact]
+    public void NonGenericNamesakeDoesNotHideTheGenericType()
+    {
+        var cu = Parse(
+            """
+            using Other;
+
+            namespace Other
+            {
+                public class Box { }
+            }
+
+            public class C
+            {
+                private Box plain;
+            }
+            """);
+
+        Assert.False(AddUsing.IsShadowedInFile(cu, "Box", "N.Box`1"));
+        Assert.True(AddUsing.IsShadowedInFile(cu, "Box", "N.Box"));
+    }
+
+    [Fact]
     public void SortedFileStaysSorted()
     {
         var after = ApplyAddUsing(

@@ -397,6 +397,22 @@ class CSharpRecipeTest implements RewriteTest {
               """
           )
         );
+
+        rewriteRun(
+          spec -> spec.recipe(new FindTypes("*..List", null)),
+          csproj(project),
+          csharp(
+            source,
+            """
+              using System.Collections.Generic;
+              class Foo {
+                  void Test(/*~~>*/List<int> list) {
+                      list.Add(1);
+                  }
+              }
+              """
+          )
+        );
     }
 
     @Test

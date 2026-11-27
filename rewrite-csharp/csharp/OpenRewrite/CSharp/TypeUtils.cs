@@ -516,7 +516,7 @@ public static partial class TypeUtils
                 foreach (var bound in gtv.Bounds)
                 {
                     var boundFqn = GetFullyQualifiedName(bound);
-                    if (boundFqn != null && !IsAssignableTo(candidate, boundFqn))
+                    if (boundFqn != null && !IsAssignableToName(candidate, boundFqn, exact: true))
                         return false;
                 }
                 return true;
@@ -663,7 +663,7 @@ public static partial class TypeUtils
                 if (cls.ClassKind is JavaType.FullyQualified.FullyQualifiedKind.Value
                     or JavaType.FullyQualified.FullyQualifiedKind.Enum)
                     return false;
-                if (ValueTypeFqns.Contains(cls.FullyQualifiedName)) return false;
+                if (ValueTypeFqns.Contains(WithoutArity(cls.FullyQualifiedName))) return false;
                 return !InheritsFrom(cls, "System.ValueType");
             default:
                 return false;

@@ -501,6 +501,22 @@ public class TypeUtilsTests
     }
 
     [Fact]
+    public void IsAssignableTo_GenericTypeVariable_BoundNotSatisfiedByGenericNamesake()
+    {
+        // Target: IEnumerable`1<T> where T : IComparable
+        var target = new JavaType.Parameterized(
+            MakeClass("System.Collections.Generic.IEnumerable`1"),
+            [new JavaType.GenericTypeVariable("T", JavaType.GenericTypeVariable.VarianceKind.Invariant,
+                [MakeClass("System.IComparable")])]);
+
+        // Candidate: IEnumerable`1<Version>, where Version implements only IComparable`1
+        var version = MakeClass("System.Version", interfaces: [MakeClass("System.IComparable`1")]);
+        var candidate = new JavaType.Parameterized(MakeClass("System.Collections.Generic.IEnumerable`1"), [version]);
+
+        Assert.False(TypeUtils.IsAssignableTo(candidate, target));
+    }
+
+    [Fact]
     public void IsAssignableTo_ConcreteGeneric_StillRequiresExactTypeArgs()
     {
         // Target: IDictionary<string, string> — NO GenericTypeVariables, all concrete
@@ -977,6 +993,16 @@ public class TypeUtilsTests
         Assert.False(intToObjects);
         Assert.False(pointToValueTypes);
         Assert.False(pointToInterfaces);
+    }
+
+    [Fact]
+    public void IsAssignableTo_Array_NullableElementWithoutItsKindNotCovariant()
+    {
+        var nullableArray = new JavaType.Array(MakeClass("System.Nullable`1"), null);
+
+        var assignable = TypeUtils.IsAssignableTo(nullableArray, new JavaType.Array(MakeClass("System.Object"), null));
+
+        Assert.False(assignable);
     }
 
     [Fact]
