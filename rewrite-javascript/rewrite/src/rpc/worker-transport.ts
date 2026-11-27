@@ -31,44 +31,62 @@ const OUT_LEN = 3;
 const EMPTY = 0;
 const FULL = 1;
 const ABORTED = 2;
-
-const MAX_PAGE_BYTES = 1 << 30;
-
-// Growable shared buffers are ES2024, newer than the lib this project compiles against
-type GrowableSharedArrayBuffer = SharedArrayBuffer & { grow(length: number): void };
-const GrowableSharedArrayBuffer = SharedArrayBuffer as unknown as
-    new (length: number, options: { maxByteLength: number }) => GrowableSharedArrayBuffer;
+// The remote's page does not fit the inbound buffer, and the main thread holds it until the worker hands over a larger one
+const OVERSIZED = 3;
 
 export interface PageBuffers {
     control: SharedArrayBuffer;
-    inbound: GrowableSharedArrayBuffer;
-    outbound: GrowableSharedArrayBuffer;
+    inbound: SharedArrayBuffer;
+    outbound: SharedArrayBuffer;
 }
 
 export function newPageBuffers(): PageBuffers {
     return {
         control: new SharedArrayBuffer(4 * Int32Array.BYTES_PER_ELEMENT),
-        inbound: new GrowableSharedArrayBuffer(1 << 20, {maxByteLength: MAX_PAGE_BYTES}),
-        outbound: new GrowableSharedArrayBuffer(1 << 20, {maxByteLength: MAX_PAGE_BYTES}),
+        inbound: new SharedArrayBuffer(1 << 20),
+        outbound: new SharedArrayBuffer(1 << 20),
     };
 }
 
-function ensureCapacity(buffer: GrowableSharedArrayBuffer, length: number): void {
-    if (buffer.byteLength < length) {
-        buffer.grow(Math.min(MAX_PAGE_BYTES, Math.max(length, buffer.byteLength * 2)));
+// The control array holds a page's length in 32 bits
+const MAX_PAGE_BYTES = 1 << 30;
+
+function checkPageLength(length: number): void {
+    if (length > MAX_PAGE_BYTES) {
+        throw new RangeError(`A page of ${length} bytes is larger than the ${MAX_PAGE_BYTES} bytes a page can have`);
     }
+}
+
+// A shared buffer grows in place only from Node.js 20, so a page that does not fit moves to a new one
+function larger(buffer: SharedArrayBuffer, length: number): SharedArrayBuffer {
+    checkPageLength(length);
+    return new SharedArrayBuffer(Math.min(MAX_PAGE_BYTES, Math.max(length, buffer.byteLength * 2)));
+}
+
+/**
+ * Waits until `index` no longer holds `value` and returns what it holds then. A wait can end on a
+ * notify sent for an earlier change, after which the state is the one waited out again.
+ */
+function waitWhile(control: Int32Array, index: number, value: number): number {
+    let state: number;
+    while ((state = Atomics.load(control, index)) === value) {
+        Atomics.wait(control, index, value);
+    }
+    return state;
 }
 
 export class PageAbortedError extends Error {
 }
 
-// The outbound buffer holds the JSON of a GetObject response's result or error
-type Answer = { t: "answer", member: "result" | "error", last: boolean };
+// The outbound buffer holds the JSON of a GetObject response's result or error.
+// `buffer` is the outbound buffer, when the worker has replaced it since its last answer.
+type Answer = { t: "answer", member: "result" | "error", last: boolean, buffer?: SharedArrayBuffer };
 
 type ToMain =
     { t: "frame", bytes: Uint8Array } |
     { t: "pull", id: string, sourceFileType?: string } |
     Answer |
+    { t: "inbound", buffer: SharedArrayBuffer } |
     { t: "served" };
 
 type ToWorker = { t: "serve", params: { id: string, sourceFileType?: string } };
@@ -120,6 +138,8 @@ export class PortMessageWriter extends rpc.AbstractMessageWriter implements rpc.
 export class WorkerPageChannel {
     private readonly control: Int32Array;
     private pullInFlight = false;
+    // An outbound buffer that replaced the main thread's, until an answer hands it over
+    private replacedOutbound?: SharedArrayBuffer;
 
     constructor(private readonly port: MessagePort, private readonly buffers: PageBuffers) {
         this.control = new Int32Array(buffers.control);
@@ -163,7 +183,12 @@ export class WorkerPageChannel {
     }
 
     private awaitPage(): RpcObjectData[] {
-        Atomics.wait(this.control, IN_STATE, EMPTY);
+        if (waitWhile(this.control, IN_STATE, EMPTY) === OVERSIZED) {
+            this.buffers.inbound = larger(this.buffers.inbound, this.control[IN_LEN]);
+            Atomics.store(this.control, IN_STATE, EMPTY);
+            this.port.postMessage({t: "inbound", buffer: this.buffers.inbound} satisfies ToMain);
+            waitWhile(this.control, IN_STATE, EMPTY);
+        }
         const text = Buffer.from(this.buffers.inbound, 0, this.control[IN_LEN]).toString("utf8");
         Atomics.store(this.control, IN_STATE, EMPTY);
         this.pullInFlight = false;
@@ -219,7 +244,9 @@ export class WorkerPageChannel {
             text = encodeFragmented(value, "utf8");
         }
         const length = typeof text === "string" ? Buffer.byteLength(text, "utf8") : text.byteLength;
-        ensureCapacity(this.buffers.outbound, length);
+        if (this.buffers.outbound.byteLength < length) {
+            this.buffers.outbound = this.replacedOutbound = larger(this.buffers.outbound, length);
+        }
         const view = Buffer.from(this.buffers.outbound, 0, length);
         if (typeof text === "string") {
             view.write(text, 0, "utf8");
@@ -229,12 +256,12 @@ export class WorkerPageChannel {
         this.control[OUT_LEN] = length;
         // the remote may have aborted while the answer was written
         this.throwIfAborted(Atomics.compareExchange(this.control, OUT_STATE, EMPTY, FULL));
-        this.port.postMessage({t: "answer", member, last} satisfies ToMain);
+        this.port.postMessage({t: "answer", member, last, buffer: this.replacedOutbound} satisfies ToMain);
+        this.replacedOutbound = undefined;
     }
 
     private awaitTaken(): void {
-        Atomics.wait(this.control, OUT_STATE, FULL);
-        this.throwIfAborted(Atomics.load(this.control, OUT_STATE));
+        this.throwIfAborted(waitWhile(this.control, OUT_STATE, FULL));
     }
 
     private throwIfAborted(state: number): void {
@@ -271,6 +298,8 @@ export class StdioRelay {
     private nextPull = 0;
     private serving?: Serving;
     private readonly queuedServes: { id: string, params: { id: string, sourceFileType?: string } }[] = [];
+    // A remote page too large for the inbound buffer, until the worker hands over a larger one
+    private oversized?: Buffer;
 
     private pending: Buffer[] = [];
     private pendingLength = 0;
@@ -365,10 +394,16 @@ export class StdioRelay {
         if (Atomics.load(this.control, IN_STATE) !== EMPTY) {
             throw new Error("A page arrived before the worker took the previous one");
         }
-        ensureCapacity(this.buffers.inbound, body.byteLength);
-        body.copy(Buffer.from(this.buffers.inbound, 0, body.byteLength));
+        checkPageLength(body.byteLength);
         this.control[IN_LEN] = body.byteLength;
-        Atomics.store(this.control, IN_STATE, FULL);
+        if (body.byteLength > this.buffers.inbound.byteLength) {
+            // The worker blocks while it waits for a page, so only it can take a new buffer in
+            this.oversized = body;
+            Atomics.store(this.control, IN_STATE, OVERSIZED);
+        } else {
+            body.copy(Buffer.from(this.buffers.inbound, 0, body.byteLength));
+            Atomics.store(this.control, IN_STATE, FULL);
+        }
         Atomics.notify(this.control, IN_STATE);
     }
 
@@ -426,9 +461,19 @@ export class StdioRelay {
                 break;
             }
             case "answer":
+                if (m.buffer) {
+                    this.buffers.outbound = m.buffer;
+                }
                 this.serving!.ready = m;
                 this.respond();
                 break;
+            case "inbound": {
+                this.buffers.inbound = m.buffer;
+                const page = this.oversized!;
+                this.oversized = undefined;
+                this.deliverPage(page);
+                break;
+            }
             case "served": {
                 this.serving = undefined;
                 const next = this.queuedServes.shift();

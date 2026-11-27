@@ -31,6 +31,13 @@ interface Response {
     error?: { message: string };
 }
 
+// A page the worker pulls from the remote
+interface Pull {
+    id: string;
+    method: "GetObject";
+    params: { id: string };
+}
+
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 describe.skipIf(!fs.existsSync(transport))("the worker transport", () => {
@@ -45,20 +52,28 @@ describe.skipIf(!fs.existsSync(transport))("the worker transport", () => {
 
     /**
      * The returned functions play the remote. `serve` is the source of the function the worker
-     * thread serves each GetObject with.
+     * thread serves each GetObject with, and can pull the remote's pages through `channel`.
+     * `pull` answers each page the worker pulls. `wake` wakes the worker's wait on one side of the
+     * exchange without any change to it, as a notify of an earlier change can arrive late.
      */
-    function start(serve: string) {
+    function start(serve: string, pull?: (params: { id: string }) => unknown[] | Promise<unknown[]>) {
         const {StdioRelay, newPageBuffers} = require(transport) as typeof import("../../src/rpc/worker-transport");
         const {port1, port2} = new MessageChannel();
         const buffers = newPageBuffers();
         worker = new Worker(`
             const {workerData} = require("node:worker_threads");
             const {WorkerPageChannel} = require(workerData.transport);
-            new WorkerPageChannel(workerData.port, workerData.buffers).onServe(${serve});
+            const channel = new WorkerPageChannel(workerData.port, workerData.buffers);
+            channel.onServe(${serve});
         `, {eval: true, workerData: {transport, port: port2, buffers}, transferList: [port2]});
         const input = stdin = new PassThrough();
         const stdout = new PassThrough();
         new StdioRelay(input, stdout, new PassThrough(), port1, buffers);
+
+        const write = (message: object): void => {
+            const body = Buffer.from(JSON.stringify(message));
+            input.write(Buffer.concat([Buffer.from(`Content-Length: ${body.length}\r\n\r\n`), body]));
+        };
 
         const answer = new Map<number, (response: Response) => void>();
         let received = Buffer.alloc(0);
@@ -73,19 +88,24 @@ describe.skipIf(!fs.existsSync(transport))("the worker transport", () => {
                 if (received.length < end + 4 + length) {
                     return;
                 }
-                const response: Response = JSON.parse(received.toString("utf8", end + 4, end + 4 + length));
+                const message: Response | Pull = JSON.parse(received.toString("utf8", end + 4, end + 4 + length));
                 received = received.subarray(end + 4 + length);
-                answer.get(response.id)!(response);
+                if ("method" in message) {
+                    const {id, params} = message;
+                    Promise.resolve(pull!(params)).then(result => write({jsonrpc: "2.0", id, result}));
+                } else {
+                    answer.get(message.id)!(message);
+                }
             }
         });
 
         let nextId = 0;
-        const send = (method: string, params: object): void => {
-            const body = Buffer.from(JSON.stringify({jsonrpc: "2.0", id: nextId++, method, params}));
-            input.write(Buffer.concat([Buffer.from(`Content-Length: ${body.length}\r\n\r\n`), body]));
-        };
+        const send = (method: string, params: object): void => write({jsonrpc: "2.0", id: nextId++, method, params});
+        const control = new Int32Array(buffers.control);
         return {
             send,
+            // the indices of the inbound and outbound states in the control array
+            wake: (side: "inbound" | "outbound") => Atomics.notify(control, side === "inbound" ? 0 : 2),
             request(method: string, params: object): Promise<Response> {
                 const id = nextId;
                 // registered first, since the relay answers within the write when the answer is ready
@@ -158,6 +178,68 @@ describe.skipIf(!fs.existsSync(transport))("the worker transport", () => {
         remote.send("AbortGetObject", {id: "tree"});
 
         expect(await remote.request("GetObject", {id: "other"})).toMatchObject({result: [{state: "END_OF_OBJECT"}]});
+    });
+
+    test("pages larger than the buffer they move through reach the remote whole", async () => {
+        const remote = start(`async (params, sink) => {
+            sink([{state: "ADD", value: "a".repeat(3 << 20)}]);
+            sink([{state: "ADD", value: "b".repeat(9 << 20)}]);
+            sink([{state: "END_OF_OBJECT"}]);
+        }`);
+
+        expect(await remote.request("GetObject", {id: "tree"})).toMatchObject({result: [{value: "a".repeat(3 << 20)}]});
+        expect(await remote.request("GetObject", {id: "tree"})).toMatchObject({result: [{value: "b".repeat(9 << 20)}]});
+        // read from the buffer the second page moved to
+        expect(await remote.request("GetObject", {id: "tree"})).toMatchObject({result: [{state: "END_OF_OBJECT"}]});
+    });
+
+    test("remote pages larger than the buffer they move through reach the worker whole", async () => {
+        const pages = [
+            [{state: "ADD", value: "a".repeat(3 << 20)}],
+            [{state: "ADD", value: "b".repeat(9 << 20)}],
+            [{state: "END_OF_OBJECT", value: "c"}],
+        ];
+        const remote = start(`async (params, sink) => {
+            const next = channel.pages("remote-tree");
+            const values = [next(), next(), next()].map(page => page[0].value);
+            sink([{state: "END_OF_OBJECT", value: values.map(value => value[0] + value.length)}]);
+        }`, () => pages.shift()!);
+
+        expect(await remote.request("GetObject", {id: "tree"}))
+            .toMatchObject({result: [{value: [`a${3 << 20}`, `b${9 << 20}`, "c1"]}]});
+    });
+
+    test("a worker woken before its page is taken does not write over it", async () => {
+        const remote = start(`async (params, sink) => {
+            sink([{state: "ADD", value: "first"}]);
+            sink([{state: "ADD", value: "second"}]);
+            sink([{state: "END_OF_OBJECT", value: "third"}]);
+        }`);
+
+        await remote.request("GetObject", {id: "tree"});
+        // the worker has handed over the second page and waits for it to be taken
+        await sleep(50);
+        remote.wake("outbound");
+        await sleep(50);
+
+        expect(await remote.request("GetObject", {id: "tree"})).toMatchObject({result: [{value: "second"}]});
+        expect(await remote.request("GetObject", {id: "tree"})).toMatchObject({result: [{value: "third"}]});
+    });
+
+    test("a worker woken before the remote's page arrives keeps waiting for it", async () => {
+        let release!: () => void;
+        const released = new Promise<void>(resolve => release = resolve);
+        const remote = start(`async (params, sink) => {
+            sink([{state: "END_OF_OBJECT", value: channel.pages("remote-tree")()[0].value}]);
+        }`, () => released.then(() => [{state: "END_OF_OBJECT", value: "whole"}]));
+
+        const response = remote.request("GetObject", {id: "tree"});
+        await sleep(50);
+        remote.wake("inbound");
+        await sleep(50);
+        release();
+
+        expect(await response).toMatchObject({result: [{value: "whole"}]});
     });
 
     test("a serve that fails after its last page lets the next transfer start", async () => {
