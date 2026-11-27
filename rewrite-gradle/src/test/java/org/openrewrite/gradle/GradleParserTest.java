@@ -503,6 +503,24 @@ class GradleParserTest implements RewriteTest {
     }
 
     @Test
+    void kotlinBuildScriptsParsedTogetherKeepTheirPlaceAmongTheOtherScripts() {
+        List<Path> paths = List.of(Path.of("a/build.gradle.kts"), Path.of("build.gradle"),
+          Path.of("settings.gradle.kts"), Path.of("b/build.gradle.kts"));
+        List<String> sources = List.of("plugins { `java-library` }", "plugins { id 'java' }",
+          "rootProject.name = \"p\"", "repositories { mavenCentral() }");
+        List<Parser.Input> inputs = new ArrayList<>();
+        for (int i = 0; i < paths.size(); i++) {
+            inputs.add(Parser.Input.fromString(paths.get(i), sources.get(i)));
+        }
+
+        List<SourceFile> parsed = GradleParser.builder().build()
+          .parseInputs(inputs, null, new InMemoryExecutionContext(Throwable::printStackTrace)).toList();
+
+        assertThat(parsed).noneMatch(ParseError.class::isInstance);
+        assertThat(parsed).extracting(SourceFile::getSourcePath).containsExactlyElementsOf(paths);
+    }
+
+    @Test
     void escapedAndNonEscapedDollarSignsInSingleDoubleQuotes() {
         var gradleParser = new GradleParser(new GradleParser.Builder());
         Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString("""

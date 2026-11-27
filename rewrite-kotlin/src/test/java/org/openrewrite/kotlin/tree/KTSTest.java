@@ -18,9 +18,12 @@ package org.openrewrite.kotlin.tree;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.kotlin.KotlinIsoVisitor;
+import org.openrewrite.kotlin.KotlinParser;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -92,6 +95,40 @@ class KTSTest implements RewriteTest {
                     }.reduce(cu, new AtomicInteger());
                     assertThat(count.get()).isEqualTo(7);
                 }))
+        );
+    }
+
+    @Test
+    void scriptSeesNonScriptSourcesButNotOtherScriptsParsedWithIt() {
+        rewriteRun(
+          spec -> spec
+            .parser(KotlinParser.builder().isKotlinScript(true).dependsOn("fun greet(): String = \"hi\""))
+            .typeValidationOptions(TypeValidation.none()),
+          kotlinScript(
+            """
+              fun version(s: String): String = s
+              """,
+            spec -> spec.path("a.kts")
+          ),
+          kotlinScript(
+            """
+              greet()
+              version("x")
+              """,
+            spec -> spec.path("b.kts").afterRecipe(cu -> {
+                Map<String, J.MethodInvocation> calls = new HashMap<>();
+                new KotlinIsoVisitor<Integer>() {
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                        calls.put(method.getSimpleName(), method);
+                        return method;
+                    }
+                }.visit(cu, 0);
+                assertThat(calls.get("greet").getMethodType()).isNotNull();
+
+                assertThat(calls.get("version").getMethodType()).isNull();
+            })
+          )
         );
     }
 }

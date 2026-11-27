@@ -17,19 +17,29 @@ package org.openrewrite.kotlin.internal
 
 import lombok.Getter
 import lombok.Setter
+import org.jetbrains.kotlin.fir.FirSession
 import org.jetbrains.kotlin.fir.declarations.FirFile
 import org.jetbrains.kotlin.ir.declarations.IrFile
 import org.jetbrains.kotlin.psi.KtFile
 import org.openrewrite.Parser
 
+/**
+ * One input of a compilation, with what the compiler made of it or the failure that stopped it.
+ */
 @Getter
 class KotlinSource(
     var input: Parser.Input,
-    val ktFile: KtFile,
+    val ktFile: KtFile?,
     val cRLFLocations : List<Int>
 ) {
     @Setter
+    var failure: Throwable? = null
+
+    @Setter
     var firFile: FirFile? = null
+
+    @Setter
+    var firSession: FirSession? = null
 
     @Setter
     var irFile: IrFile? = null
