@@ -4411,6 +4411,28 @@ class ChangeTypeTest implements RewriteTest {
     }
 
     @Test
+    void fullyQualifyParameterizedOuterWhereInheritedMemberTypeMayTakeItsName() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Outer$Old", "b.Outer$New", true)),
+          java("package a; public class Outer<T> { public class Old {} }", SourceSpec::skip),
+          java("package b; public class Outer<T> { public class New {} }", SourceSpec::skip),
+          java("package lib; public class Parent { public static class Outer {} }", SourceSpec::skip),
+          java(
+            """
+              class C extends lib.Parent {
+                  a.Outer<String>.Old value;
+              }
+              """,
+            """
+              class C extends lib.Parent {
+                  b.Outer<String>.New value;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void shortenWhenFileOnlyQualifiesAnotherTypeOfTheSameName() {
         rewriteRun(
           spec -> spec.recipe(new ChangeType("a.A1", "b.Bar", true)),

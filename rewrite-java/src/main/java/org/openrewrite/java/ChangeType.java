@@ -460,7 +460,8 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                         if (fqTarget.getOwningClass() != null) {
                             J.FieldAccess fa = updateParameterizedFieldAccess(fieldAccess, originalType, fqTarget, ctx);
                             if (getCursor().firstEnclosing(J.Import.class) == null &&
-                                    getCursor().firstEnclosing(Javadoc.class) == null) {
+                                    getCursor().firstEnclosing(Javadoc.class) == null &&
+                                    !inheritedNameMayBind(getCursor().firstEnclosingOrThrow(JavaSourceFile.class), fqTarget)) {
                                 doAfterVisit(service(ImportService.class).shortenFullyQualifiedTypeReferencesIn(fa));
                             }
                             return fa;
