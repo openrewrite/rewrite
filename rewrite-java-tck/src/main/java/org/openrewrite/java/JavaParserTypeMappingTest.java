@@ -274,6 +274,43 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
         );
     }
 
+    @Test
+    void captureBoundedThroughParameterizedCaptureOfCapture() {
+        rewriteRun(
+          java(
+            """
+              import java.util.List;
+
+              class Test {
+                  static class Box<A, B extends List<A>, C extends List<B>> {
+                      C c() {
+                          return null;
+                      }
+                  }
+
+                  void test(Box<?, ?, ?> box) {
+                      box.c();
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                AtomicReference<JavaType> type = new AtomicReference<>();
+                new JavaIsoVisitor<Integer>() {
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                        type.set(method.getType());
+                        return super.visitMethodInvocation(method, p);
+                    }
+                }.visit(cu, 0);
+                JavaType.GenericTypeVariable captureOfC = (JavaType.GenericTypeVariable) type.get();
+                Parameterized bound = (Parameterized) captureOfC.getBounds().get(0);
+                assertThat(bound.getTypeParameters().get(0)).as("capture of B")
+                  .hasToString("Generic{? extends java.util.List<Generic{?}>}");
+            })
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1762")
     @MinimumJava11
     @Test

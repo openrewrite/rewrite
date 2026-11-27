@@ -359,12 +359,16 @@ public final class PnpmOptions {
             config.put("nodeVersion", getNodeVersionFromEnginesRuntime(rootManifest, release));
         }
 
+        Map<String, @Nullable Object> rootSettings = null;
         if (rootManifest != null && release.readsSettingsFromRootManifest()) {
-            Map<String, @Nullable Object> settings = rootManifestSettings(rootManifest, env, release);
-            config.putAll(settings);
-            explicitlySetKeys.addAll(settings.keySet());
+            rootSettings = rootManifestSettings(rootManifest, env, release);
+            config.putAll(rootSettings);
+            explicitlySetKeys.addAll(rootSettings.keySet());
         }
 
+        Object npmrcLockfile = config.get("lockfile");
+        Object npmrcPackageLock = config.get("packageLock");
+        Object npmrcGitBranchLockfile = config.get("gitBranchLockfile");
         Map<String, @Nullable Map<String, @Nullable Object>> catalogs = new LinkedHashMap<>();
         List<String> patterns = null;
         boolean workspaceFetchTimeout = false;
@@ -377,6 +381,8 @@ public final class PnpmOptions {
                         release);
                 if (!release.readsSettingsFromWorkspaceManifest()) {
                     newSettings.clear();
+                } else if (!release.readsEverySettingFromTheWorkspaceManifest()) {
+                    newSettings.keySet().retainAll(PICKED_WORKSPACE_SETTINGS);
                 }
                 workspaceFetchTimeout = newSettings.containsKey("fetchTimeout");
                 for (String option : CLI_OPTIONS) {
@@ -391,6 +397,11 @@ public final class PnpmOptions {
                 }
                 catalogs = Catalogs.getCatalogsFromWorkspaceManifest(manifest);
             }
+        }
+        if (rootSettings != null) {
+            // installDeps spreads getOptionsFromRootManifest over the config again; the reporter reads the config's
+            config.put(CONFIG_PEER_DEPENDENCY_RULES, config.get("peerDependencyRules"));
+            config.putAll(rootSettings);
         }
 
         Map<String, String> registries = new LinkedHashMap<>(registriesFromNpmrc);
@@ -466,17 +477,27 @@ public final class PnpmOptions {
             release.defaultsMinimumReleaseAgeStrict()) {
             config.put("minimumReleaseAgeStrict", true);
         }
-        Object lockfile = config.get("lockfile");
-        Object packageLock = config.get("packageLock");
+        boolean lockfileOfTheWorkspace = release.readsTheLockfileSettingFromTheWorkspaceManifest();
+        Object lockfile = lockfileOfTheWorkspace ? config.get("lockfile") : npmrcLockfile;
+        Object packageLock = lockfileOfTheWorkspace ? config.get("packageLock") : npmrcPackageLock;
         config.put("useLockfile", lockfile instanceof Boolean ? lockfile :
                 packageLock instanceof Boolean ? packageLock : false);
-        Object gitBranchLockfile = config.get("gitBranchLockfile");
+        Object gitBranchLockfile = release.readsGitBranchLockfileFromTheWorkspaceManifest() ?
+                config.get("gitBranchLockfile") : npmrcGitBranchLockfile;
         config.put("useGitBranchLockfile", gitBranchLockfile instanceof Boolean ? gitBranchLockfile : false);
         WantedPackageManager wantedPackageManager = rootManifest == null ? null :
                 withPmOnFail(getWantedPackageManager(rootManifest, release), config.get("pmOnFail"));
         return new PnpmOptions(config, explicitlySetKeys, catalogs, registries, packageManagerRegistries, patterns,
                 wantedPackageManager, release.toString(), release, authConfig, trustedRegistryConfig, env == null ? Collections.emptyMap() : env, false, workspaceFetchTimeout);
     }
+
+    private static final String CONFIG_PEER_DEPENDENCY_RULES = "config.peerDependencyRules";
+
+    // getOptionsFromPnpmSettings' pick below 10.6.0, patchedDependencies beside it
+    private static final List<String> PICKED_WORKSPACE_SETTINGS = Arrays.asList("allowNonAppliedPatches",
+            "allowedDeprecatedVersions", "configDependencies", "ignoredBuiltDependencies", "ignoredOptionalDependencies",
+            "neverBuiltDependencies", "onlyBuiltDependencies", "onlyBuiltDependenciesFile", "overrides",
+            "packageExtensions", "patchedDependencies", "peerDependencyRules", "supportedArchitectures");
 
     // config/config src/getOptionsFromRootManifest.ts: only these package.json#pnpm keys are settings.
     private static final List<String> ROOT_MANIFEST_SETTINGS = Arrays.asList(
@@ -1740,7 +1761,9 @@ public final class PnpmOptions {
             }
             Map<String, @Nullable Object> map = (Map<String, @Nullable Object>) overrides;
             if (map.isEmpty()) {
-                settings.remove("overrides");
+                if (release.dropsEmptyOverrides()) {
+                    settings.remove("overrides");
+                }
             } else if (manifest != null) {
                 Map<String, @Nullable Object> replaced = new LinkedHashMap<>();
                 for (String selector : Js.keys(map)) {
@@ -2173,7 +2196,30 @@ public final class PnpmOptions {
 
     @SuppressWarnings("unchecked")
     ReportPeerDependencyIssues.@Nullable PeerDependencyRules getPeerDependencyRules() {
-        Object rules = config.get("peerDependencyRules");
+        return peerDependencyRules(config.get("peerDependencyRules"));
+    }
+
+    /**
+     * The root manifest's {@code pnpm.peerDependencyRules}, which the reporter renders the issues by below 10.6.2.
+     */
+    ReportPeerDependencyIssues.@Nullable PeerDependencyRules getRootManifestPeerDependencyRules() {
+        Object manifest = config.get("rootProjectManifest");
+        Object pnpm = manifest instanceof Map ? ((Map<?, ?>) manifest).get("pnpm") : null;
+        return peerDependencyRules(pnpm instanceof Map ? ((Map<?, ?>) pnpm).get("peerDependencyRules") : null);
+    }
+
+    /**
+     * The config's peerDependencyRules, pnpm-workspace.yaml's over the root manifest's, which the reporter renders
+     * the issues by from 10.6.2; the install takes the root manifest's over pnpm-workspace.yaml's.
+     */
+    ReportPeerDependencyIssues.@Nullable PeerDependencyRules getConfigPeerDependencyRules() {
+        return config.containsKey(CONFIG_PEER_DEPENDENCY_RULES) ?
+                peerDependencyRules(config.get(CONFIG_PEER_DEPENDENCY_RULES)) : getPeerDependencyRules();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static ReportPeerDependencyIssues.@Nullable PeerDependencyRules peerDependencyRules(
+            @Nullable Object rules) {
         if (rules == null || rules == Js.UNDEFINED) {
             return null;
         }

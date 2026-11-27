@@ -1330,7 +1330,8 @@ final class ResolveDependencies {
         resolveDependencyOpts.pinnedVersion = options.getPinnedVersion();
 
         ParentPkg parentPkg = options.getParentPkg();
-        if ("workspace".equals(parentPkg.getResolvedVia()) && parentPkg.getPkgId().startsWith("file:")) {
+        if ("workspace".equals(parentPkg.getResolvedVia()) && parentPkg.getPkgId().startsWith("file:") &&
+            ctx.getRelease().replacesTheCatalogProtocolOfAnInjectedWorkspacePackage()) {
             Catalogs.Resolution catalogResult = Catalogs.resolveFromCatalog(ctx.getCatalogs(), wanted.getAlias(),
                     wanted.getBareSpecifier());
             if ("misconfiguration".equals(catalogResult.getType())) {

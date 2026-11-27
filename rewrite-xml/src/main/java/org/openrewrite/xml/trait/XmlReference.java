@@ -15,13 +15,43 @@
  */
 package org.openrewrite.xml.trait;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Tree;
 import org.openrewrite.trait.Reference;
 import org.openrewrite.xml.tree.Xml;
 
+import java.util.regex.Pattern;
+
 public abstract class XmlReference implements Reference {
+    private static final Pattern REFERENCE_PATTERN = Pattern.compile(
+            "\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*" +
+                    "(?:\\.\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*)*");
+
+    static boolean isQualifiedName(@Nullable String value) {
+        return value != null && REFERENCE_PATTERN.matcher(value).matches();
+    }
+
+    static @Nullable Kind referenceKind(@Nullable String value, boolean requireQualifiedType) {
+        if (value == null || !isQualifiedName(value)) {
+            return null;
+        }
+        int lastDot = value.lastIndexOf('.');
+        boolean type = Character.isUpperCase(value.charAt(lastDot + 1));
+        if (requireQualifiedType && (lastDot < 0 || !type || isConstantName(value.substring(lastDot + 1)))) {
+            return null;
+        }
+        return type ? Kind.TYPE : Kind.PACKAGE;
+    }
+
+    /**
+     * An all-capitals name longer than a short acronym such as {@code URL}, for example {@code PAGE_CACHE}, names a
+     * constant or a key rather than a class.
+     */
+    private static boolean isConstantName(String segment) {
+        return segment.length() > 3 && segment.chars().noneMatch(Character::isLowerCase);
+    }
 
     @Override
     public Tree getTree() {

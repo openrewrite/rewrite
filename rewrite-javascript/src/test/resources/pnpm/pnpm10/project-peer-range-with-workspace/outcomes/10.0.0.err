@@ -1,0 +1,5 @@
+Scope: all 2 workspace projects
+ ERR_PNPM_INVALID_PEER_DEPENDENCY_SPECIFICATION  The peerDependencies field named 'pc' of package 'a' has an invalid value: '^1 || workspace:^'
+
+The values in peerDependencies should be either a valid semver range, a `workspace:` spec, or a `catalog:` spec
+exit 1

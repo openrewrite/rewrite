@@ -646,4 +646,15 @@ class AppendToSequenceTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void appendToFlowSequenceEndingInPair() {
+        rewriteRun(
+          spec -> spec.recipe(new AppendToSequence("$.key", "c", null, null)),
+          yaml(
+            "key: [a: 1, b: 2]",
+            "key: [a: 1, b: 2, c]"
+          )
+        );
+    }
 }

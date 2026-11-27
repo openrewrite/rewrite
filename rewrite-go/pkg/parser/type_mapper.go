@@ -18,6 +18,8 @@ package parser
 
 import (
 	"go/types"
+	"slices"
+	"sort"
 	"strings"
 	"unicode"
 
@@ -281,6 +283,7 @@ func (m *typeMapper) mapNamed(named *types.Named) *java.JavaTypeClass {
 	case *types.Interface:
 		cls.Kind = "Interface"
 		cls.Methods = m.interfaceMethods(u, cls)
+		cls.Interfaces = m.embeddedInterfaces(u)
 	default:
 		// Named type wrapping a basic type (e.g., type MyInt int)
 		cls.Kind = "Class"
@@ -295,16 +298,40 @@ func (m *typeMapper) mapNamed(named *types.Named) *java.JavaTypeClass {
 	}
 
 	// Go satisfies an interface by method set alone, so a type of the package under parse
-	// names the interfaces it satisfies among those the package can see. Another package's
+	// also names the interfaces it satisfies among those the package can see. Another package's
 	// type is mapped without them, as is a generic type, whose method set varies with its arguments.
 	if m.visible != nil && obj.Pkg() == m.visible.pkg && obj.Parent() == obj.Pkg().Scope() &&
 		(tparams == nil || tparams.Len() == 0) {
 		for _, iface := range m.visible.satisfiedBy(named) {
-			cls.Interfaces = append(cls.Interfaces, m.mapNamed(iface))
+			if satisfied := java.FullyQualified(m.mapNamed(iface)); !slices.Contains(cls.Interfaces, satisfied) {
+				cls.Interfaces = append(cls.Interfaces, satisfied)
+			}
 		}
 	}
+	sort.SliceStable(cls.Interfaces, func(i, j int) bool {
+		return java.FQNOf(cls.Interfaces[i]) < java.FQNOf(cls.Interfaces[j])
+	})
 
 	return cls
+}
+
+// embeddedInterfaces maps the named interfaces iface embeds, which are its direct supertypes, as an interface's
+// extends clause is in Java. A constraint's other type-set terms are no supertypes.
+func (m *typeMapper) embeddedInterfaces(iface *types.Interface) []java.FullyQualified {
+	var embedded []java.FullyQualified
+	for i := 0; i < iface.NumEmbeddeds(); i++ {
+		named, ok := types.Unalias(iface.EmbeddedType(i)).(*types.Named)
+		if !ok {
+			continue
+		}
+		if _, ok := named.Underlying().(*types.Interface); !ok {
+			continue
+		}
+		if fq, ok := m.mapType(named).(java.FullyQualified); ok {
+			embedded = append(embedded, fq)
+		}
+	}
+	return embedded
 }
 
 // mapSignature maps a function signature to JavaTypeMethod.

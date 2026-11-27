@@ -178,4 +178,98 @@ class SequenceTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void commaAfterNestedSequence() {
+        rewriteRun(
+          yaml(
+            "[[1] , 2]",
+            spec -> spec.afterRecipe(y -> {
+                var seq = (Yaml.Sequence) y.getDocuments().getFirst().getBlock();
+                assertThat(seq.getEntries().getFirst().getTrailingCommaPrefix()).isEqualTo(" ");
+                assertThat(seq.getEntries().get(1).getBlock().getPrefix()).isEqualTo(" ");
+            })
+          )
+        );
+    }
+
+    @Test
+    void commaAfterAlias() {
+        rewriteRun(
+          yaml(
+            "[&x 1, *x , 2]",
+            spec -> spec.afterRecipe(y -> {
+                var seq = (Yaml.Sequence) y.getDocuments().getFirst().getBlock();
+                assertThat(seq.getEntries().get(1).getTrailingCommaPrefix()).isEqualTo(" ");
+                assertThat(seq.getEntries().get(2).getBlock().getPrefix()).isEqualTo(" ");
+            })
+          )
+        );
+    }
+
+    @Test
+    void commaAfterPair() {
+        rewriteRun(
+          yaml(
+            "[a: 1, b: 2]",
+            spec -> spec.afterRecipe(y -> {
+                var seq = (Yaml.Sequence) y.getDocuments().getFirst().getBlock();
+                assertThat(seq.getEntries().getFirst().getTrailingCommaPrefix()).isEmpty();
+                var pair = (Yaml.Mapping) seq.getEntries().get(1).getBlock();
+                assertThat(pair.getEntries().getFirst().getPrefix()).isEqualTo(" ");
+            })
+          )
+        );
+    }
+
+    @Test
+    void trailingCommaAfterNestedSequences() {
+        rewriteRun(
+          yaml(
+            "[[1], [2], ]",
+            spec -> spec.afterRecipe(y -> {
+                var seq = (Yaml.Sequence) y.getDocuments().getFirst().getBlock();
+                assertThat(seq.getEntries().getFirst().getTrailingCommaPrefix()).isEmpty();
+                assertThat(seq.getEntries().get(1).getTrailingCommaPrefix()).isEmpty();
+                assertThat(((Yaml.Sequence) seq.getEntries().get(1).getBlock()).getOpeningBracketPrefix()).isEqualTo(" ");
+                assertThat(seq.getClosingBracketPrefix()).isEqualTo(" ");
+            })
+          )
+        );
+    }
+
+    @Test
+    void commaInCommentAfterNestedSequence() {
+        rewriteRun(
+          yaml(
+            """
+              [
+                [1] # a, b
+                , 2
+              ]
+              """,
+            spec -> spec.afterRecipe(y -> {
+                var seq = (Yaml.Sequence) y.getDocuments().getFirst().getBlock();
+                assertThat(seq.getEntries().getFirst().getTrailingCommaPrefix()).isEqualTo(" # a, b\n  ");
+                assertThat(seq.getEntries().get(1).getBlock().getPrefix()).isEqualTo(" ");
+            })
+          )
+        );
+    }
+
+    @Test
+    void commaAfterSupplementaryCharacterInComment() {
+        rewriteRun(
+          yaml(
+            """
+              [
+                1 # \uD83D\uDE00
+                , [2] # \uD83D\uDE00
+                , a: 3 # \uD83D\uDE00
+                , 4
+              ]
+              """
+          )
+        );
+    }
 }

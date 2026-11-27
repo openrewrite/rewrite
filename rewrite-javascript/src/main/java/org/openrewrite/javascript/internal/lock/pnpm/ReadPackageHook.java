@@ -480,13 +480,15 @@ final class ReadPackageHook {
             Object optionalDependencies = manifest.get("optionalDependencies");
             Object devDependencies = manifest.get("devDependencies");
             Object peerDependencies = manifest.get("peerDependencies");
-            for (Object deps : new Object[]{dependencies, optionalDependencies, devDependencies}) {
+            boolean peersApart = release.movesAnOverrideThatIsNoPeerRangeToDependencies();
+            for (Object deps : peersApart ? new Object[]{dependencies, optionalDependencies, devDependencies} :
+                    new Object[]{dependencies, optionalDependencies, devDependencies, peerDependencies}) {
                 if (Js.truthy(deps)) {
                     overrideDeps(versionOverridesWithParent, genericVersionOverrides, convergeVersions, dir,
                             (Map<String, @Nullable Object>) deps, null, release);
                 }
             }
-            if (Js.truthy(peerDependencies)) {
+            if (peersApart && Js.truthy(peerDependencies)) {
                 if (!Js.truthy(manifest.get("dependencies"))) {
                     manifest.put("dependencies", new LinkedHashMap<>());
                 }
