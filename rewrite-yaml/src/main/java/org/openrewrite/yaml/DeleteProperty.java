@@ -232,8 +232,12 @@ public class DeleteProperty extends Recipe {
                     } else {
                         if (entries.isEmpty() && firstDeletedPrefix != null &&
                             containsOnlyWhitespace(TrailingComments.withoutInlineComment(entry.getPrefix()))) {
-                            // the first entry now, without the comment of the deleted line before it
-                            entry = entry.withPrefix(firstDeletedPrefix);
+                            // the first entry now, without the comment of the deleted line before it, and without
+                            // the comments above the deleted first entry, as DeleteKey does; the comment ending the
+                            // key line stays
+                            String keyLineComment = TrailingComments.inlineComment(firstDeletedPrefix);
+                            entry = entry.withPrefix((keyLineComment == null ? "" : keyLineComment) +
+                                    TrailingComments.withoutCommentLines(TrailingComments.withoutInlineComment(firstDeletedPrefix)));
                         } else if (previousWasDeleted && !entries.isEmpty() && !containsNewline(entry.getPrefix())) {
                             entry = entry.withPrefix("\n" + entry.getPrefix());
                         } else if (previousWasDeleted && !entries.isEmpty()

@@ -969,4 +969,62 @@ class DeletePropertyKeyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void deletesTheCommentsAboveADeletedFirstNestedEntry() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("p.x", null, null, null)),
+          yaml(
+            """
+              p:
+                # about x
+                x: 1
+                y: 2
+              """,
+            """
+              p:
+                y: 2
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepsTheCommentOfTheKeyLineWhenTheFirstNestedEntryGoes() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("p.x", null, null, null)),
+          yaml(
+            """
+              p: # about p
+                # about x
+                x: 1
+                y: 2
+              """,
+            """
+              p: # about p
+                y: 2
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepsTheCommentsThatStartTheFile() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("a", null, null, null)),
+          yaml(
+            """
+              # header
+
+              a: 1
+              b: 2
+              """,
+            """
+              # header
+
+              b: 2
+              """
+          )
+        );
+    }
 }
