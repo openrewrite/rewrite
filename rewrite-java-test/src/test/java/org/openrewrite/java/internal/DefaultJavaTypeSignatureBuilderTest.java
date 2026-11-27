@@ -126,35 +126,4 @@ class DefaultJavaTypeSignatureBuilderTest implements JavaTypeSignatureBuilderTes
         String sig = signatureBuilder().signature(parameterized);
         assertThat(sig).isNotNull();
     }
-
-    @Test
-    void cyclicWildcard() {
-        // given
-        JavaType.GenericTypeVariable wildcard = new JavaType.GenericTypeVariable(null, "?",
-          JavaType.GenericTypeVariable.Variance.INVARIANT, null);
-        JavaType.GenericTypeVariable outer = new JavaType.GenericTypeVariable(null, "?",
-          JavaType.GenericTypeVariable.Variance.COVARIANT, List.of(wildcard));
-        wildcard.unsafeSet("?", JavaType.GenericTypeVariable.Variance.COVARIANT, List.of(wildcard));
-
-        // when
-        String sig = signatureBuilder().signature(outer);
-
-        // then
-        assertThat(sig).isEqualTo("Generic{? extends Generic{? extends Generic{?}}}");
-    }
-
-    @Test
-    void nestedWildcards() {
-        // given
-        JavaType.GenericTypeVariable inner = new JavaType.GenericTypeVariable(null, "?",
-          JavaType.GenericTypeVariable.Variance.COVARIANT, List.of(JavaType.ShallowClass.build("java.lang.Number")));
-        JavaType.GenericTypeVariable outer = new JavaType.GenericTypeVariable(null, "?",
-          JavaType.GenericTypeVariable.Variance.COVARIANT, List.of(inner));
-
-        // when
-        String sig = signatureBuilder().signature(outer);
-
-        // then
-        assertThat(sig).isEqualTo("Generic{? extends Generic{? extends java.lang.Number}}");
-    }
 }

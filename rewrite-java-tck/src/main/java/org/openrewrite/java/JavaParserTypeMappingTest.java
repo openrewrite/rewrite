@@ -260,14 +260,15 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
               }
               """,
             spec -> spec.afterRecipe(cu -> {
-                JavaType type = new JavaIsoVisitor<AtomicReference<JavaType>>() {
+                AtomicReference<JavaType> type = new AtomicReference<>();
+                new JavaIsoVisitor<Integer>() {
                     @Override
-                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicReference<JavaType> t) {
-                        t.set(method.getType());
-                        return super.visitMethodInvocation(method, t);
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                        type.set(method.getType());
+                        return super.visitMethodInvocation(method, p);
                     }
-                }.reduce(cu, new AtomicReference<>()).get();
-                assertThat(type).hasToString("Generic{? extends Generic{? extends Generic{? extends java.lang.Number}}}");
+                }.visit(cu, 0);
+                assertThat(type.get()).hasToString("Generic{? extends Generic{? extends Generic{? extends java.lang.Number}}}");
             })
           )
         );
