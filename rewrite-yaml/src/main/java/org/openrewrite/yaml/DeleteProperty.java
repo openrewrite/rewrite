@@ -124,14 +124,14 @@ public class DeleteProperty extends Recipe {
 
             @Override
             public Yaml.Document visitDocument(Yaml.Document document, ExecutionContext ctx) {
-                Yaml.Document d = TrailingComments.apply(getCursor(), super.visitDocument(document, ctx));
+                Yaml.Document d = TrailingComments.visit(getCursor(), () -> super.visitDocument(document, ctx));
                 String comment = trailingComment(d.getBlock());
                 return comment == null ? d : d.withEnd(d.getEnd().withPrefix(comment + d.getEnd().getPrefix()));
             }
 
             @Override
             public Yaml.Sequence visitSequence(Yaml.Sequence sequence, ExecutionContext ctx) {
-                Yaml.Sequence s = TrailingComments.apply(getCursor(), super.visitSequence(sequence, ctx));
+                Yaml.Sequence s = TrailingComments.visit(getCursor(), () -> super.visitSequence(sequence, ctx));
                 boolean childModified = (s != sequence);
                 List<Yaml.Sequence.Entry> entries = s.getEntries();
                 if (entries.isEmpty()) {
@@ -200,7 +200,7 @@ public class DeleteProperty extends Recipe {
 
             @Override
             public Yaml.Mapping visitMapping(Yaml.Mapping mapping, ExecutionContext ctx) {
-                Yaml.Mapping m = TrailingComments.apply(getCursor(), super.visitMapping(mapping, ctx));
+                Yaml.Mapping m = TrailingComments.visit(getCursor(), () -> super.visitMapping(mapping, ctx));
                 boolean childModified = (m != mapping);
 
                 boolean changed = false;

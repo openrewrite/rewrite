@@ -916,4 +916,27 @@ class DeletePropertyKeyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void emptiesANestedMappingThatEndsWithABlockScalar() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("a.y.*", null, null, null)),
+          yaml(
+            """
+              a:
+                x: 1 # x
+                y:
+                  p: 1
+                  q: |
+                    t
+              b: 1
+              """,
+            """
+              a:
+                x: 1 # x
+              b: 1
+              """
+          )
+        );
+    }
 }

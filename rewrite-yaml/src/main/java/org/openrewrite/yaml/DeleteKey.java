@@ -57,15 +57,16 @@ public class DeleteKey extends Recipe {
 
             @Override
             public Yaml.Document visitDocument(Yaml.Document document, ExecutionContext ctx) {
-                return TrailingComments.apply(getCursor(), super.visitDocument(document, ctx));
+                return TrailingComments.visit(getCursor(), () -> super.visitDocument(document, ctx));
             }
 
             @Override
             public Yaml.Sequence visitSequence(Yaml.Sequence sequence, ExecutionContext ctx) {
-                Yaml.Sequence s = TrailingComments.apply(getCursor(), super.visitSequence(sequence, ctx));
+                Yaml.Sequence s = TrailingComments.visit(getCursor(), () -> super.visitSequence(sequence, ctx));
                 if (s.getOpeningBracketPrefix() == null) {
                     List<Yaml.Sequence.Entry> kept = TrailingComments.remove(getCursor(), s.getEntries(), e ->
-                            matcher.matches(new Cursor(getCursor(), e)) || matcher.matches(new Cursor(getCursor(), e.getBlock())));
+                            isEmptied(e.getBlock()) || matcher.matches(new Cursor(getCursor(), e)) ||
+                            matcher.matches(new Cursor(getCursor(), e.getBlock())));
                     if (kept.size() == s.getEntries().size()) {
                         return s;
                     }
@@ -94,10 +95,10 @@ public class DeleteKey extends Recipe {
 
             @Override
             public Yaml.Mapping visitMapping(Yaml.Mapping mapping, ExecutionContext ctx) {
-                Yaml.Mapping m = TrailingComments.apply(getCursor(), super.visitMapping(mapping, ctx));
+                Yaml.Mapping m = TrailingComments.visit(getCursor(), () -> super.visitMapping(mapping, ctx));
                 if (m.getOpeningBracePrefix() == null) {
                     List<Yaml.Mapping.Entry> kept = TrailingComments.remove(getCursor(), m.getEntries(), e ->
-                            matcher.matches(new Cursor(getCursor(), e)));
+                            isEmptied(e.getValue()) || matcher.matches(new Cursor(getCursor(), e)));
                     if (kept.size() == m.getEntries().size()) {
                         return m;
                     }
@@ -123,5 +124,19 @@ public class DeleteKey extends Recipe {
                 return m;
             }
         });
+    }
+
+    // Removed here rather than by RemoveUnusedVisitor, which would drop the comments its prefix holds. The parser
+    // never makes a block collection without entries, so this one had them all deleted.
+    private static boolean isEmptied(Yaml.Block block) {
+        if (block instanceof Yaml.Mapping) {
+            Yaml.Mapping mapping = (Yaml.Mapping) block;
+            return mapping.getOpeningBracePrefix() == null && mapping.getEntries().isEmpty();
+        }
+        if (block instanceof Yaml.Sequence) {
+            Yaml.Sequence sequence = (Yaml.Sequence) block;
+            return sequence.getOpeningBracketPrefix() == null && sequence.getEntries().isEmpty();
+        }
+        return false;
     }
 }

@@ -22,23 +22,23 @@ import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.*;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 
-/**
- * The comment that ends the last line of a node. The parser puts it in the prefix of whatever follows the node: the
- * next entry of the nearest enclosing block collection that has one, or the end of the document. A visitor that asks
- * for a change with {@link #replace} applies it with {@code apply} in its visits of mappings, sequences and documents.
- */
+/// The comment that ends the last line of a node. The parser puts it in the prefix of whatever follows the node: the
+/// next entry of the nearest enclosing block collection that has one, or the end of the document. A visitor that asks
+/// for a change with [#replace] wraps its visits of mappings, sequences and documents in [#visit], which applies it.
+/// A request is only made when the node holding what follows is one of those visits, as a visit that starts below it
+/// never gets back to it.
 final class TrailingComments {
     private static final String REPLACEMENTS = TrailingComments.class.getName() + ".REPLACEMENTS";
+    private static final String VISITING = TrailingComments.class.getName() + ".VISITING";
 
     private TrailingComments() {
     }
 
-    /**
-     * The comment that ends the last line of the node at {@code cursor}, or null. Asks the visit of the collection or
-     * document holding it to replace it with {@code replacement}, or to remove it when that is null.
-     */
+    /// The comment that ends the last line of the node at `cursor`, or null. Asks the visit of the collection or
+    /// document holding it to replace it with `replacement`, or to remove it when that is null.
     static @Nullable String replace(Cursor cursor, @Nullable String replacement) {
         if (endsWithBlockScalar(cursor.getValue())) {
             return null;
@@ -46,11 +46,9 @@ final class TrailingComments {
         return edit(cursor, prefix -> withComment(prefix, replacement), replacement == null);
     }
 
-    /**
-     * Asks for the entries of a block collection after the last of them is removed: the comment that ends the removed
-     * entry's last line goes, {@code carried}, the comment that ends the line before it, takes its place, and the line
-     * break a block scalar holds moves with the entry that now ends the collection.
-     */
+    /// Asks for the entries of a block collection after the last of them is removed: the comment that ends the removed
+    /// entry's last line goes, `carried`, the comment that ends the line before it, takes its place, and the line
+    /// break a block scalar holds moves with the entry that now ends the collection.
     static void afterRemovingLast(Cursor removed, @Nullable Yaml lastKept, @Nullable String carried) {
         boolean removedBlock = endsWithBlockScalar(removed.getValue());
         boolean keptBlock = lastKept != null && endsWithBlockScalar(lastKept);
@@ -64,25 +62,22 @@ final class TrailingComments {
         }
     }
 
-    /**
-     * Asks for what follows the node at {@code cursor} to start on a new line, as an entry that doesn't end with a
-     * block scalar now ends the node, and the block scalar held that line break.
-     */
+    /// Asks for what follows the node at `cursor` to start on a new line, as an entry that doesn't end with a block
+    /// scalar now ends the node, and the block scalar held that line break.
     static void breakLineAfter(Cursor cursor) {
         String lineBreak = lineBreakOf(cursor.getValue());
         edit(cursor, prefix -> lineBreak + prefix, false);
     }
 
-    /**
-     * Asks the visit of the collection or document holding what follows the node at {@code cursor} to change its
-     * prefix with {@code edit}. Returns the comment that ends the node's last line, or null.
-     */
     private static @Nullable String edit(Cursor cursor, UnaryOperator<String> edit, boolean onlyIfCommented) {
         Cursor child = cursor;
         Cursor parent = cursor.getParentTreeCursor();
         while (!parent.isRoot()) {
             Object value = parent.getValue();
             if (value instanceof Yaml.Document) {
+                if (parent.getMessage(VISITING) == null) {
+                    return null;
+                }
                 Yaml.Document.End end = ((Yaml.Document) value).getEnd();
                 return editIn(parent, end.getId(), end.getPrefix(), edit, onlyIfCommented);
             }
@@ -95,6 +90,9 @@ final class TrailingComments {
                 UUID id = ((Yaml) child.getValue()).getId();
                 for (int i = 0; i < entries.size() - 1; i++) {
                     if (entries.get(i).getId().equals(id)) {
+                        if (parent.getMessage(VISITING) == null) {
+                            return null;
+                        }
                         Yaml next = entries.get(i + 1);
                         return editIn(parent, next.getId(), next.getPrefix(), edit, onlyIfCommented);
                     }
@@ -106,67 +104,79 @@ final class TrailingComments {
         return null;
     }
 
-    /**
-     * Removes the entries of a block collection that {@code removed} matches, each with the comment that ends its last
-     * line. The comment that ends the line before a removed entry moves to what follows it.
-     */
+    /// Removes the entries of a block collection that `removed` matches, each with the comment that ends its last line
+    /// and the whole-line comments above it. The comment that ends the line before a removed entry moves to what
+    /// follows it.
     @SuppressWarnings("unchecked")
     static <E extends Yaml> List<E> remove(Cursor cursor, List<E> entries, Predicate<E> removed) {
         List<E> kept = new ArrayList<>(entries.size());
         String carried = null;
         String firstPrefix = null;
-        boolean previousRemoved = false;
+        E previousRemoved = null;
         for (E entry : entries) {
             if (removed.test(entry)) {
-                if (!previousRemoved) {
+                if (previousRemoved == null) {
                     carried = inlineComment(entry.getPrefix());
                 }
                 if (kept.isEmpty() && firstPrefix == null) {
                     firstPrefix = entry.getPrefix();
                 }
-                previousRemoved = true;
+                previousRemoved = entry;
                 continue;
             }
-            if (previousRemoved) {
+            if (previousRemoved != null) {
                 String own = withoutInlineComment(entry.getPrefix());
                 if (kept.isEmpty()) {
-                    String first = withoutInlineComment(firstPrefix);
+                    String first = withoutCommentLines(withoutInlineComment(firstPrefix));
                     own = own.trim().isEmpty() ? first : first.indexOf('\n') < 0 ? stripLeadingLineBreak(own) : own;
+                } else if (endsWithBlockScalar(kept.get(kept.size() - 1))) {
+                    own = stripLeadingLineBreak(own);
+                } else if (own.indexOf('\n') < 0) {
+                    own = lineBreakOf(previousRemoved) + own;
                 }
                 entry = (E) entry.withPrefix((carried == null ? "" : carried) + own);
                 carried = null;
             }
             kept.add(entry);
-            previousRemoved = false;
+            previousRemoved = null;
         }
-        if (previousRemoved) {
+        if (previousRemoved != null) {
             afterRemovingLast(new Cursor(cursor, entries.get(entries.size() - 1)), kept.isEmpty() ? null : kept.get(kept.size() - 1), carried);
         }
         return kept;
     }
 
-    static Yaml.Mapping apply(Cursor cursor, Yaml.Mapping mapping) {
+    /// Runs the visit of the mapping, sequence or document at `cursor`, then applies the changes that the visits of
+    /// its descendants asked for.
+    @SuppressWarnings("unchecked")
+    static <T extends Yaml> T visit(Cursor cursor, Supplier<T> visit) {
+        cursor.putMessage(VISITING, true);
+        T visited = visit.get();
         Map<UUID, UnaryOperator<String>> edits = cursor.pollMessage(REPLACEMENTS);
-        return edits == null ? mapping : mapping.withEntries(ListUtils.map(mapping.getEntries(),
-                e -> edits.containsKey(e.getId()) ? e.withPrefix(edits.get(e.getId()).apply(e.getPrefix())) : e));
+        if (edits == null) {
+            return visited;
+        }
+        if (visited instanceof Yaml.Mapping) {
+            Yaml.Mapping mapping = (Yaml.Mapping) visited;
+            return (T) mapping.withEntries(ListUtils.map(mapping.getEntries(), e -> apply(edits, e)));
+        }
+        if (visited instanceof Yaml.Sequence) {
+            Yaml.Sequence sequence = (Yaml.Sequence) visited;
+            return (T) sequence.withEntries(ListUtils.map(sequence.getEntries(), e -> apply(edits, e)));
+        }
+        if (visited instanceof Yaml.Document) {
+            Yaml.Document document = (Yaml.Document) visited;
+            return (T) document.withEnd(apply(edits, document.getEnd()));
+        }
+        return visited;
     }
 
-    static Yaml.Sequence apply(Cursor cursor, Yaml.Sequence sequence) {
-        Map<UUID, UnaryOperator<String>> edits = cursor.pollMessage(REPLACEMENTS);
-        return edits == null ? sequence : sequence.withEntries(ListUtils.map(sequence.getEntries(),
-                e -> edits.containsKey(e.getId()) ? e.withPrefix(edits.get(e.getId()).apply(e.getPrefix())) : e));
+    @SuppressWarnings("unchecked")
+    private static <Y extends Yaml> Y apply(Map<UUID, UnaryOperator<String>> edits, Y y) {
+        UnaryOperator<String> edit = edits.get(y.getId());
+        return edit == null ? y : (Y) y.withPrefix(edit.apply(y.getPrefix()));
     }
 
-    static Yaml.Document apply(Cursor cursor, Yaml.Document document) {
-        Map<UUID, UnaryOperator<String>> edits = cursor.pollMessage(REPLACEMENTS);
-        Yaml.Document.End end = document.getEnd();
-        return edits == null || !edits.containsKey(end.getId()) ? document :
-                document.withEnd(end.withPrefix(edits.get(end.getId()).apply(end.getPrefix())));
-    }
-
-    /**
-     * The comment that ends the line a prefix starts on, or null.
-     */
     static @Nullable String inlineComment(@Nullable String prefix) {
         if (prefix == null) {
             return null;
@@ -194,22 +204,21 @@ final class TrailingComments {
         if (comment == null && onlyIfCommented) {
             return null;
         }
-        holder.<Map<UUID, UnaryOperator<String>>>computeMessageIfAbsent(REPLACEMENTS, k -> new HashMap<>()).put(owner, edit);
+        holder.<Map<UUID, UnaryOperator<String>>>computeMessageIfAbsent(REPLACEMENTS, k -> new HashMap<>())
+                .merge(owner, edit, (first, then) -> p -> then.apply(first.apply(p)));
         return comment;
     }
 
-    private static String lineBreakOf(Object node) {
+    private static String lineBreakOf(@Nullable Object node) {
         while (node instanceof Yaml.Mapping.Entry || node instanceof Yaml.Sequence.Entry || node instanceof Yaml.Mapping || node instanceof Yaml.Sequence) {
             if (node instanceof Yaml.Mapping.Entry) {
                 node = ((Yaml.Mapping.Entry) node).getValue();
             } else if (node instanceof Yaml.Sequence.Entry) {
                 node = ((Yaml.Sequence.Entry) node).getBlock();
-            } else if (node instanceof Yaml.Mapping) {
-                List<Yaml.Mapping.Entry> entries = ((Yaml.Mapping) node).getEntries();
-                node = entries.get(entries.size() - 1);
             } else {
-                List<Yaml.Sequence.Entry> entries = ((Yaml.Sequence) node).getEntries();
-                node = entries.get(entries.size() - 1);
+                List<? extends Yaml> entries = node instanceof Yaml.Mapping ? ((Yaml.Mapping) node).getEntries() :
+                        ((Yaml.Sequence) node).getEntries();
+                node = entries.isEmpty() ? null : entries.get(entries.size() - 1);
             }
         }
         return node instanceof Yaml.Scalar && ((Yaml.Scalar) node).getValue().endsWith("\r\n") ? "\r\n" : "\n";
@@ -244,6 +253,21 @@ final class TrailingComments {
             return !isFlow(node) && !entries.isEmpty() && endsWithBlockScalar(entries.get(entries.size() - 1));
         }
         return false;
+    }
+
+    /// The prefix without the lines that hold only a comment, which needs the comment that ends the line it starts on
+    /// to be removed first.
+    static String withoutCommentLines(String prefix) {
+        StringBuilder kept = new StringBuilder(prefix.length());
+        int start = 0;
+        for (int end = prefix.indexOf('\n'); end >= 0; end = prefix.indexOf('\n', start)) {
+            String line = prefix.substring(start, end + 1);
+            if (!line.trim().startsWith("#")) {
+                kept.append(line);
+            }
+            start = end + 1;
+        }
+        return kept.append(prefix, start, prefix.length()).toString();
     }
 
     static String stripLeadingLineBreak(String s) {

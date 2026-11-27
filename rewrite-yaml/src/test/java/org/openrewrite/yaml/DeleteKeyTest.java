@@ -429,4 +429,166 @@ class DeleteKeyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void deletingTheOnlyNestedKeyKeepsTheCommentsAround() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteKey("$.a.x", null)),
+          yaml(
+            """
+              p: 1 # p
+              a: # about a
+                x: 1 # x
+              b: 3
+              """,
+            """
+              p: 1 # p
+              b: 3
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepsTheCommentBeforeAnEmptiedNestedMapping() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteKey("$..q", null)),
+          yaml(
+            """
+              a:
+                x:
+                  p: 1 # p
+                  q: 2 # q
+                y:
+                  q: 3 # q2
+              b: 1
+              """,
+            """
+              a:
+                x:
+                  p: 1 # p
+              b: 1
+              """
+          )
+        );
+    }
+
+    @Test
+    void deletesABlockScalarBetweenEntries() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteKey("$.a", null)),
+          yaml(
+            """
+              x: 1
+              a: |
+                t
+              b: 2
+              """,
+            """
+              x: 1
+              b: 2
+              """
+          )
+        );
+    }
+
+    @Test
+    void deletesTheEntryAfterABlockScalar() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteKey("$.b", null)),
+          yaml(
+            """
+              a: |
+                t
+              b: 1
+              c: 2
+              """,
+            """
+              a: |
+                t
+              c: 2
+              """
+          )
+        );
+    }
+
+    @Test
+    void deletesTheCommentLinesAboveADeletedFirstKey() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteKey("$.a.x", null)),
+          yaml(
+            """
+              a:
+                # about x
+                x: 1
+                y: 2
+              """,
+            """
+              a:
+                y: 2
+              """
+          )
+        );
+    }
+
+    @Test
+    void deletesTheCommentLinesAboveADeletedMiddleKey() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteKey("$.a.x", null)),
+          yaml(
+            """
+              a:
+                w: 0
+                # about x
+                x: 1
+                y: 2
+              """,
+            """
+              a:
+                w: 0
+                y: 2
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepsTheFileHeaderWhenDeletingTheFirstKey() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteKey("$.x", null)),
+          yaml(
+            """
+              # header
+              x: 1
+              y: 2
+              """,
+            """
+              # header
+              y: 2
+              """
+          )
+        );
+    }
+
+    @Test
+    void emptiesANestedMappingThatEndsWithABlockScalar() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteKey("$.a.y.q", null)),
+          yaml(
+            """
+              a:
+                x: 1 # x
+                y:
+                  q: |
+                    t
+              b: 1
+              """,
+            """
+              a:
+                x: 1 # x
+              b: 1
+              """
+          )
+        );
+    }
 }

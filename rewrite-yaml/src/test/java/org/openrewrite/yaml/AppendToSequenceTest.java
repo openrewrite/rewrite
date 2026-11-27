@@ -17,11 +17,14 @@ package org.openrewrite.yaml;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.List;
 
+import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.yaml.Assertions.yaml;
 
 class AppendToSequenceTest implements RewriteTest {
@@ -746,6 +749,61 @@ class AppendToSequenceTest implements RewriteTest {
                 - |
                   t
                 - y
+              b: 1
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotCopyTheCommentLinesAboveTheLastItem() {
+        rewriteRun(
+          spec -> spec.recipe(new AppendToSequence("$.a", "z", null, null)),
+          yaml(
+            """
+              a:
+                - x
+                # about y
+                - y # y
+              b: 1
+              """,
+            """
+              a:
+                - x
+                # about y
+                - y # y
+                - z
+              b: 1
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotDuplicateTheCommentOfTheLastItemWhenVisitingPartOfTheTree() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new YamlIsoVisitor<>() {
+              @Override
+              public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext ctx) {
+                  if ("a".equals(entry.getKey().getValue())) {
+                      return (Yaml.Mapping.Entry) new AppendToSequenceVisitor(new JsonPathMatcher("$.a"), "z", List.of("x", "y"), false)
+                        .visitNonNull(entry, ctx, getCursor().getParentOrThrow());
+                  }
+                  return super.visitMappingEntry(entry, ctx);
+              }
+          })),
+          yaml(
+            """
+              a:
+                - x # one
+                - y # two
+              b: 1
+              """,
+            """
+              a:
+                - x # one
+                - y
+                - z # two
               b: 1
               """
           )

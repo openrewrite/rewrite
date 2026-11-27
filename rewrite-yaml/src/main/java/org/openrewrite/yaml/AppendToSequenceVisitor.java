@@ -32,6 +32,9 @@ import static java.util.Collections.sort;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 
+/// Appends a value to the sequences that `matcher` matches. The comment that ends the last item's line stays on that
+/// line only when the visit starts at the document or above it, as the parser keeps that comment in the prefix of what
+/// follows the sequence; a visit that starts below it leaves the comment to end the appended item's line instead.
 public class AppendToSequenceVisitor extends YamlIsoVisitor<ExecutionContext> {
     private final JsonPathMatcher matcher;
     private final String value;
@@ -51,17 +54,17 @@ public class AppendToSequenceVisitor extends YamlIsoVisitor<ExecutionContext> {
         if (matcher.matches(parent) && checkExistingSequenceValues(existingSeq, parent)) {
             return appendToSequence(existingSeq, this.value, ctx);
         }
-        return TrailingComments.apply(getCursor(), super.visitSequence(existingSeq, ctx));
+        return TrailingComments.visit(getCursor(), () -> super.visitSequence(existingSeq, ctx));
     }
 
     @Override
     public Yaml.Mapping visitMapping(Yaml.Mapping mapping, ExecutionContext ctx) {
-        return TrailingComments.apply(getCursor(), super.visitMapping(mapping, ctx));
+        return TrailingComments.visit(getCursor(), () -> super.visitMapping(mapping, ctx));
     }
 
     @Override
     public Yaml.Document visitDocument(Yaml.Document document, ExecutionContext ctx) {
-        return TrailingComments.apply(getCursor(), super.visitDocument(document, ctx));
+        return TrailingComments.visit(getCursor(), () -> super.visitDocument(document, ctx));
     }
 
     protected boolean checkExistingSequenceValues(final Yaml.Sequence seq, final Cursor cursor) {
@@ -127,12 +130,13 @@ public class AppendToSequenceVisitor extends YamlIsoVisitor<ExecutionContext> {
             } else if (TrailingComments.endsWithBlockScalar(existingEntry)) {
                 // The block scalar ending the last item holds the line break before the new item, which now needs
                 // one before what follows it
-                entryPrefix = TrailingComments.stripLeadingLineBreak(TrailingComments.withoutInlineComment(entryPrefix));
+                entryPrefix = TrailingComments.stripLeadingLineBreak(
+                        TrailingComments.withoutCommentLines(TrailingComments.withoutInlineComment(entryPrefix)));
                 TrailingComments.breakLineAfter(getCursor());
             } else {
                 // The comment ending the last item's line stays on that line, which the new item now follows, and
-                // the comment ending the line before it isn't copied
-                entryPrefix = TrailingComments.withoutInlineComment(entryPrefix);
+                // the comments on and above the line before it aren't copied
+                entryPrefix = TrailingComments.withoutCommentLines(TrailingComments.withoutInlineComment(entryPrefix));
                 String comment = TrailingComments.replace(getCursor(), null);
                 if (comment != null) {
                     entryComment = comment;
