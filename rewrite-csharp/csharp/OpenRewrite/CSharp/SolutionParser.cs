@@ -16,6 +16,7 @@
 using System.Diagnostics;
 using System.Xml.Linq;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.MSBuild;
 using NuGet.Frameworks;
 using NuGet.ProjectModel;
@@ -509,6 +510,7 @@ public class SolutionParser
                 Log.Debug("  ... and {Remaining} more distinct diagnostics", grouped.Count - 10);
         }
 
+        solution = RemoveOuterBuilds(solution);
         RecordUnevaluatedProjects(declaredProjects, solution, diags);
 
         var projects = solution.Projects.ToList();
@@ -631,6 +633,29 @@ public class SolutionParser
     }
 
     /// <summary>
+    /// MSBuildWorkspace loads a multi-targeted project once per entry of its <c>TargetFrameworks</c>,
+    /// empty entries included, so <c>;net10.0</c> also loads MSBuild's outer build. That variant has no
+    /// <c>Compile</c> target and so no documents, yet it carries a reference, which is what
+    /// <see cref="ParseProject"/> picks a variant by. It produces no assembly, so removing it takes no
+    /// types from a project that references it. It is the variant named after the file alone.
+    /// </summary>
+    private static Solution RemoveOuterBuilds(Solution solution)
+    {
+        static bool IsOuterBuild(Project p) =>
+            p.Name == Path.GetFileNameWithoutExtension(p.FilePath) && !p.Documents.Any();
+        var outerBuilds = solution.Projects
+            .Where(p => p.FilePath != null)
+            .GroupBy(p => p.FilePath, StringComparer.Ordinal)
+            .Where(variants => variants.Any(p => !IsOuterBuild(p)))
+            .SelectMany(variants => variants.Where(IsOuterBuild))
+            .Select(p => p.Id)
+            .ToList();
+        foreach (var outerBuild in outerBuilds)
+            solution = solution.RemoveProject(outerBuild);
+        return solution;
+    }
+
+    /// <summary>
     /// Flags declared C# projects that MSBuild failed to evaluate: those a workspace failure
     /// diagnostic names (a build-only <c>UsingTask</c>, an unresolvable <c>Import</c>, ...) and
     /// those that never reached the solution at all. Both cases surface as a project with no
@@ -740,7 +765,31 @@ public class SolutionParser
                 }))
             .ToList();
 
-        return ParseUnits(projectPath, rootDir, units, configSymbolSets, requirePrintEqualsInput);
+        var frameworkProperties = NuGetResolver.EvaluateProperties(projectPath,
+            ["TargetFramework", "TargetFrameworks", "TargetFrameworkMoniker"]);
+        var frameworks = frameworkProperties.TryGetValue("TargetFrameworks", out var multiTarget)
+            ? multiTarget.Value.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            : frameworkProperties.TryGetValue("TargetFramework", out var singleTarget)
+                ? [singleTarget.Value.Trim()]
+                : frameworkProperties.TryGetValue("TargetFrameworkMoniker", out var legacyTarget)
+                    ? [NuGetFramework.Parse(legacyTarget.Value).GetShortFolderName()]
+                    : Array.Empty<string>();
+        var languageVersions = solution.Projects
+            .Where(p => string.Equals(p.FilePath, projectPath, StringComparison.OrdinalIgnoreCase) &&
+                        !_unsupportedVariants.Contains(p.Id) && p.ParseOptions is CSharpParseOptions)
+            .Select(p => new CSharpLanguageVersion.TargetFrameworkVersion(
+                p.AnalyzerOptions.AnalyzerConfigOptionsProvider.GlobalOptions.TryGetValue(
+                    "build_property.TargetFramework", out var framework) && !string.IsNullOrWhiteSpace(framework)
+                    ? framework.Trim()
+                    : frameworks.Length == 1 ? frameworks[0] : TargetFrameworkOf(p) ?? "",
+                ((CSharpParseOptions)p.ParseOptions!).LanguageVersion.ToDisplayString()))
+            .ToList();
+        var frameworkCoverageComplete = frameworks.Length > 0 &&
+            languageVersions.All(v => !string.IsNullOrEmpty(v.TargetFramework)) &&
+            new HashSet<string>(frameworks, StringComparer.OrdinalIgnoreCase)
+                .SetEquals(languageVersions.Select(v => v.TargetFramework));
+        return ParseUnits(projectPath, rootDir, units, configSymbolSets, requirePrintEqualsInput,
+            languageVersions, frameworkCoverageComplete);
     }
 
     /// <summary>
@@ -788,6 +837,15 @@ public class SolutionParser
         Func<string?> ReadSource,
         Func<SemanticModel?> GetSemanticModel);
 
+    private sealed class LanguageVersionVisitor : CSharpVisitor<CSharpLanguageVersion>
+    {
+        public override OpenRewrite.Java.J VisitCompilationUnit(CompilationUnit cu, CSharpLanguageVersion version)
+        {
+            cu = (CompilationUnit)base.VisitCompilationUnit(cu, version);
+            return cu.WithMarkers(cu.Markers.Remove<CSharpLanguageVersion>().Add(version));
+        }
+    }
+
     private static string? ReadSource(string filePath)
     {
         try
@@ -803,7 +861,9 @@ public class SolutionParser
 
     private List<SourceFile> ParseUnits(
         string projectPath, string rootDir, IReadOnlyList<ParseUnit> units,
-        List<HashSet<string>> configSymbolSets, bool requirePrintEqualsInput)
+        List<HashSet<string>> configSymbolSets, bool requirePrintEqualsInput,
+        IList<CSharpLanguageVersion.TargetFrameworkVersion>? languageVersions = null,
+        bool frameworkCoverageComplete = false)
     {
         var projectName = Path.GetFileNameWithoutExtension(projectPath);
 
@@ -881,6 +941,12 @@ public class SolutionParser
                     }
                 }
 
+                if (languageVersions != null && cu.Markers.FindFirst<CSharpLanguageVersion>() is { } languageVersion)
+                {
+                    cu = (CompilationUnit)new LanguageVersionVisitor().VisitNonNull(cu,
+                        languageVersion.WithTargetFrameworkVersions(languageVersions)
+                            .WithTargetFrameworkCoverageComplete(frameworkCoverageComplete));
+                }
                 cu = cu.WithMarkers(cu.Markers.Add(dotNetProject));
                 results.Add(cu);
                 fileSw.Stop();

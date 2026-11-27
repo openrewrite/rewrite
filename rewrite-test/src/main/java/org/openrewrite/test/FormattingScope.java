@@ -191,7 +191,7 @@ final class FormattingScope extends FormattingListener {
     }
 
     // A formatting recipe may format whole files, and so may the recipes run alongside it
-    private static boolean isFormatter(Recipe recipe) {
+    static boolean isFormatter(Recipe recipe) {
         if (inFormatPackage(recipe.getName()) || inFormatPackage(recipe.getClass().getName())) {
             return true;
         }

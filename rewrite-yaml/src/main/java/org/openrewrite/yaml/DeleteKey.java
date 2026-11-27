@@ -22,6 +22,7 @@ import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.yaml.tree.Yaml;
 
+import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
 @Value
@@ -55,8 +56,23 @@ public class DeleteKey extends Recipe {
         return Preconditions.check(new FindSourceFiles(filePattern), new YamlIsoVisitor<ExecutionContext>() {
 
             @Override
+            public Yaml.Document visitDocument(Yaml.Document document, ExecutionContext ctx) {
+                return TrailingComments.visit(getCursor(), () -> super.visitDocument(document, ctx));
+            }
+
+            @Override
             public Yaml.Sequence visitSequence(Yaml.Sequence sequence, ExecutionContext ctx) {
-                Yaml.Sequence s = super.visitSequence(sequence, ctx);
+                Yaml.Sequence s = TrailingComments.visit(getCursor(), () -> super.visitSequence(sequence, ctx));
+                if (s.getOpeningBracketPrefix() == null) {
+                    List<Yaml.Sequence.Entry> kept = TrailingComments.remove(getCursor(), s.getEntries(), e ->
+                            isEmptied(e.getBlock()) || matcher.matches(new Cursor(getCursor(), e)) ||
+                            matcher.matches(new Cursor(getCursor(), e.getBlock())));
+                    if (kept.size() == s.getEntries().size()) {
+                        return s;
+                    }
+                    removeUnused(getCursor());
+                    return s.withEntries(kept);
+                }
                 AtomicReference<@Nullable String> copyFirstPrefix = new AtomicReference<>();
                 s = s.withEntries(ListUtils.map(s.getEntries(), (i, e) -> {
                     if (matcher.matches(new Cursor(getCursor(), e)) || matcher.matches(new Cursor(getCursor(), e.getBlock()))) {
@@ -79,7 +95,16 @@ public class DeleteKey extends Recipe {
 
             @Override
             public Yaml.Mapping visitMapping(Yaml.Mapping mapping, ExecutionContext ctx) {
-                Yaml.Mapping m = super.visitMapping(mapping, ctx);
+                Yaml.Mapping m = TrailingComments.visit(getCursor(), () -> super.visitMapping(mapping, ctx));
+                if (m.getOpeningBracePrefix() == null) {
+                    List<Yaml.Mapping.Entry> kept = TrailingComments.remove(getCursor(), m.getEntries(), e ->
+                            isEmptied(e.getValue()) || matcher.matches(new Cursor(getCursor(), e)));
+                    if (kept.size() == m.getEntries().size()) {
+                        return m;
+                    }
+                    removeUnused(getCursor().getParent());
+                    return m.withEntries(kept);
+                }
                 AtomicReference<String> copyFirstPrefix = new AtomicReference<>();
                 m = m.withEntries(ListUtils.map(m.getEntries(), (i, e) -> {
                     if (matcher.matches(new Cursor(getCursor(), e))) {
@@ -99,5 +124,19 @@ public class DeleteKey extends Recipe {
                 return m;
             }
         });
+    }
+
+    // Removed here rather than by RemoveUnusedVisitor, which would drop the comments its prefix holds. The parser
+    // never makes a block collection without entries, so this one had them all deleted.
+    private static boolean isEmptied(Yaml.Block block) {
+        if (block instanceof Yaml.Mapping) {
+            Yaml.Mapping mapping = (Yaml.Mapping) block;
+            return mapping.getOpeningBracePrefix() == null && mapping.getEntries().isEmpty();
+        }
+        if (block instanceof Yaml.Sequence) {
+            Yaml.Sequence sequence = (Yaml.Sequence) block;
+            return sequence.getOpeningBracketPrefix() == null && sequence.getEntries().isEmpty();
+        }
+        return false;
     }
 }

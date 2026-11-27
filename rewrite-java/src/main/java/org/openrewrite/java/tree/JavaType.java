@@ -1077,15 +1077,43 @@ public interface JavaType {
             return this;
         }
 
+        // Bound containers call equals without a context, so carry active pairs through those calls.
+        // Each top-level comparison releases its thread-local state, including on failure.
+        private static final ThreadLocal<TypeUtils.ComparisonContext> EQUALITY_CONTEXT = new ThreadLocal<>();
+
         @Override
         public boolean equals(Object o) {
             if (this == o) return true;
             if (!(o instanceof GenericTypeVariable)) return false;
             GenericTypeVariable that = (GenericTypeVariable) o;
+            if (!name.equals(that.name) || variance != that.variance) {
+                return false;
+            }
             List<JavaType> bounds = getBounds(), thatBounds = that.getBounds();
-            return name.equals(that.name) && variance == that.variance &&
-                   (variance == Variance.INVARIANT && bounds.isEmpty() && thatBounds.isEmpty() ||
-                    !bounds.isEmpty() && bounds.equals(thatBounds));
+            if (bounds.isEmpty() || thatBounds.isEmpty()) {
+                return variance == Variance.INVARIANT && bounds.isEmpty() && thatBounds.isEmpty();
+            }
+            TypeUtils.ComparisonContext parent = EQUALITY_CONTEXT.get();
+            TypeUtils.ComparisonContext context = parent == null ? TypeUtils.ComparisonContext.BOUND : parent;
+            if (context.isComparing(this, that)) {
+                return true;
+            }
+            EQUALITY_CONTEXT.set(context.enterComparison(this, that));
+            try {
+                return bounds.equals(thatBounds);
+            } finally {
+                if (parent == null) {
+                    EQUALITY_CONTEXT.remove();
+                } else {
+                    EQUALITY_CONTEXT.set(parent);
+                }
+            }
+        }
+
+        @Override
+        public int hashCode() {
+            // Bounds may be cyclic. Equal variables always have the same name and variance.
+            return 31 * name.hashCode() + variance.hashCode();
         }
 
         @Override
@@ -1654,7 +1682,8 @@ public interface JavaType {
         }
 
         public Method withFlags(Set<Flag> flags) {
-            return withFlagsBitMap(Flag.flagsToBitMap(flags));
+            // the mark of a C# extension method isn't one of the flags
+            return withFlagsBitMap(Flag.flagsToBitMap(flags) | flagsBitMap & EXTENSION_METHOD_FLAG);
         }
 
         /**

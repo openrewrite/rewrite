@@ -310,6 +310,7 @@ class JavaScriptSender extends JavaScriptRpcVisitor<RpcSendQueue> {
         q.getAndSend(arrowFunction, el => el.typeParameters, el => this.visit(el, q));
         q.getAndSend(arrowFunction, el => el.lambda, el => this.visit(el, q));
         q.getAndSend(arrowFunction, el => el.returnTypeExpression, el => this.visit(el, q));
+        q.getAndSend(arrowFunction, el => asRef(el.methodType), el => this.visitType(el, q));
         return arrowFunction;
     }
 
@@ -386,6 +387,7 @@ class JavaScriptSender extends JavaScriptRpcVisitor<RpcSendQueue> {
 
     override visitImportClause(jsImportClause: JS.ImportClause, q: RpcSendQueue): J | undefined {
         q.getAndSend(jsImportClause, el => el.typeOnly);
+        q.getAndSend(jsImportClause, el => el.deferred);
         q.getAndSend(jsImportClause, el => el.name, el => this.visitRightPadded(el, q));
         q.getAndSend(jsImportClause, el => el.namedBindings, el => this.visit(el, q));
         return jsImportClause;
@@ -645,6 +647,7 @@ class JavaScriptSender extends JavaScriptRpcVisitor<RpcSendQueue> {
         q.getAndSendList(tag, el => el.children!, child => child.id, child => this.visit(child, q));
         q.getAndSend(tag, el => el.closingName, el => this.visitLeftPadded(el, q));
         q.getAndSend(tag, el => spaceRef(el.afterClosingName), el => this.visitSpace(el, q));
+        q.getAndSend(tag, el => asRef(el.methodType), el => this.visitType(el, q));
 
         return tag;
     }
@@ -851,7 +854,8 @@ class JavaScriptReceiver extends JavaScriptRpcVisitor<RpcReceiveQueue> {
             modifiers: q.receiveListDefined(arrowFunction.modifiers, el => this.visitDefined<J.Modifier>(el, q)),
             typeParameters: q.receive(arrowFunction.typeParameters, el => this.visitDefined<J.TypeParameters>(el, q)),
             lambda: q.receive(arrowFunction.lambda, el => this.visitDefined<J.Lambda>(el, q)),
-            returnTypeExpression: q.receive(arrowFunction.returnTypeExpression, el => this.visitDefined<TypeTree>(el, q))
+            returnTypeExpression: q.receive(arrowFunction.returnTypeExpression, el => this.visitDefined<TypeTree>(el, q)),
+            methodType: q.receive(arrowFunction.methodType, el => this.visitType(el, q) as unknown as Type.Method)
         };
         return updateIfChanged(arrowFunction, updates);
     }
@@ -950,6 +954,7 @@ class JavaScriptReceiver extends JavaScriptRpcVisitor<RpcReceiveQueue> {
     override visitImportClause(jsImportClause: JS.ImportClause, q: RpcReceiveQueue): J | undefined {
         const updates = {
             typeOnly: q.receive(jsImportClause.typeOnly),
+            deferred: q.receive(jsImportClause.deferred),
             name: q.receive(jsImportClause.name, el => this.visitRightPadded(el, q)),
             namedBindings: q.receive(jsImportClause.namedBindings, el => this.visitDefined<Expression>(el, q))
         };
@@ -1283,7 +1288,8 @@ class JavaScriptReceiver extends JavaScriptRpcVisitor<RpcReceiveQueue> {
                 selfClosing: q.receive(tag.selfClosing, space => this.visitSpace(space, q)),
                 children: q.receiveList(tag.children, child => this.visit(child, q)),
                 closingName: q.receive(tag.closingName, el => this.visitLeftPadded(el, q)),
-                afterClosingName: q.receive(tag.afterClosingName, el => this.visitSpace(el, q))
+                afterClosingName: q.receive(tag.afterClosingName, el => this.visitSpace(el, q)),
+                methodType: q.receive(tag.methodType, el => this.visitType(el, q) as unknown as Type.Method)
             };
             // Type assertion is needed due to `JSX.Tag` being a union type
             return updateIfChanged(tag, updates as any);

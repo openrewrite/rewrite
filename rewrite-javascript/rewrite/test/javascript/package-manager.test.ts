@@ -29,7 +29,8 @@ import {
     PackageJsonParser,
     PackageManager,
     runWorkspaceInstallInTempDir,
-    updateNodeResolutionMarker
+    updateNodeResolutionMarker,
+    findNodeResolutionResult
 } from "../../src/javascript";
 import {Json} from "../../src/json";
 
@@ -321,6 +322,35 @@ describe("runWorkspaceInstallInTempDir", () => {
 });
 
 describe("updateNodeResolutionMarker", () => {
+
+    test.each(["package-lock.json", "packages/member/package-lock.json", undefined])(
+        "refresh uses the explicitly selected lock root: %s", async (lockPath) => {
+        await withDir(async (repo) => {
+            const manifestPath = "packages/member/package.json";
+            const manifest = JSON.stringify({name: "member", dependencies: {semver: "*"}});
+            fs.mkdirSync(path.join(repo.path, "packages/member"), {recursive: true});
+            fs.writeFileSync(path.join(repo.path, manifestPath), manifest);
+            const parser = new PackageJsonParser({relativeTo: repo.path});
+            const docs: Json.Document[] = [];
+            for await (const result of parser.parse(path.join(repo.path, manifestPath))) docs.push(result as Json.Document);
+            const acc = createDependencyRecipeAccumulator<BaseProjectUpdateInfo>();
+            acc.updatedLockFiles.set("package-lock.json", JSON.stringify({lockfileVersion: 3, packages: {
+                "node_modules/semver": {version: "7.8.5"},
+                "packages/member/node_modules/semver": {version: "7.8.6"}
+            }}));
+            if (lockPath && lockPath !== "package-lock.json") {
+                acc.updatedLockFiles.set(lockPath, JSON.stringify({lockfileVersion: 3, packages: {
+                    "node_modules/semver": {version: "8.0.0"},
+                    "packages/member/node_modules/semver": {version: "9.0.0"}
+                }}));
+            }
+            const refreshed = await updateNodeResolutionMarker(docs[0], {
+                packageJsonPath: manifestPath, packageManager: PackageManager.Npm, originalPackageJson: manifest, lockFilePath: lockPath
+            }, acc);
+            expect(findNodeResolutionResult(refreshed)!.dependencies[0].resolved?.version)
+                .toBe(lockPath === undefined ? undefined : lockPath === "package-lock.json" ? "7.8.6" : "8.0.0");
+        }, {unsafeCleanup: true});
+    });
 
     test("returns same doc reference when accumulator has no updates", async () => {
         // given a parsed package.json with a NodeResolutionResult marker

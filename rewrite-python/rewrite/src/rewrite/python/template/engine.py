@@ -17,8 +17,10 @@
 from __future__ import annotations
 
 import ast
+import io
 import os
 import textwrap
+import tokenize
 from collections import OrderedDict
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Set, Tuple, Union, TYPE_CHECKING
@@ -27,7 +29,11 @@ from uuid import UUID
 from rewrite import random_id
 from rewrite.java import J, Expression, Statement
 from rewrite.java import tree as j
+from rewrite.java.markers import TrailingComma
+from rewrite.java.support_types import Space
+from rewrite.markers import Marker
 from rewrite.python.visitor import PythonVisitor
+from rewrite.utils import list_map
 
 if TYPE_CHECKING:
     from rewrite.python.tree import CompilationUnit
@@ -40,6 +46,31 @@ from .replacement import substitution_marker
 
 # Wrapper function name used to make template code parseable
 WRAPPER_FUNCTION_NAME = "__WRAPPER__"
+_WRAPPER_INDENT = "    "
+
+
+_stdlib_venv: Optional[str] = None
+
+
+def _stdlib_only_venv() -> str:
+    """An empty venv of the running interpreter, for templates that declare no dependencies.
+
+    Given no venv, ty resolves against an inherited ``VIRTUAL_ENV``, the parser's own venv or the
+    ``python3`` on ``PATH``, whose packages vary with where the recipe runs. ty fails to start on
+    a venv without its ``pyvenv.cfg``, which a temp cleaner can remove while the process runs.
+    """
+    global _stdlib_venv
+    if _stdlib_venv is None or not os.path.isfile(os.path.join(_stdlib_venv, "pyvenv.cfg")):
+        import atexit
+        import shutil
+        import tempfile
+        import venv
+
+        path = tempfile.mkdtemp(prefix="openrewrite-template-stdlib-")
+        atexit.register(shutil.rmtree, path, ignore_errors=True)
+        venv.EnvBuilder(with_pip=False, symlinks=os.name != "nt").create(path)
+        _stdlib_venv = path
+    return _stdlib_venv
 
 
 @dataclass(frozen=True)
@@ -56,7 +87,9 @@ class TemplateOptions:
         dependencies: PyPI ``(package, version)`` pairs (use explicit
             operators like ``">=2.31.0"``; bare versions default to ``>=``).  When set, the
             template is parsed inside a cached virtualenv that has these
-            packages installed, enabling type attribution.
+            packages installed, enabling type attribution. Without them only
+            the standard library resolves, whatever the running interpreter
+            has installed.
         context_sensitive: Whether the template requires cursor context
             for correct parsing.
     """
@@ -64,6 +97,23 @@ class TemplateOptions:
     context: Tuple[str, ...] = ()
     dependencies: Tuple[Tuple[str, str], ...] = ()
     context_sensitive: bool = False
+
+
+def _indented_outside_strings(code: str) -> str:
+    """``code`` indented to be the wrapper's body, but for the lines a string runs on to, whose leading
+    whitespace is the string's own text."""
+    from rewrite.python._parser_visitor import FSTRING_MIDDLE, TSTRING_MIDDLE
+    continued: Set[int] = set()
+    try:
+        for token in tokenize.generate_tokens(io.StringIO(code).readline):
+            if token.type in (tokenize.STRING, FSTRING_MIDDLE, TSTRING_MIDDLE):
+                continued.update(range(token.start[0] + 1, token.end[0] + 1))
+    except (tokenize.TokenError, SyntaxError):
+        # The parser tokenizes the wrapper around this code too, so code that does not tokenize fails to parse there,
+        # and the parse says what is wrong with it.
+        pass
+    return '\n'.join(line if row in continued else _WRAPPER_INDENT + line
+                     for row, line in enumerate(code.split('\n'), 1))
 
 
 def _in_statement_slot(coordinates: PythonCoordinates, cursor: Optional['Cursor']) -> bool:
@@ -161,6 +211,10 @@ class TemplateEngine:
 
         # Extract template content from wrapper
         extracted = cls._extract_from_wrapper(compilation_unit, is_expression)
+        if not is_expression:
+            out_of_wrapper = _OutOfWrapper().visit(extracted, None)
+            assert out_of_wrapper is not None
+            extracted = out_of_wrapper
 
         # The template's own code is the last statement, so everything ahead of it is context.
         parsed = (extracted, tuple(compilation_unit.statements[:-1]))
@@ -270,13 +324,12 @@ class TemplateEngine:
         if is_expression:
             # Expression: wrap with return
             lines.append(f"def {WRAPPER_FUNCTION_NAME}():")
-            lines.append(f"    return {dedented}")
+            lines.append(f"{_WRAPPER_INDENT}return {dedented}")
         else:
-            # Statement(s): wrap directly
+            # In a function, a name the context or a typed capture declares has its declared type, where at the
+            # module's level ty would take it as unbound or narrow it to the value assigned.
             lines.append(f"def {WRAPPER_FUNCTION_NAME}():")
-            # Indent each line of the template
-            for line in dedented.split('\n'):
-                lines.append(f"    {line}")
+            lines.append(_indented_outside_strings(dedented))
 
         return '\n'.join(lines)
 
@@ -299,10 +352,8 @@ class TemplateEngine:
         """
         Parse Python code into an LST CompilationUnit.
 
-        Always attempts type attribution via ``TyTypesClient``.  When
-        *options* specifies dependencies, a cached virtualenv workspace is
-        used; otherwise a temporary directory suffices (enough for stdlib
-        and already-installed packages).
+        Always attempts type attribution via ``TyTypesClient``, in the
+        environment ``TemplateOptions.dependencies`` describes.
 
         Args:
             code: Python source code.
@@ -324,14 +375,16 @@ class TemplateEngine:
                 import tempfile as _tmpmod
                 from rewrite.python.ty_client import TyTypesClient
 
+                virtual_env = None
                 if options and options.dependencies:
                     from .dependency_workspace import DependencyWorkspace
                     workspace = DependencyWorkspace.get_or_create(options.dependencies)
                 else:
                     workspace = _tmpmod.mkdtemp()
                     owns_workspace = True
+                    virtual_env = _stdlib_only_venv()
 
-                ty_client = TyTypesClient()
+                ty_client = TyTypesClient(virtual_env=virtual_env)
                 ty_client.initialize(workspace)
 
                 # ty needs a real file path for type resolution
@@ -562,3 +615,20 @@ class _SubstitutedLayout(PythonVisitor[None]):
             tree = before.replace(prefix=tree.prefix)
         return tree.replace(markers=tree.markers.replace(
             markers=[m for m in tree.markers.markers if m != marker]))
+
+
+class _OutOfWrapper(PythonVisitor[None]):
+    """Takes the indentation `_indented_outside_strings` gave a statement off each of its lines, so that the
+    template's tree is laid out as its code is, whether or not it is formatted where it lands."""
+
+    def visit_space(self, space: Optional[Space], p: None) -> Space:
+        space = super().visit_space(space, p)
+        return space.replace(
+            whitespace=space.whitespace.replace('\n' + _WRAPPER_INDENT, '\n'),
+            comments=list_map(lambda c: c.replace(suffix=c.suffix.replace('\n' + _WRAPPER_INDENT, '\n')),
+                              space.comments))
+
+    def visit_marker(self, marker: Marker, p: None) -> Marker:
+        if isinstance(marker, TrailingComma):
+            return marker.replace(suffix=self.visit_space(marker.suffix, p))
+        return marker

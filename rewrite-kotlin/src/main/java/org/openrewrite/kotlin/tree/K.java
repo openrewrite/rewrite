@@ -26,11 +26,13 @@ import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.service.AutoFormatService;
 import org.openrewrite.java.service.ImportService;
+import org.openrewrite.java.service.ScopeService;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinVisitor;
 import org.openrewrite.kotlin.internal.KotlinPrinter;
 import org.openrewrite.kotlin.service.KotlinAutoFormatService;
 import org.openrewrite.kotlin.service.KotlinImportService;
+import org.openrewrite.kotlin.service.KotlinScopeService;
 import org.openrewrite.marker.Markers;
 
 import java.beans.Transient;
@@ -40,6 +42,7 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -308,14 +311,21 @@ public interface K extends J {
             }
 
             public K.CompilationUnit withClasses(List<JRightPadded<J.ClassDeclaration>> classes) {
-                List<JRightPadded<Statement>> statements = t.statements.stream()
-                        .filter(s -> !(s.getElement() instanceof J.ClassDeclaration))
-                        .collect(toList());
-
-                //noinspection unchecked
-                statements.addAll(0, classes.stream()
-                        .map(i -> (JRightPadded<Statement>) (Object) i)
-                        .collect(toList()));
+                // Top-level declarations initialize and read in source order, so each class keeps its position.
+                List<JRightPadded<Statement>> statements = new ArrayList<>(t.statements.size());
+                Iterator<JRightPadded<J.ClassDeclaration>> replacements = classes.iterator();
+                for (JRightPadded<Statement> statement : t.statements) {
+                    if (!(statement.getElement() instanceof J.ClassDeclaration)) {
+                        statements.add(statement);
+                    } else if (replacements.hasNext()) {
+                        //noinspection unchecked
+                        statements.add((JRightPadded<Statement>) (Object) replacements.next());
+                    }
+                }
+                while (replacements.hasNext()) {
+                    //noinspection unchecked
+                    statements.add((JRightPadded<Statement>) (Object) replacements.next());
+                }
 
                 return t.getPadding().getClasses() == classes ? t : new K.CompilationUnit(t.id, t.shebang, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, t.checksum, t.annotations, t.packageDeclaration, t.imports, statements, t.eof);
             }
@@ -351,6 +361,10 @@ public interface K extends J {
                     serviceClass = service;
                 } else if (ImportService.class.getName().equals(serviceName)) {
                     serviceClass = (Class<S>) service.getClassLoader().loadClass(KotlinImportService.class.getName());
+                } else if (KotlinScopeService.class.getName().equals(serviceName)) {
+                    serviceClass = service;
+                } else if (ScopeService.class.getName().equals(serviceName)) {
+                    serviceClass = (Class<S>) service.getClassLoader().loadClass(KotlinScopeService.class.getName());
                 } else if (KotlinAutoFormatService.class.getName().equals(serviceName)) {
                     serviceClass = service;
                 } else if (AutoFormatService.class.getName().equals(serviceName)) {

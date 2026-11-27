@@ -1,0 +1,18 @@
+Scope: all 3 workspace projects
+Progress: resolved 1, reused 0, downloaded 0, added 0
+packages/app:
+ ERR_PNPM_SPEC_NOT_SUPPORTED_BY_ANY_RESOLVER  dep@catalog: isn't supported by any available resolver.
+
+This error happened while installing the dependencies of lib@1.0.0
+
+An external package outside of the pnpm workspace declared a dependency using
+the catalog protocol. This is likely a bug in that external package. Only
+packages within the pnpm workspace may use catalogs. Usages of the catalog
+protocol are replaced with real specifiers on 'pnpm publish'.
+
+This is likely a bug in the publishing automation of this package. Consider filing
+a bug with the authors of:
+
+  lib@1.0.0
+
+exit 1

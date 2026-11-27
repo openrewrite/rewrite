@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.UnaryOperator;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
@@ -89,6 +90,20 @@ public class DependencyConstraintToRule extends Recipe {
     }
 
     static class RemoveConstraints extends JavaIsoVisitor<List<GroupArtifactVersionBecause>> {
+
+        @Override
+        public J.Block visitBlock(J.Block block, List<GroupArtifactVersionBecause> groupArtifactVersions) {
+            J.Block b = super.visitBlock(block, groupArtifactVersions);
+            // A constraints block removed from the top of the block leaves the statement that followed it where the
+            // constraints block was, as it was before the constraints block was added above it
+            if (!block.getStatements().isEmpty() && !b.getStatements().isEmpty() &&
+                b.getStatements().get(0) != block.getStatements().get(0) &&
+                block.getStatements().size() > 1 && b.getStatements().get(0) == block.getStatements().get(1)) {
+                Space removed = block.getStatements().get(0).getPrefix();
+                b = b.withStatements(ListUtils.mapFirst(b.getStatements(), s -> s.withPrefix(removed)));
+            }
+            return b;
+        }
 
         @SuppressWarnings({"DataFlowIssue", "NullableProblems"})
         @Override
@@ -191,11 +206,19 @@ public class DependencyConstraintToRule extends Recipe {
                 return m;
             }
             J.Block closureBody = (J.Block) ((J.Lambda) maybeClosure).getBody();
-            J rawParam = ((J.Lambda) maybeClosure).getParameters().getParameters().get(0);
-            if (!(rawParam instanceof J.VariableDeclarations)) {
+            List<J> params = ((J.Lambda) maybeClosure).getParameters().getParameters();
+            J rawParam = params.isEmpty() ? null : params.get(0);
+            J.Identifier p;
+            if (rawParam == null || rawParam instanceof J.Empty) {
+                // A closure without a declared parameter has the details as its receiver in the Kotlin DSL, and as
+                // its implicit parameter in Groovy
+                p = new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, emptyList(),
+                        isKotlinDsl ? "this" : "it", null, null);
+            } else if (rawParam instanceof J.VariableDeclarations) {
+                p = ((J.VariableDeclarations) rawParam).getVariables().get(0).getName();
+            } else {
                 return m;
             }
-            J.Identifier p = ((J.VariableDeclarations) rawParam).getVariables().get(0).getName();
 
             // The closure parameter comes from the tree and the coordinates from the recipe's options, so the
             // predicate is assembled from parameters and needs no declaration of `p` to parse against
@@ -355,12 +378,28 @@ public class DependencyConstraintToRule extends Recipe {
                 JavaTemplate eachDependency = isKotlinDsl ?
                         KotlinTemplate.builder(snippet).build() :
                         GroovyTemplate.builder(snippet).build();
-                return eachDependency.apply(new Cursor(getCursor(), sourceFile), anchor == null ?
+                JavaSourceFile added = eachDependency.apply(new Cursor(getCursor(), sourceFile), anchor == null ?
                         statements.get(statements.size() - 1).getCoordinates().after() :
                         anchor.getCoordinates().before());
+                // Separated from what precedes it as the statement it is placed before, or after, is
+                int index = anchor == null ? statements.size() : statements.indexOf(anchor);
+                Statement reference = anchor == null ? statements.get(statements.size() - 1) : anchor;
+                return index == 0 ? added : mapStatement(added, index, s ->
+                        s.withPrefix(s.getPrefix().withWhitespace(reference.getPrefix().getWhitespace())));
             }
             return super.visit(tree, ctx);
         }
+    }
+
+    private static JavaSourceFile mapStatement(JavaSourceFile sourceFile, int index, UnaryOperator<Statement> map) {
+        if (sourceFile instanceof K.CompilationUnit) {
+            K.CompilationUnit k = (K.CompilationUnit) sourceFile;
+            return k.withStatements(ListUtils.mapFirst(k.getStatements(), block -> block instanceof J.Block ?
+                    ((J.Block) block).withStatements(ListUtils.map(((J.Block) block).getStatements(),
+                            (i, s) -> i == index ? map.apply(s) : s)) : block));
+        }
+        G.CompilationUnit g = (G.CompilationUnit) sourceFile;
+        return g.withStatements(ListUtils.map(g.getStatements(), (i, s) -> i == index ? map.apply(s) : s));
     }
 
     static class MaybeRemoveDependencyBlock extends JavaIsoVisitor<ExecutionContext> {

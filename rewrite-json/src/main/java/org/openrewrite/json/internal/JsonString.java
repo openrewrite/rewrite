@@ -15,6 +15,8 @@
  */
 package org.openrewrite.json.internal;
 
+import static org.openrewrite.internal.StringUtils.escapeUnpairedSurrogates;
+
 /**
  * Converts between a JSON5 string literal as written and the string it stands for.
  */
@@ -26,7 +28,8 @@ public final class JsonString {
     /**
      * The string that a single- or double-quoted JSON5 literal stands for.
      * An {@code x} or {@code u} escape without its hex digits is kept as written, since recipe options reach here
-     * without passing the grammar.
+     * without passing the grammar. A surrogate with no partner stays a lower-case {@code u} escape, because the LST
+     * writer can't encode it.
      */
     public static String decode(String literal) {
         String body = literal.substring(1, literal.length() - 1);
@@ -88,7 +91,7 @@ public final class JsonString {
                     out.append(escaped);
             }
         }
-        return out.toString();
+        return escapeUnpairedSurrogates(out);
     }
 
     private static int hex(String s, int from, int digits) {

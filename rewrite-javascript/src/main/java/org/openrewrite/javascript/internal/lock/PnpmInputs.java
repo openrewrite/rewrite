@@ -21,6 +21,7 @@ import org.openrewrite.javascript.internal.lock.pnpm.PnpmLockRegenerator;
 import org.openrewrite.javascript.internal.lock.pnpm.PnpmLockRegenerator.Inputs;
 import org.openrewrite.javascript.internal.lock.pnpm.PnpmManifestRules;
 import org.openrewrite.javascript.internal.lock.pnpm.PnpmReleases;
+import org.openrewrite.javascript.internal.lock.pnpm.PnpmRelease;
 import org.openrewrite.javascript.internal.lock.pnpm.WorkspaceRootFinder;
 import org.openrewrite.javascript.internal.registry.NpmRegistryClient;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
@@ -85,20 +86,22 @@ final class PnpmInputs implements Port {
         } catch (CannotKnow e) {
             return Result.failure(LockOnlyInstall.cannotKnow(e));
         }
-        return new PnpmLockRegenerator(inputs, new PnpmRegistryMetadata(host.transport(), client)).regenerate();
+        return new PnpmLockRegenerator(inputs, new PnpmRegistryMetadata(host.transport(), client, host.pnpmRequestEnvironment())).regenerate();
     }
 
     /**
      * Run by the pnpm release that built the LST ({@code NodeRuntime}), 11.2.2 where the host recorded none. With the
-     * host's registries as pnpm's user .npmrc, its user npmrc only: pnpm reads no global npmrc, and the marker's
+     * host's registries as pnpm's user .npmrc: pnpm 10 reads global and user npmrc; 11 only user. The marker's
      * project npmrc (the repository root's) only as the workspace's .npmrc.
      *
      * @throws CannotKnow where the pnpm that built the LST is a release the engine does not reproduce
      */
     static Inputs from(LockDirectory dir, HostInputs host) {
+        PnpmRelease release = PnpmReleases.runs(host.packageManagerVersion(PackageManager.Pnpm));
         return project(dir)
-                .release(PnpmReleases.runs(host.packageManagerVersion(PackageManager.Pnpm)))
-                .userNpmrc(host.userNpmrc(HostInputs.USER))
+                .release(release)
+                .userNpmrc(host.userPnpmrc(release != null && !release.atLeast(11, 0, 0) ?
+                        HostInputs.GLOBAL_AND_USER : HostInputs.USER, release != null && !release.atLeast(11, 0, 0)))
                 .env(host.getEnvironment().process())
                 .host(host.getHost())
                 .now(host.getNow())

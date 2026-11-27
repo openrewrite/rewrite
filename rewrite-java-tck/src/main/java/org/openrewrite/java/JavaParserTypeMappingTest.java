@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.ExecutionContext;
@@ -48,14 +49,19 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 @SuppressWarnings({"ConstantConditions", "PatternVariableCanBeUsed", "StatementWithEmptyBody"})
 class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
 
-    @Language("java")
-    private final String goat = StringUtils.readFully(JavaParserTypeMappingTest.class.getResourceAsStream("/JavaTypeGoat.java"));
+    // Every test reads the same compilation unit, so none may change its types, as `unsafeSet` would.
+    private static J.@Nullable CompilationUnit goatCu;
 
-    private final J.CompilationUnit goatCu = JavaParser.fromJavaVersion().build()
-      .parse(goat)
-      .findFirst()
-      .map(J.CompilationUnit.class::cast)
-      .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"));
+    private static J.CompilationUnit goatCu() {
+        if (goatCu == null) {
+            goatCu = JavaParser.fromJavaVersion().build()
+              .parse(StringUtils.readFully(JavaParserTypeMappingTest.class.getResourceAsStream("/JavaTypeGoat.java")))
+              .findFirst()
+              .map(J.CompilationUnit.class::cast)
+              .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"));
+        }
+        return goatCu;
+    }
 
     @Override
     public JavaType.FullyQualified classType(String fqn) {
@@ -69,7 +75,7 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
                 }
                 return super.visitClassDeclaration(classDecl, o);
             }
-        }.visit(goatCu, 0);
+        }.visit(goatCu(), 0);
         return type.get();
     }
 
@@ -191,6 +197,120 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
         );
     }
 
+    @Test
+    void capturedWildcardKeepsItsBounds() {
+        // javac captures the wildcard of a variable read as an argument or a receiver
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  static class Box<T extends Number> {
+                      T get() {
+                          return null;
+                      }
+                  }
+
+                  static <T> int frequency(Iterable<T> iterable, T value) {
+                      return 0;
+                  }
+
+                  int test(Iterable<? super String> values, String value, Box<?> box) {
+                      box.get();
+                      return frequency(values, value);
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                AtomicReference<JavaType> argumentType = new AtomicReference<>();
+                AtomicReference<JavaType> receiverBoundType = new AtomicReference<>();
+                new JavaIsoVisitor<Integer>() {
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                        if ("frequency".equals(method.getSimpleName())) {
+                            argumentType.set(method.getArguments().get(0).getType());
+                        } else {
+                            receiverBoundType.set(method.getType());
+                        }
+                        return super.visitMethodInvocation(method, p);
+                    }
+                }.visit(cu, 0);
+                assertThat(argumentType.get()).hasToString("java.lang.Iterable<Generic{? super java.lang.String}>");
+
+                assertThat(receiverBoundType.get()).hasToString("Generic{? extends java.lang.Number}");
+            })
+          )
+        );
+    }
+
+    @Test
+    void captureBoundedByCaptureOfCapture() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  static class Box<A extends Number, B extends A, C extends B> {
+                      C c() {
+                          return null;
+                      }
+                  }
+
+                  void test(Box<?, ?, ?> box) {
+                      box.c();
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                AtomicReference<JavaType> type = new AtomicReference<>();
+                new JavaIsoVisitor<Integer>() {
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                        type.set(method.getType());
+                        return super.visitMethodInvocation(method, p);
+                    }
+                }.visit(cu, 0);
+                assertThat(type.get()).hasToString("Generic{? extends Generic{? extends Generic{? extends java.lang.Number}}}");
+            })
+          )
+        );
+    }
+
+    @Test
+    void captureBoundedThroughParameterizedCaptureOfCapture() {
+        rewriteRun(
+          java(
+            """
+              import java.util.List;
+
+              class Test {
+                  static class Box<A, B extends List<A>, C extends List<B>> {
+                      C c() {
+                          return null;
+                      }
+                  }
+
+                  void test(Box<?, ?, ?> box) {
+                      box.c();
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                AtomicReference<JavaType> type = new AtomicReference<>();
+                new JavaIsoVisitor<Integer>() {
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                        type.set(method.getType());
+                        return super.visitMethodInvocation(method, p);
+                    }
+                }.visit(cu, 0);
+                JavaType.GenericTypeVariable captureOfC = (JavaType.GenericTypeVariable) type.get();
+                Parameterized bound = (Parameterized) captureOfC.getBounds().get(0);
+                assertThat(bound.getTypeParameters().get(0)).as("capture of B")
+                  .hasToString("Generic{? extends java.util.List<Generic{?}>}");
+            })
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1762")
     @MinimumJava11
     @Test
@@ -229,7 +349,7 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
     @Test
     void methodInvocationOnUnknownType() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).methodDeclarations(false).constructorInvocations(false).build()),
+          spec -> spec.typeValidationOptions(TypeValidation.all().identifiers(false).methodDeclarations(false)),
           java(
             """
               import java.util.ArrayList;
@@ -256,6 +376,40 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
                   }
               }
               """
+          )
+        );
+    }
+
+    @Test
+    void initializerBlockLocalIsOwnedByTheInitializer() {
+        rewriteRun(
+          java(
+            """
+              class C {
+                  { int block = 1; block++; }
+                  static { int sblock = 1; sblock++; }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                List<J.Identifier> locals = new ArrayList<>();
+                new JavaIsoVisitor<List<J.Identifier>>() {
+                    @Override
+                    public J.Identifier visitIdentifier(J.Identifier identifier, List<J.Identifier> found) {
+                        if (identifier.getSimpleName().endsWith("block")) {
+                            found.add(identifier);
+                        }
+                        return identifier;
+                    }
+                }.visit(cu, locals);
+
+                assertThat(locals).hasSize(4).allSatisfy(local ->
+                  assertThat(local.getFieldType().getOwner()).isInstanceOfSatisfying(JavaType.Method.class, owner -> {
+                      assertThat(owner.getDeclaringType().getFullyQualifiedName()).isEqualTo("C");
+                      assertThat(owner.getName()).isEmpty();
+                      assertThat(owner.getReturnType()).isEqualTo(JavaType.Primitive.Void);
+                      assertThat(owner.getParameterTypes()).isEmpty();
+                  }));
+            })
           )
         );
     }
@@ -452,7 +606,7 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
     @Test
     void methodInvocationTypeBoundWhenArgumentTypeUnresolvable() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).methodInvocations(false).build()),
+          spec -> spec.typeValidationOptions(TypeValidation.all().identifiers(false)),
           java(
             """
               import static java.util.Objects.requireNonNull;
@@ -488,7 +642,7 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
     @Test
     void methodInvocationTypeResolvedFromRecoveredInvocationTypeWhenArgumentTypeUnresolvable() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).methodInvocations(false).build()),
+          spec -> spec.typeValidationOptions(TypeValidation.all().identifiers(false)),
           java(
             """
               import static java.util.Objects.requireNonNull;
@@ -527,7 +681,7 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
     @Test
     void methodInvocationTypeBoundOnOverloadedCalleeWithUnresolvableArgument() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).methodInvocations(false).build()),
+          spec -> spec.typeValidationOptions(TypeValidation.all().identifiers(false)),
           java(
             """
               class MyTest {

@@ -217,7 +217,7 @@ Bidirectional JSON-RPC over stdin/stdout using StreamJsonRpc. The `OpenRewrite.T
 ### Debugging RPC Issues
 
 - RPC tests can hang indefinitely if communication fails. Always use timeouts.
-- Non-concurrent synchronization context prevents deadlocks on reentrant requests.
+- Requests run on the thread pool, so a reentrant request doesn't deadlock. Notifications (`Evict`) run on the message reader, in arrival order. `StringErrorDataJsonRpc` explains why.
 - Check that Sender/Receiver methods stay aligned between C# and Java sides.
 - The RPC server logs to a file when `--log-file=` is passed to the tool.
 

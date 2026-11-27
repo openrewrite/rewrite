@@ -58,6 +58,7 @@ func TestBasicLitDecodedValue(t *testing.T) {
 		{"interpreted string", `"foo"`, "foo", `"foo"`},
 		{"string with escape", `"a\tb"`, "a\tb", `"a\tb"`},
 		{"raw string", "`foo`", "foo", "`foo`"},
+		{"raw string with carriage return", "`a\r\nb`", "a\nb", "`a\r\nb`"},
 		{"char", `'a'`, int64('a'), `'a'`},
 		{"char escape", `'\n'`, int64('\n'), `'\n'`},
 		{"char multibyte", `'π'`, int64('π'), `'π'`},

@@ -253,6 +253,24 @@ public class ForLoopTests : RewriteTest
     }
 
     [Fact]
+    public void ForWithSpaceBeforeFirstSemicolon()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                class Foo {
+                    void Bar() {
+                        for (int i = 0 ; i < 10; i++) { }
+                        int j, k;
+                        for (j = 0 , k = 1 ; j < 10; j++) { }
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
     public void InfiniteForHasEmptyInitConditionAndUpdate()
     {
         // given

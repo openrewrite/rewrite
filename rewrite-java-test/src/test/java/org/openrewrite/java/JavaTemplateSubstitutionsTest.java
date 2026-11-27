@@ -20,6 +20,7 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.ArrayList;
@@ -384,7 +385,9 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
     @Test
     void arrayTernaryToMethodAccess() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+          // the template types an argument by the position it is moved from
+          spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build())
+            .recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitTernary(J.Ternary ternary, ExecutionContext executionContext) {
                   maybeAddImport("java.util.Arrays");
@@ -441,7 +444,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
               import java.util.Map;
               class Test {
                void test(Map<String, ?> map) {
-                   System.out.println(map.get("test"));
+                System.out.println(map.get("test"));
                }
               }
               """
@@ -531,6 +534,42 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
                   abstract Map.Entry<String, ? extends Object> entry();
                   void test() {
                       System.out.println(entry());
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void anyWithAParenthesizedArgument() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if ("count".equals(method.getSimpleName())) {
+                      return JavaTemplate.apply("java.util.Collections.frequency(#{any()}, #{any()})",
+                        getCursor(), method.getCoordinates().replace(), method.getArguments().toArray());
+                  }
+                  return super.visitMethodInvocation(method, ctx);
+              }
+          })),
+          java(
+            """
+              import java.util.List;
+              abstract class Test {
+                  abstract int count(List<String> values, String value);
+                  int test(List<String> values, String value) {
+                      return count((values), value);
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+              abstract class Test {
+                  abstract int count(List<String> values, String value);
+                  int test(List<String> values, String value) {
+                      return java.util.Collections.frequency((values), value);
                   }
               }
               """
@@ -725,7 +764,9 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
     @Test
     void replacedExpressionPassedAsParameterKeepsItsCommentsOnce() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+          // the template doesn't retype the call that its replacement is an argument of
+          spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build())
+            .recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitIdentifier(J.Identifier ident, ExecutionContext ctx) {
                   if ("o".equals(ident.getSimpleName()) && getCursor().getParentTreeCursor().getValue() instanceof J.MethodInvocation m &&
@@ -787,6 +828,38 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
                       if (o != null) {
                           o.toString();
                       }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void preservesSpacingInsideSubstitutedExpression() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if (method.getSimpleName().equals("print")) {
+                      return JavaTemplate.apply("System.out.println( #{any(String)} )", getCursor(),
+                        method.getCoordinates().replace(), method.getArguments().getFirst());
+                  }
+                  return super.visitMethodInvocation(method, ctx);
+              }
+          })),
+          java(
+            """
+              class T {
+                  void print(String readLine) {
+                      System.out.print("ip:"+readLine);
+                  }
+              }
+              """,
+            """
+              class T {
+                  void print(String readLine) {
+                      System.out.println("ip:"+readLine);
                   }
               }
               """

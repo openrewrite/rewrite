@@ -31,11 +31,113 @@ import org.openrewrite.test.TypeValidation;
 
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @SuppressWarnings("ALL")
 class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
+
+    @Test
+    void preserveNestedNegationPrecedence() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  boolean same(String left, String right) {
+                      return !!(left == right);
+                  }
+              }
+              """,
+            """
+              class Test {
+                  boolean same(String left, String right) {
+                      return left == right;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void stringLiteralEqualsAsStatement() {
+        rewriteRun(java("class A{void f(){\"foo\".equals(\"bar\");}}"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"\"foo\".equals(\"bar\")", "\"\".isEmpty()", "value.equals(value)"})
+    void preserveStringCallsInStatementPositions(String invocation) {
+        rewriteRun(java(
+          """
+            class A {
+                void f(String value, boolean flag, String[] values) {
+                    %1$s;
+                    if (flag) %1$s; else %1$s;
+                    while (flag) %1$s;
+                    do %1$s; while (flag);
+                    for (; flag;) %1$s;
+                    for (String item : values) %1$s;
+                    for (%1$s; flag; %1$s) {}
+                    label: %1$s;
+                    switch (value) { case "foo": %1$s; break; }
+                }
+            }
+            """.formatted(invocation),
+          spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
+              @Override
+              public J.Block visitBlock(J.Block block, Integer p) {
+                  assertThat((List<?>) block.getStatements())
+                    .allMatch(org.openrewrite.java.tree.Statement.class::isInstance);
+                  return super.visitBlock(block, p);
+              }
+          }.visit(cu, 0))
+        ));
+    }
+
+    @Test
+    void foldStringExpressionsInsideStatementArguments() {
+        rewriteRun(java(
+          """
+            class A {
+                void accept(boolean a, boolean b) {}
+                boolean f(boolean flag) {
+                    accept("foo".equals("bar"), "".isEmpty());
+                    if (flag) accept("foo".equals("foo"), "foo".isEmpty());
+                    for (; "".isEmpty(); accept("foo".equals("bar"), "".isEmpty())) {}
+                    return "foo".equals("bar");
+                }
+            }
+            """,
+          """
+            class A {
+                void accept(boolean a, boolean b) {}
+                boolean f(boolean flag) {
+                    accept(false, true);
+                    if (flag) accept(true, false);
+                    for (; true; accept(false, true)) {}
+                    return false;
+                }
+            }
+            """
+        ));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"value.equals(value)", "next().equals(next())", "holder.value.equals(holder.value)", "values[index].equals(values[index])"})
+    void preserveStringSelfEqualsEvaluation(String expression) {
+        rewriteRun(java(
+          """
+            class A {
+                String value;
+                String next() { return value; }
+                boolean f(String value, A holder, String[] values, int index) {
+                    return %s;
+                }
+            }
+            """.formatted(expression)
+        ));
+    }
 
     @Override
     public void defaults(RecipeSpec spec) {
@@ -977,7 +1079,7 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   {
                       String foo = "foo";
                       if (true) {}
-                      if (true) {}
+                      if (foo.equals(foo)) {}
                       if (foo.equals("foo")) {}
                       if ("foo".equals(foo)) {}
                       if (false) {}
@@ -1184,8 +1286,7 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
     void doNotFailOnNumericComparisonWhenLiteralTypeMissing() {
         rewriteRun(
           spec -> spec.recipe(new StripLiteralTypesThenSimplify())
-            .expectedCyclesThatMakeChanges(1)
-            .typeValidationOptions(TypeValidation.none()),
+            .expectedCyclesThatMakeChanges(1),
           java(
             """
               class A {

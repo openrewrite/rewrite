@@ -26,6 +26,7 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
 const scannerReturnsNilName = "org.openrewrite.go.test.ScannerReturnsNil"
@@ -123,6 +124,20 @@ func TestScannerResultIsIgnored(t *testing.T) {
 	}
 }
 
+var visitPaths = []struct {
+	name string
+	run  func(t *testing.T, s *server, visitorName, treeID string) []visitResult
+}{
+	{name: "Visit", run: dispatchVisit},
+	{name: "BatchVisit", run: dispatchBatchVisit},
+}
+
+var renameFile = scannerFunc(func(t java.Tree) java.Tree {
+	cu := *t.(*golang.CompilationUnit)
+	cu.SourcePath = "renamed.go"
+	return &cu
+})
+
 const gatedRenameName = "org.openrewrite.go.test.GatedRename"
 
 type gatedRename struct{ recipe.Base }
@@ -131,25 +146,31 @@ func (*gatedRename) Name() string        { return gatedRenameName }
 func (*gatedRename) DisplayName() string { return "Gated rename" }
 func (*gatedRename) Description() string { return "Renames the file unless its path matches nothing." }
 func (*gatedRename) Editor() recipe.TreeVisitor {
+	return preconditions.Check(preconditions.HasSourcePath("**/never-matches.go"), renameFile)
+}
+
+const gatedScanName = "org.openrewrite.go.test.GatedScan"
+
+type gatedScan struct{ recipe.ScanningBase }
+
+func (*gatedScan) Name() string        { return gatedScanName }
+func (*gatedScan) DisplayName() string { return "Gated scan" }
+func (*gatedScan) Description() string { return "Records the file unless its path matches nothing." }
+func (*gatedScan) InitialValue(*recipe.ExecutionContext) any {
+	return &[]string{}
+}
+func (*gatedScan) Scanner(acc any) recipe.TreeVisitor {
 	return preconditions.Check(preconditions.HasSourcePath("**/never-matches.go"),
 		scannerFunc(func(t java.Tree) java.Tree {
-			cu := *t.(*golang.CompilationUnit)
-			cu.SourcePath = "renamed.go"
-			return &cu
+			scanned := acc.(*[]string)
+			*scanned = append(*scanned, t.(*golang.CompilationUnit).SourcePath)
+			return t
 		}))
 }
 
-// The host evaluates a promoted edit precondition before dispatching either
-// visit, so neither path re-evaluates it Go-side.
-func TestPromotedEditPreconditionIsNotReevaluated(t *testing.T) {
-	for _, dispatch := range []struct {
-		name string
-		run  func(t *testing.T, s *server, visitorName, treeID string) []visitResult
-	}{
-		{name: "Visit", run: dispatchVisit},
-		{name: "BatchVisit", run: dispatchBatchVisit},
-	} {
-		t.Run(dispatch.name, func(t *testing.T) {
+func TestHoistedPreconditionIsNotReevaluated(t *testing.T) {
+	for _, path := range visitPaths {
+		t.Run(path.name+"/edit", func(t *testing.T) {
 			// given
 			s, _ := newTestServer(t)
 			s.registry.Register(&gatedRename{})
@@ -158,11 +179,63 @@ func TestPromotedEditPreconditionIsNotReevaluated(t *testing.T) {
 			seedTreeForVisit(t, s, treeID, afterVisitsBefore)
 
 			// when
-			results := dispatch.run(t, s, "edit:"+recipeID, treeID)
+			results := path.run(t, s, "edit:"+recipeID, treeID)
 
 			// then
 			require.True(t, results[0].modified)
 			require.Equal(t, "renamed.go", s.localObjects[treeID].(*golang.CompilationUnit).SourcePath)
+		})
+		t.Run(path.name+"/scan", func(t *testing.T) {
+			// given
+			s, _ := newTestServer(t)
+			s.registry.Register(&gatedScan{})
+			recipeID := prepareRecipe(t, s, gatedScanName)
+			const treeID = "tree-1"
+			seedTreeForVisit(t, s, treeID, afterVisitsBefore)
+
+			// when
+			path.run(t, s, "scan:"+recipeID, treeID)
+
+			// then
+			require.Contains(t, *s.preparedAccumulators[recipeID].(*[]string), "sort.go")
+		})
+	}
+}
+
+const peerGatedRenameName = "org.openrewrite.go.test.PeerGatedRename"
+
+type peerGatedRename struct{ recipe.Base }
+
+func (*peerGatedRename) Name() string        { return peerGatedRenameName }
+func (*peerGatedRename) DisplayName() string { return "Peer-gated rename" }
+func (*peerGatedRename) Description() string { return "Renames the file if a Go visitor matches it." }
+func (*peerGatedRename) Editor() recipe.TreeVisitor {
+	return preconditions.Check(scannerFunc(func(t java.Tree) java.Tree { return t }), visitor.Init(&goRename{}))
+}
+
+type goRename struct{ visitor.GoVisitor }
+
+func (*goRename) VisitCompilationUnit(cu *golang.CompilationUnit, _ any) java.J {
+	return renameFile(cu).(*golang.CompilationUnit)
+}
+
+func TestPeerOnlyPreconditionStillGatesTheVisit(t *testing.T) {
+	for _, path := range visitPaths {
+		t.Run(path.name, func(t *testing.T) {
+			// given
+			s, _ := newTestServer(t)
+			s.registry.Register(&peerGatedRename{})
+			prepared := prepareRecipeResponseFor(t, s, peerGatedRenameName)
+			const treeID = "tree-1"
+			seedTreeForVisit(t, s, treeID, afterVisitsBefore)
+
+			// when
+			results := path.run(t, s, prepared.EditVisitor, treeID)
+
+			// then
+			requireWire(t, `[`+goLanguageGateWire+`]`, prepared.EditPreconditions)
+			require.False(t, results[0].modified)
+			require.Equal(t, "sort.go", s.localObjects[treeID].(*golang.CompilationUnit).SourcePath)
 		})
 	}
 }

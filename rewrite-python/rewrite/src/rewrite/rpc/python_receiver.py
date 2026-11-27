@@ -691,7 +691,8 @@ class PythonRpcReceiver:
     def _visit_j_array_access(self, arr, q: RpcReceiveQueue):
         indexed = q.receive(arr.indexed)
         dimension = q.receive(arr.dimension)
-        return q.apply(arr, indexed=indexed, dimension=dimension)
+        type_ = q.receive(arr.type)
+        return q.apply(arr, indexed=indexed, dimension=dimension, type=type_)
 
     def _visit_j_array_dimension(self, dim, q: RpcReceiveQueue):
         index = q.receive(dim.padding.index)
@@ -2019,8 +2020,10 @@ def _register_python_resolution_result_codecs():
 
     # --- ResolvedDependency ---
 
+    # Filled in place: the queue registered this instance for its ref before calling the codec,
+    # so a back-reference closing a cycle in the graph resolves to the finished object.
     def _receive_resolved_dep(rd: ResDep, q: RpcReceiveQueue) -> ResDep:
-        return replace(rd,
+        return q.apply(rd,
             _name=q.receive(rd.name),
             _version=q.receive(rd.version),
             _source=q.receive(rd.source),
@@ -2052,7 +2055,7 @@ def _register_python_resolution_result_codecs():
     # --- Dependency ---
 
     def _receive_dependency(dep: Dep, q: RpcReceiveQueue) -> Dep:
-        return replace(dep,
+        return q.apply(dep,
             _name=q.receive(dep.name),
             _version_constraint=q.receive(dep.version_constraint),
             _extras=q.receive(dep.extras),
@@ -2065,7 +2068,8 @@ def _register_python_resolution_result_codecs():
         q.get_and_send(dep, lambda x: x.version_constraint)
         q.get_and_send(dep, lambda x: x.extras)
         q.get_and_send(dep, lambda x: x.marker)
-        q.get_and_send(dep, lambda x: x.resolved)
+        # the entry of resolved_dependencies, as the host sends it
+        q.get_and_send_as_ref(dep, lambda x: x.resolved)
 
     register_codec_with_both_names(
         'org.openrewrite.python.marker.PythonResolutionResult$Dependency',

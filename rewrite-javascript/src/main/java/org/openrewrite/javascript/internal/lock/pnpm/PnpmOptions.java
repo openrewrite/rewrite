@@ -19,6 +19,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Value;
 import lombok.With;
+
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.EcmaScript;
@@ -28,6 +29,7 @@ import org.openrewrite.javascript.internal.lock.PosixPath;
 import org.openrewrite.javascript.internal.lock.RootRelativePath;
 import org.openrewrite.javascript.internal.lock.StripBom;
 import org.openrewrite.javascript.internal.lock.WhatwgUrl;
+import org.openrewrite.javascript.internal.registry.RegistryTransport;
 import org.openrewrite.javascript.semver.NodeSemver;
 
 import java.util.ArrayList;
@@ -65,6 +67,50 @@ public final class PnpmOptions {
      * The settings by name: the defaults, the .npmrc's, pnpm-workspace.yaml's, then the environment's.
      */
     private final Map<String, @Nullable Object> config;
+    private final Map<String, String> transportEnvironment;
+    private final boolean bootstrapTransport;
+    private final boolean workspaceFetchTimeout;
+
+    /** Request routes after this release has filtered its config sources. */
+    public RegistryTransport transport() {
+        return transport(Collections.emptyMap());
+    }
+
+    /** Selected host request settings, kept out of project placeholder expansion. */
+    public RegistryTransport transport(Map<String, String> requestEnvironment) {
+        if (bootstrapTransport) {
+            return RegistryTransport.pnpmBootstrap(trustedRegistryConfig, transportEnvironment);
+        }
+        // Defaults in the normalized config are not a request for a custom deadline.
+        Map<String, @Nullable Object> transportConfig = new LinkedHashMap<>(config);
+        if (!explicitlySetKeys.contains("fetchTimeout")) {
+            transportConfig.remove("fetchTimeout");
+        }
+        if (release.readsSettingsFromNpmrc()) {
+            // npm-conf's environment precedes workspace settings in pnpm 10.
+            String key = envVarOf(requestEnvironment, "npm_config_", "fetch_timeout");
+            if (!workspaceFetchTimeout && key != null) {
+                Object value = parseValueByType(ConfigTypes.Type.NUMBER, requestEnvironment.get(key), requestEnvironment);
+                if (value != Js.UNDEFINED) {
+                    transportConfig.put("fetchTimeout", value);
+                }
+            }
+        } else {
+            // pnpm 11's typed environment follows the workspace. Invalid numeric values are ignored.
+            Object previous = Js.UNDEFINED;
+            for (ConfigPair pair : parseEnvVars(ENV_TYPES, requestEnvironment, release)) {
+                if (!"fetchTimeout".equals(pair.key) || pair.value == Js.UNDEFINED) {
+                    continue;
+                }
+                if (previous != Js.UNDEFINED && !Js.strictEquals(previous, pair.value)) {
+                    throw new CannotKnow("conflicting upper- and lower-case pnpm fetchTimeout environment settings");
+                }
+                transportConfig.put("fetchTimeout", pair.value);
+                previous = pair.value;
+            }
+        }
+        return RegistryTransport.pnpm(transportConfig, transportEnvironment);
+    }
 
     private final Set<String> explicitlySetKeys;
 
@@ -74,6 +120,14 @@ public final class PnpmOptions {
      * The registry of every package ({@code default}) and of each scope that has its own, normalized.
      */
     private final Map<String, String> registries;
+
+    private final Map<String, @Nullable Object> registryConfig;
+    private final Map<String, @Nullable Object> trustedRegistryConfig;
+
+    /** Credentials after this release has applied source trust, precedence and environment substitution. */
+    public PnpmAuthHeaders authHeaders() {
+        return new PnpmAuthHeaders(registryConfig, release);
+    }
 
     /**
      * 11.5.3's {@code packageManagerRegistries}: the registries of the user's .npmrc and the environment alone, which
@@ -107,7 +161,14 @@ public final class PnpmOptions {
                         @Nullable Map<String, String> packageManagerRegistries,
                         @Nullable List<String> workspacePackagePatterns,
                         @Nullable WantedPackageManager wantedPackageManager, String packageManagerVersion,
-                        PnpmRelease release) {
+                        PnpmRelease release, Map<String, @Nullable Object> registryConfig,
+                        Map<String, @Nullable Object> trustedRegistryConfig, Map<String, String> transportEnvironment, boolean bootstrapTransport,
+                        boolean workspaceFetchTimeout) {
+        this.workspaceFetchTimeout = workspaceFetchTimeout;
+        this.bootstrapTransport = bootstrapTransport;
+        this.transportEnvironment = transportEnvironment;
+        this.registryConfig = registryConfig;
+        this.trustedRegistryConfig = trustedRegistryConfig;
         this.config = config;
         this.explicitlySetKeys = explicitlySetKeys;
         this.catalogs = catalogs;
@@ -125,7 +186,7 @@ public final class PnpmOptions {
      */
     PnpmOptions withPackageManagerVersion(String version) {
         return new PnpmOptions(config, explicitlySetKeys, catalogs, registries, packageManagerRegistries,
-                workspacePackagePatterns, wantedPackageManager, version, release);
+                workspacePackagePatterns, wantedPackageManager, version, release, registryConfig, trustedRegistryConfig, transportEnvironment, bootstrapTransport, workspaceFetchTimeout);
     }
 
     /**
@@ -133,7 +194,7 @@ public final class PnpmOptions {
      */
     PnpmOptions withRelease(PnpmRelease release) {
         return new PnpmOptions(config, explicitlySetKeys, catalogs, registries, packageManagerRegistries,
-                workspacePackagePatterns, wantedPackageManager, packageManagerVersion, release);
+                workspacePackagePatterns, wantedPackageManager, packageManagerVersion, release, registryConfig, trustedRegistryConfig, transportEnvironment, bootstrapTransport, workspaceFetchTimeout);
     }
 
     /**
@@ -143,7 +204,7 @@ public final class PnpmOptions {
      * asked where the two differ.
      */
     PnpmOptions packageManagerBootstrap(PnpmRelease running) {
-        if (packageManagerRegistries == null || packageManagerRegistries.equals(registries) ||
+        if (packageManagerRegistries == null ||
             !running.resolvesThePackageManagerFromTrustedConfig()) {
             return this;
         }
@@ -151,7 +212,7 @@ public final class PnpmOptions {
         bootstrapConfig.put("registries", packageManagerRegistries);
         return new PnpmOptions(bootstrapConfig, explicitlySetKeys, catalogs, packageManagerRegistries,
                 packageManagerRegistries, workspacePackagePatterns, wantedPackageManager, packageManagerVersion,
-                release);
+                release, trustedRegistryConfig, trustedRegistryConfig, transportEnvironment, true, workspaceFetchTimeout);
     }
 
     @Value
@@ -227,6 +288,17 @@ public final class PnpmOptions {
             }
         }
 
+        // npm-conf supplies pnpm 10's npm_config_ settings before workspace settings. pnpm 11 reads
+        // pnpm_config_ instead, below. Keep this request policy out of unrelated configuration parsing.
+        if (release.readsSettingsFromNpmrc() && env != null) {
+            String timeout = envVarOf(env, "npm_config_", "fetch_timeout");
+            if (timeout != null) {
+                Object value = parseValueByType(ConfigTypes.Type.NUMBER, env.get(timeout), env);
+                if (value != Js.UNDEFINED) {
+                    mergedConfig.put("fetch-timeout", value);
+                }
+            }
+        }
         Map<String, @Nullable Object> config = new LinkedHashMap<>();
         for (String key : Js.keys(defaultOptions)) {
             config.put(camelcase(key), defaultOptions.get(key));
@@ -237,6 +309,11 @@ public final class PnpmOptions {
             }
         }
         Set<String> explicitlySetKeys = new LinkedHashSet<>();
+        if (mergedConfig.containsKey("fetch-timeout") &&
+            (userConfig.containsKey("fetch-timeout") || workspaceNpmrc.containsKey("fetch-timeout") ||
+             env != null && envVarOf(env, "npm_config_", "fetch_timeout") != null && release.readsSettingsFromNpmrc())) {
+            explicitlySetKeys.add("fetchTimeout");
+        }
         for (String option : CLI_OPTIONS) {
             explicitlySetKeys.add(camelcase(option));
         }
@@ -244,8 +321,18 @@ public final class PnpmOptions {
         Map<String, @Nullable Object> authConfig = pickIniConfig(rawConfig);
         Map<String, String> networkRegistries = getNetworkConfigs(authConfig, release);
         Map<String, String> registriesFromNpmrc = new LinkedHashMap<>();
-        registriesFromNpmrc.put("default", normalizeRegistryUrl(authConfig.get("registry")));
+        registriesFromNpmrc.put("default", normalizeRegistryUrl(authConfig.get("registry"), release));
         registriesFromNpmrc.putAll(networkRegistries);
+        Map<String, @Nullable Object> trustedRegistryConfig = new LinkedHashMap<>();
+        for (Map<String, @Nullable Object> source : Arrays.asList(builtin, defaultOptions, userConfig,
+                envScopedConfig, jsonAuth.auth)) {
+            trustedRegistryConfig.putAll(pickIniConfig(source));
+            for (String key : NETWORK_INI_KEYS) {
+                if (source.containsKey(key)) {
+                    trustedRegistryConfig.put(key, source.get(key));
+                }
+            }
+        }
         Map<String, String> packageManagerRegistries = trustedRegistries(builtin, defaultOptions, userConfig,
                 envScopedConfig, jsonAuth, release);
         if (holdsUnscopedCreds(authConfig) && !release.rescopesUnscopedCredentials()) {
@@ -265,28 +352,39 @@ public final class PnpmOptions {
             // the root manifest is read only now, converted as every read converts it
             Manifests.convertManifestAfterRead(rootManifest, release);
         }
+        if (rootManifest != null) {
+            config.put("rootProjectManifest", rootManifest);
+        }
         if (rootManifest != null && config.get("nodeVersion") == null) {
             config.put("nodeVersion", getNodeVersionFromEnginesRuntime(rootManifest, release));
         }
 
+        Map<String, @Nullable Object> rootSettings = null;
         if (rootManifest != null && release.readsSettingsFromRootManifest()) {
-            Map<String, @Nullable Object> settings = rootManifestSettings(rootManifest, env, release);
-            config.putAll(settings);
-            explicitlySetKeys.addAll(settings.keySet());
+            rootSettings = rootManifestSettings(rootManifest, env, release);
+            config.putAll(rootSettings);
+            explicitlySetKeys.addAll(rootSettings.keySet());
         }
 
+        Object npmrcLockfile = config.get("lockfile");
+        Object npmrcPackageLock = config.get("packageLock");
+        Object npmrcGitBranchLockfile = config.get("gitBranchLockfile");
         Map<String, @Nullable Map<String, @Nullable Object>> catalogs = new LinkedHashMap<>();
         List<String> patterns = null;
+        boolean workspaceFetchTimeout = false;
         if (workspaceManifest != null) {
             Map<String, @Nullable Object> manifest = WorkspaceManifest.readWorkspaceManifest(workspaceManifest,
                     release);
-            patterns = workspacePackagePatterns(manifest);
+            patterns = workspacePackagePatterns(manifest, release);
             if (manifest != null) {
                 Map<String, @Nullable Object> newSettings = getOptionsFromPnpmSettings(manifest, rootManifest, env,
                         release);
                 if (!release.readsSettingsFromWorkspaceManifest()) {
                     newSettings.clear();
+                } else if (!release.readsEverySettingFromTheWorkspaceManifest()) {
+                    newSettings.keySet().retainAll(PICKED_WORKSPACE_SETTINGS);
                 }
+                workspaceFetchTimeout = newSettings.containsKey("fetchTimeout");
                 for (String option : CLI_OPTIONS) {
                     newSettings.put(camelcase(option), true);
                 }
@@ -299,6 +397,11 @@ public final class PnpmOptions {
                 }
                 catalogs = Catalogs.getCatalogsFromWorkspaceManifest(manifest);
             }
+        }
+        if (rootSettings != null) {
+            // installDeps spreads getOptionsFromRootManifest over the config again; the reporter reads the config's
+            config.put(CONFIG_PEER_DEPENDENCY_RULES, config.get("peerDependencyRules"));
+            config.putAll(rootSettings);
         }
 
         Map<String, String> registries = new LinkedHashMap<>(registriesFromNpmrc);
@@ -322,10 +425,11 @@ public final class PnpmOptions {
         // (PnpmRelease#takesTheRegistrySettingAsTheDefault), asked where it is another
         Object registrySetting = config.get("registry");
         if (explicitlySetKeys.contains("registry") && registrySetting instanceof String) {
-            String setting = normalizeRegistryUrl(registrySetting);
+            String setting = normalizeRegistryUrl(registrySetting, release);
             String current = Js.truthy(registries.get("default")) ? registries.get("default") :
                     registriesFromNpmrc.get("default");
-            if (!setting.equals(normalizeRegistryUrl(current)) && release.takesTheRegistrySettingAsTheDefault()) {
+            if (!setting.equals(normalizeRegistryUrl(current, release)) &&
+                release.takesTheRegistrySettingAsTheDefault()) {
                 registries.put("default", setting);
             }
         }
@@ -333,7 +437,7 @@ public final class PnpmOptions {
             registries.put("default", registriesFromNpmrc.get("default"));
         }
         for (Map.Entry<String, String> registry : registries.entrySet()) {
-            registry.setValue(normalizeRegistryUrl(registry.getValue()));
+            registry.setValue(normalizeRegistryUrl(registry.getValue(), release));
         }
         if (!explicitlySetKeys.contains("registry") &&
             !registries.get("default").equals(registriesFromNpmrc.get("default"))) {
@@ -342,7 +446,8 @@ public final class PnpmOptions {
 
         Map<String, String> fromEnv = new LinkedHashMap<>();
         for (ConfigPair pair : parseEnvVars(ENV_TYPES, env, release)) {
-            if (pair.value == Js.UNDEFINED) {
+            if (pair.value == Js.UNDEFINED ||
+                "fetchTimeout".equals(pair.key) && release.readsSettingsFromNpmrc()) {
                 continue;
             }
             if (CLI_OPTIONS.contains(kebabCase(pair.key))) {
@@ -360,9 +465,9 @@ public final class PnpmOptions {
                     throw new JsError(JsError.TYPE_ERROR, "Unexpected type of registry, expecting a string but " +
                                       "received " + Js.jsonStringify(pair.value));
                 }
-                registries.put("default", normalizeRegistryUrl(pair.value));
+                registries.put("default", normalizeRegistryUrl(pair.value, release));
                 if (packageManagerRegistries != null) {
-                    packageManagerRegistries.put("default", normalizeRegistryUrl(pair.value));
+                    packageManagerRegistries.put("default", normalizeRegistryUrl(pair.value, release));
                 }
             }
         }
@@ -372,17 +477,27 @@ public final class PnpmOptions {
             release.defaultsMinimumReleaseAgeStrict()) {
             config.put("minimumReleaseAgeStrict", true);
         }
-        Object lockfile = config.get("lockfile");
-        Object packageLock = config.get("packageLock");
+        boolean lockfileOfTheWorkspace = release.readsTheLockfileSettingFromTheWorkspaceManifest();
+        Object lockfile = lockfileOfTheWorkspace ? config.get("lockfile") : npmrcLockfile;
+        Object packageLock = lockfileOfTheWorkspace ? config.get("packageLock") : npmrcPackageLock;
         config.put("useLockfile", lockfile instanceof Boolean ? lockfile :
                 packageLock instanceof Boolean ? packageLock : false);
-        Object gitBranchLockfile = config.get("gitBranchLockfile");
+        Object gitBranchLockfile = release.readsGitBranchLockfileFromTheWorkspaceManifest() ?
+                config.get("gitBranchLockfile") : npmrcGitBranchLockfile;
         config.put("useGitBranchLockfile", gitBranchLockfile instanceof Boolean ? gitBranchLockfile : false);
         WantedPackageManager wantedPackageManager = rootManifest == null ? null :
                 withPmOnFail(getWantedPackageManager(rootManifest, release), config.get("pmOnFail"));
         return new PnpmOptions(config, explicitlySetKeys, catalogs, registries, packageManagerRegistries, patterns,
-                wantedPackageManager, release.toString(), release);
+                wantedPackageManager, release.toString(), release, authConfig, trustedRegistryConfig, env == null ? Collections.emptyMap() : env, false, workspaceFetchTimeout);
     }
+
+    private static final String CONFIG_PEER_DEPENDENCY_RULES = "config.peerDependencyRules";
+
+    // getOptionsFromPnpmSettings' pick below 10.6.0, patchedDependencies beside it
+    private static final List<String> PICKED_WORKSPACE_SETTINGS = Arrays.asList("allowNonAppliedPatches",
+            "allowedDeprecatedVersions", "configDependencies", "ignoredBuiltDependencies", "ignoredOptionalDependencies",
+            "neverBuiltDependencies", "onlyBuiltDependencies", "onlyBuiltDependenciesFile", "overrides",
+            "packageExtensions", "patchedDependencies", "peerDependencyRules", "supportedArchitectures");
 
     // config/config src/getOptionsFromRootManifest.ts: only these package.json#pnpm keys are settings.
     private static final List<String> ROOT_MANIFEST_SETTINGS = Arrays.asList(
@@ -446,7 +561,7 @@ public final class PnpmOptions {
             return null;
         }
         Map<String, String> packageManagerRegistries = new LinkedHashMap<>();
-        packageManagerRegistries.put("default", normalizeRegistryUrl(trustedAuthConfig.get("registry")));
+        packageManagerRegistries.put("default", normalizeRegistryUrl(trustedAuthConfig.get("registry"), release));
         packageManagerRegistries.putAll(trustedNetworkRegistries);
         // from 11.10.0 pnpm_config__auth's routes too (PnpmRelease#readsTheAuthSetting)
         packageManagerRegistries.putAll(jsonAuth.registries);
@@ -653,9 +768,15 @@ public final class PnpmOptions {
      * The workspace's package patterns as getConfig takes them from a pnpm-workspace.yaml it read.
      */
     @SuppressWarnings("unchecked")
-    static List<String> workspacePackagePatterns(@Nullable Map<String, @Nullable Object> manifest) {
+    static List<String> workspacePackagePatterns(@Nullable Map<String, @Nullable Object> manifest,
+                                                 PnpmRelease release) {
         Object packages = manifest == null ? null : manifest.get("packages");
-        return packages instanceof List ? new ArrayList<>((List<String>) packages) : Collections.singletonList(".");
+        if (packages instanceof List) {
+            return new ArrayList<>((List<String>) packages);
+        }
+        // findPackages' own patterns, which it takes when getConfig leaves them unset
+        return release.takesEveryManifestOfAWorkspaceWithoutPackages() ? Arrays.asList(".", "**") :
+                Collections.singletonList(".");
     }
 
     static @Nullable WantedPackageManager getWantedPackageManager(Map<String, @Nullable Object> manifest) {
@@ -883,6 +1004,19 @@ public final class PnpmOptions {
             // pnpm warns of the file and reads nothing from it
             return result;
         }
+        // npm-conf (pnpm 10) discards the whole file when any substitution fails, before its trust filter runs.
+        if (release.readsSettingsFromNpmrc() && env != null) {
+            try {
+                for (String key : Js.keys(raw)) {
+                    envReplace(key, env);
+                    if (raw.get(key) instanceof String) {
+                        envReplace((String) raw.get(key), env);
+                    }
+                }
+            } catch (JsError e) {
+                return result;
+            }
+        }
         for (String rawKey : Js.keys(raw)) {
             Object rawValue = raw.get(rawKey);
             boolean keyFromEnv = repositoryControlled && hasEnvPlaceholder(rawKey);
@@ -903,11 +1037,13 @@ public final class PnpmOptions {
                     continue;
                 }
                 // a credential or network value reaches no lock, so an environment the host does not know is no matter
-                value = env == null && !readByALockOnlyInstall(key) ? rawValue :
+                value = env == null && !readByALockOnlyInstall(key) && !isAuthValueKey(key) ? rawValue :
                         substituteEnv((String) rawValue, env, release);
             }
             if (isNpmrcReadableKey(key) || release.readsSettingsFromNpmrc()) {
-                if (release.readsSettingsFromNpmrc() && value instanceof String && ConfigTypes.TYPES.containsKey(key)) {
+                // npm-conf's parseField takes no url type: a registry is the string the file gives
+                if (release.readsSettingsFromNpmrc() && value instanceof String && ConfigTypes.TYPES.containsKey(key) &&
+                    !isUrlTyped(ConfigTypes.TYPES.get(key))) {
                     Object parsed = parseValueBySchema(ConfigTypes.TYPES.get(key), (String) value,
                             env == null ? Collections.emptyMap() : env);
                     if (parsed != Js.UNDEFINED) {
@@ -973,9 +1109,9 @@ public final class PnpmOptions {
         return scoped;
     }
 
-    // an entry a lock-only install does not read ends the same kept or left out, so the release is asked of the others
+    // Credentials are read by registry requests, even though they never appear in the resulting lock.
     private static boolean leavesOutAnEntryFromTheEnvironment(String key, PnpmRelease release) {
-        return !readByALockOnlyInstall(key) || release.ignoresTheEnvironmentInRepositoryRequestDestinations();
+        return release.ignoresTheEnvironmentInRepositoryRequestDestinations();
     }
 
     private static final Pattern ENV_PLACEHOLDER = Pattern.compile("\\$\\{[^}]+}");
@@ -1104,7 +1240,7 @@ public final class PnpmOptions {
 
     /**
      * getNetworkConfigs: the scoped registries, after the checks pnpm makes of each registry's credentials; the
-     * credentials themselves and the certificates are the host's.
+     * credentials are retained for the store controller's fetcher; certificates remain the host's.
      */
     static Map<String, String> getNetworkConfigs(Map<String, @Nullable Object> rawConfig, PnpmRelease release) {
         Map<String, String> registries = new LinkedHashMap<>();
@@ -1115,7 +1251,7 @@ public final class PnpmOptions {
         for (String configKey : Js.keys(rawConfig)) {
             Object value = rawConfig.get(configKey);
             if (!configKey.isEmpty() && configKey.charAt(0) == '@' && configKey.endsWith(":registry")) {
-                registries.put(configKey.substring(0, configKey.indexOf(':')), normalizeRegistryUrl(value));
+                registries.put(configKey.substring(0, configKey.indexOf(':')), normalizeRegistryUrl(value, release));
                 continue;
             }
             Matcher creds = AUTH_SUFFIX.matcher(configKey);
@@ -1245,7 +1381,7 @@ public final class PnpmOptions {
 
     // parseCreds' decodeBase64Credential of 11.1.3, its padding mended before it fails; before, atob alone, whose
     // InvalidCharacterError pnpm does not catch (PnpmRelease#decodesACredentialForgivingItsPadding)
-    private static String decodeBase64Credential(String value, String key, PnpmRelease release) {
+    static String decodeBase64Credential(String value, String key, PnpmRelease release) {
         String decoded = atob(value);
         if (decoded == null && !release.decodesACredentialForgivingItsPadding()) {
             throw new JsError("InvalidCharacterError", atobError(value));
@@ -1358,11 +1494,18 @@ public final class PnpmOptions {
      * normalize-registry-url 2.0.1.
      */
     static String normalizeRegistryUrl(@Nullable Object value) {
+        return normalizeRegistryUrl(value, PnpmRelease.PORTED);
+    }
+
+    /**
+     * The normalize-registry-url {@code release} bundles ({@link PnpmRelease#normalizesTheRegistryUrlAsAUrl}).
+     */
+    static String normalizeRegistryUrl(@Nullable Object value, PnpmRelease release) {
         if (!(value instanceof String)) {
             throw new JsError(JsError.ERROR, "`registry` should be a string");
         }
         String registry = (String) value;
-        WhatwgUrl url = WhatwgUrl.tryParse(registry);
+        WhatwgUrl url = release.normalizesTheRegistryUrlAsAUrl() ? WhatwgUrl.tryParse(registry) : null;
         if (url != null) {
             registry = url.toString();
         }
@@ -1425,6 +1568,11 @@ public final class PnpmOptions {
                     parseValueBySchema(schema, entry.getValue(), env)));
         }
         return pairs;
+    }
+
+    private static boolean isUrlTyped(Object schema) {
+        return schema == ConfigTypes.Type.URL ||
+               schema instanceof List && ((List<?>) schema).contains(ConfigTypes.Type.URL);
     }
 
     private static @Nullable Object parseValueBySchema(Object schema, String envVar, Map<String, String> env) {
@@ -1613,7 +1761,9 @@ public final class PnpmOptions {
             }
             Map<String, @Nullable Object> map = (Map<String, @Nullable Object>) overrides;
             if (map.isEmpty()) {
-                settings.remove("overrides");
+                if (release.dropsEmptyOverrides()) {
+                    settings.remove("overrides");
+                }
             } else if (manifest != null) {
                 Map<String, @Nullable Object> replaced = new LinkedHashMap<>();
                 for (String selector : Js.keys(map)) {
@@ -1909,13 +2059,29 @@ public final class PnpmOptions {
 
     /**
      * The install command's getFetchFullMetadata.ts: {@code supportedArchitectures.libc && true}, which 11.13.0
-     * removed ({@link CreateNewStoreController#createInstallStoreController}).
+     * removed ({@link CreateNewStoreController#createInstallStoreController}); pnpm 10 falls back on the root
+     * manifest's {@code pnpm.supportedArchitectures.libc}.
      */
     @Nullable
     Object getFetchFullMetadata() {
         Map<String, @Nullable Object> supportedArchitectures = getSupportedArchitectures();
         Object libc = supportedArchitectures == null ? null : supportedArchitectures.get("libc");
+        if ((libc == null || libc == Js.UNDEFINED) && release.readsSettingsFromRootManifest()) {
+            libc = getRootManifestLibc();
+        }
         return Js.truthy(libc) ? Boolean.TRUE : libc;
+    }
+
+    /**
+     * The root manifest's {@code pnpm.supportedArchitectures.libc}, which the install command below 10.14.0 passes
+     * as fetchFullMetadata ({@code && true}) alone.
+     */
+    @Nullable
+    Object getRootManifestLibc() {
+        Object manifest = config.get("rootProjectManifest");
+        Object pnpm = manifest instanceof Map ? ((Map<?, ?>) manifest).get("pnpm") : null;
+        Object supportedArchitectures = pnpm instanceof Map ? ((Map<?, ?>) pnpm).get("supportedArchitectures") : null;
+        return supportedArchitectures instanceof Map ? ((Map<?, ?>) supportedArchitectures).get("libc") : null;
     }
 
     @SuppressWarnings("unchecked")
@@ -2030,7 +2196,30 @@ public final class PnpmOptions {
 
     @SuppressWarnings("unchecked")
     ReportPeerDependencyIssues.@Nullable PeerDependencyRules getPeerDependencyRules() {
-        Object rules = config.get("peerDependencyRules");
+        return peerDependencyRules(config.get("peerDependencyRules"));
+    }
+
+    /**
+     * The root manifest's {@code pnpm.peerDependencyRules}, which the reporter renders the issues by below 10.6.2.
+     */
+    ReportPeerDependencyIssues.@Nullable PeerDependencyRules getRootManifestPeerDependencyRules() {
+        Object manifest = config.get("rootProjectManifest");
+        Object pnpm = manifest instanceof Map ? ((Map<?, ?>) manifest).get("pnpm") : null;
+        return peerDependencyRules(pnpm instanceof Map ? ((Map<?, ?>) pnpm).get("peerDependencyRules") : null);
+    }
+
+    /**
+     * The config's peerDependencyRules, pnpm-workspace.yaml's over the root manifest's, which the reporter renders
+     * the issues by from 10.6.2; the install takes the root manifest's over pnpm-workspace.yaml's.
+     */
+    ReportPeerDependencyIssues.@Nullable PeerDependencyRules getConfigPeerDependencyRules() {
+        return config.containsKey(CONFIG_PEER_DEPENDENCY_RULES) ?
+                peerDependencyRules(config.get(CONFIG_PEER_DEPENDENCY_RULES)) : getPeerDependencyRules();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static ReportPeerDependencyIssues.@Nullable PeerDependencyRules peerDependencyRules(
+            @Nullable Object rules) {
         if (rules == null || rules == Js.UNDEFINED) {
             return null;
         }

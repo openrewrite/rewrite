@@ -33,6 +33,96 @@ import * as path from "path";
 
 describe("PackageJsonParser", () => {
 
+    test("npm workspace dependencies resolve from their owning member", async () => {
+        await withDir(async (repo) => {
+            const write = (file: string, value: object) => {
+                fs.mkdirSync(path.dirname(path.join(repo.path, file)), {recursive: true});
+                fs.writeFileSync(path.join(repo.path, file), JSON.stringify(value));
+            };
+            write("package.json", {name: "root", workspaces: ["packages/*"]});
+            write("packages/appium/package.json", {name: "appium", dependencies: {semver: "7.8.6"}});
+            write("package-lock.json", {lockfileVersion: 3, packages: {
+                "": {name: "root"},
+                "packages/appium": {name: "appium", version: "1.0.0", dependencies: {semver: "7.8.6"}},
+                "node_modules/appium": {resolved: "packages/appium", link: true},
+                "node_modules/semver": {version: "7.8.5"},
+                "packages/appium/node_modules/semver": {version: "7.8.6"}
+            }});
+            const parser = new PackageJsonParser({relativeTo: repo.path});
+            for await (const result of parser.parse(path.join(repo.path, "packages/appium/package.json"))) {
+                const marker = findNodeResolutionResult(result as Json.Document)!;
+                expect(marker.dependencies[0].resolved?.version).toBe("7.8.6");
+            }
+        }, {unsafeCleanup: true});
+    });
+
+    test.each(["app", "nested/app"])("independent lock root %s is separate from marker path", async (project) => {
+        await withDir(async (repo) => {
+            const write = (file: string, value: object) => {
+                fs.mkdirSync(path.dirname(path.join(repo.path, file)), {recursive: true});
+                fs.writeFileSync(path.join(repo.path, file), JSON.stringify(value));
+            };
+            write("package.json", {name: "outer"});
+            write("package-lock.json", {lockfileVersion: 3, packages: {"node_modules/semver": {version: "6.0.0"}}});
+            write(`${project}/package.json`, {name: "independent", dependencies: {semver: "*"}});
+            write(`${project}/package-lock.json`, {lockfileVersion: 3, packages: {
+                "node_modules/semver": {version: "7.8.5"},
+                // This is a different nested directory inside the independent project.
+                [`${project}/node_modules/semver`]: {version: "7.8.6"}
+            }});
+            const parser = new PackageJsonParser({relativeTo: repo.path});
+            const docs: Json.Document[] = [];
+            for await (const result of parser.parse(path.join(repo.path, `${project}/package.json`))) {
+                docs.push(result as Json.Document);
+            }
+            expect(docs).toHaveLength(1);
+            const marker = findNodeResolutionResult(docs[0])!;
+            expect(marker.path).toBe(`${project}/package.json`);
+            expect(marker.dependencies[0].resolved?.version).toBe("7.8.5");
+        }, {unsafeCleanup: true});
+    });
+
+    test("npm nearest workspace ancestor, scoped dependencies and links retain target context", async () => {
+        await withDir(async (repo) => {
+            const write = (file: string, value: object) => {
+                fs.mkdirSync(path.dirname(path.join(repo.path, file)), {recursive: true});
+                fs.writeFileSync(path.join(repo.path, file), JSON.stringify(value));
+            };
+            write("package.json", {name: "root", workspaces: ["packages/**"], dependencies: {"@local/member": "*"}});
+            write("packages/group/member/package.json", {name: "@local/member", version: "1.0.0",
+                dependencies: {"@scope/dep": "*", child: "*"}, devDependencies: {"@scope/dep": "*"},
+                peerDependencies: {"@scope/dep": "*"}, optionalDependencies: {"@scope/dep": "*"},
+                bundledDependencies: ["@scope/dep"]});
+            write("package-lock.json", {lockfileVersion: 3, packages: {
+                "node_modules/@scope/dep": {version: "1.0.0"},
+                "packages/group/node_modules/@scope/dep": {version: "2.0.0"},
+                "packages/group/member": {version: "1.0.0",
+                    dependencies: {"@scope/dep": "*", child: "*"}},
+                "node_modules/@local/member": {link: true, resolved: "packages/group/member"},
+                "packages/group/member/node_modules/child": {version: "1.0.0", dependencies: {"@scope/dep": "*", "@local/member": "*"}},
+                "packages/group/member/node_modules/child/node_modules/@scope/dep": {version: "3.0.0"}
+            }});
+            const parser = new PackageJsonParser({relativeTo: repo.path});
+            const docs: Json.Document[] = [];
+            for await (const result of parser.parse(path.join(repo.path, "package.json"),
+                path.join(repo.path, "packages/group/member/package.json"))) {
+                docs.push(result as Json.Document);
+            }
+            expect(docs).toHaveLength(2);
+            const root = findNodeResolutionResult(docs[0])!;
+            const member = findNodeResolutionResult(docs[1])!;
+            expect(root.dependencies[0].resolved?.name).toBe("@local/member");
+            expect(root.dependencies[0].resolved?.dependencies?.find(d => d.name === "@scope/dep")?.resolved?.version).toBe("2.0.0");
+            for (const deps of [member.dependencies, member.devDependencies, member.peerDependencies,
+                member.optionalDependencies, member.bundledDependencies]) {
+                expect(deps.find(d => d.name === "@scope/dep")?.resolved?.version).toBe("2.0.0");
+            }
+            const child = member.dependencies.find(d => d.name === "child")!.resolved!;
+            expect(child.dependencies?.find(d => d.name === "@scope/dep")?.resolved?.version).toBe("3.0.0");
+            expect(child.dependencies?.find(d => d.name === "@local/member")?.resolved?.name).toBe("@local/member");
+        }, {unsafeCleanup: true});
+    });
+
     test("should parse package.json and create NodeResolutionResult marker", async () => {
         const spec = new RecipeSpec();
         await withDir(async (repo) => {

@@ -2496,11 +2496,16 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
      * 1. Type checking for field access
      * 2. Semantic equivalence between `undefined` identifier and void expressions
      * 3. Names that differ but denote one declaration, as an import alias and its export do
+     * 4. An import read through its module, as `os.EOL` is for `EOL`
      */
     override async visitIdentifier(identifier: J.Identifier, other: J): Promise<J | undefined> {
         // Check if this identifier is "undefined" and the other is a void expression
         if (identifier.simpleName === 'undefined' && (other as any).kind === JS.Kind.Void) {
             // Both evaluate to undefined, so they match
+            return identifier;
+        }
+
+        if (other.kind === J.Kind.FieldAccess && this.readsImport(other as J.FieldAccess, identifier)) {
             return identifier;
         }
 
@@ -2516,7 +2521,8 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
 
         // For identifiers with field types, check type attribution
         if (identifier.fieldType && otherIdentifier.fieldType) {
-            if (!this.isOfType(identifier.fieldType, otherIdentifier.fieldType)) {
+            if (!this.isOfType(identifier.fieldType, otherIdentifier.fieldType) ||
+                !this.lenientTypeMatching && !this.sameOwner(identifier, otherIdentifier)) {
                 return this.typeMismatch('fieldType');
             }
         } else if (identifier.fieldType || otherIdentifier.fieldType) {
@@ -2530,19 +2536,52 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
         return super.visitIdentifier(identifier, other);
     }
 
+    /** The counterpart of `visitIdentifier`'s case for an import read through its module. */
+    override async visitFieldAccess(fieldAccess: J.FieldAccess, other: J): Promise<J | undefined> {
+        if (other.kind === J.Kind.Identifier && this.readsImport(fieldAccess, other as J.Identifier)) {
+            return fieldAccess;
+        }
+        return super.visitFieldAccess(fieldAccess, other);
+    }
+
+    /** Whether `fieldAccess` reads through its module what `identifier` imports by name, as `os.EOL` does for `EOL`. */
+    private readsImport(fieldAccess: J.FieldAccess, identifier: J.Identifier): boolean {
+        return this.sameVariable(identifier.fieldType, fieldAccess.name.element.fieldType);
+    }
+
+    /**
+     * Whether two variables of one spelling have one owner, which is a module for an import and nothing for a
+     * variable the file declares. Only a reference is asked. A member's owner is whichever class in a
+     * hierarchy declares it, and it is named where it is read from a receiver or declared.
+     */
+    private sameOwner(identifier: J.Identifier, other: J.Identifier): boolean {
+        const parent = this.cursor.parentTree()?.value;
+        if (parent?.kind === J.Kind.FieldAccess && (parent as J.FieldAccess).name.element === identifier ||
+            parent?.kind === J.Kind.NamedVariable && (parent as J.VariableDeclarations.NamedVariable).name === identifier) {
+            return true;
+        }
+        const owner = identifier.fieldType?.owner;
+        const otherOwner = other.fieldType?.owner;
+        return Type.isFullyQualified(owner) || Type.isFullyQualified(otherOwner) ?
+            this.sameFullyQualifiedName(owner, otherOwner) : true;
+    }
+
     /** An import alias and its export denote one declaration, where a variable holding the same value does not. */
     private denoteOneDeclaration(identifier: J.Identifier, other: J.Identifier): boolean {
         if (identifier.fieldType || other.fieldType) {
-            // An unresolved import has the placeholder name `unknown`, which identifies nothing
-            return !!identifier.fieldType && !!other.fieldType &&
-                identifier.fieldType.name === other.fieldType.name && identifier.fieldType.name !== 'unknown' &&
-                this.sameFullyQualifiedName(identifier.fieldType.owner, other.fieldType.owner);
+            return this.sameVariable(identifier.fieldType, other.fieldType);
         }
         // Only a nominal type names a declaration. The function and object type shells are shared,
         // and a parameterized type is named after its base alone.
         return identifier.type?.kind === Type.Kind.Class && other.type?.kind === Type.Kind.Class &&
             !Type.isFunctionType(identifier.type) && !Type.isObjectType(identifier.type) &&
             this.sameFullyQualifiedName(identifier.type, other.type);
+    }
+
+    private sameVariable(variable?: Type.Variable, other?: Type.Variable): boolean {
+        // An unresolved import has the placeholder name `unknown`, which identifies nothing
+        return !!variable && !!other && variable.name === other.name && variable.name !== 'unknown' &&
+            this.sameFullyQualifiedName(variable.owner, other.owner);
     }
 
     private sameFullyQualifiedName(type?: Type, other?: Type): boolean {
@@ -2828,5 +2867,6 @@ function denotation(literal: J.Literal): string {
         const quoted = source.startsWith("'") || source.startsWith('"');
         return JSON.stringify([primitive, quoted ? source.slice(1, -1) : source, literal.unicodeEscapes]);
     }
-    return JSON.stringify([primitive, literal.value]);
+    const value = typeof literal.value === 'bigint' ? literal.value.toString() : literal.value;
+    return JSON.stringify([primitive, value]);
 }

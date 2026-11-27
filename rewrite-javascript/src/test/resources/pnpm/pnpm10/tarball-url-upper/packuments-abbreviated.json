@@ -1,0 +1,74 @@
+{
+  "dep": {
+    "name": "dep",
+    "dist-tags": {
+      "latest": "1.0.0"
+    },
+    "versions": {
+      "1.0.0": {
+        "name": "dep",
+        "version": "1.0.0",
+        "dist": {
+          "integrity": "sha512-VM5I7ChwNZm/X37ased+OZFRHAorSFZmZ8NsWvk6KPUpRbPCthAAUTo3xD73e5oTGeDg0n/FREDuX1uEwPikQg==",
+          "shasum": "5710e650ba2f56a7cb07f23eeda34a8b364a3fe7",
+          "tarball": "http://localhost:80/dep/-/dep-1.0.0.tgz"
+        }
+      }
+    },
+    "modified": "2020-01-01T00:00:00.000Z"
+  },
+  "dup": {
+    "name": "dup",
+    "dist-tags": {
+      "latest": "1.0.0"
+    },
+    "versions": {
+      "1.0.0": {
+        "name": "dup",
+        "version": "1.0.0",
+        "dist": {
+          "integrity": "sha512-SJVl67gilyvZETmgNfRUIlgDGykLRdIi/mRxXuqqoVz/DkceS43wBJjr4AP8LWUKZLmKPWP5mCdaiejNiJI/KA==",
+          "shasum": "e97555c24658726666e87f1c779da5665d182b18",
+          "tarball": "http://LOCALHOST:4882/dup/-/dup-1.0.0.tgz"
+        }
+      }
+    },
+    "modified": "2020-01-01T00:00:00.000Z"
+  },
+  "dot": {
+    "name": "dot",
+    "dist-tags": {
+      "latest": "1.0.0"
+    },
+    "versions": {
+      "1.0.0": {
+        "name": "dot",
+        "version": "1.0.0",
+        "dist": {
+          "integrity": "sha512-qTIzgyfPRx8Grlo9UKSoWPSzraE3+5HGlFL7KQGBCi2D+4x+bVM8w8COd+Z7OTEsOtjacidLGO+zKYWzpdoqww==",
+          "shasum": "a18a48cda62e68b97f47d113cdad5475b12c0f21",
+          "tarball": "http://localhost:4882/./dot/-/dot-1.0.0.tgz"
+        }
+      }
+    },
+    "modified": "2020-01-01T00:00:00.000Z"
+  },
+  "other": {
+    "name": "other",
+    "dist-tags": {
+      "latest": "1.0.0"
+    },
+    "versions": {
+      "1.0.0": {
+        "name": "other",
+        "version": "1.0.0",
+        "dist": {
+          "integrity": "sha512-QZQOh7FpO5Y+5BdBlfYPSWalxyhg524h8/vIw4hfkTCNZK56GUnINaAVbOatH2jfsTKV+cqCiopwry1QURPdXA==",
+          "shasum": "fe9832e85b7b2e3441acf88de2fcdca744719938",
+          "tarball": "http://localhost:4882/other/-/other-1.0.0.tgz"
+        }
+      }
+    },
+    "modified": "2020-01-01T00:00:00.000Z"
+  }
+}

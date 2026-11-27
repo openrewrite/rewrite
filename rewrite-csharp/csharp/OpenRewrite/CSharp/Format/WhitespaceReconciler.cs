@@ -41,6 +41,22 @@ public class WhitespaceReconciler
 
     public static bool ThrowOnMismatchDefault { get; set; }
 
+    private static readonly AsyncLocal<bool?> ScopedThrowOnMismatch = new();
+
+    internal static IDisposable UseThrowOnMismatch(bool throwOnMismatch) => new MismatchScope(throwOnMismatch);
+
+    private sealed class MismatchScope : IDisposable
+    {
+        private readonly bool? _previous = ScopedThrowOnMismatch.Value;
+
+        public MismatchScope(bool throwOnMismatch)
+        {
+            ScopedThrowOnMismatch.Value = throwOnMismatch;
+        }
+
+        public void Dispose() => ScopedThrowOnMismatch.Value = _previous;
+    }
+
     private const int MaxMismatches = 5;
     private readonly bool _throwOnMismatch;
     private List<MismatchEntry>? _mismatches;
@@ -48,7 +64,7 @@ public class WhitespaceReconciler
 
     public WhitespaceReconciler(bool? throwOnMismatch = null)
     {
-        _throwOnMismatch = throwOnMismatch ?? ThrowOnMismatchDefault;
+        _throwOnMismatch = throwOnMismatch ?? ScopedThrowOnMismatch.Value ?? ThrowOnMismatchDefault;
     }
 
     private bool _compatible = true;

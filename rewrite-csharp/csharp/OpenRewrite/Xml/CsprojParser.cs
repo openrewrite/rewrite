@@ -55,7 +55,14 @@ public class CsprojParser
     /// resolves each project's dependency graph in-process. Returns parsed Documents in the
     /// same order as input. Only project files (csproj/vbproj/fsproj) receive a marker.
     /// </summary>
-    public IList<Document> ParseAll(IList<(string sourceStr, string sourcePath)> files)
+    public IList<Document> ParseAll(IList<(string sourceStr, string sourcePath)> files) => ParseAll(files, _ => true);
+
+    /// <summary>
+    /// Parses the files together as <see cref="ParseAll(IList{ValueTuple{string, string}})"/> does, restoring only the
+    /// project files at the source paths <paramref name="restores"/> accepts. The other project files get a marker
+    /// with their SDK only, as props and targets files do, and are still there for the restore of the rest.
+    /// </summary>
+    public IList<Document> ParseAll(IList<(string sourceStr, string sourcePath)> files, Predicate<string> restores)
     {
         if (files.Count == 0) return [];
 
@@ -80,7 +87,7 @@ public class CsprojParser
             foreach (var (sourceStr, sourcePath) in files)
             {
                 var doc = _xmlParser.Parse(sourceStr, sourcePath);
-                if (IsProjectFile(sourcePath))
+                if (IsProjectFile(sourcePath) && restores(sourcePath))
                 {
                     var marker = MSBuildProjectHelper.CreateMarker(doc, tempDir);
                     if (marker != null)

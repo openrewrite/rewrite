@@ -792,4 +792,151 @@ class DeletePropertyKeyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void deletesTheCommentOfTheLastEntry() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("c", null, null, null)),
+          yaml(
+            """
+              a: 1 # one
+              b: 2 # two
+              c: 3 # three
+              """,
+            """
+              a: 1 # one
+              b: 2 # two
+              """
+          )
+        );
+    }
+
+    @Test
+    void deletesTheFirstEntryWithItsComment() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("a", null, null, null)),
+          yaml(
+            """
+              a: 1 # one
+              b: 2 # two
+              """,
+            """
+              b: 2 # two
+              """
+          )
+        );
+    }
+
+    @Test
+    void deletesTheCommentOfANestedLastEntry() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("a.y", null, null, null)),
+          yaml(
+            """
+              a:
+                x: 1 # keep
+                y: 2 # drop
+              b: 3
+              """,
+            """
+              a:
+                x: 1 # keep
+              b: 3
+              """
+          )
+        );
+    }
+
+    @Test
+    void deletesTheCommentOfADeeplyNestedLastEntry() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("jobs.test.strategy.matrix.os", null, null, null)),
+          yaml(
+            """
+              jobs:
+                test:
+                  strategy:
+                    matrix:
+                      node-version: [16, 18]
+                      os:
+                        - ubuntu-latest # LTS runner
+                lint:
+                  runs-on: ubuntu-latest
+              """,
+            """
+              jobs:
+                test:
+                  strategy:
+                    matrix:
+                      node-version: [16, 18]
+                lint:
+                  runs-on: ubuntu-latest
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepsTheCommentOfTheItemBeforeADeletedLastItem() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("a.c", null, null, null)),
+          yaml(
+            """
+              a:
+                - b: 1 # one
+                - c: 2 # two
+              d: 3
+              """,
+            """
+              a:
+                - b: 1 # one
+              d: 3
+              """
+          )
+        );
+    }
+
+    @Test
+    void deletesABlockScalarThatEndsTheMapping() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("a.x", null, null, null)),
+          yaml(
+            """
+              a:
+                w: 1 # w
+                x: |
+                  t
+              b: 1
+              """,
+            """
+              a:
+                w: 1 # w
+              b: 1
+              """
+          )
+        );
+    }
+
+    @Test
+    void emptiesANestedMappingThatEndsWithABlockScalar() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("a.y.*", null, null, null)),
+          yaml(
+            """
+              a:
+                x: 1 # x
+                y:
+                  p: 1
+                  q: |
+                    t
+              b: 1
+              """,
+            """
+              a:
+                x: 1 # x
+              b: 1
+              """
+          )
+        );
+    }
 }

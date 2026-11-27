@@ -138,20 +138,32 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
             requested = requested.withRepositories(emptyList());
         }
 
+        Map<Path, Pom> projectPoms = resolutionResult.getProjectPoms();
+        Path sourcePath = requested.getSourcePath();
+        if (sourcePath != null) {
+            projectPoms.put(sourcePath, requested);
+        }
+        MavenPomDownloader downloader = downloader(ctx, projectPoms);
+        MavenResolutionResult withPom;
         try {
-            Map<Path, Pom> projectPoms = resolutionResult.getProjectPoms();
-            Path sourcePath = requested.getSourcePath();
-            if (sourcePath != null) {
-                projectPoms.put(sourcePath, requested);
-            }
-            MavenResolutionResult updated = updateResult(ctx, resolutionResult.withPom(resolutionResult.getPom().withRequested(requested)),
-                    projectPoms);
-            markDirtyForAmbiguityRecipes(ctx, document, updated);
-            return document.withMarkers(document.getMarkers().computeByType(getResolutionResult(),
-                    (original, ignored) -> updated));
+            withPom = resolvePom(ctx, resolutionResult.withPom(resolutionResult.getPom().withRequested(requested)),
+                    projectPoms, downloader);
         } catch (MavenDownloadingExceptions e) {
             return e.warn(document);
         }
+        MavenResolutionResult updated;
+        try {
+            updated = withPom.resolveDependencies(downloader, ctx);
+        } catch (MavenDownloadingExceptions e) {
+            // The pom itself resolved, so the recipes that run next see its new properties and managed versions,
+            // with the dependencies as they were last resolved, rather than a model of the pom before this change.
+            Xml.Document warned = e.warn(document);
+            return warned.withMarkers(warned.getMarkers().computeByType(getResolutionResult(),
+                    (original, ignored) -> withPom));
+        }
+        markDirtyForAmbiguityRecipes(ctx, document, updated);
+        return document.withMarkers(document.getMarkers().computeByType(getResolutionResult(),
+                (original, ignored) -> updated));
     }
 
     /**
@@ -194,11 +206,22 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
                 .orElse(null);
     }
 
-    private MavenResolutionResult updateResult(ExecutionContext ctx, MavenResolutionResult resolutionResult, Map<Path, Pom> projectPoms) throws MavenDownloadingExceptions {
-        MavenPomDownloader downloader = new MavenPomDownloader(projectPoms, ctx,
+    private MavenPomDownloader downloader(ExecutionContext ctx, Map<Path, Pom> projectPoms) {
+        return new MavenPomDownloader(projectPoms, ctx,
                 MavenExecutionContextView.view(ctx).effectiveSettings(getResolutionResult()),
                 getResolutionResult().getActiveProfiles());
+    }
 
+    private MavenResolutionResult updateResult(ExecutionContext ctx, MavenResolutionResult resolutionResult, Map<Path, Pom> projectPoms) throws MavenDownloadingExceptions {
+        MavenPomDownloader downloader = downloader(ctx, projectPoms);
+        return resolvePom(ctx, resolutionResult, projectPoms, downloader).resolveDependencies(downloader, ctx);
+    }
+
+    /**
+     * Resolves the pom and re-resolves its modules, but not its own dependencies.
+     */
+    private MavenResolutionResult resolvePom(ExecutionContext ctx, MavenResolutionResult resolutionResult, Map<Path, Pom> projectPoms,
+                                             MavenPomDownloader downloader) throws MavenDownloadingExceptions {
         try {
             ResolvedPom resolved = resolutionResult.getPom().resolve(ctx, downloader);
             return resolutionResult
@@ -211,8 +234,7 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
                         } catch (MavenDownloadingExceptions e) {
                             return module;
                         }
-                    }))
-                    .resolveDependencies(downloader, ctx);
+                    }));
         } catch (MavenDownloadingException e) {
             throw MavenDownloadingExceptions.append(null, e);
         }

@@ -261,6 +261,14 @@ internal static class TemplateEngine
 
         var result = ExtractTemplateNode(cu, code, scaffoldKind);
 
+        // A statement or member ending with `}` (an array initializer, a switch expression)
+        // only gets its `;` here, as BuildScaffold can't tell it apart from a block.
+        if (result is Erroneous && scaffoldKind is not (ScaffoldKind.Expression or ScaffoldKind.Attribute) &&
+            code.TrimEnd().EndsWith('}'))
+        {
+            return ParseInternal(code.TrimEnd() + ";", preamble, usings, context, dependencies, scaffoldKind);
+        }
+
         // When the legacy scaffold (scaffoldKind == null) produces a VariableDeclarations,
         // C#'s parser likely misparsed an expression like `a * b` as a pointer declaration.
         // Re-parse using the Expression scaffold where the code appears in an initializer

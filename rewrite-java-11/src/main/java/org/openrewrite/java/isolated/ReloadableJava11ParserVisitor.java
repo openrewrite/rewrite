@@ -1543,18 +1543,18 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
         if (vartype == null) {
             typeExpr = null;
         } else if (endPos(vartype) < 0) {
-            if (!hasLombokGeneratedSymbol(node)) {
+            String keyword = inferredTypeKeyword(node);
+            if (keyword == null) {
                 // Inferred lambda parameter types and unresolved types have no source representation.
                 typeExpr = null;
             } else {
                 Space space = whitespace();
-                boolean lombokVal = source.startsWith("val", cursor);
-                cursor += 3; // skip `val` or `var`
+                cursor += keyword.length();
                 typeExpr = new J.Identifier(randomId(),
                         space,
                         Markers.build(singletonList(JavaVarKeyword.build())),
                         emptyList(),
-                        lombokVal ? "val" : "var",
+                        keyword,
                         typeMapping.type(vartype),
                         null);
             }
@@ -1595,8 +1595,6 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
             typeExpr = new J.AnnotatedType(randomId(), prefix, Markers.EMPTY, ListUtils.mapFirst(typeExprAnnotations, a -> a.withPrefix(EMPTY)), typeExpr);
         }
 
-        List<JLeftPadded<Space>> beforeDimensions = emptyList();
-
         Space varargs = null;
         if (typeExpr != null && typeExpr.getMarkers().findFirst(JavaVarKeyword.class).isEmpty()) {
             int varargStart = indexOfNextNonWhitespace(cursor, source);
@@ -1635,7 +1633,7 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
             );
         }
 
-        return new J.VariableDeclarations(randomId(), fmt, Markers.EMPTY, modifierResults.getLeadingAnnotations(), modifierResults.getModifiers(), typeExpr, varargs, beforeDimensions, vars);
+        return new J.VariableDeclarations(randomId(), fmt, Markers.EMPTY, modifierResults.getLeadingAnnotations(), modifierResults.getModifiers(), typeExpr, varargs, vars);
     }
 
     private List<Tree> parametersWithReceiver(MethodTree node) {
@@ -1956,13 +1954,15 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
                 converted.add(convert(treeGroup.get(0), suffix));
             } else {
                 // multi-variable declarations are split into independent overlapping JCVariableDecl's by the OpenJDK AST
-                String prefix = source.substring(cursor, max(((JCTree) treeGroup.get(0)).getStartPosition(), cursor));
+                JCTree first = (JCTree) treeGroup.get(0);
+                String prefix = source.substring(cursor, max(first.getStartPosition(), cursor));
                 cursor += prefix.length();
 
                 Tree last = treeGroup.get(treeGroup.size() - 1);
 
                 @SuppressWarnings("unchecked")
-                J.VariableDeclarations vars = visitVariables((List<VariableTree>) treeGroup, format(prefix));
+                J.VariableDeclarations vars = visitVariables((List<VariableTree>) treeGroup,
+                        formatWithCommentTree(prefix, first, docCommentTable.getCommentTree(first)));
                 JRightPadded<Statement> paddedVars = padRight(vars, semiDelim.apply(last));
                 cursor(max(endPos(last), cursor));
                 converted.add(paddedVars);
@@ -2008,6 +2008,18 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
             }
         }
         return true;
+    }
+
+    /**
+     * The {@code var} or {@code val} written where javac inferred the type, or null if neither precedes the name.
+     * Read from the source, because Lombok releases differ in whether they leave an annotation on the declaration.
+     */
+    private @Nullable String inferredTypeKeyword(JCVariableDecl node) {
+        int idx = indexOfNextNonWhitespace(cursor, source);
+        if (idx < 0 || idx + 3 >= node.pos || Character.isJavaIdentifierPart(source.charAt(idx + 3))) {
+            return null;
+        }
+        return source.startsWith("var", idx) ? "var" : source.startsWith("val", idx) ? "val" : null;
     }
 
     private static boolean hasLombokGeneratedSymbol(Tree t) {

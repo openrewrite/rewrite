@@ -4109,6 +4109,39 @@ class MergeYamlTest implements RewriteTest {
         );
     }
 
+    @Test
+    void wildcardMatchesEachSequenceItem() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.list.services.*",
+            //language=yaml
+            "beta: fixedValue",
+            false,
+            null,
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              list:
+                services:
+                  - alpha: randomValue1
+                  - alpha: randomValue2
+              """,
+            """
+              list:
+                services:
+                  - alpha: randomValue1
+                    beta: fixedValue
+                  - alpha: randomValue2
+                    beta: fixedValue
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/2834")
     @Test
     void mergeFlowStyleSequence() {
@@ -5026,6 +5059,215 @@ class MergeYamlTest implements RewriteTest {
                 <<: *base
                 b: 2
                 c: 3
+              """
+          )
+        );
+    }
+
+    @Test
+    void mergeMultilineScalarIntoExistingKeyOfIdentifiedSequenceItem() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.jobs.build",
+            //language=yaml
+            """
+              steps:
+                - name: compile
+                  run: |
+                    ./gradlew assemble
+                    ./gradlew check
+              """,
+            false,
+            "name",
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              jobs:
+                build:
+                  steps:
+                    - name: compile
+                      run: |
+                        ./gradlew build
+              """,
+            """
+              jobs:
+                build:
+                  steps:
+                    - name: compile
+                      run: |
+                        ./gradlew assemble
+                        ./gradlew check
+              """
+          )
+        );
+    }
+
+    @Test
+    void addMultilineScalarToIdentifiedSequenceItem() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.jobs.build",
+            //language=yaml
+            """
+              steps:
+                - name: compile
+                  run: |
+                    ./gradlew assemble
+                    ./gradlew check
+              """,
+            false,
+            "name",
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              jobs:
+                build:
+                  steps:
+                    - name: compile
+                      uses: gradle
+              """,
+            """
+              jobs:
+                build:
+                  steps:
+                    - name: compile
+                      uses: gradle
+                      run: |
+                        ./gradlew assemble
+                        ./gradlew check
+              """
+          )
+        );
+    }
+
+    @Test
+    void addMultilineScalarInUnmatchedSequenceItem() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.jobs.build",
+            //language=yaml
+            """
+              steps:
+                - name: compile
+                  run: |
+                    ./gradlew assemble
+                    ./gradlew check
+              """,
+            false,
+            "name",
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              jobs:
+                build:
+                  steps:
+                    - name: test
+              """,
+            """
+              jobs:
+                build:
+                  steps:
+                    - name: test
+                    - name: compile
+                      run: |
+                        ./gradlew assemble
+                        ./gradlew check
+              """
+          )
+        );
+    }
+
+    @Test
+    void addMultilineScalarAsFirstKeyOfUnmatchedSequenceItem() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.jobs.build",
+            //language=yaml
+            """
+              steps:
+                - run: |
+                    ./gradlew assemble
+                    ./gradlew check
+                  name: compile
+              """,
+            false,
+            "name",
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              jobs:
+                build:
+                  steps:
+                    - name: test
+              """,
+            """
+              jobs:
+                build:
+                  steps:
+                    - name: test
+                    - run: |
+                        ./gradlew assemble
+                        ./gradlew check
+                      name: compile
+              """
+          )
+        );
+    }
+
+    @Test
+    void addNestedMultilineScalarInUnmatchedSequenceItem() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.jobs.build",
+            //language=yaml
+            """
+              steps:
+                - name: compile
+                  with:
+                    script: |
+                      ./gradlew assemble
+                      ./gradlew check
+              """,
+            false,
+            "name",
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              jobs:
+                build:
+                  steps:
+                    - name: test
+              """,
+            """
+              jobs:
+                build:
+                  steps:
+                    - name: test
+                    - name: compile
+                      with:
+                        script: |
+                          ./gradlew assemble
+                          ./gradlew check
               """
           )
         );

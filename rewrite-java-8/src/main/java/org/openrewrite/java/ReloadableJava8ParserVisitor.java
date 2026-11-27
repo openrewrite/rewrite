@@ -1568,8 +1568,6 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
             typeExpr = new J.AnnotatedType(randomId(), prefix, Markers.EMPTY, ListUtils.mapFirst(typeExprAnnotations, a -> a.withPrefix(EMPTY)), typeExpr);
         }
 
-        List<JLeftPadded<Space>> beforeDimensions = emptyList();
-
         Space varargs = null;
         if (typeExpr != null) {
             int varargStart = indexOfNextNonWhitespace(cursor, source);
@@ -1608,7 +1606,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
             );
         }
 
-        return new J.VariableDeclarations(randomId(), fmt, Markers.EMPTY, modifierResults.getLeadingAnnotations(), modifierResults.getModifiers(), typeExpr, varargs, beforeDimensions, vars);
+        return new J.VariableDeclarations(randomId(), fmt, Markers.EMPTY, modifierResults.getLeadingAnnotations(), modifierResults.getModifiers(), typeExpr, varargs, vars);
     }
 
     private List<Tree> parametersWithReceiver(MethodTree node) {
@@ -1935,13 +1933,15 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                 converted.add(convert(treeGroup.get(0), suffix));
             } else {
                 // multi-variable declarations are split into independent overlapping JCVariableDecl's by the OpenJDK AST
-                String prefix = source.substring(cursor, max(((JCTree) treeGroup.get(0)).getStartPosition(), cursor));
+                JCTree first = (JCTree) treeGroup.get(0);
+                String prefix = source.substring(cursor, max(first.getStartPosition(), cursor));
                 cursor += prefix.length();
 
                 Tree last = treeGroup.get(treeGroup.size() - 1);
 
                 @SuppressWarnings("unchecked")
-                J.VariableDeclarations vars = visitVariables((List<VariableTree>) treeGroup, format(prefix));
+                J.VariableDeclarations vars = visitVariables((List<VariableTree>) treeGroup,
+                        formatWithCommentTree(prefix, first, docCommentTable.getCommentTree(first)));
                 JRightPadded<Statement> paddedVars = padRight(vars, semiDelim.apply(last));
                 cursor(max(endPos(last), cursor));
                 converted.add(paddedVars);

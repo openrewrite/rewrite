@@ -922,6 +922,7 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
         q.GetAndSend(cod, c => c.Parameters, c2 => VisitContainer(c2, q));
         q.GetAndSend(cod, c => c.ExpressionBody, lp => VisitLeftPadded(lp!, q));
         q.GetAndSend(cod, c => (J?)c.Body, el => Visit(el!, q));
+        q.GetAndSend(cod, c => AsRef(c.MethodType), t => VisitType(GetValueNonNull<JavaType>(t), q));
         return cod;
     }
 

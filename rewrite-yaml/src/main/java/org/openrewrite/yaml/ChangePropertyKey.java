@@ -246,6 +246,20 @@ public class ChangePropertyKey extends Recipe {
         return true;
     }
 
+    private static String afterFirstLineBreak(String prefix) {
+        int lineBreak = prefix.indexOf('\n');
+        return lineBreak < 0 ? "" : prefix.substring(lineBreak + 1);
+    }
+
+    private static String withoutLeadingBlankLines(String prefix) {
+        int lineBreak = prefix.indexOf('\n');
+        while (lineBreak >= 0 && prefix.substring(0, lineBreak).trim().isEmpty()) {
+            prefix = prefix.substring(lineBreak + 1);
+            lineBreak = prefix.indexOf('\n');
+        }
+        return prefix;
+    }
+
     private List<String> excludedSubKeys() {
         return except != null ? except : emptyList();
     }
@@ -265,6 +279,10 @@ public class ChangePropertyKey extends Recipe {
         public Yaml.Mapping visitMapping(Yaml.Mapping mapping, P p) {
             Yaml.Mapping m = super.visitMapping(mapping, p);
             if (m.getEntries().contains(scope)) {
+                // After `---` a document's leading comment is parsed into its first entry's prefix
+                boolean documentHead = getCursor().getParentOrThrow().getValue() instanceof Yaml.Document &&
+                        m.getEntries().size() > 1 && scope.isScope(m.getEntries().get(0)) &&
+                        scope.getPrefix().contains("#");
                 String newEntryPrefix = scope.getPrefix();
                 // The portion before the first line break belongs to the preceding sibling.
                 int lineBreak = newEntryPrefix.indexOf('\n');
@@ -274,32 +292,33 @@ public class ChangePropertyKey extends Recipe {
                 // A shared scope can survive while intermediate ancestors of the moved property
                 // disappear. Preserve comments from exactly the entries that disappear.
                 List<Yaml.Mapping.Entry> path = new ArrayList<>();
+                boolean[] removed = new boolean[0];
                 if (!hasExcludedValues(entryToReplace) && pathToEntry(scope, path)) {
-                    boolean[] removed = new boolean[path.size()];
+                    removed = new boolean[path.size()];
                     removed[path.size() - 1] = true;
                     for (int i = path.size() - 2; i >= 0; i--) {
                         removed[i] = removed[i + 1] && ((Yaml.Mapping) path.get(i).getValue()).getEntries().size() == 1;
                     }
-                    if (!removed[0] && newEntryPrefix.contains("#")) {
-                        int lastBreak = newEntryPrefix.lastIndexOf('\n');
-                        newEntryPrefix = lastBreak < 0 ? "" : newEntryPrefix.substring(lastBreak);
+                }
+                boolean scopeKeepsItsComments = removed.length == 0 || !removed[0] || documentHead;
+                if (scopeKeepsItsComments && newEntryPrefix.contains("#")) {
+                    int lastBreak = newEntryPrefix.lastIndexOf('\n');
+                    newEntryPrefix = lastBreak < 0 ? "" : newEntryPrefix.substring(lastBreak);
+                }
+                for (int i = 1; i < removed.length; i++) {
+                    if (!removed[i]) {
+                        continue;
                     }
-                    for (int i = 1; i < path.size(); i++) {
-                        if (!removed[i]) {
-                            continue;
+                    String prefix = path.get(i).getPrefix();
+                    // An inline comment belongs to the parent; standalone comments belong to this entry.
+                    if (!removed[i - 1]) {
+                        prefix = afterFirstLineBreak(prefix);
+                    }
+                    if (prefix.contains("#")) {
+                        if (!newEntryPrefix.contains("\n")) {
+                            newEntryPrefix += "\n";
                         }
-                        String prefix = path.get(i).getPrefix();
-                        // An inline comment belongs to the parent; standalone comments belong to this entry.
-                        if (!removed[i - 1]) {
-                            int breakAt = prefix.indexOf('\n');
-                            prefix = breakAt < 0 ? "" : prefix.substring(breakAt);
-                        }
-                        if (prefix.contains("#")) {
-                            if (!newEntryPrefix.contains("\n")) {
-                                newEntryPrefix += "\n";
-                            }
-                            newEntryPrefix += prefix.trim() + "\n";
-                        }
+                        newEntryPrefix += prefix.trim() + "\n";
                     }
                 }
                 Yaml.Mapping.Entry newEntry = new Yaml.Mapping.Entry(randomId(),
@@ -311,7 +330,8 @@ public class ChangePropertyKey extends Recipe {
                         removeExclusions(entryToReplace.getValue().copyPaste()));
 
                 if (hasExcludedValues(entryToReplace)) {
-                    m = maybeAutoFormat(m, m.withEntries(ListUtils.concat(m.getEntries(), newEntry)), p, getCursor().getParentOrThrow());
+                    Yaml.Mapping.Entry formatted = autoFormat(newEntry, p, new Cursor(getCursor().getParentOrThrow(), m));
+                    m = m.withEntries(ListUtils.concat(m.getEntries(), formatted));
                 } else {
                     if (m.getEntries().contains(entryToReplace)) {
                         m = m.withEntries(ListUtils.map(m.getEntries(), e -> {
@@ -322,6 +342,11 @@ public class ChangePropertyKey extends Recipe {
                         }));
                     } else {
                         m = (Yaml.Mapping) new DeletePropertyVisitor<>(entryToReplace).visitNonNull(m, p);
+                        if (documentHead && !m.getEntries().isEmpty() && !scope.isScope(m.getEntries().get(0))) {
+                            String head = scope.getPrefix().substring(0, scope.getPrefix().lastIndexOf('\n') + 1);
+                            m = m.withEntries(ListUtils.mapFirst(m.getEntries(),
+                                    e -> e.withPrefix(head + afterFirstLineBreak(e.getPrefix()))));
+                        }
                         Yaml.Mapping incoming = nestUnderExistingPrefix(m, newEntry);
                         if (incoming == null) {
                             incoming = m.withEntries(singletonList(newEntry));
@@ -493,9 +518,12 @@ public class ChangePropertyKey extends Recipe {
                 }
             }
 
-            if (entries.size() == 1) {
+            if (!entries.isEmpty() && entries.get(0) != m.getEntries().get(0)) {
+                // Comments of a removed first entry travel with the moved property, not onto the survivor
                 String firstEntryPrefix = m.getEntries().get(0).getPrefix();
-                entries = ListUtils.map(entries, e -> e.withPrefix(firstEntryPrefix));
+                int lineBreak = firstEntryPrefix.indexOf('\n');
+                String lead = lineBreak < 0 ? firstEntryPrefix : firstEntryPrefix.substring(0, lineBreak + 1);
+                entries = ListUtils.mapFirst(entries, e -> e.withPrefix(lead + withoutLeadingBlankLines(afterFirstLineBreak(e.getPrefix()))));
             }
 
             if (changed) {

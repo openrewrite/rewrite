@@ -393,6 +393,7 @@ public final class UvLockEngine {
                     newMetadata.getProvidesExtras() == null && newMetadata.getRequiresDev() == null;
             packages.set(rootIndex, root.toBuilder()
                     .version(projectVersion(project, root.getVersion()))
+                    .source(rootSource(root.getSource()))
                     // uv omits [package.metadata] entirely when nothing is declared (s-remove-last-dep fixture)
                     .metadata(metadataEmpty ? null : newMetadata)
                     .build());
@@ -1023,6 +1024,19 @@ public final class UvLockEngine {
                 groups.add(Pep508Requirement.canonicalize(group));
             }
             return groups.equals(Collections.singleton("dev")) ? null : new ArrayList<>(groups);
+        }
+
+        /**
+         * The project is a package, locked as {@code editable = "."}, when {@code [tool.uv] package = true}, or when
+         * {@code package} is unset and the manifest declares a {@code [build-system]}; otherwise it is virtual, as uv's
+         * {@code PyProjectToml::is_package} decides. A lock recording the other kind no longer satisfies the manifest.
+         */
+        private UvLockSource rootSource(UvLockSource recorded) {
+            boolean isPackage = Optional.ofNullable(UvLockToml.findTable(pyproject, "tool.uv"))
+                    .map(uv -> UvLockToml.literalBoolean(uv, "package"))
+                    .orElseGet(() -> UvLockToml.findTable(pyproject, "build-system") != null);
+            UvLockSource.Type type = isPackage ? UvLockSource.Type.EDITABLE : UvLockSource.Type.VIRTUAL;
+            return recorded.getType() == type ? recorded : recorded.withType(type);
         }
 
         private int findRoot() {

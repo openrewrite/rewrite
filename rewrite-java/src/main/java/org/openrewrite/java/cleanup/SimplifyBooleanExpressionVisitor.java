@@ -32,6 +32,19 @@ import static java.util.Collections.emptyList;
 
 public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionContext> {
     @Override
+    public J visitAssert(J.Assert assertion, ExecutionContext ctx) {
+        SourceFile source = getCursor().firstEnclosing(SourceFile.class);
+        // Groovy power assertions (including Spock conditions) render the source expression
+        // and record intermediate values. Preserve their input before visiting children,
+        // even when a simplification would preserve the boolean result.
+        // Use the tree type to avoid a dependency from rewrite-java to rewrite-groovy.
+        if (source != null && "org.openrewrite.groovy.tree.G$CompilationUnit".equals(source.getClass().getName())) {
+            return assertion;
+        }
+        return super.visitAssert(assertion, ctx);
+    }
+
+    @Override
     public J visitBinary(J.Binary binary, ExecutionContext ctx) {
         J j = super.visitBinary(binary, ctx);
         J.Binary asBinary = (J.Binary) j;
@@ -51,8 +64,8 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
                 j = asBinary.getRight();
             } else if (isLiteralTrue(asBinary.getRight()) && shouldSimplifyShortCircuitOn(asBinary.getLeft())) {
                 j = asBinary.getLeft().withPrefix(asBinary.getLeft().getPrefix().withWhitespace(""));
-            } else if (!(asBinary.getLeft() instanceof MethodCall) && canDiscardEvaluation(asBinary.getLeft()) &&
-                       SemanticallyEqual.areEqual(asBinary.getLeft(), asBinary.getRight())) {
+            } else if (!(asBinary.getLeft() instanceof MethodCall) && shouldSimplifyShortCircuitOn(asBinary.getLeft()) &&
+                       canDiscardEvaluation(asBinary.getLeft()) && SemanticallyEqual.areEqual(asBinary.getLeft(), asBinary.getRight())) {
                 j = asBinary.getLeft();
             }
         } else if (asBinary.getOperator() == J.Binary.Type.Or) {
@@ -65,8 +78,8 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
                 j = asBinary.getRight();
             } else if (isLiteralFalse(asBinary.getRight()) && shouldSimplifyShortCircuitOn(asBinary.getLeft())) {
                 j = asBinary.getLeft().withPrefix(asBinary.getLeft().getPrefix().withWhitespace(""));
-            } else if (!(asBinary.getLeft() instanceof MethodCall) && canDiscardEvaluation(asBinary.getLeft()) &&
-                       SemanticallyEqual.areEqual(asBinary.getLeft(), asBinary.getRight())) {
+            } else if (!(asBinary.getLeft() instanceof MethodCall) && shouldSimplifyShortCircuitOn(asBinary.getLeft()) &&
+                       canDiscardEvaluation(asBinary.getLeft()) && SemanticallyEqual.areEqual(asBinary.getLeft(), asBinary.getRight())) {
                 j = asBinary.getLeft();
             }
         } else if (asBinary.getOperator() == J.Binary.Type.Equal) {
@@ -150,13 +163,25 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
 
     @Override
     public J visitUnary(J.Unary unary, ExecutionContext ctx) {
+        if (unary.getOperator() == J.Unary.Type.Not &&
+            unary.getExpression().unwrap() instanceof J.Unary &&
+            ((J.Unary) unary.getExpression().unwrap()).getOperator() == J.Unary.Type.Not) {
+            SourceFile source = getCursor().firstEnclosing(SourceFile.class);
+            // Avoid a dependency from rewrite-java to rewrite-groovy. The tree type, rather than
+            // the file extension, identifies Groovy even when a source path has been changed.
+            if (source != null && "org.openrewrite.groovy.tree.G$CompilationUnit".equals(source.getClass().getName())) {
+                // Spock's compiler uses double logical negation to disable condition rendering.
+                // Preserve the whole expression before visiting children can invert a comparison.
+                return unary;
+            }
+        }
         J j = super.visitUnary(unary, ctx);
         if (j instanceof J.Unary) {
             J.Unary asUnary = (J.Unary) j;
 
             if (asUnary.getOperator() == J.Unary.Type.Not) {
                 j = unpackExpression(asUnary.getExpression(), asUnary);
-                if (j instanceof J.Ternary) {
+                if (j instanceof Expression) {
                     j = ParenthesizeVisitor.maybeParenthesize((Expression) j, getCursor());
                 }
             }
@@ -385,6 +410,16 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
     public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
         J j = super.visitMethodInvocation(method, executionContext);
         J.MethodInvocation asMethod = (J.MethodInvocation) j;
+        Object parent = getCursor().getParentTreeCursor().getValue();
+        // A method invocation can be a statement, but a boolean literal cannot. Visit the children
+        // first so that expressions in the select and arguments can still be simplified.
+        if (parent instanceof J.Block || parent instanceof J.If || parent instanceof J.If.Else ||
+            parent instanceof Loop || parent instanceof J.Label ||
+            parent instanceof J.ForLoop.Control &&
+            !method.isScope(((J.ForLoop.Control) parent).getCondition()) ||
+            parent instanceof J.Case && ((J.Case) parent).getStatements().stream().anyMatch(method::isScope)) {
+            return asMethod;
+        }
         Expression select = asMethod.getSelect();
         if (IS_EMPTY.matches(asMethod) &&
             select instanceof J.Literal &&
@@ -394,8 +429,6 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
             Expression arg = asMethod.getArguments().get(0);
             if (arg instanceof J.Literal && select instanceof J.Literal) {
                 return booleanLiteral(method, ((J.Literal) select).getValue().equals(((J.Literal) arg).getValue()));
-            } else if (SemanticallyEqual.areEqual(select, arg)) {
-                return booleanLiteral(method, true);
             }
         }
         return j;
@@ -579,10 +612,11 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
      * e.g. {@code x && true}, {@code x && false}, {@code x || true}, or {@code x || false}.
      * <p>
      * In Java, {@code &&} and {@code ||} are boolean-only, so these always simplify to {@code x} or the
-     * literal. In languages like JavaScript/TypeScript and Groovy, {@code &&}/{@code ||} return one of
+     * literal. In JavaScript/TypeScript, {@code &&}/{@code ||} return one of
      * their operands unchanged based on truthiness, so {@code x || false} yields {@code false} when
      * {@code x} is falsy (e.g. {@code undefined}) rather than the original value. Simplifying then
-     * changes semantics unless {@code x} is boolean-typed.
+     * changes semantics unless {@code x} is boolean-typed. Groovy also coerces non-boolean operands,
+     * so replacing a boolean result with an operand can change its type and value.
      *
      * @param nonLiteralOperand the operand that is not the boolean literal
      * @return true if the short-circuit expression can be safely simplified

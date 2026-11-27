@@ -120,7 +120,7 @@ final class LockfileUtils {
             return out;
         }
         String url = tarballUrl(tarball);
-        boolean gitHosted = Boolean.TRUE.equals(resolution.get("gitHosted")) || isGitHostedTarball(url, release);
+        boolean gitHosted = Boolean.TRUE.equals(resolution.get("gitHosted")) || isGitHostedTarballOnWrite(url, release);
         if (Boolean.TRUE.equals(lockfileIncludeTarballUrl) || url.startsWith("file:") || gitHosted) {
             return preservingGitHosted(integrity, url, gitHosted);
         }
@@ -153,7 +153,7 @@ final class LockfileUtils {
                                                                      boolean marksGitHosted) {
         boolean hasTarball = tarball != null && tarball != Js.UNDEFINED;
         String url = hasTarball ? tarballUrl(tarball) : null;
-        boolean gitHostedUrl = url != null && isGitHostedTarballUrl(url, release);
+        boolean gitHostedUrl = url != null && isGitHostedTarballUrlOnWrite(url, release);
         boolean gitHosted = marksGitHosted ? Boolean.TRUE.equals(resolution.get("gitHosted")) || gitHostedUrl :
                 gitHostedUrl;
         if (Boolean.TRUE.equals(lockfileIncludeTarballUrl)) {
@@ -237,6 +237,15 @@ final class LockfileUtils {
      */
     static Map<String, @Nullable Object> pkgSnapshotToResolution(String depPath, PackageSnapshot pkgSnapshot,
                                                                  Map<String, String> registries, PnpmRelease release) {
+        // pnpm 10 checks a registry dep path's resolution here from 10.34.2
+        // (PnpmRelease#rejectsARegistryDepPathWithANonRegistryResolutionOnRead)
+        if (!isRegistryShapedResolutionOf(depPath, pkgSnapshot.getResolution()) &&
+            release.rejectsARegistryDepPathWithANonRegistryResolutionOnRead()) {
+            throw new PnpmError("RESOLUTION_SHAPE_MISMATCH", "Cannot use the lockfile entry of \"" + depPath + "\": " +
+                                "its registry-style dependency path is backed by a non-registry resolution.",
+                    "The lockfile may be corrupted or have been tampered with. Restore it from a trusted source, or " +
+                    "delete it and re-run installation without --frozen-lockfile to regenerate.");
+        }
         Map<String, @Nullable Object> resolution = pkgSnapshot.getResolution();
         if (resolution == null) {
             resolution = new LinkedHashMap<>();
@@ -251,7 +260,7 @@ final class LockfileUtils {
         boolean fileTarball = tarball instanceof String && ((String) tarball).startsWith("file:");
         if (isNullish(resolution.get("type")) && isNullish(resolution.get("integrity")) && !fileTarball &&
             !(Boolean.TRUE.equals(resolution.get("gitHosted")) ||
-              tarball instanceof String && isGitHostedTarballUrl((String) tarball, release)) &&
+              tarball instanceof String && isGitHostedTarballUrlWithoutAnIntegrity((String) tarball, release)) &&
             release.requiresALockedTarballsIntegrity() && !release.verifiesALockedTarballsIntegrity()) {
             throw new PnpmError("MISSING_TARBALL_INTEGRITY", "Cannot install package \"" + depPath + "\": its " +
                                 "lockfile entry has no \"integrity\" field, so pnpm cannot verify the downloaded " +
@@ -300,6 +309,76 @@ final class LockfileUtils {
         Map<String, @Nullable Object> out = new LinkedHashMap<>(resolution);
         out.put("tarball", url);
         return out;
+    }
+
+    // the git-hosted tarball that pkgSnapshotToResolution lets go without an integrity: in pnpm 10.34.1 any URL of a
+    // git host, as written (PnpmRelease#exemptsAnyGitHostUrlFromTheLockedIntegrity)
+    private static boolean isGitHostedTarballUrlWithoutAnIntegrity(String url, PnpmRelease release) {
+        boolean gitHostedUrl = isGitHostedTarballUrl(url, release);
+        boolean gitHostUrl = hasAGitHostsPrefix(url);
+        return gitHostedUrl == gitHostUrl || !release.exemptsAnyGitHostUrlFromTheLockedIntegrity() ? gitHostedUrl :
+                gitHostUrl;
+    }
+
+    private static boolean hasAGitHostsPrefix(String url) {
+        return url.startsWith("https://codeload.github.com/") || url.startsWith("https://bitbucket.org/") ||
+               url.startsWith("https://gitlab.com/");
+    }
+
+    private static final Pattern URL_SCHEME = Pattern.compile("^[a-z][a-z0-9+.-]*:", Pattern.CASE_INSENSITIVE);
+    private static final Pattern HTTP_URL = Pattern.compile("^https?://", Pattern.CASE_INSENSITIVE);
+
+    /**
+     * assertRegistryShapedResolution.ts' test of pnpm 10.34.2: whether a dep path that is a registry version
+     * ({@code name@version}) has a resolution a registry gives, any other dep path passing.
+     */
+    static boolean isRegistryShapedResolutionOf(String depPath, @Nullable Object resolution) {
+        DepPath.DependencyPath parsed = DepPath.parse(depPath);
+        if (parsed.getName() == null || parsed.getVersion() == null || parsed.getNonSemverVersion() != null) {
+            return true;
+        }
+        return isRegistryShapedResolution(resolution);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static boolean isRegistryShapedResolution(@Nullable Object resolution) {
+        if (isNullish(resolution)) {
+            return true;
+        }
+        if (!(resolution instanceof Map)) {
+            return false;
+        }
+        Map<String, @Nullable Object> r = (Map<String, @Nullable Object>) resolution;
+        Object type = r.get("type");
+        if ("variations".equals(type)) {
+            Object variants = r.get("variants");
+            if (!(variants instanceof List)) {
+                return false;
+            }
+            for (Object variant : (List<Object>) variants) {
+                if (!isRegistryShapedResolution(variant instanceof Map ?
+                        ((Map<String, @Nullable Object>) variant).get("resolution") : null)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        if (!isNullish(type)) {
+            return false;
+        }
+        Object gitHosted = r.get("gitHosted");
+        if (!isNullish(gitHosted) && (!(gitHosted instanceof Boolean) || (Boolean) gitHosted)) {
+            return false;
+        }
+        Object tarball = r.get("tarball");
+        if (tarball instanceof String && !((String) tarball).isEmpty()) {
+            String url = (String) tarball;
+            if (URL_SCHEME.matcher(url).find()) {
+                return HTTP_URL.matcher(url).find() && !isGitHostedTarballUrlInAnyCase(url);
+            }
+            return !url.startsWith("/") && !url.startsWith("\\");
+        }
+        return true;
     }
 
     /**
@@ -367,6 +446,22 @@ final class LockfileUtils {
             return commitArchive;
         }
         return isGitHostedTarballUrl(url, release);
+    }
+
+    // isGitHostedTarball as toLockfileResolution asks it, which pnpm 10 asks of the URL as written
+    // (PnpmRelease#writesGitHostedTarballUrlsInAnyCase)
+    private static boolean isGitHostedTarballOnWrite(String url, PnpmRelease release) {
+        boolean commitArchive = isGitHostedCommitArchive(url);
+        if (isGitHostedTarballUrlInAnyCase(url) != commitArchive &&
+            release.recognizesOnlyCommitArchivesAsGitHosted()) {
+            return commitArchive;
+        }
+        return isGitHostedTarballUrlOnWrite(url, release);
+    }
+
+    private static boolean isGitHostedTarballUrlOnWrite(String url, PnpmRelease release) {
+        return isGitHostedTarballUrl(url) ||
+               isGitHostedTarballUrlInAnyCase(url) && release.writesGitHostedTarballUrlsInAnyCase();
     }
 
     private static final Pattern GIT_COMMIT_SHA = Pattern.compile("[0-9a-f]{40}", Pattern.CASE_INSENSITIVE);

@@ -313,8 +313,10 @@ final class PickPackageFromMeta {
                             excludeResult instanceof List ? (List<String>) excludeResult : null);
                 } else {
                     Instant modifiedDate = parseModifiedDate(meta.get("modified"));
+                    // pnpm 10 reads no modified (PnpmRelease#readsTheModifiedDateOfAnAbbreviatedPackument)
                     if (modifiedDate == null || modifiedDate.isAfter(publishedBy) ||
-                        modifiedDate.equals(publishedBy) && !release.takesAPackumentModifiedAtTheCutoffAsMature()) {
+                        modifiedDate.equals(publishedBy) && !release.takesAPackumentModifiedAtTheCutoffAsMature() ||
+                        !release.readsTheModifiedDateOfAnAbbreviatedPackument()) {
                         assertMetaHasTime(meta);
                     }
                 }

@@ -833,7 +833,6 @@ public class TypeUtils {
                         case Short:
                             switch (fromPrimitive) {
                                 case Byte:
-                                case Char:
                                 case Short:
                                     return true;
                             }
@@ -1073,7 +1072,14 @@ public class TypeUtils {
     }
 
     public static Optional<JavaType.Method> findDeclaredMethod(JavaType.@Nullable FullyQualified clazz, String name, List<JavaType> argumentTypes) {
-        if (clazz == null) {
+        return findDeclaredMethod(clazz, name, argumentTypes, Collections.newSetFromMap(new IdentityHashMap<>()));
+    }
+
+    private static Optional<JavaType.Method> findDeclaredMethod(JavaType.@Nullable FullyQualified clazz, String name,
+                                                                List<JavaType> argumentTypes, Set<JavaType.FullyQualified> seen) {
+        // A type graph can reach the same type by many paths, and an incompletely attributed one can even be cyclic.
+        // Without this, the search is exponential in the depth of the hierarchy and does not terminate on a cycle.
+        if (clazz == null || !seen.add(clazz)) {
             return Optional.empty();
         }
         for (JavaType.Method method : clazz.getMethods()) {
@@ -1082,13 +1088,13 @@ public class TypeUtils {
             }
         }
 
-        Optional<JavaType.Method> methodResult = findDeclaredMethod(clazz.getSupertype(), name, argumentTypes);
+        Optional<JavaType.Method> methodResult = findDeclaredMethod(clazz.getSupertype(), name, argumentTypes, seen);
         if (methodResult.isPresent()) {
             return methodResult;
         }
 
         for (JavaType.FullyQualified i : clazz.getInterfaces()) {
-            methodResult = findDeclaredMethod(i, name, argumentTypes);
+            methodResult = findDeclaredMethod(i, name, argumentTypes, seen);
             if (methodResult.isPresent()) {
                 return methodResult;
             }
@@ -1323,7 +1329,12 @@ public class TypeUtils {
         }
 
         public boolean isComparing(JavaType to, JavaType from) {
-            return Objects.equals(this.to, to) && Objects.equals(this.from, from) ||
+            // Bound/equality comparisons track actual nodes to terminate cyclic graphs. Inference
+            // also revisits equivalent graphs rebuilt by parameter substitution, so retain structural
+            // matching there without treating distinct nodes as an active bound comparison.
+            return this.to == to && this.from == from ||
+                    inference != InferenceDirection.NONE &&
+                    Objects.equals(this.to, to) && Objects.equals(this.from, from) ||
                     parent != null && parent.isComparing(to, from);
         }
 

@@ -96,11 +96,15 @@ final class SwitchCliVersion {
         }
         String version = Js.string(pm.getVersion());
         boolean persistLockfile = shouldPersistLockfile(pm);
-        if (!persistLockfile && (version.equals(current) || follows(version))) {
-            return new Switched(version, null);
-        }
         // the store controller and the resolution of pnpm itself take the release's bootstrap config
         Supplier<PnpmOptions> bootstrap = () -> options.packageManagerBootstrap(running());
+        if (!persistLockfile && (version.equals(current) || follows(version))) {
+            if (!version.equals(current)) {
+                // the store controller pnpm downloads the other release with, whose config it checks
+                stores.createStoreController(bootstrap.get());
+            }
+            return new Switched(version, null);
+        }
         if (lockFile == null && persistLockfile &&
             satisfies(current, version)) {
             PnpmError failure = stores.storeControllerFailure(bootstrap.get());

@@ -24,6 +24,7 @@ import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.ruby.RubyIsoVisitor;
 import org.openrewrite.ruby.RubyParser;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.Arrays;
@@ -267,7 +268,9 @@ class HeredocTest implements RewriteTest {
     @Test
     void rewritingTheBodyLiteralWithoutATrailingNewline() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new RubyIsoVisitor<ExecutionContext>() {
+          // the naive idiom replaces the body's indentation along with its text
+          spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().keepEditedLineIndentation(false).build())
+            .recipe(toRecipe(() -> new RubyIsoVisitor<ExecutionContext>() {
               @Override
               public J.Literal visitLiteral(J.Literal literal, ExecutionContext ctx) {
                   return literal.getValue() != null && literal.getValue().toString().contains("SELECT 1") ?

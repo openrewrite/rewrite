@@ -15,6 +15,11 @@
  */
 package org.openrewrite.java.tree;
 
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.databind.MapperFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.dataformat.smile.SmileFactory;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
@@ -26,11 +31,13 @@ import org.openrewrite.java.MinimumJava21;
 import org.openrewrite.java.service.AnnotationService;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.openrewrite.java.Assertions.java;
@@ -536,6 +543,47 @@ class AnnotationTest implements RewriteTest {
         annotation = (JavaType.Annotation) mi.getMethodType().getAnnotations().get(0);
         assertEquals("java.lang.Deprecated", annotation.getType().getFullyQualifiedName());
         assertTrue(annotation.getValues().isEmpty());
+    }
+
+    @Test
+    void unpairedSurrogatesInAnnotationValuesAreEscaped() {
+        rewriteRun(
+          java(
+            """
+              @Ann(value = "a\\uD83Db", values = {"a\\uD83D", "\\uD83D\\uDE00"}, c = '\\uDE00')
+              class Test {
+              }
+
+              @interface Ann {
+                  String value();
+                  String[] values();
+                  char c();
+                  String d() default "\\uDE00\\uD83D";
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                var type = (JavaType.Class) cu.getClasses().get(0).getType();
+                var a = (JavaType.Annotation) type.getAnnotations().get(0);
+                assertThat(a.getValues()).extracting(JavaType.Annotation.ElementValue::getValue).containsExactly(
+                  "a\\ud83db",
+                  Arrays.asList("a\\ud83d", "😀"),
+                  "\\ude00"
+                );
+                assertThat(a.getMethods()).filteredOn(m -> "d".equals(m.getName()))
+                  .singleElement().extracting(JavaType.Method::getDefaultValue)
+                  .isEqualTo(singletonList("\\ude00\\ud83d"));
+
+                ObjectMapper smile = JsonMapper.builder(new SmileFactory())
+                  .configure(MapperFeature.PROPAGATE_TRANSIENT_MARKER, true)
+                  .build();
+                smile.setVisibility(smile.getSerializationConfig().getDefaultVisibilityChecker()
+                  .withGetterVisibility(JsonAutoDetect.Visibility.NONE)
+                  .withIsGetterVisibility(JsonAutoDetect.Visibility.NONE)
+                  .withFieldVisibility(JsonAutoDetect.Visibility.ANY));
+                assertThatCode(() -> smile.writeValueAsBytes(cu)).doesNotThrowAnyException();
+            })
+          )
+        );
     }
 
     @Test

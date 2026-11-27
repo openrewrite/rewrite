@@ -73,7 +73,9 @@ final class YarnBerryInputs implements Port {
 
     @Override
     public Result regenerate(LockDirectory dir, HostInputs host, NpmRegistryClient client) {
-        return new YarnBerryLockRegenerator(from(dir, host), new HostRegistrySource(host.transport(), client))
+        return new YarnBerryLockRegenerator(from(dir, host), new HostRegistrySource(host.transport(), client,
+                NetworkPolicy.environment(host.getSystem(),
+                        "NODE_EXTRA_CA_CERTS", "SSL_CERT_FILE", "SSL_CERT_DIR")))
                 .regenerate();
     }
 
@@ -85,9 +87,25 @@ final class YarnBerryInputs implements Port {
     static Inputs from(LockDirectory dir, HostInputs host) {
         return project(dir, host).toBuilder()
                 .env(host.getEnvironment().process())
+                .networkEnvironment(networkEnvironment(host))
                 .homeFile(DEFAULT_RC_FILENAME, host.userYarnrc())
                 .release(host.packageManagerVersion(PackageManager.YarnBerry))
                 .build();
+    }
+
+    private static Map<String, String> networkEnvironment(HostInputs host) {
+        String[] names = {"YARN_HTTP_PROXY", "YARN_HTTPS_PROXY", "YARN_HTTPS_CA_FILE_PATH",
+                "YARN_HTTPS_CERT_FILE_PATH", "YARN_HTTPS_KEY_FILE_PATH", "YARN_ENABLE_NETWORK",
+                "YARN_ENABLE_OFFLINE_MODE", "YARN_ENABLE_STRICT_SSL", "YARN_HTTP_TIMEOUT"};
+        Map<String, String> values = NetworkPolicy.environment(host.getSystem(), names);
+        for (String name : names) {
+            String lower = name.toLowerCase(java.util.Locale.ROOT);
+            String value = host.getSystem().getenv(lower);
+            if (value != null) {
+                values.put(lower, value);
+            }
+        }
+        return values;
     }
 
     private static Inputs project(LockDirectory dir, HostInputs host) {

@@ -34,6 +34,23 @@ subprojects {
         options.compilerArgs.add("-XDsuppressNotes")
     }
 
+    // These modules' tests pass RecipeQualityValidation's parserTypedTrees check, which is off by default, or opt out
+    // of it test by test
+    if (name in setOf("rewrite-test", "rewrite-java", "rewrite-java-test", "rewrite-java-8", "rewrite-java-11",
+            "rewrite-java-17", "rewrite-java-21", "rewrite-java-25", "rewrite-java-lombok", "rewrite-groovy",
+            "rewrite-kotlin", "rewrite-maven", "rewrite-gradle")) {
+        tasks.withType<Test>().configureEach {
+            systemProperty("org.openrewrite.test.parserTypedTrees", true)
+        }
+    }
+
+    // Hands the test JVMs the opt-outs to check, as in -Dorg.openrewrite.test.failOnUnneededOptOuts=all
+    providers.systemProperty("org.openrewrite.test.failOnUnneededOptOuts").orNull?.let { checks ->
+        tasks.withType<Test>().configureEach {
+            systemProperty("org.openrewrite.test.failOnUnneededOptOuts", checks)
+        }
+    }
+
     // Added after module scripts have changed the release, as a plain argument: a task tracks an argument provider's
     // class, so a provider compiled from this script would make every edit here recompile every module.
     afterEvaluate {
@@ -58,12 +75,16 @@ subprojects {
 
     tasks.withType<JavaExec>().configureEach {
         if (name == "generateAntlrSources") {
+            // a module under the Moderne Source Available License names its header on the license extension
+            val headerFile = project.provider {
+                project.extensions.findByType<LicenseExtension>()?.header ?: rootProject.file("gradle/licenseHeader.txt")
+            }
             doLast {
                 val idx = args?.indexOf("-o") ?: return@doLast
                 if (idx < 0 || idx + 1 >= args!!.size) return@doLast
                 val rootPrefix = rootProject.projectDir.absolutePath.replace("\\", "/") + "/"
                 val year = Calendar.getInstance().get(Calendar.YEAR)
-                val licenseHeader = "/*\n" + rootProject.file("gradle/licenseHeader.txt")
+                val licenseHeader = "/*\n" + headerFile.get()
                     .readText().trim()
                     .replace("\${year}", year.toString())
                     .lines()

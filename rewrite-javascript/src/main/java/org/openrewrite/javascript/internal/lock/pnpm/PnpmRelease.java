@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.ValidateNpmPackageName;
 import org.openrewrite.javascript.semver.NodeSemver;
 
 import java.util.ArrayList;
@@ -142,10 +143,37 @@ public final class PnpmRelease {
     }
 
     /**
+     * npm-conf takes {@code userconfig}, {@code globalconfig} and {@code prefix}, which name the files it loads as the
+     * user's and the global config, from the command line, the environment, the builtin and the default config alone
+     * from pnpm 10.34.3 (pnpm/pnpm#12328, @pnpm/npm-conf 3.0.3); before, a project's or workspace's .npmrc names them
+     * too (3.0.0 and 3.0.2).
+     */
+    boolean loadsTheUserAndGlobalConfigFromTrustedSettings() {
+        return atLeast(11, 0, 0) || atLeast(10, 34, 3);
+    }
+
+    /**
      * General settings in pnpm-workspace.yaml are read from 10.5.0; before, only packages and catalogs.
      */
     boolean readsSettingsFromWorkspaceManifest() {
         return atLeast(10, 5, 0);
+    }
+
+    /**
+     * pnpm bundles normalize-registry-url 2.0.1 from 10.28.1 (pnpm/pnpm#10470), which serializes a registry URL as
+     * WHATWG URL does (a default port dropped, the host lowercased) before it adds the trailing slash; before, 2.0.0
+     * adds the slash alone.
+     */
+    boolean normalizesTheRegistryUrlAsAUrl() {
+        return atLeast(11, 0, 0) || atLeast(10, 28, 1);
+    }
+
+    /**
+     * minimumReleaseAge and minimumReleaseAgeExclude are settings from 10.16.0 (pnpm/pnpm#9957); before, an .npmrc's
+     * {@code minimum-release-age} is read into no setting.
+     */
+    boolean readsMinimumReleaseAge() {
+        return atLeast(10, 16, 0);
     }
 
     /**
@@ -156,17 +184,167 @@ public final class PnpmRelease {
     }
 
     /**
-     * Optional dependencies request full metadata for libc from 10.28.2 (pnpm/pnpm#9950).
+     * pnpm 10's store controller fetches full metadata where minimumReleaseAge is set and the registry has no time
+     * field, from 10.16.0 (pnpm/pnpm#9957); pnpm 11, which defaults the age to a day, does not.
+     */
+    boolean fetchesFullMetadataUnderAReleaseAge() {
+        return !atLeast(11, 0, 0) && atLeast(10, 16, 0);
+    }
+
+    /**
+     * A minimumReleaseAge pnpm 10 reads from 10.16.0 to 10.32.x: what it excludes, how it falls back on dist-tags,
+     * and how an optional dependency without a mature version fails, changed in 10.17.0 (pnpm/pnpm#9984,
+     * pnpm/pnpm#9988), 10.17.1 (pnpm/pnpm#10004), 10.19.0 (pnpm/pnpm#10059), 10.20.0 (pnpm/pnpm#10118,
+     * pnpm/pnpm#10130) and 10.25.0 (pnpm/pnpm#10289). The port has the rules of 10.33.0, so that the versions
+     * those releases resolve under a release age are cannot-know.
+     */
+    boolean readsAReleaseAgeThePortDoesNot() {
+        return !atLeast(11, 0, 0) && atLeast(10, 16, 0) && !atLeast(10, 33, 0);
+    }
+
+    /**
+     * trustPolicy, trustPolicyExclude and trustPolicyIgnoreAfter are read from 10.21.0 (pnpm/pnpm#10103); before,
+     * no setting.
+     */
+    boolean readsTrustPolicy() {
+        return atLeast(11, 0, 0) || atLeast(10, 21, 0);
+    }
+
+    /**
+     * A trustPolicy pnpm 10 reads from 10.21.0 to 10.32.x: trustPolicyExclude from 10.22.0 (pnpm/pnpm#10168), an
+     * optional dependency that fails the check fails the install from 10.23.0 (pnpm/pnpm#10211), a prerelease's
+     * evidence is ignored for a stable version from 10.24.0 (pnpm/pnpm#10227), an excluded package needs no time
+     * from 10.25.0 (pnpm/pnpm#10292), and trustPolicyIgnoreAfter is read from 10.27.0 (pnpm/pnpm#10359). The port
+     * has the rules of 10.33.0, so that the versions those releases resolve under no-downgrade are cannot-know.
+     */
+    boolean readsATrustPolicyThePortDoesNot() {
+        return !atLeast(11, 0, 0) && atLeast(10, 21, 0) && !atLeast(10, 33, 0);
+    }
+
+    /**
+     * Optional dependencies request full metadata for libc from 10.28.2 (pnpm/pnpm#10455).
      */
     boolean fetchesFullMetadataForOptionalDependencies() {
         return atLeast(10, 28, 2);
     }
 
     /**
-     * package-requester seeds the preferred version from currentPkg from 10.12.1.
+     * strictPeerDependencies fails over the peer issues peerDependencyRules leave from 10.11.0 (pnpm/pnpm#9505);
+     * before, over all of them, the reporter printing only those its rules leave, and nothing where it leaves none.
+     */
+    boolean filtersPeerIssuesByTheRules() {
+        return atLeast(11, 0, 0) || atLeast(10, 11, 0);
+    }
+
+    /**
+     * Below 10.11.0, the reporter renders the peer issues by the config's peerDependencyRules from 10.6.2
+     * (pnpm/pnpm#9245); before, by the root manifest's {@code pnpm.peerDependencyRules} alone.
+     */
+    boolean reportsTheRulesOfTheConfig() {
+        return atLeast(11, 0, 0) || atLeast(10, 6, 2);
+    }
+
+    /**
+     * peerDependencyRules leave out a missing peer every dependent takes as optional from 10.11.1 (pnpm/pnpm#9567).
+     */
+    boolean leavesOutAMissingOptionalPeer() {
+        return atLeast(11, 0, 0) || atLeast(10, 11, 1);
+    }
+
+    /**
+     * getOptionsFromPnpmSettings reads every setting of pnpm-workspace.yaml from 10.6.0 (pnpm/pnpm#9211); before,
+     * the ones the root manifest's pnpm field holds.
+     */
+    boolean readsEverySettingFromTheWorkspaceManifest() {
+        return atLeast(11, 0, 0) || atLeast(10, 6, 0);
+    }
+
+    /**
+     * getOptionsFromPnpmSettings drops empty overrides from 10.5.1 (pnpm/pnpm#9176); before, the root manifest's
+     * empty ones replace pnpm-workspace.yaml's.
+     */
+    boolean dropsEmptyOverrides() {
+        return atLeast(11, 0, 0) || atLeast(10, 5, 1);
+    }
+
+    /**
+     * workspace.root-finder takes pnpm-workspaces.yaml and pnpm-workspaces.yml for misspellings from 10.5.1
+     * (pnpm/pnpm#9173); before, pnpm-workspace.yml alone.
+     */
+    boolean detectsMisspelledWorkspaceManifests() {
+        return atLeast(11, 0, 0) || atLeast(10, 5, 1);
+    }
+
+    /**
+     * getConfig derives useLockfile after reading pnpm-workspace.yaml from 11.0.0; before, from the lockfile setting
+     * as .npmrc leaves it.
+     */
+    boolean readsTheLockfileSettingFromTheWorkspaceManifest() {
+        return atLeast(11, 0, 0);
+    }
+
+    /**
+     * getConfig derives useGitBranchLockfile after reading pnpm-workspace.yaml from 10.21.0 (pnpm/pnpm#10139);
+     * before, from the gitBranchLockfile setting as .npmrc leaves it.
+     */
+    boolean readsGitBranchLockfileFromTheWorkspaceManifest() {
+        return atLeast(11, 0, 0) || atLeast(10, 21, 0);
+    }
+
+    /**
+     * validatePeerDependencies takes a project peer that holds a {@code workspace:} or {@code catalog:} spec within a
+     * wider range from 10.1.0 (pnpm/pnpm#8946); before, only one that starts with it.
+     */
+    boolean acceptsAWorkspaceOrCatalogPeerWithinARange() {
+        return atLeast(11, 0, 0) || atLeast(10, 1, 0);
+    }
+
+    /**
+     * An override of a peer whose value is no peer range goes to the package's dependencies from 10.2.0
+     * (pnpm/pnpm#9000); before, peers are overridden as the other dependencies are.
+     */
+    boolean movesAnOverrideThatIsNoPeerRangeToDependencies() {
+        return atLeast(11, 0, 0) || atLeast(10, 2, 0);
+    }
+
+    /**
+     * The {@code catalog:} specs of an injected workspace package's dependencies are replaced from 10.6.5
+     * (pnpm/pnpm#9266); before, no resolver supports them.
+     */
+    boolean replacesTheCatalogProtocolOfAnInjectedWorkspacePackage() {
+        return atLeast(11, 0, 0) || atLeast(10, 6, 5);
+    }
+
+    /**
+     * switchCliVersion installs as the running release where the packageManager version is not clean, such as
+     * {@code v10.4.0}, from 10.4.0 (pnpm/pnpm#9057); before, it switches to it.
+     */
+    boolean keepsTheRunningReleaseForAPackageManagerVersionThatIsNotClean() {
+        return atLeast(11, 0, 0) || atLeast(10, 4, 0);
+    }
+
+    /**
+     * package-requester seeds the preferred version from currentPkg from 10.11.1 (pnpm/pnpm#9588).
      */
     boolean prefersTheCurrentPackageVersion() {
-        return atLeast(10, 12, 1);
+        return atLeast(10, 11, 1);
+    }
+
+    /**
+     * resolvePeersOfChildren adds the peer edges of an npm-aliased child under its package's name too from 10.12.4
+     * (pnpm/pnpm#9675); before, under its alias alone, so that a cycle through the package's name is not found and
+     * its dependency paths wait for each other forever.
+     */
+    boolean findsPeerCyclesUnderTheNameOfAnAlias() {
+        return atLeast(10, 12, 4);
+    }
+
+    /**
+     * A catalog entry's locked version is requested as the catalog's range, with that version its only preferred
+     * one, from 10.27.0 (pnpm/pnpm#10370); before, the locked version itself is requested.
+     */
+    boolean requestsTheCatalogRangeOfALockedVersion() {
+        return atLeast(10, 27, 0);
     }
 
     /**
@@ -177,10 +355,27 @@ public final class PnpmRelease {
     }
 
     /**
+     * satisfiesPackageManifest takes an importer whose locked version its unchanged range does not admit for one out
+     * of date from 10.15.0 (pnpm/pnpm#9832); before, it is up to date.
+     */
+    boolean checksTheLockedVersionOfAnImporter() {
+        return atLeast(10, 15, 0);
+    }
+
+    /**
      * hoistPeers reads a weighted preferred selector's type and omits a null maximum from 10.33.0.
      */
     boolean readsWeightedRequiredPeerSelectors() {
         return atLeast(10, 33, 0);
+    }
+
+    /**
+     * hoistPeers takes the highest preferred version an exact peer version (an override's, say) names from 10.30.2
+     * (pnpm/pnpm#10655), and under autoInstallPeers the version itself where none does; before, the highest
+     * preferred version.
+     */
+    boolean hoistsAnExactPeerVersion() {
+        return atLeast(11, 0, 0) || atLeast(10, 30, 2);
     }
 
     /**
@@ -199,6 +394,25 @@ public final class PnpmRelease {
     }
 
     /**
+     * A bare {@code workspace:} is read as {@code workspace:*}, a prerelease workspace version among those it takes,
+     * from 10.29.0 (pnpm/pnpm#10436); before, its range is {@code ''}, which takes no prerelease.
+     */
+    boolean readsABareWorkspaceSpecAsAny() {
+        return atLeast(11, 0, 0) || atLeast(10, 29, 0);
+    }
+
+    /**
+     * getConfig takes the root alone ({@code ['.']}) for a pnpm-workspace.yaml without packages, but in 10.29.0 to
+     * 10.29.1 (1dbbffb6a, put back by 595cd414f) and 10.31.0 to 10.32.0 (pnpm/pnpm#10127, put back by
+     * pnpm/pnpm#10927) leaves the patterns unset, so that findPackages takes every package.json
+     * ({@code ['.', '**']}).
+     */
+    boolean takesEveryManifestOfAWorkspaceWithoutPackages() {
+        return !atLeast(11, 0, 0) && (atLeast(10, 29, 0) && !atLeast(10, 29, 2) ||
+                                     atLeast(10, 31, 0) && !atLeast(10, 32, 1));
+    }
+
+    /**
      * pnpm 10 bundles @yarnpkg/extensions 2.0.3; pnpm 11's compatibility database is 2.0.6.
      */
     boolean usesCompatibilityDatabase206() {
@@ -212,9 +426,10 @@ public final class PnpmRelease {
      * A git-hosted tarball's resolution (codeload.github.com, gitlab.com, bitbucket.org) carries
      * {@code gitHosted: true}, written by toLockfileResolution and added to a lock read without it, from 11.0.7
      * ("Pin the integrity of git-hosted tarballs"); before, there is no such field, and a lock's is not written back.
+     * pnpm 10 marks them from 10.33.4 (pnpm/pnpm#11491).
      */
     boolean marksGitHostedTarballs() {
-        return atLeast(11, 0, 7);
+        return !atLeast(11, 0, 0) ? atLeast(10, 33, 4) : atLeast(11, 0, 7);
     }
 
     /**
@@ -235,17 +450,38 @@ public final class PnpmRelease {
 
     /**
      * A locked registry tarball without an integrity is {@code ERR_PNPM_MISSING_TARBALL_INTEGRITY}, from 11.4.0
-     * (pkgSnapshotToResolution); before, it is resolved as it is.
+     * (pkgSnapshotToResolution); before, it is resolved as it is. pnpm 10 requires it from 10.34.1
+     * (pnpm/pnpm#12007).
      */
     boolean requiresALockedTarballsIntegrity() {
-        return atLeast(11, 4, 0);
+        return !atLeast(11, 0, 0) ? atLeast(10, 34, 1) : atLeast(11, 4, 0);
+    }
+
+    /**
+     * pkgSnapshotToResolution of pnpm 10.34.1 lets any URL of a git host's ({@code https://codeload.github.com/},
+     * {@code https://bitbucket.org/}, {@code https://gitlab.com/}) go without an integrity, as written and without
+     * {@code tar.gz} in it, its own copy of isGitHostedTarballUrl; from 10.34.2 it asks lockfile.utils', as pnpm 11
+     * does.
+     */
+    boolean exemptsAnyGitHostUrlFromTheLockedIntegrity() {
+        return !atLeast(11, 0, 0) && !atLeast(10, 34, 2);
     }
 
     /**
      * A tarball URL is git-hosted in any case ({@code https://CodeLoad.GitHub.com/...}, {@code TAR.GZ}), and
-     * lockfile.fs asks lockfile.utils, from 11.5.3; before, only as written in lower case.
+     * lockfile.fs asks lockfile.utils, from 11.5.3; before, only as written in lower case. pnpm 10 reads the lock so
+     * from 10.34.2 (pnpm/pnpm#12306), the lock written as before ({@link #writesGitHostedTarballUrlsInAnyCase}).
      */
     boolean matchesGitHostedTarballUrlsInAnyCase() {
+        return !atLeast(11, 0, 0) ? atLeast(10, 34, 2) : atLeast(11, 5, 3);
+    }
+
+    /**
+     * toLockfileResolution takes a tarball URL for git-hosted in any case from 11.5.3, as
+     * {@link #matchesGitHostedTarballUrlsInAnyCase}; pnpm 10's (resolve-dependencies' updateLockfile.ts, its own copy
+     * of isGitHostedTarballUrl) only as written in lower case.
+     */
+    boolean writesGitHostedTarballUrlsInAnyCase() {
         return atLeast(11, 5, 3);
     }
 
@@ -428,10 +664,10 @@ public final class PnpmRelease {
      * An .npmrc's unscoped credentials ({@code _authToken}, {@code _auth}, {@code username}, {@code _password},
      * {@code tokenHelper}, {@code cert}, {@code key}) are pinned to the registry that .npmrc names, else npm's, and
      * checked with that registry's own, from 11.4.0; before, the merged unscoped ones are checked as the default
-     * registry's.
+     * registry's. pnpm 10 rescopes each source from 10.34.0 (pnpm/pnpm#11986).
      */
     boolean rescopesUnscopedCredentials() {
-        return atLeast(11, 4, 0);
+        return !atLeast(11, 0, 0) ? atLeast(10, 34, 0) : atLeast(11, 4, 0);
     }
 
     /**
@@ -528,19 +764,22 @@ public final class PnpmRelease {
      * The project's own .npmrc expands no environment variable in a request destination (a registry, a {@code //}
      * key, a proxy) or a credential, and its pnpm-workspace.yaml none in {@code registry}, {@code pnprServer},
      * {@code registries} or {@code namedRegistries}: such an entry is left out with a warning, from 11.5.3; before,
-     * each is expanded as any other.
+     * each is expanded as any other. pnpm 10 applies this filter from 10.34.2 (pnpm/pnpm#12300, config/config's
+     * dropUntrustedEnvExpansions).
      */
     boolean ignoresTheEnvironmentInRepositoryRequestDestinations() {
-        return atLeast(11, 5, 3);
+        return !atLeast(11, 0, 0) ? atLeast(10, 34, 2) : atLeast(11, 5, 3);
     }
 
     /**
      * pnpm resolves and fetches itself (the package manager check and the switch) from {@code
      * packageManagerRegistries}, those of its built-in config, the user's .npmrc and the environment alone, from
      * 11.5.3 (getPackageManagerBootstrapConfig); before, from the install's registries, the project's among them.
+     * pnpm 10 does so from 10.34.2 (pnpm/pnpm#12300, config/config's packageManagerRegistries), where the engine hands
+     * no install over and its getNetworkConfigs fails on no credential.
      */
     boolean resolvesThePackageManagerFromTrustedConfig() {
-        return atLeast(11, 5, 3);
+        return !atLeast(11, 0, 0) ? atLeast(10, 34, 2) : atLeast(11, 5, 3);
     }
 
     // pnpm/src main.ts, syncEnvLockfile.ts, switchCliVersion.ts, packageManagerLockfile.ts
@@ -719,10 +958,39 @@ public final class PnpmRelease {
 
     /**
      * A packument the run already holds, abbreviated and changed after the release-age cutoff, is fetched again in
-     * full, from 11.1.2 (maybeUpgradeAbbreviatedMetaForReleaseAge); before, it is picked from as it is.
+     * full, from 11.1.2 (maybeUpgradeAbbreviatedMetaForReleaseAge); before, it is picked from as it is. pnpm 10 fetches
+     * it again from 10.34.0 (pnpm/pnpm#11630), whatever its {@code modified}
+     * ({@link #readsTheModifiedDateOfAnAbbreviatedPackument}).
      */
     boolean upgradesAHeldPackumentForTheReleaseAge() {
-        return atLeast(11, 1, 2);
+        return !atLeast(11, 0, 0) ? atLeast(10, 34, 0) : atLeast(11, 1, 2);
+    }
+
+    /**
+     * {@code minimumReleaseAgeIgnoreMissingTime}, true by default, lets the picker skip the release-age policy of a
+     * packument without a time field in pnpm 11 (pnpm/pnpm#11293); pnpm 10 has no such setting, and the picker fails
+     * with {@code ERR_PNPM_MISSING_TIME}.
+     */
+    boolean readsMinimumReleaseAgeIgnoreMissingTime() {
+        return atLeast(11, 0, 0);
+    }
+
+    /**
+     * An abbreviated packument without a time field that the registry gives under a release-age cutoff is fetched
+     * again in full, in pnpm 10 from 10.34.0 (pnpm/pnpm#11630, pickPackage); before, it is picked from as it is.
+     */
+    boolean fetchesAFullPackumentForTheReleaseAge() {
+        return atLeast(11, 0, 0) || atLeast(10, 34, 0);
+    }
+
+    /**
+     * An abbreviated packument whose {@code modified} is before the release-age cutoff is mature as it is, and is not
+     * fetched again in full, in pnpm 11; pnpm 10 does not read its {@code modified}: it fetches it in full all the same
+     * ({@link #fetchesAFullPackumentForTheReleaseAge}, {@link #upgradesAHeldPackumentForTheReleaseAge}), and its picker
+     * fails on one without a time field ({@code ERR_PNPM_MISSING_TIME}).
+     */
+    boolean readsTheModifiedDateOfAnAbbreviatedPackument() {
+        return atLeast(11, 0, 0);
     }
 
     /**
@@ -918,10 +1186,21 @@ public final class PnpmRelease {
      * A lock entry whose dep path is a registry version ({@code name@version}) but whose resolution is no registry
      * tarball (typed, git-hosted, or a tarball URL neither http nor https) fails the lock's verification with
      * {@code ERR_PNPM_RESOLUTION_SHAPE_MISMATCH}, ahead of any verifier and with none active, from 11.5.3; before, it
-     * is read as it is.
+     * is read as it is. pnpm 10 makes the check where pkgSnapshotToResolution reads the entry
+     * ({@link #rejectsARegistryDepPathWithANonRegistryResolutionOnRead}).
      */
     boolean rejectsARegistryDepPathWithANonRegistryResolution() {
         return atLeast(11, 5, 3);
+    }
+
+    /**
+     * pkgSnapshotToResolution fails on a lock entry whose dep path is a registry version but whose resolution is no
+     * registry tarball ({@code ERR_PNPM_RESOLUTION_SHAPE_MISMATCH}, lockfile.utils' assertRegistryShapedResolution),
+     * in pnpm 10 from 10.34.2 (pnpm/pnpm#12306); pnpm 11 verifies the whole lock instead
+     * ({@link #rejectsARegistryDepPathWithANonRegistryResolution}).
+     */
+    boolean rejectsARegistryDepPathWithANonRegistryResolutionOnRead() {
+        return !atLeast(11, 0, 0) && atLeast(10, 34, 2);
     }
 
     /**
@@ -944,7 +1223,8 @@ public final class PnpmRelease {
 
     /**
      * {@code updateChecksums} makes the install resolve in full, from 11.4.0; before, a lock-only install does not
-     * read it.
+     * read it. pnpm 10 takes it from 10.34.0 (pnpm/pnpm#11985) on the command line alone, which no input gives: an
+     * .npmrc's {@code update-checksums} is no setting there.
      */
     boolean resolvesInFullToUpdateChecksums() {
         return atLeast(11, 4, 0);
@@ -1008,10 +1288,19 @@ public final class PnpmRelease {
 
     /**
      * A dependency name no npm package can have is {@code ERR_PNPM_INVALID_DEPENDENCY_NAME}, in a project's manifest
-     * and a package's, from 11.4.0; before, it is taken as a name.
+     * and a package's, from 11.4.0; before, it is taken as a name. pnpm 10 rejects it from 10.34.0 (pnpm/pnpm
+     * 455cfcd84), with the validate-npm-package-name it bundles ({@link #validateNpmPackageName}).
      */
     boolean rejectsAnInvalidDependencyName() {
-        return atLeast(11, 4, 0);
+        return !atLeast(11, 0, 0) ? atLeast(10, 34, 0) : atLeast(11, 4, 0);
+    }
+
+    /**
+     * The validate-npm-package-name pnpm checks a dependency's name with (validateDependencyAlias.ts,
+     * safeJoinModulesDir): 7.0.2 in pnpm 11, whose {@code -x} and {@code @s/.x} are no names; pnpm 10 bundles 5.0.0.
+     */
+    ValidateNpmPackageName.Release validateNpmPackageName() {
+        return atLeast(11, 0, 0) ? ValidateNpmPackageName.Release.V7_0_2 : ValidateNpmPackageName.Release.V5_0_0;
     }
 
     /**
@@ -1051,7 +1340,42 @@ public final class PnpmRelease {
     }
 
     /**
-     * The install command passes supportedArchitectures.libc to getFetchFullMetadata from 10.14.0.
+     * A package whose manifest names no bin keeps the hasBin the lock gives it from 10.18.3 (pnpm/pnpm#10065), an
+     * abbreviated packument holding no {@code directories}; before, hasBin comes from the manifest alone.
+     */
+    boolean keepsTheLockedHasBinOfAManifestWithoutBin() {
+        return atLeast(11, 0, 0) || atLeast(10, 18, 3);
+    }
+
+    /**
+     * A resolved package's {@code engines.runtime} becomes a {@code runtime:} dependency from 10.21.0
+     * (pnpm/pnpm#10141); before, it is an engines field like any other.
+     */
+    boolean convertsTheEnginesRuntimeOfADependency() {
+        return atLeast(11, 0, 0) || atLeast(10, 21, 0);
+    }
+
+    /**
+     * The npm resolver serializes a packument's tarball URL as WHATWG URL does (a default port dropped, the host
+     * lowercased) from 10.26.0 (pnpm/pnpm#10273); before, it takes the URL as the packument gives it.
+     */
+    boolean normalizesATarballUrl() {
+        return atLeast(11, 0, 0) || atLeast(10, 26, 0);
+    }
+
+    /**
+     * Where the registry has no version of a dependency, the npm resolver falls back on a workspace package within
+     * the dependency's range from 10.31.0 (pnpm/pnpm#10704); before, it passes the install's update to the fallback,
+     * which a dependency without a locked version has, and takes any version of the workspace package.
+     */
+    boolean fallsBackOnAWorkspacePackageWithinTheRange() {
+        return atLeast(11, 0, 0) || atLeast(10, 31, 0);
+    }
+
+    /**
+     * The install command passes getFetchFullMetadata's {@code supportedArchitectures.libc}, the root manifest's as a
+     * fallback, from 10.14.0 (pnpm/pnpm#9745); before, the root manifest's {@code pnpm.supportedArchitectures.libc}
+     * alone.
      */
     boolean fetchesFullMetadataForConfiguredLibc() {
         return atLeast(10, 14, 0);
@@ -1102,10 +1426,10 @@ public final class PnpmRelease {
      * A git-hosted tarball the install fetches for its manifest gives a resolution without an integrity the one it
      * was fetched with, under --lockfile-only too (a store that holds the tarball gives none), from 11.0.7
      * (gitHostedTarballFetcher, the change that marks git-hosted tarballs, {@link #marksGitHostedTarballs}); before,
-     * it is written without one.
+     * it is written without one. pnpm 10 pins it from 10.33.4 (pnpm/pnpm#11491).
      */
     boolean pinsTheIntegrityOfAFetchedGitHostedTarball() {
-        return atLeast(11, 0, 7);
+        return !atLeast(11, 0, 0) ? atLeast(10, 33, 4) : atLeast(11, 0, 7);
     }
 
     /**
@@ -1187,10 +1511,11 @@ public final class PnpmRelease {
     /**
      * A package's directory in the virtual store is safeJoinModulesDir's, which refuses a name
      * validate-npm-package-name rejects ({@code ERR_PNPM_INVALID_DEPENDENCY_NAME}, naming the directory's absolute
-     * path), from 11.11.0; before, any name is joined as it is.
+     * path), from 11.11.0; before, any name is joined as it is. pnpm 10 refuses it from 10.34.5 (pnpm/pnpm#12890),
+     * with the validate-npm-package-name it bundles ({@link #validateNpmPackageName}).
      */
     boolean placesAPackageOnlyUnderAValidName() {
-        return atLeast(11, 11, 0);
+        return !atLeast(11, 0, 0) ? atLeast(10, 34, 5) : atLeast(11, 11, 0);
     }
 
     // @pnpm/installing.deps-resolver src/dedupeInjectedDeps.ts
@@ -1305,12 +1630,15 @@ public final class PnpmRelease {
      * {@code includePrerelease}; 7.8.4 from 11.7.0, which takes an x-range with a number after a wildcard
      * ({@code 1.x.3}) for no range and leaves a caret range below 1.0.0 without the {@code -0} includePrerelease adds;
      * 7.8.1 from 11.3.0, which strips build metadata from a whole range; 7.8.0 from 11.2.0, and before, 7.7.4, which
-     * answers as 7.8.0 does (7.8.0 adds only {@code truncate}).
+     * answers as 7.8.0 does (7.8.0 adds only {@code truncate}). pnpm 10 bundles 7.7.3 from 10.29.0 and 7.7.4 from
+     * 10.31.0, which answer as 7.8.0 does; before, 7.6.2, 7.7.0, 7.7.1 or 7.7.2, which answer as 7.7.2 does and keep
+     * a comparator's build metadata, so that {@code ^1+build} is no range.
      */
     NodeSemver.Release semver() {
         return atLeast(11, 9, 0) ? NodeSemver.Release.V7_8_5 :
                 atLeast(11, 7, 0) ? NodeSemver.Release.V7_8_4 :
-                        atLeast(11, 3, 0) ? NodeSemver.Release.V7_8_1 : NodeSemver.Release.V7_8_0;
+                        atLeast(11, 3, 0) ? NodeSemver.Release.V7_8_1 :
+                                atLeast(10, 29, 0) ? NodeSemver.Release.V7_8_0 : NodeSemver.Release.V7_7_2;
     }
 
     /**

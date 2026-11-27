@@ -28,7 +28,9 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
+import java.util.function.Predicate;
 
 /**
  * This matcher will find all annotations matching the annotation pattern
@@ -89,43 +91,92 @@ public class AnnotationMatcher {
     }
 
     public boolean matches(J.Annotation annotation) {
-        return matchesAnnotationName(annotation) &&
-               matchesSingleParameter(annotation) &&
-               matchesNamedParameters(annotation);
-    }
-
-    private boolean matchesAnnotationName(J.Annotation annotation) {
-        return matchesAnnotationOrMetaAnnotation(TypeUtils.asFullyQualified(annotation.getType()), null);
+        JavaType.FullyQualified type = TypeUtils.asFullyQualified(annotation.getType());
+        if (type != null && matcher.matches(type.getFullyQualifiedName())) {
+            return matchesSingleParameter(annotation) && matchesNamedParameters(annotation);
+        }
+        return matchesMetaAnnotation(type, this::matchesElementValues, null);
     }
 
     public boolean matchesAnnotationOrMetaAnnotation(JavaType.@Nullable FullyQualified fqn) {
-        return matchesAnnotationOrMetaAnnotation(fqn, null);
+        return fqn != null && (matcher.matches(fqn.getFullyQualifiedName()) ||
+                               matchesMetaAnnotation(fqn, annotation -> true, null));
     }
 
-    private boolean matchesAnnotationOrMetaAnnotation(JavaType.@Nullable FullyQualified fqn,
-                                                      @Nullable Set<String> seenAnnotations) {
-        if (fqn != null) {
-            if (matcher.matches(fqn.getFullyQualifiedName())) {
-                return true;
-            } else if (matchMetaAnnotations) {
-                for (JavaType.FullyQualified annotation : fqn.getAnnotations()) {
-                    //noinspection ConstantValue
-                    if (annotation == null) {
-                        // Workaround for parsing bug that caused these annotations
-                        // to sometimes be null.
-                        continue;
-                    }
-                    if (seenAnnotations == null) {
-                        seenAnnotations = new HashSet<>();
-                    }
-                    if (seenAnnotations.add(annotation.getFullyQualifiedName()) &&
-                        matchesAnnotationOrMetaAnnotation(annotation, seenAnnotations)) {
-                        return true;
-                    }
+    private boolean matchesMetaAnnotation(JavaType.@Nullable FullyQualified fqn,
+                                          Predicate<JavaType.FullyQualified> matchesValues,
+                                          @Nullable Set<String> seenAnnotations) {
+        if (fqn == null || !matchMetaAnnotations) {
+            return false;
+        }
+        for (JavaType.FullyQualified annotation : fqn.getAnnotations()) {
+            //noinspection ConstantValue
+            if (annotation == null) {
+                // Workaround for parsing bug that caused these annotations
+                // to sometimes be null.
+                continue;
+            }
+            if (matcher.matches(annotation.getFullyQualifiedName())) {
+                if (matchesValues.test(annotation)) {
+                    return true;
                 }
+                continue;
+            }
+            if (seenAnnotations == null) {
+                seenAnnotations = new HashSet<>();
+            }
+            if (seenAnnotations.add(annotation.getFullyQualifiedName()) &&
+                matchesMetaAnnotation(annotation, matchesValues, seenAnnotations)) {
+                return true;
             }
         }
         return false;
+    }
+
+    private boolean matchesElementValues(JavaType.FullyQualified annotation) {
+        if (match.elementValue() != null) {
+            return elementValueMatches(annotation, "value", match.elementValue().getText());
+        }
+        AnnotationSignatureParser.ElementValuePairsContext pairs = match.elementValuePairs();
+        if (pairs != null && pairs.elementValuePair() != null) {
+            for (AnnotationSignatureParser.ElementValuePairContext pair : pairs.elementValuePair()) {
+                if (!elementValueMatches(annotation, pair.Identifier().getText(), pair.elementValue().getText())) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    private static boolean elementValueMatches(JavaType.FullyQualified annotation, String name, String matchText) {
+        if (!(annotation instanceof JavaType.Annotation)) {
+            return false;
+        }
+        for (JavaType.Annotation.ElementValue elementValue : ((JavaType.Annotation) annotation).getValues()) {
+            if (elementValue.getElement() instanceof JavaType.Method &&
+                name.equals(((JavaType.Method) elementValue.getElement()).getName())) {
+                Object value = elementValue.getValue();
+                return value instanceof List ?
+                        ((List<?>) value).stream().anyMatch(v -> valueMatches(v, matchText)) :
+                        valueMatches(value, matchText);
+            }
+        }
+        return false;
+    }
+
+    private static boolean valueMatches(@Nullable Object value, String matchText) {
+        if (value instanceof JavaType.Variable) {
+            JavaType.Variable variable = (JavaType.Variable) value;
+            JavaType.FullyQualified owner = TypeUtils.asFullyQualified(variable.getOwner());
+            return owner != null && matchText.equals(owner.getFullyQualifiedName() + "." + variable.getName());
+        } else if (value instanceof JavaType.FullyQualified) {
+            return matchText.endsWith(".class") && TypeUtils.fullyQualifiedNamesAreEqual(
+                    matchText.substring(0, matchText.length() - 6),
+                    ((JavaType.FullyQualified) value).getFullyQualifiedName());
+        }
+        // Serialized LSTs may hold any constant as its string form, so compare text, not Java type
+        String text = String.valueOf(value);
+        return matchText.equals(text) || matchText.equals('"' + text + '"') || matchText.equals("'" + text + "'");
     }
 
     private boolean matchesNamedParameters(J.Annotation annotation) {

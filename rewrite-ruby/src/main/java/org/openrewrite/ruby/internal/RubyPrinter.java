@@ -661,7 +661,7 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
     public J visitYield(Rb.Yield yield, PrintOutputCapture<P> p) {
         beforeSyntax(yield, RubySpace.Location.YIELD_DATA, p);
         p.append("yield");
-        JContainer<Statement> args = yield.getPadding().getData();
+        JContainer<Expression> args = yield.getPadding().getData();
         if (args.getMarkers().findFirst(OmitParentheses.class).isPresent()) {
             visitContainer("", args, RubyContainer.Location.YIELD_DATA, ",", "", p);
         } else {
@@ -1225,7 +1225,11 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
                             (method.getMarkers().findFirst(Colon2.class).isPresent() ? "::" : ".");
             visitRightPadded(method.getPadding().getSelect(),
                     JRightPadded.Location.METHOD_SELECT, suffix, p);
-            visit(method.getName(), p);
+            // `Foo.()` writes no message, but a recipe that renamed it has to write the new one
+            if (!method.getMarkers().findFirst(ImplicitCall.class).isPresent() ||
+                !"call".equals(method.getSimpleName())) {
+                visit(method.getName(), p);
+            }
 
             JContainer<Expression> args = method.getPadding().getArguments();
             AtomicReference<Rb.Block> blockArg = new AtomicReference<>();
@@ -1310,7 +1314,8 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
             beforeSyntax(newClass, Space.Location.NEW_CLASS_PREFIX, p);
             visit(newClass.getClazz(), p);
             visitSpace(requireNonNull(newClass.getPadding().getEnclosing()).getAfter(), Space.Location.NEW_CLASS_ENCLOSING_SUFFIX, p);
-            p.append(newClass.getMarkers().findFirst(SafeNavigation.class).isPresent() ? "&." : ".");
+            p.append((newClass.getMarkers().findFirst(SafeNavigation.class).isPresent() ? "&" : "") +
+                     (newClass.getMarkers().findFirst(Colon2.class).isPresent() ? "::" : "."));
             visitSpace(newClass.getNew(), Space.Location.NEW_PREFIX, p);
             p.append("new");
             JContainer<Expression> args = newClass.getPadding().getArguments();

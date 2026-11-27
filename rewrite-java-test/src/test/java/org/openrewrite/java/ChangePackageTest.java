@@ -29,6 +29,7 @@ import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
+import org.openrewrite.test.TypeValidation;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -287,6 +288,52 @@ class ChangePackageTest implements RewriteTest {
                 assertThat(TypeUtils.asFullyQualified(methodType.getParameterTypes().getFirst()).getFullyQualifiedName())
                   .isEqualTo("org.openrewrite.test.Test");
             })
+          )
+        );
+    }
+
+    @Test
+    void updateThrownExceptionType() {
+        rewriteRun(
+          java(testClassBefore, testClassAfter),
+          java(
+            """
+              import org.openrewrite.Test;
+              public class A {
+                  void m() throws Test {
+                  }
+              }
+              """,
+            """
+              import org.openrewrite.test.Test;
+              public class A {
+                  void m() throws Test {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void updateThrownTypeVariableBound() {
+        rewriteRun(
+          java(testClassBefore, testClassAfter),
+          java(
+            """
+              import org.openrewrite.Test;
+              public class A {
+                  <E extends Test> void m() throws E {
+                  }
+              }
+              """,
+            """
+              import org.openrewrite.test.Test;
+              public class A {
+                  <E extends Test> void m() throws E {
+                  }
+              }
+              """
           )
         );
     }
@@ -1527,6 +1574,44 @@ class ChangePackageTest implements RewriteTest {
     }
 
     @Test
+    void typeVariableBoundThatRefersToTheVariable() {
+        rewriteRun(
+          java(
+            """
+              package org.openrewrite;
+              public class Node<T extends Node<T>> {
+              }
+              """,
+            """
+              package org.openrewrite.test;
+              public class Node<T extends Node<T>> {
+              }
+              """
+          ),
+          java(
+            """
+              import org.openrewrite.Node;
+              import java.util.List;
+
+              class Test {
+                  <T extends Node<T>> void sort(List<T> nodes) {
+                  }
+              }
+              """,
+            """
+              import org.openrewrite.test.Node;
+              import java.util.List;
+
+              class Test {
+                  <T extends Node<T>> void sort(List<T> nodes) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void multiCatch() {
         rewriteRun(
           java(testClassBefore, testClassAfter),
@@ -2018,14 +2103,50 @@ class ChangePackageTest implements RewriteTest {
           xml(
             """
               <?xml version="1.0" encoding="UTF-8"?>
-              <beans xsi:schemaLocation="www.springframework.org/schema/beans">
+              <beans xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="www.springframework.org/schema/beans">
                 <bean id="abc" class="test.type.A"/>
               </beans>
               """,
             """
               <?xml version="1.0" encoding="UTF-8"?>
-              <beans xsi:schemaLocation="www.springframework.org/schema/beans">
+              <beans xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="www.springframework.org/schema/beans">
                 <bean id="abc" class="test.test.type.A"/>
+              </beans>
+              """
+          )
+        );
+    }
+
+    @Test
+    void changePackageInSpringXmlLeavesPomAndPropertyKeys() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("test.type", "test.test.type", true)),
+          xml(
+            """
+              <project>
+                <groupId>test.type</groupId>
+                <artifactId>app</artifactId>
+              </project>
+              """,
+            spec -> spec.path("pom.xml")
+          ),
+          xml(
+            """
+              <beans xmlns="http://www.springframework.org/schema/beans">
+                <bean class="test.type.A">
+                  <property name="delegate" value="test.type.B"/>
+                  <property name="messageKey" value="test.type.error.title"/>
+                  <property name="basename" value="test.type.Messages"/>
+                </bean>
+              </beans>
+              """,
+            """
+              <beans xmlns="http://www.springframework.org/schema/beans">
+                <bean class="test.test.type.A">
+                  <property name="delegate" value="test.test.type.B"/>
+                  <property name="messageKey" value="test.type.error.title"/>
+                  <property name="basename" value="test.type.Messages"/>
+                </bean>
               </beans>
               """
           )
@@ -2390,6 +2511,352 @@ class ChangePackageTest implements RewriteTest {
             "org.foo.MyImpl\n",
             "org.bar.MyImpl\n",
             spec -> spec.path("META-INF/services/org.other.SomeInterface")
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4142")
+    void singleElementPackageName() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("somepkg", "org.openrewrite.somepkg", null)),
+          java(
+            """
+              package somepkg;
+
+              public class Test {
+              }
+              """,
+            """
+              package org.openrewrite.somepkg;
+
+              public class Test {
+              }
+              """
+          ),
+          java(
+            """
+              package somepkg.sub;
+
+              public class Other {
+              }
+              """
+          ),
+          java(
+            """
+              import somepkg.Test;
+              import somepkg.sub.Other;
+
+              /**
+               * {@link somepkg.Test}
+               */
+              class A {
+                  Test a;
+                  somepkg.Test b;
+                  Other c;
+
+                  void test(String somepkg) {
+                      int len = somepkg.length();
+                  }
+
+                  void test(Integer somepkg) {
+                      int max = somepkg.MAX_VALUE;
+                  }
+              }
+              """,
+            """
+              import org.openrewrite.somepkg.Test;
+              import somepkg.sub.Other;
+
+              /**
+               * {@link org.openrewrite.somepkg.Test}
+               */
+              class A {
+                  Test a;
+                  org.openrewrite.somepkg.Test b;
+                  Other c;
+
+                  void test(String somepkg) {
+                      int len = somepkg.length();
+                  }
+
+                  void test(Integer somepkg) {
+                      int max = somepkg.MAX_VALUE;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4142")
+    void singleElementPackageNameRecursive() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("somepkg", "org.openrewrite.somepkg", true)),
+          java(
+            """
+              package somepkg;
+
+              public class Test {
+              }
+              """,
+            """
+              package org.openrewrite.somepkg;
+
+              public class Test {
+              }
+              """
+          ),
+          java(
+            """
+              package somepkg.sub;
+
+              public class Other {
+              }
+              """,
+            """
+              package org.openrewrite.somepkg.sub;
+
+              public class Other {
+              }
+              """
+          ),
+          java(
+            """
+              import somepkg.*;
+              import somepkg.sub.Other;
+
+              class A {
+                  Test a;
+                  Other b;
+              }
+              """,
+            """
+              import org.openrewrite.somepkg.*;
+              import org.openrewrite.somepkg.sub.Other;
+
+              class A {
+                  Test a;
+                  Other b;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void recursiveRenameToPackageNameThatIsAStringPrefix() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("com.acme.boot3", "com.acme.boot", true)),
+          java(
+            """
+              package com.acme.boot3.retry;
+              public class Retry {
+              }
+              """,
+            """
+              package com.acme.boot.retry;
+              public class Retry {
+              }
+              """
+          ),
+          java(
+            """
+              import com.acme.boot3.retry.Retry;
+              class A {
+                  Retry retry;
+              }
+              """,
+            """
+              import com.acme.boot.retry.Retry;
+              class A {
+                  Retry retry;
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> assertThat(cu.getTypesInUse().getTypesInUse())
+              .extracting(JavaType::toString)
+              .contains("com.acme.boot.retry.Retry")
+              .doesNotContain("com.acme.boot3.retry.Retry"))
+          )
+        );
+    }
+
+    @Test
+    void recursiveRenameKeepsSubpackageNamedLikeTheNewPackageTail() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("com.acme.boot3", "com.acme.boot", true)),
+          java(
+            """
+              package com.acme.boot3.boot;
+              public class Retry {
+              }
+              """,
+            """
+              package com.acme.boot.boot;
+              public class Retry {
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> assertThat(cu.findType("com.acme.boot.boot.Retry")).isNotEmpty())
+          )
+        );
+    }
+
+    @Test
+    void recursiveRenameToParentPackage() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("com.acme.boot.legacy", "com.acme.boot", true)),
+          java(
+            """
+              package com.acme.boot.legacy.retry;
+              public class Retry {
+              }
+              """,
+            """
+              package com.acme.boot.retry;
+              public class Retry {
+              }
+              """
+          ),
+          java(
+            """
+              import com.acme.boot.legacy.retry.Retry;
+              class A {
+                  Retry retry;
+              }
+              """,
+            """
+              import com.acme.boot.retry.Retry;
+              class A {
+                  Retry retry;
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> assertThat(cu.getTypesInUse().getTypesInUse())
+              .extracting(JavaType::toString)
+              .contains("com.acme.boot.retry.Retry")
+              .doesNotContain("com.acme.boot.legacy.retry.Retry"))
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4142")
+    void singleElementPackageNameToSubpackage() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("somepkg", "somepkg.sub", false)),
+          java(
+            """
+              package somepkg;
+
+              public class Test {
+              }
+              """,
+            """
+              package somepkg.sub;
+
+              public class Test {
+              }
+              """
+          ),
+          java(
+            """
+              package somepkg.sub;
+
+              public class Other {
+              }
+              """
+          ),
+          java(
+            """
+              import somepkg.Test;
+              import somepkg.sub.Other;
+
+              class A {
+                  Test a;
+                  Other b;
+              }
+              """,
+            """
+              import somepkg.sub.Test;
+              import somepkg.sub.Other;
+
+              class A {
+                  Test a;
+                  Other b;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4142")
+    void singleElementPackageNameRecursiveKeepsUnresolvedFieldAccess() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("somepkg", "org.openrewrite.somepkg", true))
+            .typeValidationOptions(TypeValidation.all().identifiers(false)),
+          java(
+            """
+              package somepkg;
+
+              public class Test {
+              }
+              """,
+            """
+              package org.openrewrite.somepkg;
+
+              public class Test {
+              }
+              """
+          ),
+          java(
+            """
+              import somepkg.Test;
+
+              class A extends Missing {
+                  Test a;
+                  int b = somepkg.count;
+              }
+              """,
+            """
+              import org.openrewrite.somepkg.Test;
+
+              class A extends Missing {
+                  Test a;
+                  int b = somepkg.count;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void typeArgumentsWithinTypeArguments() {
+        rewriteRun(
+          java(testClassBefore, testClassAfter, spec -> spec.path("org/openrewrite/Test.java")),
+          java(
+            """
+              import org.openrewrite.Test;
+
+              import java.util.List;
+
+              class B {
+                  List<List<Test>> nested;
+                  List<? extends List<Test>> bound;
+                  List<Test[]> array;
+              }
+              """,
+            """
+              import org.openrewrite.test.Test;
+
+              import java.util.List;
+
+              class B {
+                  List<List<Test>> nested;
+                  List<? extends List<Test>> bound;
+                  List<Test[]> array;
+              }
+              """
           )
         );
     }

@@ -107,7 +107,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
             private J.Annotation addOrUpdate(J.Annotation original, J.Annotation a, ExecutionContext ctx) {
                 String newAttributeValue;
                 if (isFullyQualifiedClass()) {
-                    maybeAddImport(attributeValue.substring(0, attributeValue.length() - 6));
+                    maybeAddImport(fullyQualifiedClassName());
                     newAttributeValue = attributeValue;
                 } else if (isFullyQualifiedEnumValue(a)) {
                     maybeAddImport(getEnumClassName(attributeValue), false);
@@ -204,10 +204,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                     if (oldAttributeValue != null) {
                         return as;
                     }
-                    if (isFullyQualifiedClass() && getFullyQualifiedClass(newAttributeValue).equals(exp.toString())) {
-                        return as;
-                    }
-                    if (newAttributeValue.equals(exp.toString())) {
+                    if (alreadySetTo((J.FieldAccess) exp, newAttributeValue)) {
                         return as;
                     }
                     // If appendArray is true and attribute is an array, convert FieldAccess to array and append
@@ -250,10 +247,10 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                     if (newAttributeValue == null) {
                         return null;
                     }
-                    if (isFullyQualifiedClass() && getFullyQualifiedClass(newAttributeValue).equals(fieldAccess.toString())) {
+                    if (alreadySetTo(fieldAccess, newAttributeValue)) {
                         return fieldAccess;
                     }
-                    if (!valueMatches(fieldAccess, oldAttributeValue) || newAttributeValue.equals(fieldAccess.toString())) {
+                    if (!valueMatches(fieldAccess, oldAttributeValue)) {
                         return fieldAccess;
                     }
                     // If appendArray is true and attribute is an array, convert FieldAccess to array and append
@@ -274,7 +271,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
             private JavaTemplate getJavaTemplate(String template) {
                 JavaTemplate.Builder builder = JavaTemplate.builder(template);
                 if (isFullyQualifiedClass()) {
-                    JavaType.ShallowClass fqn = JavaType.ShallowClass.build(attributeValue.substring(0, attributeValue.length() - 6));
+                    JavaType.ShallowClass fqn = JavaType.ShallowClass.build(fullyQualifiedClassName());
                     builder
                             .javaParser(JavaParser.fromJavaVersion().dependsOn(String.format("package %s;\npublic interface %s {}\n", fqn.getPackageName(), fqn.getClassName())))
                             .imports(fqn.getFullyQualifiedName());
@@ -371,6 +368,39 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                !attributeValue.contains(",") &&
                attributeValue.endsWith(".class") &&
                StringUtils.countOccurrences(attributeValue, ".") > 1;
+    }
+
+    private String fullyQualifiedClassName() {
+        return requireNonNull(attributeValue).substring(0, attributeValue.length() - 6);
+    }
+
+    private boolean alreadySetTo(J.FieldAccess fieldAccess, String newAttributeValue) {
+        if (isFullyQualifiedClass()) {
+            JavaType targetType = fieldAccess.getTarget().getType();
+            if ("class".equals(fieldAccess.getSimpleName()) &&
+                targetType instanceof JavaType.FullyQualified && !(targetType instanceof JavaType.Unknown)) {
+                return TypeUtils.isOfClassType(targetType, fullyQualifiedClassName());
+            }
+            String name = dottedName(fieldAccess);
+            return getFullyQualifiedClass(newAttributeValue).equals(name) || newAttributeValue.equals(name);
+        }
+        return newAttributeValue.equals(dottedName(fieldAccess));
+    }
+
+    private static String dottedName(Expression expression) {
+        if (expression instanceof J.Identifier) {
+            return ((J.Identifier) expression).getSimpleName();
+        }
+        if (expression instanceof J.FieldAccess) {
+            return dottedName(((J.FieldAccess) expression).getTarget()) + "." + ((J.FieldAccess) expression).getSimpleName();
+        }
+        if (expression instanceof J.Primitive) {
+            return ((J.Primitive) expression).getType().getKeyword();
+        }
+        if (expression instanceof J.ArrayType) {
+            return dottedName((Expression) ((J.ArrayType) expression).getElementType()) + "[]";
+        }
+        return expression.toString();
     }
 
     private static String getFullyQualifiedClass(String fqn) {
@@ -489,12 +519,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
         } else if (expression instanceof J.Literal) {
             return oldAttributeValue.equals(((J.Literal) expression).getValue());
         } else if (expression instanceof J.FieldAccess) {
-            J.FieldAccess fa = (J.FieldAccess) expression;
-            if (!(fa.getTarget() instanceof J.Identifier)) {
-                return oldAttributeValue.equals(fa.toString());
-            }
-            String currentValue = ((J.Identifier) fa.getTarget()).getSimpleName() + "." + fa.getSimpleName();
-            return oldAttributeValue.equals(currentValue);
+            return oldAttributeValue.equals(dottedName(expression));
         } else if (expression instanceof J.Identifier) { // class names, static variables, ...
             if (oldAttributeValue.endsWith(".class")) {
                 String className = TypeUtils.toString(requireNonNull(expression.getType())) + ".class";
@@ -629,7 +654,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
             return values.contains(((J.Literal) e).getValue() + "");
         } else if (e instanceof J.FieldAccess) {
             J.FieldAccess fa = (J.FieldAccess) e;
-            String fullString = fa.toString();
+            String fullString = dottedName(fa);
             if (values.contains(fullString)) {
                 return true;
             }

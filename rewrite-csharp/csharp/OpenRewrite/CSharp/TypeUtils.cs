@@ -55,29 +55,7 @@ public static partial class TypeUtils
     /// extends it, or implements it. Walks the supertype and interface chains.
     /// </summary>
     public static bool IsAssignableTo(JavaType? type, string fullyQualifiedName) =>
-        IsAssignableTo(type, fullyQualifiedName, exact: false);
-
-    private static bool IsAssignableTo(JavaType? type, string fullyQualifiedName, bool exact)
-    {
-        if (type == null) return false;
-
-        // Primitives (int, bool, string, etc.) have no Class representation —
-        // map to their .NET FQN and compare directly
-        if (type is JavaType.Primitive prim)
-        {
-            var primFqn = PrimitiveToFqn(prim.Kind);
-            return primFqn != null && string.Equals(primFqn, fullyQualifiedName, StringComparison.Ordinal);
-        }
-
-        // Arrays implement a known set of non-generic interfaces
-        if (type is JavaType.Array)
-            return IsArrayAssignableTo(fullyQualifiedName);
-
-        var cls = AsClass(type);
-        if (cls == null) return false;
-
-        return IsAssignableToInternal(cls, fullyQualifiedName, exact, new HashSet<string>());
-    }
+        type != null && IsAssignableToName(type, fullyQualifiedName, exact: false);
 
     /// <summary>
     /// Check if a type is assignable to the target type, where the target is specified
@@ -88,7 +66,7 @@ public static partial class TypeUtils
     /// <see cref="JavaType.GenericTypeVariable"/> type parameters, those positions are treated
     /// as wildcards: any concrete type argument satisfies an unbounded type variable, and
     /// bounded type variables check that the candidate's type argument satisfies the bound.
-    /// Concrete type parameters require an exact FQN match.
+    /// Concrete type parameters must match exactly, recursing into nested generic arguments.
     /// </para>
     /// </summary>
     public static bool IsAssignableTo(JavaType? type, JavaType? targetType)
@@ -112,6 +90,9 @@ public static partial class TypeUtils
             return IsAssignableTo(type, innerType);
         }
 
+        if (targetType is JavaType.Array targetArray)
+            return type is JavaType.Array sourceArray && IsArrayAssignableToArray(sourceArray, targetArray);
+
         // When target is parameterized with type parameters, do parameter-aware matching.
         // This handles both open generics (with GenericTypeVariable wildcards) and concrete
         // generics (where all type args must match exactly).
@@ -124,7 +105,7 @@ public static partial class TypeUtils
         if (targetFqn == null) return false;
 
         // The target is a type, so only that type matches.
-        return IsAssignableTo(type, targetFqn, exact: true);
+        return IsAssignableToName(type, targetFqn, exact: true);
     }
 
     /// <summary>
@@ -134,19 +115,9 @@ public static partial class TypeUtils
     {
         if (type == null) return false;
 
-        // Primitives have no Class representation — map to FQN and check
-        if (type is JavaType.Primitive prim2)
-        {
-            var primFqn = PrimitiveToFqn(prim2.Kind);
-            return primFqn != null && fullyQualifiedNames.Contains(primFqn);
-        }
-
-        var cls = AsClass(type);
-        if (cls == null) return false;
-
         foreach (var fqn in fullyQualifiedNames)
         {
-            if (IsAssignableToInternal(cls, fqn, exact: false, new HashSet<string>()))
+            if (IsAssignableToName(type, fqn, exact: false))
                 return true;
         }
         return false;
@@ -253,6 +224,26 @@ public static partial class TypeUtils
             Literal lit => lit.Type,
             _ => TryGetTypeDynamic(expr)
         };
+    }
+
+    private static bool IsAssignableToName(JavaType type, string fullyQualifiedName, bool exact)
+    {
+        // Primitives (int, bool, string, etc.) have no Class representation —
+        // map to their .NET FQN and compare directly
+        if (type is JavaType.Primitive prim)
+        {
+            var primFqn = PrimitiveToFqn(prim.Kind);
+            return primFqn != null && string.Equals(primFqn, fullyQualifiedName, StringComparison.Ordinal);
+        }
+
+        // Arrays implement a known set of non-generic interfaces
+        if (type is JavaType.Array)
+            return IsArrayAssignableTo(fullyQualifiedName);
+
+        var cls = AsClass(type);
+        if (cls == null) return false;
+
+        return IsAssignableToInternal(cls, fullyQualifiedName, exact, new HashSet<string>());
     }
 
     private static bool IsAssignableToInternal(JavaType.Class cls, string fqn, bool exact, HashSet<string> seen)
@@ -493,43 +484,57 @@ public static partial class TypeUtils
     /// Compare type parameter lists position-by-position. A <see cref="JavaType.GenericTypeVariable"/>
     /// in the target acts as a wildcard (any concrete type matches). If the variable has bounds,
     /// the candidate's type argument must be assignable to all bounds.
-    /// Concrete type parameters require exact FQN match.
+    /// Concrete type parameters are compared invariantly and structurally: nested generic
+    /// arguments must match recursively, and other arguments require an exact FQN match.
     /// </summary>
-    private static bool TypeParametersMatch(IList<JavaType>? candidateParams, IList<JavaType>? targetParams)
+    private static bool TypeParametersMatch(IList<JavaType>? candidateParams, IList<JavaType>? targetParams) =>
+        TypeParametersMatch(candidateParams, targetParams, new HashSet<(JavaType, JavaType)>());
+
+    private static bool TypeParametersMatch(IList<JavaType>? candidateParams, IList<JavaType>? targetParams,
+        HashSet<(JavaType, JavaType)> inProgress)
     {
         if (targetParams == null || targetParams.Count == 0) return true;
         if (candidateParams == null || candidateParams.Count != targetParams.Count) return false;
 
         for (int i = 0; i < targetParams.Count; i++)
         {
-            var targetParam = targetParams[i];
-            var candidateParam = candidateParams[i];
+            if (!TypeArgumentMatches(candidateParams[i], targetParams[i], inProgress))
+                return false;
+        }
+        return true;
+    }
 
-            if (targetParam is JavaType.GenericTypeVariable gtv)
-            {
-                // Unbounded type variable — any type matches
-                if (gtv.Bounds == null || gtv.Bounds.Count == 0)
-                    continue;
+    private static bool TypeArgumentMatches(JavaType? candidate, JavaType? target,
+        HashSet<(JavaType, JavaType)> inProgress)
+    {
+        if (candidate == null || target == null) return false;
 
-                // Bounded — candidate must be assignable to all bounds
+        switch (target)
+        {
+            case JavaType.GenericTypeVariable gtv:
+                if (gtv.Bounds == null) return true;
                 foreach (var bound in gtv.Bounds)
                 {
                     var boundFqn = GetFullyQualifiedName(bound);
-                    if (boundFqn != null && !IsAssignableTo(candidateParam, boundFqn))
+                    if (boundFqn != null && !IsAssignableTo(candidate, boundFqn))
                         return false;
                 }
-            }
-            else
-            {
-                // Concrete type parameter — require exact FQN match
-                var targetFqn = GetFullyQualifiedName(targetParam);
-                var candidateFqn = GetFullyQualifiedName(candidateParam);
-                if (targetFqn == null || candidateFqn == null ||
-                    !string.Equals(targetFqn, candidateFqn, StringComparison.Ordinal))
+                return true;
+
+            case JavaType.Parameterized { TypeParameters.Count: > 0 } targetParam:
+                if (candidate is not JavaType.Parameterized candidateParam) return false;
+                var targetFqn = GetFullyQualifiedName(targetParam.Type);
+                if (targetFqn == null ||
+                    !string.Equals(targetFqn, GetFullyQualifiedName(candidateParam.Type), StringComparison.Ordinal))
                     return false;
-            }
+                // A pair already being compared is assumed to match; any real difference
+                // is still found on the path that reaches a non-cyclic argument.
+                if (!inProgress.Add((candidate, target))) return true;
+                return TypeParametersMatch(candidateParam.TypeParameters, targetParam.TypeParameters, inProgress);
+
+            default:
+                return AreEquivalent(candidate, target);
         }
-        return true;
     }
 
     /// <summary>
@@ -586,6 +591,105 @@ public static partial class TypeUtils
     /// Check if a <see cref="JavaType.Array"/> is assignable to a non-generic target FQN.
     /// </summary>
     private static bool IsArrayAssignableTo(string fqn) => ArrayNonGenericSupertypes.Contains(fqn);
+
+    /// <summary>
+    /// Check if <c>S[]</c> is assignable to <c>T[]</c>: identical element types always are,
+    /// and reference element types are additionally covariant (<c>string[]</c> to <c>object[]</c>).
+    /// Value element types are invariant. Rank is not compared because the type model
+    /// does not retain it.
+    /// </summary>
+    private static bool IsArrayAssignableToArray(JavaType.Array source, JavaType.Array target)
+    {
+        if (ReferenceEquals(source, target)) return true;
+
+        var sourceElem = source.ElemType;
+        var targetElem = target.ElemType;
+        if (sourceElem == null || targetElem == null) return false;
+
+        if (AreEquivalent(sourceElem, targetElem)) return true;
+
+        if (!IsReferenceType(sourceElem) || !IsReferenceType(targetElem)) return false;
+
+        return IsObject(targetElem) || IsAssignableTo(sourceElem, targetElem);
+    }
+
+    private static bool AreEquivalent(JavaType? a, JavaType? b)
+    {
+        if (ReferenceEquals(a, b)) return true;
+        if (a == null || b == null) return false;
+
+        switch (a, b)
+        {
+            case (JavaType.Array arrA, JavaType.Array arrB):
+                return AreEquivalent(arrA.ElemType, arrB.ElemType);
+            case (JavaType.Primitive primA, JavaType.Primitive primB):
+                return primA.Kind == primB.Kind;
+            case (JavaType.GenericTypeVariable gtvA, JavaType.GenericTypeVariable gtvB):
+                return string.Equals(gtvA.Name, gtvB.Name, StringComparison.Ordinal);
+            case (JavaType.Array, _) or (_, JavaType.Array):
+            case (JavaType.GenericTypeVariable, _) or (_, JavaType.GenericTypeVariable):
+                return false;
+        }
+
+        var fqnA = a is JavaType.Primitive pa ? PrimitiveToFqn(pa.Kind) : GetFullyQualifiedName(a);
+        var fqnB = b is JavaType.Primitive pb ? PrimitiveToFqn(pb.Kind) : GetFullyQualifiedName(b);
+        if (fqnA == null || !string.Equals(fqnA, fqnB, StringComparison.Ordinal)) return false;
+
+        var paramsA = (a as JavaType.Parameterized)?.TypeParameters;
+        var paramsB = (b as JavaType.Parameterized)?.TypeParameters;
+        var countA = paramsA?.Count ?? 0;
+        var countB = paramsB?.Count ?? 0;
+        if (countA != countB) return false;
+        for (var i = 0; i < countA; i++)
+        {
+            if (!AreEquivalent(paramsA![i], paramsB![i]))
+                return false;
+        }
+        return true;
+    }
+
+    private static bool IsReferenceType(JavaType type)
+    {
+        switch (type)
+        {
+            case JavaType.Array:
+                return true;
+            case JavaType.Primitive prim:
+                return prim.Kind == JavaType.Primitive.PrimitiveKind.String;
+            case JavaType.Class or JavaType.Parameterized:
+                var cls = AsClass(type);
+                if (cls == null) return false;
+                if (cls.FullyQualifiedName is "System.ValueType" or "System.Enum") return true;
+                if (cls.ClassKind is JavaType.FullyQualified.FullyQualifiedKind.Value
+                    or JavaType.FullyQualified.FullyQualifiedKind.Enum)
+                    return false;
+                if (ValueTypeFqns.Contains(cls.FullyQualifiedName)) return false;
+                return !InheritsFrom(cls, "System.ValueType");
+            default:
+                return false;
+        }
+    }
+
+    private static readonly HashSet<string> ValueTypeFqns =
+    [
+        "System.Boolean",
+        "System.Byte",
+        "System.SByte",
+        "System.Char",
+        "System.Decimal",
+        "System.Double",
+        "System.Single",
+        "System.Int16",
+        "System.UInt16",
+        "System.Int32",
+        "System.UInt32",
+        "System.Int64",
+        "System.UInt64",
+        "System.IntPtr",
+        "System.UIntPtr",
+        "System.Nullable",
+        "System.ValueTuple"
+    ];
 
     /// <summary>
     /// Synthesize the generic interfaces that <c>T[]</c> implements as

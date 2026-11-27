@@ -41,11 +41,10 @@ final class EffectiveRepositoryAssertions {
     }
 
     /**
-     * The Gradle plugin portal's URL as the model builds see it: with MAVEN_CENTRAL_MIRROR_* set, they use the mirror
-     * in its place too, with or without its trailing slash depending on the environment.
+     * The Gradle plugin portal remains separate from Maven Central and its mirror.
      */
     static String gradlePluginPortal() {
-        return withoutTrailingSlash(mirrorOr("https://plugins.gradle.org/m2"));
+        return "https://plugins.gradle.org/m2";
     }
 
     static List<Row> withoutTrailingSlashes(List<Row> rows) {

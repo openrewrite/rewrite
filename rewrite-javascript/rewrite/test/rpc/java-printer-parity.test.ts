@@ -15,7 +15,7 @@
  */
 import * as path from "path";
 import * as rpc from "vscode-jsonrpc/node";
-import {describeJavaRpc, testJavaRpc} from "../../src/test/java-rpc";
+import {describeJavaRpc, testJavaRpc} from "../../src/test/java-rpc.mjs";
 import {JavaScriptParser, JavaScriptVisitor, JS} from "../../src/javascript";
 import {J} from "../../src/java";
 import {Cursor, isSourceFile} from "../../src/tree";

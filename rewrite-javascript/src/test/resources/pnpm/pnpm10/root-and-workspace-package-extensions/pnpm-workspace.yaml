@@ -1,0 +1,6 @@
+packages:
+  - .
+packageExtensions:
+  b:
+    dependencies:
+      y: 1.0.0

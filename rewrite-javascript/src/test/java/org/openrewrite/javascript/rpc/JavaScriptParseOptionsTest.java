@@ -43,6 +43,20 @@ class JavaScriptParseOptionsTest {
     }
 
     @Test
+    void namesAreNotResolvedUnlessAskedFor() {
+        assertThat(JavaScriptRewriteRpc.parseOptions(new InMemoryExecutionContext()))
+                .doesNotContainKey("resolveNames");
+    }
+
+    @Test
+    void resolvingNamesFollowsTheExecutionContext() {
+        ExecutionContext ctx = new InMemoryExecutionContext();
+        ctx.putMessage(JavaScriptRewriteRpc.RESOLVE_NAMES, true);
+
+        assertThat(JavaScriptRewriteRpc.parseOptions(ctx)).containsEntry("resolveNames", "true");
+    }
+
+    @Test
     void optionsSerializeUnderTheKeyTheNodeServerReads() throws Exception {
         // A rename on either side falls back to the default rather than failing.
         assertThat(new ObjectMapper().writeValueAsString(new ParseProject(Paths.get("."), null, null,

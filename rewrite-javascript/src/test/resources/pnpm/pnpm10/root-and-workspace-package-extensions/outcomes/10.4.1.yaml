@@ -1,0 +1,47 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+packageExtensionsChecksum: sha256-GMBgv2zh+kD0ClgivXNhMEiI4ur8LPSUcCgkDm0tgFs=
+
+importers:
+
+  .:
+    dependencies:
+      a:
+        specifier: ^1.0.0
+        version: 1.1.0
+      b:
+        specifier: ^1.0.0
+        version: 1.1.0
+      c:
+        specifier: ^1.0.0
+        version: 1.1.0
+
+packages:
+
+  a@1.1.0:
+    resolution: {integrity: sha512-FwAl/aMG8j8hF6t1k/bPIHZtg9YYUTHQV+n4msKQjkeRzaNhieE52A9x1dlMCRUIbK9nLOMrhnBJLz2fQ584LA==}
+
+  b@1.1.0:
+    resolution: {integrity: sha512-UlBt5TBCB7M56dASgL0UtrKAjKxnG+V7V98fh4pXhghx5lLazsYN9dT/cwykVDYJfOFVMGmrQQRnPHfuAOdbng==}
+
+  c@1.1.0:
+    resolution: {integrity: sha512-nPDKddLaNytUFlaRf2EFGWgFRpZpAHuMPCyzwfkrNKcMb0+UkrgZn9mPeO9WJk3RNqnL/yFO+3aLTUhepywlyQ==}
+
+  x@1.0.0:
+    resolution: {integrity: sha512-LSQeA2UZB/H5Xzuz5sAxQ9pzITHWwD74CYpT+qAfI1ZqgRzRlGUdn8G7vUFmIMtrFxcRaTzJhR6ewp5y2qPxuw==}
+
+snapshots:
+
+  a@1.1.0:
+    dependencies:
+      x: 1.0.0
+
+  b@1.1.0: {}
+
+  c@1.1.0: {}
+
+  x@1.0.0: {}

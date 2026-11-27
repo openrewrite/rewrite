@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {afterAll, afterEach, beforeAll, describe, expect, test, vi} from "vitest";
-import {describeJavaRpc} from "../../src/test/java-rpc";
+import {describeJavaRpc} from "../../src/test/java-rpc.mjs";
 import {JavaRpcTestServer} from "../../src/rpc/java-rpc-client";
 import {RpcReceiveQueue} from "../../src/rpc";
 import {ExecutionContext} from "../../src/execution";

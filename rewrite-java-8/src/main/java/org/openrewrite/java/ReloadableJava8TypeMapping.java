@@ -33,6 +33,7 @@ import java.util.List;
 import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
+import static org.openrewrite.internal.StringUtils.escapeUnpairedSurrogates;
 import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
 
 @RequiredArgsConstructor
@@ -192,6 +193,11 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
             name = type.tsym.name.toString();
         }
         return typeFactory.computeGenericTypeVariable(signature, name, INVARIANT, gtv -> {
+            if (type instanceof Type.CapturedType && !((Type.CapturedType) type).lower.hasTag(TypeTag.BOT)) {
+                // a capture of `? super String` is denoted by its lower bound, not by the declared bound it has above
+                gtv.unsafeSet(gtv.getName(), CONTRAVARIANT, singletonList(type(((Type.CapturedType) type).lower)));
+                return;
+            }
             List<JavaType> bounds = null;
             if (type.getUpperBound() instanceof Type.IntersectionClassType) {
                 Type.IntersectionClassType intersectionBound = (Type.IntersectionClassType) type.getUpperBound();
@@ -331,6 +337,12 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
             return variableType(((JCTree.JCVariableDecl) tree).sym);
         } else if (tree instanceof JCTree.JCAnnotatedType && ((JCTree.JCAnnotatedType) tree).getUnderlyingType() instanceof JCTree.JCArrayTypeTree) {
             return annotatedArray((JCTree.JCAnnotatedType) tree);
+        } else if (tree instanceof JCTree.JCFieldAccess) {
+            JCTree.JCFieldAccess select = (JCTree.JCFieldAccess) tree;
+            // A class literal that javac marks erroneous because of its context still has `Class<X>` on its symbol
+            if (select.type instanceof Type.ErrorType && select.sym != null && select.name.contentEquals("class")) {
+                return type(select.sym.type);
+            }
         }
 
         return type(((JCTree) tree).type, symbol);
@@ -397,15 +409,33 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
                     type = ((Type.ForAll) type).qtype;
                 }
 
-                resolvedOwner = type instanceof Type.MethodType ?
-                        methodDeclarationType(sym, (JavaType.FullyQualified) type(sym.owner.type)) :
-                        type(type);
+                if (type instanceof Type.MethodType) {
+                    resolvedOwner = methodDeclarationType(sym, (JavaType.FullyQualified) type(sym.owner.type));
+                } else if (type == null && sym instanceof Symbol.MethodSymbol &&
+                           ((Symbol.MethodSymbol) sym).isStaticOrInstanceInit()) {
+                    resolvedOwner = initializerType((Symbol.MethodSymbol) sym);
+                } else {
+                    resolvedOwner = type(type);
+                }
                 assert resolvedOwner != null;
             }
 
             variable.unsafeSet(resolvedOwner, type(symbol.type), listAnnotations(symbol));
             return variable;
         });
+    }
+
+    /**
+     * javac 21 and earlier leave the placeholder method symbol of an initializer block without a type,
+     * so give it the {@code void()} method type that later javac versions produce.
+     */
+    private JavaType.Method initializerType(Symbol.MethodSymbol initializer) {
+        JavaType.FullyQualified declaringType = (JavaType.FullyQualified) type(initializer.owner.type);
+        return typeFactory.methodFor(signatureBuilder.methodSignature(initializer),
+                () -> new JavaType.Method(null, initializer.flags_field, declaringType, "",
+                        JavaType.Primitive.Void, (String[]) null, null, null, null, null, null),
+                method -> {
+                });
     }
 
     /**
@@ -538,11 +568,12 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
             if(methodSymbol.getDefaultValue() != null) {
                 if(methodSymbol.getDefaultValue() instanceof Attribute.Array) {
                     defaultValues = ((Attribute.Array) methodSymbol.getDefaultValue()).getValue().stream()
-                            .map(attr -> attr.getValue().toString())
+                            .map(attr -> escapeUnpairedSurrogates(attr.getValue().toString()))
                             .collect(toList());
                 } else {
                     try {
-                        defaultValues = singletonList(methodSymbol.getDefaultValue().getValue().toString());
+                        defaultValues = singletonList(
+                                escapeUnpairedSurrogates(methodSymbol.getDefaultValue().getValue().toString()));
                     } catch(UnsupportedOperationException e) {
                         // not all Attribute implementations define `getValue()`
                     }
@@ -662,7 +693,12 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
     }
 
     private Object annotationElementValue(Object value) {
-        if (value instanceof String || value instanceof Number || value instanceof Boolean || value instanceof Character) {
+        if (value instanceof String) {
+            return escapeUnpairedSurrogates((String) value);
+        } else if (value instanceof Character && Character.isSurrogate((Character) value)) {
+            // The escape of a lone surrogate takes six chars, so the value becomes a String
+            return escapeUnpairedSurrogates(value.toString());
+        } else if (value instanceof Number || value instanceof Boolean || value instanceof Character) {
             return value;
         } else if (value instanceof Symbol.VarSymbol) {
             JavaType.Variable mapped = variableType((Symbol.VarSymbol) value);

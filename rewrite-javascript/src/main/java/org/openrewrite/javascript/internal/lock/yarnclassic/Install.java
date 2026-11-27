@@ -66,6 +66,7 @@ final class Install {
         private final boolean frozenLockfile;
         private final boolean updateChecksums;
         private final boolean skipIntegrityCheck;
+        private final boolean binLinks;
         private final boolean global;
 
         /**
@@ -101,6 +102,7 @@ final class Install {
             frozenLockfile = Js.truthy(rawFlags.get("frozenLockfile"));
             updateChecksums = Js.truthy(rawFlags.get("updateChecksums"));
             skipIntegrityCheck = Js.truthy(rawFlags.get("skipIntegrityCheck"));
+            binLinks = !Boolean.FALSE.equals(rawFlags.get("binLinks"));
         }
     }
 
@@ -195,6 +197,12 @@ final class Install {
                 throw config.offlineCache();
             }
             fetchStep(resolver, compatibility);
+            if (release.findsTheNearestInstalledVersionForBins() &&
+                request.getWorkspaceLayout() == null && !config.isFocus() &&
+                !Boolean.FALSE.equals(config.getOption("bin-links")) &&
+                flags.isBinLinks()) {
+                new PackageLinker(resolver).copyModules(topLevelPatterns, flags.isIgnoreOptional());
+            }
             return saveLockfileAndIntegrity(resolver, topLevelPatterns, request.getWorkspaceLayout(), config, flags,
                     lockfile, inputs.getLock(), inputs.getHost());
         } catch (MessageError e) {

@@ -204,35 +204,32 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                     J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
                                     if ("dependencies".equals(m.getSimpleName())) {
                                         // Gradle tolerates multiple declarations of the same dependency, but only the one with the newest version is used
-                                        // Filter out duplicates
-                                        Map<GroupArtifactVersion, J.MethodInvocation> requestedToDeclaration = new HashMap<>();
-                                        Map<GroupArtifact, List<String>> gaToRequested = new HashMap<>();
+                                        List<DeclaredDependency> declared = new ArrayList<>();
                                         new JavaIsoVisitor<ExecutionContext>() {
                                             @Override
                                             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
                                                 J.MethodInvocation m1 = super.visitMethodInvocation(method, executionContext);
-                                                new GradleDependency.Matcher().get(getCursor()).ifPresent(it -> {
-                                                    if (it.getResolvedDependency().getRequested().getVersion() != null) {
-                                                        requestedToDeclaration.put(it.getResolvedDependency().getRequested().getGav(), m1);
-                                                        gaToRequested.computeIfAbsent(it.getResolvedDependency().getGav().asGroupArtifact(), (groupArtifact -> new ArrayList<>()))
-                                                                .add(it.getResolvedDependency().getRequested().getVersion());
-                                                    }
-                                                });
+                                                new GradleDependency.Matcher()
+                                                        .groupId(groupPattern)
+                                                        .artifactId(artifactPattern)
+                                                        .get(getCursor())
+                                                        .ifPresent(it -> {
+                                                            Dependency requested = it.getResolvedDependency().getRequested();
+                                                            declared.add(new DeclaredDependency(it.getConfigurationName(), requested.getGav().asGroupArtifact(),
+                                                                    requested.getVersion(), requested.getClassifier(), requested.getType(), it.isPlatform(), m1));
+                                                        });
                                                 return m1;
                                             }
                                         }.visit(m.getArguments().get(0), ctx, getCursor());
 
-                                        for (Map.Entry<GroupArtifact, List<String>> gaToRequestedVersions : gaToRequested.entrySet()) {
-                                            GroupArtifact ga = gaToRequestedVersions.getKey();
-                                            List<String> requested = gaToRequestedVersions.getValue();
-                                            if (requested.size() < 2) {
-                                                continue;
+                                        for (int i = 0; i < declared.size(); i++) {
+                                            DeclaredDependency candidate = declared.get(i);
+                                            for (int j = 0; j < declared.size(); j++) {
+                                                if (i != j && isRedundant(candidate, declared.get(j), j < i)) {
+                                                    statementsToRemove.add(candidate.getDeclaration());
+                                                    break;
+                                                }
                                             }
-                                            // The newest version number is relevant, others are redundant and can be removed
-                                            requested.stream()
-                                                    .sorted(VERSION_COMPARATOR.reversed())
-                                                    .skip(1)
-                                                    .forEach(redundant -> statementsToRemove.add(requestedToDeclaration.get(new GroupArtifactVersion(ga.getGroupId(), ga.getArtifactId(), redundant))));
                                         }
                                     } else if ("constraints".equals(m.getSimpleName())) {
                                         if (m.getArguments().isEmpty() ||
@@ -283,6 +280,25 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                         return null;
                                     }
                                     return r;
+                                }
+
+                                /**
+                                 * Only declarations in the same configuration are compared, as the same module in another configuration
+                                 * lands on different classpaths. A missing version adds nothing, and among equal versions the first
+                                 * declaration is kept.
+                                 */
+                                private boolean isRedundant(DeclaredDependency candidate, DeclaredDependency other, boolean otherDeclaredFirst) {
+                                    if (!candidate.getConfiguration().equals(other.getConfiguration()) ||
+                                        !candidate.getGa().equals(other.getGa()) ||
+                                        !Objects.equals(candidate.getClassifier(), other.getClassifier()) ||
+                                        !Objects.equals(candidate.getType(), other.getType()) ||
+                                        candidate.isPlatform() != other.isPlatform()) {
+                                        return false;
+                                    }
+                                    int comparison = candidate.getVersion() == null ? (other.getVersion() == null ? 0 : 1) :
+                                            other.getVersion() == null ? -1 :
+                                                    VERSION_COMPARATOR.compare(null, other.getVersion(), candidate.getVersion());
+                                    return comparison > 0 || (comparison == 0 && otherDeclaredFirst);
                                 }
 
                                 private boolean isDependencyManagementMethod(String methodName) {
@@ -464,6 +480,24 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                     }
                 }
         );
+    }
+
+    @Value
+    private static class DeclaredDependency {
+        String configuration;
+        GroupArtifact ga;
+
+        @Nullable
+        String version;
+
+        @Nullable
+        String classifier;
+
+        @Nullable
+        String type;
+
+        boolean platform;
+        J.MethodInvocation declaration;
     }
 
     private Comparator determineComparator() {

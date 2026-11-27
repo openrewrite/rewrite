@@ -15,6 +15,11 @@
  */
 package org.openrewrite.json;
 
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.databind.MapperFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.dataformat.smile.SmileFactory;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -34,6 +39,7 @@ import java.util.Map;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.entry;
 import static org.openrewrite.json.Assertions.json;
 
@@ -376,6 +382,33 @@ class JsonParserTest implements RewriteTest {
                   entry("crlf", "cd")
                 );
             })
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "a\\ud800b",
+      "a\\ud800",
+      "\\udfaa",
+      "\\ud83d\\ud83d\\ude00",
+      "\\ude00\\ud83d",
+      "\\ud83d\\ude00",
+      "emoji=😀;high=\\ud800;low=\\udfff;nbsp=\u00A0"
+    })
+    void keyAndValueHoldingSurrogateEscapesAreSerializable(String escapes) {
+        ObjectMapper smile = JsonMapper.builder(new SmileFactory())
+          .configure(MapperFeature.PROPAGATE_TRANSIENT_MARKER, true)
+          .build();
+        smile.setVisibility(smile.getSerializationConfig().getDefaultVisibilityChecker()
+          .withGetterVisibility(JsonAutoDetect.Visibility.NONE)
+          .withIsGetterVisibility(JsonAutoDetect.Visibility.NONE)
+          .withFieldVisibility(JsonAutoDetect.Visibility.ANY));
+        rewriteRun(
+          json(
+            "{\"%s\": \"%s\"}".formatted(escapes, escapes),
+            spec -> spec.afterRecipe(doc ->
+              assertThatCode(() -> smile.writeValueAsBytes(doc)).doesNotThrowAnyException())
           )
         );
     }

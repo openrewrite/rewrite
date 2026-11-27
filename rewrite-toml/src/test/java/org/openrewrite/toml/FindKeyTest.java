@@ -295,4 +295,69 @@ class FindKeyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void dottedKeyIsAPathOfItsOwn() {
+        rewriteRun(
+          spec -> spec.recipe(new FindKey("dependencies.serde.workspace")),
+          toml(
+            """
+              [dependencies]
+              serde.workspace = true
+              serde-json = "1"
+              """,
+            """
+              [dependencies]
+              ~~>serde.workspace = true
+              serde-json = "1"
+              """
+          )
+        );
+    }
+
+    @Test
+    void quotedTableNamePartMatchesWhatItStandsFor() {
+        rewriteRun(
+          spec -> spec.recipe(new FindKey("target.cfg(windows).dependencies.winapi")),
+          toml(
+            """
+              [target.'cfg(windows)'.dependencies]
+              winapi = "0.3"
+
+              [target."x86_64.linux".dependencies]
+              winapi = "0.3"
+              """,
+            """
+              [target.'cfg(windows)'.dependencies]
+              ~~>winapi = "0.3"
+
+              [target."x86_64.linux".dependencies]
+              winapi = "0.3"
+              """
+          )
+        );
+    }
+
+    @Test
+    void quotedPartKeepsTheDotItHolds() {
+        rewriteRun(
+          spec -> spec.recipe(new FindKey("target.\"x86_64.linux\".dependencies.winapi")),
+          toml(
+            """
+              [target."x86_64.linux".dependencies]
+              winapi = "0.3"
+
+              [target.x86_64.linux.dependencies]
+              winapi = "0.3"
+              """,
+            """
+              [target."x86_64.linux".dependencies]
+              ~~>winapi = "0.3"
+
+              [target.x86_64.linux.dependencies]
+              winapi = "0.3"
+              """
+          )
+        );
+    }
 }

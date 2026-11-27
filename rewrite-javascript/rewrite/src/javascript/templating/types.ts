@@ -356,10 +356,10 @@ export interface PatternOptions {
     types?: string[];
 
     /**
-     * When true, allows patterns without type annotations to match code with type annotations.
-     * This enables more flexible pattern matching during development or when full type attribution
-     * is not needed. When false, enforces strict type matching where both pattern and target must
-     * have matching type annotations.
+     * When true, a pattern without a type annotation matches code with or without one, so
+     * `const ${x} = ${v}` matches `const a: number = 1`, while an annotation the pattern spells out
+     * must be matched by the code's. Type attribution missing on either side is not a mismatch.
+     * When false, the pattern and the code must both have each annotation, or both lack it.
      *
      * @default true (lenient matching enabled for backward compatibility)
      */

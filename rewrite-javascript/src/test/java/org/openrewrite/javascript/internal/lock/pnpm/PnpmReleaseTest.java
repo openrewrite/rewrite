@@ -70,7 +70,7 @@ class PnpmReleaseTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"11.0.2", "10.34.6", "12.0.0", "11.6.0-rc.0", "13.0.0"})
+    @ValueSource(strings = {"11.0.2", "10.34.2", "12.0.0", "11.6.0-rc.0", "13.0.0"})
     void aReleaseOutsideTheProvenOnesIsCannotKnow(String version) {
         assertThatThrownBy(() -> PnpmReleases.runs(version))
           .isInstanceOf(CannotKnow.class)
@@ -2629,6 +2629,8 @@ class PnpmReleaseTest {
     /**
      * installing/deps-resolver resolvePeers.ts and fs/symlink-dependency safeJoinModulesDir (11.11.0): a package named
      * @x/../y is refused a directory in the virtual store, whose absolute path the error names; before, it is placed.
+     * pnpm 10 refuses it from 10.34.5 (pnpm/pnpm#12890): 10.34.5 failed so, and 10.34.4 locked {@code npm:@x/../y@1.0.0},
+     * when run on it.
      */
     @Test
     void placesAPackageOnlyUnderAValidNameFrom11110() {
@@ -2636,6 +2638,10 @@ class PnpmReleaseTest {
           .isInstanceOf(CannotKnow.class)
           .hasMessageContaining("with the invalid alias \"@x/../y\" (ERR_PNPM_INVALID_DEPENDENCY_NAME");
         assertThat(placeTraversal("11.10.0")).containsExactly("@x/../y/1.0.0");
+        assertThatThrownBy(() -> placeTraversal("10.34.5"))
+          .isInstanceOf(CannotKnow.class)
+          .hasMessageContaining("with the invalid alias \"@x/../y\" (ERR_PNPM_INVALID_DEPENDENCY_NAME");
+        assertThat(placeTraversal("10.34.4")).containsExactly("@x/../y/1.0.0");
     }
 
     // a registry of these packuments by name

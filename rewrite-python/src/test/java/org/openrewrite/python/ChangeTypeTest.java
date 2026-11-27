@@ -18,6 +18,7 @@ package org.openrewrite.python;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledIfEnvironmentVariable;
 import org.openrewrite.java.ChangeType;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.python.Assertions.python;
@@ -30,10 +31,14 @@ import static org.openrewrite.python.Assertions.python;
 @DisabledIfEnvironmentVariable(named = "CI", matches = "true", disabledReason = "No remote client/server available")
 class ChangeTypeTest implements RewriteTest {
 
+  @Override
+  public void defaults(RecipeSpec spec) {
+    spec.recipe(new ChangeType("typing.Iterable", "collections.abc.Iterable", true));
+  }
+
     @Test
     void rewritesFromImport() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("typing.Iterable", "collections.abc.Iterable", true)),
           python(
             """
               from typing import Iterable
@@ -54,7 +59,6 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void keepsModuleDocstringFirst() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("typing.Iterable", "collections.abc.Iterable", true)),
           python(
             """
               \"""
@@ -81,7 +85,6 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void keepsLeadingCommentAttachedToTheFile() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("typing.Iterable", "collections.abc.Iterable", true)),
           python(
             """
               # Copyright 2016 Someone
@@ -104,7 +107,6 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void mergesIntoAnExistingImportFromTheTargetModule() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("typing.Iterable", "collections.abc.Iterable", true)),
           python(
             """
               from collections.abc import Mapping

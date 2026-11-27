@@ -101,6 +101,34 @@ class SetupCfgParserTest {
         assertThat(listFiles(tempDir)).isEqualTo(projectFiles);
     }
 
+    @Test
+    void markerCarriesPythonRequiresFromOptions(@TempDir Path tempDir) throws Exception {
+        Files.writeString(tempDir.resolve("setup.cfg"), """
+                [metadata]
+                name = myapp
+
+                [options]
+                python_requires = >=3.9
+                install_requires =
+                    six
+                """);
+        Path env = tempDir.resolve(".venv");
+        Path distInfo = Files.createDirectories(env.resolve("lib/python3.12/site-packages/six-1.16.0.dist-info"));
+        Files.writeString(distInfo.resolve("METADATA"), "Metadata-Version: 2.1\nName: six\nVersion: 1.16.0\n");
+
+        SourceFile parsed = new SetupCfgParser(env).parseInputs(
+                singletonList(Parser.Input.fromFile(tempDir.resolve("setup.cfg"))), tempDir,
+                new InMemoryExecutionContext(Throwable::printStackTrace)).findFirst().orElseThrow();
+
+        PythonResolutionResult marker = parsed.getMarkers().findFirst(PythonResolutionResult.class).orElseThrow();
+        assertThat(marker.getRequiresPython()).isEqualTo(">=3.9");
+        assertThat(marker.getDependencies()).singleElement().satisfies(six -> {
+            assertThat(six.getName()).isEqualTo("six");
+            assertThat(six.getResolved()).isNotNull()
+                    .extracting(ResolvedDependency::getVersion).isEqualTo("1.16.0");
+        });
+    }
+
     private static List<Path> listFiles(Path dir) throws IOException {
         try (Stream<Path> walk = Files.walk(dir)) {
             return walk.map(dir::relativize).sorted().collect(toList());

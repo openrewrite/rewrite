@@ -31,8 +31,8 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * The own tests of every validate-npm-package-name release ported (4.0.0, 6.0.0, 6.0.1, 6.0.2, 7.0.2) and the inputs
- * where their sources differ ({@code upstream/validate-npm-package-name-*}): each answer's errors and {@code
+ * The own tests of every validate-npm-package-name release ported (4.0.0, 5.0.0, 6.0.0, 6.0.1, 6.0.2, 7.0.2) and the
+ * inputs where their sources differ ({@code upstream/validate-npm-package-name-*}): each answer's errors and {@code
  * validForOldPackages}.
  */
 class ValidateNpmPackageNameTest {

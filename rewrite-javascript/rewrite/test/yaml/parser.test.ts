@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {isDirective, isDocuments, isMapping, isScalar, isSequence, Yaml, yaml, YamlParser} from "../../src/yaml";
-import {findMarker, printer} from "../../src";
-import {dedent, RecipeSpec} from "../../src/test";
+import {isDirective, isDocuments, isMapping, isScalar, isSequence, Yaml, yaml, YamlParser, YamlVisitor} from "../../src/yaml";
+import {ExecutionContext, findMarker, printer, randomId} from "../../src";
+import {dedent, fromVisitor, RecipeSpec} from "../../src/test";
 
 async function parseAndPrint(yaml: string): Promise<string> {
     const parser = new YamlParser();
@@ -667,4 +667,395 @@ describe('Text after the last document', () => {
                 # only a comment
             `)
         ));
+});
+
+describe('Comment after the last entry of a block sequence', () => {
+    const spec = new RecipeSpec();
+    spec.recipe = fromVisitor(new class extends YamlVisitor<ExecutionContext> {
+        protected async visitSequence(sequence: Yaml.Sequence, p: ExecutionContext): Promise<Yaml | undefined> {
+            const first = sequence.entries[0];
+            if ((sequence.entries[sequence.entries.length - 1].block as Yaml.Scalar).value === 'c') {
+                return sequence;
+            }
+            const appended: Yaml.Sequence = {
+                ...sequence,
+                entries: [...sequence.entries, {...first, id: randomId(), block: {...first.block as Yaml.Scalar, id: randomId(), value: 'c'}}]
+            };
+            return appended;
+        }
+    });
+
+    test('an appended entry goes before the comment', () =>
+        spec.rewriteRun(
+            yaml(
+                `
+                steps:
+                  - a
+                  # b
+                `,
+                `
+                steps:
+                  - a
+                  - c
+                  # b
+                `
+            )
+        ));
+
+    test('comment at the sequence indent before the next key', () =>
+        spec.rewriteRun(
+            yaml(
+                `
+                steps:
+                  - a
+                  # b
+                other: d
+                `,
+                `
+                steps:
+                  - a
+                  - c
+                  # b
+                other: d
+                `
+            )
+        ));
+
+    test('an empty last entry stays an entry', () =>
+        spec.rewriteRun(
+            yaml(
+                `
+                steps:
+                  - a
+                  -`,
+                `
+                steps:
+                  - a
+                  -
+                  - c`
+            )
+        ));
+});
+
+describe('Flow sequence of pairs', () => {
+    const spec = new RecipeSpec();
+
+    function flowSequence(docs: Yaml.Documents): Yaml.Sequence {
+        return (docs.documents[0].block as Yaml.Mapping).entries[0].value as Yaml.Sequence;
+    }
+
+    function pair(entry: Yaml.SequenceEntry): [string, string] {
+        expect(isMapping(entry.block)).toBe(true);
+        const mapping = entry.block as Yaml.Mapping;
+        expect(mapping.openingBracePrefix).toBeUndefined();
+        expect(mapping.closingBracePrefix).toBeUndefined();
+        expect(mapping.entries).toHaveLength(1);
+        const mappingEntry = mapping.entries[0];
+        expect(mappingEntry.prefix).not.toContain(",");
+        return [(mappingEntry.key as Yaml.Scalar).value, (mappingEntry.value as Yaml.Scalar).value];
+    }
+
+    test('each pair is a single-entry mapping', () => spec.rewriteRun({
+        ...yaml(`f: [a: 1, b: 2]`),
+        afterRecipe: docs => {
+            const [first, second] = flowSequence(docs).entries;
+            expect(pair(first)).toEqual(["a", "1"]);
+            expect(first.trailingCommaPrefix).toBe("");
+            expect(pair(second)).toEqual(["b", "2"]);
+            expect(second.prefix).toBe("");
+            expect(second.trailingCommaPrefix).toBeUndefined();
+        }
+    }));
+
+    test('single pair', () => spec.rewriteRun({
+        ...yaml(`f: [a: 1]`),
+        afterRecipe: docs => {
+            const entries = flowSequence(docs).entries;
+            expect(entries).toHaveLength(1);
+            expect(pair(entries[0])).toEqual(["a", "1"]);
+        }
+    }));
+
+    test('scalar followed by a pair', () => spec.rewriteRun({
+        ...yaml(`f: [x, a: 1]`),
+        afterRecipe: docs => {
+            const [first, second] = flowSequence(docs).entries;
+            expect((first.block as Yaml.Scalar).value).toBe("x");
+            expect(pair(second)).toEqual(["a", "1"]);
+        }
+    }));
+
+    test('pair without a value', () => spec.rewriteRun({
+        ...yaml(`f: [a:]`),
+        afterRecipe: docs => {
+            expect(pair(flowSequence(docs).entries[0])).toEqual(["a", ""]);
+        }
+    }));
+
+    test('pair followed by a trailing comma', () => spec.rewriteRun({
+        ...yaml(`f: [a: 1, ]`),
+        afterRecipe: docs => {
+            const sequence = flowSequence(docs);
+            expect(sequence.entries).toHaveLength(1);
+            expect(pair(sequence.entries[0])).toEqual(["a", "1"]);
+            expect(sequence.entries[0].trailingCommaPrefix).toBe("");
+            expect(sequence.closingBracketPrefix).toBe(" ");
+        }
+    }));
+
+    test('pairs spread over lines with extra spaces', () => spec.rewriteRun({
+        ...yaml(`
+            f: [ a : 1 ,
+               b:  2 ]
+        `),
+        afterRecipe: docs => {
+            const [first, second] = flowSequence(docs).entries;
+            expect(pair(first)).toEqual(["a", "1"]);
+            expect(first.trailingCommaPrefix).toBe(" ");
+            expect(pair(second)).toEqual(["b", "2"]);
+        }
+    }));
+
+    test('comma on the line after a pair and its comment', () => spec.rewriteRun({
+        ...yaml(`
+            f: [a: 1 # one
+              , b: 2]
+        `),
+        afterRecipe: docs => {
+            const [first, second] = flowSequence(docs).entries;
+            expect(first.trailingCommaPrefix).toBe(" # one\n  ");
+            expect(pair(second)).toEqual(["b", "2"]);
+            expect(second.prefix).toBe("");
+        }
+    }));
+});
+
+describe('Flow sequence without a trailing entry', () => {
+    const spec = new RecipeSpec();
+
+    function flowSequence(docs: Yaml.Documents): Yaml.Sequence {
+        return (docs.documents[0].block as Yaml.Mapping).entries[0].value as Yaml.Sequence;
+    }
+
+    test('blank sequence has no entries', () => spec.rewriteRun({
+        ...yaml(`f: [ ]`),
+        afterRecipe: docs => {
+            const sequence = flowSequence(docs);
+            expect(sequence.entries).toHaveLength(0);
+            expect(sequence.closingBracketPrefix).toBe(" ");
+        }
+    }));
+
+    test('trailing comma followed by a comment adds no entry', () => spec.rewriteRun({
+        ...yaml(`
+            f: [a , # c
+              ]
+        `),
+        afterRecipe: docs => {
+            const sequence = flowSequence(docs);
+            expect(sequence.entries).toHaveLength(1);
+            expect((sequence.entries[0].block as Yaml.Scalar).value).toBe("a");
+            expect(sequence.entries[0].trailingCommaPrefix).toBe(" ");
+            expect(sequence.closingBracketPrefix).toBe(" # c\n  ");
+        }
+    }));
+
+    test('trailing anchored null is still an entry', () => spec.rewriteRun({
+        ...yaml(`f: [a, &x ]`),
+        afterRecipe: docs => {
+            expect(flowSequence(docs).entries).toHaveLength(2);
+        }
+    }));
+});
+
+describe('Empty values', () => {
+    const rootEntries = (docs: Yaml.Documents) => (docs.documents[0].block as Yaml.Mapping).entries;
+
+    test('the line break after an empty value is the prefix of the next entry', async () => {
+        const docs = await parseYaml("a:\nb: 1\n");
+        const [a, b] = rootEntries(docs);
+        expect((a.value as Yaml.Scalar).value).toBe("");
+        expect(a.value.prefix).toBe("");
+        expect(b.prefix).toBe("\n");
+    });
+
+    test('a comment after an empty value is the prefix of the next entry', async () => {
+        const docs = await parseYaml("a: # c\nb: 1\n");
+        const [a, b] = rootEntries(docs);
+        expect(a.value.prefix).toBe("");
+        expect(b.prefix).toBe(" # c\n");
+    });
+
+    test('the line break after an empty last value is the prefix of the document end', async () => {
+        const docs = await parseYaml("a: 1\nb:\n");
+        expect(rootEntries(docs)[1].value.prefix).toBe("");
+        expect(docs.documents[0].end.prefix).toBe("\n");
+    });
+
+    test('the line break after an empty last value of a nested mapping is the prefix of the next entry', async () => {
+        const docs = await parseYaml("on:\n  push:\n  workflow_dispatch:\nnext: 1\n");
+        const [on, next] = rootEntries(docs);
+        const [push, dispatch] = (on.value as Yaml.Mapping).entries;
+        expect(push.value.prefix).toBe("");
+        expect(dispatch.prefix).toBe("\n  ");
+        expect(dispatch.value.prefix).toBe("");
+        expect(next.prefix).toBe("\n");
+    });
+
+    test('the line break after an empty sequence item is the prefix of the next item', async () => {
+        const docs = await parseYaml("a:\n  -\n  - b\n");
+        const [empty, b] = (rootEntries(docs)[0].value as Yaml.Sequence).entries;
+        expect(empty.block.prefix).toBe("");
+        expect(b.prefix).toBe("\n  ");
+    });
+
+    test.each([
+        "a:\nb: 1\n",
+        "a: # c\nb: 1\n",
+        "a: 1\nb:\n",
+        "a:\n  -\n  - b\n",
+        "-\n- a\n",
+        "x: {a: , b: 1}\n",
+        "x: {a:}\n",
+        "a:\r\n  b:\r\nc: 1\r\n",
+        "a:"
+    ])('prints %j as it was', async text => {
+        expect(await parseAndPrint(text)).toBe(text);
+    });
+});
+
+describe('Space after a comma in a flow sequence', () => {
+    const items = async (text: string) => {
+        const docs = await parseYaml(text);
+        const value = (docs.documents[0].block as Yaml.Mapping).entries.find(e => (e.key as Yaml.Scalar).value === "v")!.value;
+        return (value as Yaml.Sequence).entries;
+    };
+
+    test('is the prefix of the item, as the Java parser has it', async () => {
+        const [first, second] = await items("v: [8, 10]\n");
+        expect([first.prefix, second.prefix]).toEqual(["", ""]);
+        expect([first.block.prefix, second.block.prefix]).toEqual(["", " "]);
+    });
+
+    test('keeps a comment on the line with the item after it', async () => {
+        const [first, second] = await items("v: [\n  8, # a\n  10\n]\n");
+        expect([first.prefix, second.prefix]).toEqual(["", ""]);
+        expect([first.block.prefix, second.block.prefix]).toEqual(["\n  ", " # a\n  "]);
+    });
+
+    test('is the opening bracket prefix of a nested sequence', async () => {
+        const [first, second] = await items("v: [ [1], [2] ]\n");
+        expect([first.prefix, second.prefix]).toEqual(["", ""]);
+        expect([first.block, second.block].map(s => (s as Yaml.Sequence).openingBracketPrefix)).toEqual([" ", " "]);
+    });
+
+    test('is the prefix of an alias', async () => {
+        const [, alias] = await items("a: &x 1\nv: [1, *x]\n");
+        expect(alias.prefix).toBe("");
+        expect(alias.block.prefix).toBe(" ");
+    });
+
+    test.each([
+        "v: [8, 10]\n",
+        "v: [ 8 , 10 , ]\n",
+        "v: [\n  8, # a\n  10 # b\n]\n",
+        "v: [ [1], [2] ]\n",
+        "a: &x 1\nv: [1, *x]\n",
+        "v: [8,\t10]\r\nw: 1\r\n"
+    ])('prints %j as it was', async text => {
+        expect(await parseAndPrint(text)).toBe(text);
+    });
+});
+
+describe('Anchors and tags', () => {
+    const root = async (text: string) => (await parseYaml(text)).documents[0];
+    const entries = async (text: string) => ((await root(text)).block as Yaml.Mapping).entries;
+    const items = (block: Yaml.Block) => (block as Yaml.Sequence).entries.map(e => e.block);
+
+    test('are read in a flow sequence', async () => {
+        const [anchored, alias, tagged] = items((await entries("v: [&x 1, *x, !!str 2]\n"))[0].value) as Yaml.Scalar[];
+        expect(anchored.anchor?.key).toBe("x");
+        expect((alias as unknown as Yaml.Alias).anchor).toBe(anchored.anchor);
+        expect(tagged.tag?.name).toBe("str");
+        expect(tagged.prefix).toBe(" ");
+    });
+
+    test('are read in a flow mapping, on keys and values', async () => {
+        const [a, b] = ((await entries("v: { &k a: &x 1, !!str b: *x }\n"))[0].value as Yaml.Mapping).entries;
+        expect((a.key as Yaml.Scalar).anchor?.key).toBe("k");
+        expect((a.value as Yaml.Scalar).anchor?.key).toBe("x");
+        expect((b.key as Yaml.Scalar).tag?.name).toBe("str");
+        expect((b.value as Yaml.Alias).anchor).toBe((a.value as Yaml.Scalar).anchor);
+    });
+
+    test('are read on a block mapping key', async () => {
+        const [, c] = await entries("b: 1\n&k c: 2\n");
+        expect(c.prefix).toBe("\n");
+        expect((c.key as Yaml.Scalar).anchor).toMatchObject({key: "k", prefix: "", postfix: " "});
+    });
+
+    test('are read on the root of a document', async () => {
+        const document = await root("# c\n&x 1\n");
+        expect(document.prefix).toBe("# c\n");
+        expect((document.block as Yaml.Scalar).anchor).toMatchObject({key: "x", prefix: "", postfix: " "});
+    });
+
+    test('are read after a tag', async () => {
+        const [a] = await entries("a: !!str &x 2\n");
+        const value = a.value as Yaml.Scalar;
+        expect(value.anchor?.key).toBe("x");
+        expect(findMarker(value, Yaml.Markers.TagBeforeAnchor)).toBeDefined();
+    });
+
+    test('are read on an empty value, which keeps the line break after it', async () => {
+        const [a, b] = await entries("a: &x\nb: !!null\nc: 1\n");
+        expect((a.value as Yaml.Scalar).anchor).toMatchObject({key: "x", prefix: "", postfix: ""});
+        expect((b.value as Yaml.Scalar).tag?.name).toBe("null");
+        expect(b.prefix).toBe("\n");
+    });
+
+    test('on a scalar hold the space after them, and the scalar the space before', async () => {
+        const [a] = await entries("a: &x !!str 2\n");
+        const value = a.value as Yaml.Scalar;
+        expect(value.prefix).toBe(" ");
+        expect(value.anchor).toMatchObject({prefix: "", postfix: " "});
+        expect(value.tag).toMatchObject({prefix: "", suffix: " "});
+    });
+
+    test('on a collection hold the space before them, and a tag the rest of its line', async () => {
+        const [a] = await entries("a: &m !!map\n  b: 1\n");
+        const value = a.value as Yaml.Mapping;
+        expect(value.anchor).toMatchObject({prefix: " ", postfix: ""});
+        expect(value.tag).toMatchObject({prefix: " ", suffix: "\n"});
+        expect(value.entries[0].prefix).toBe("  ");
+    });
+
+    test('on a flow collection leave the space after them to the opening bracket', async () => {
+        const [a] = await entries("a: &s [1]\n");
+        const value = a.value as Yaml.Sequence;
+        expect(value.anchor).toMatchObject({prefix: " ", postfix: ""});
+        expect(value.openingBracketPrefix).toBe(" ");
+    });
+
+    test.each([
+        "a: &x\nb: !!null\nc: 1\n",
+        "v: [&x 1, !!str 2, &y !!str 3, *x]\n",
+        "v: [ &x 1 , !!str 2 ]\n",
+        "v: [\n  &x 1, # one\n  !!str 2\n]\n",
+        "v: [&s [1], *s]\n",
+        "v: [&k a: 1, b: &v 2]\n",
+        "v: [&x , !!null ]\nw: { a: &y , b: !!null }\n",
+        "v: { &k a: &x 1, !!str b: *x, c: &m { d: 1 } }\n",
+        "&k a: 1\n!!str b: 2\n",
+        "a: !!str &x 2\nb: [!!str &y 3]\n",
+        "a: &m !!map\n  b: 1\nc: !!map &n # c\n  d: 2\n",
+        "# c\n&x 1\n",
+        "--- &x\na: 1\n",
+        "--- !!map\na: 1\n",
+        "a: &x\n\n  b: 1\n",
+        "a:   &x   1\n",
+        "a: &x |\n  t\nb: !!str >\n  u\n"
+    ])('prints %j as it was', async text => {
+        expect(await parseAndPrint(text)).toBe(text);
+    });
 });

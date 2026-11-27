@@ -16,11 +16,34 @@
 package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.SourceFile;
+import org.openrewrite.groovy.GroovyParser;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.groovy.Assertions.groovy;
 
 class FieldAccessTest implements RewriteTest {
+
+    @ParameterizedTest
+    @ValueSource(strings = {"\n .", "\n ?.", "\n *.", "\r\n .", "\r\n ?.", "\r\n *."})
+    void propertyAccessAfterLineContinuation(String continuation) {
+        // given
+        String source = "foo \\" + continuation + "bar";
+
+        // when
+        SourceFile parsed = GroovyParser.builder().build().parse(source).findFirst().orElseThrow();
+
+        // then
+        assertThat(parsed).isInstanceOf(G.CompilationUnit.class);
+        assertThat(parsed.printAll()).isEqualTo(source);
+        G.CompilationUnit cu = (G.CompilationUnit) parsed;
+        assertThat(cu.getStatements()).singleElement().isInstanceOfSatisfying(J.FieldAccess.class,
+          access -> assertThat(access.getSimpleName()).isEqualTo("bar"));
+    }
 
     @Test
     void starAccess() {

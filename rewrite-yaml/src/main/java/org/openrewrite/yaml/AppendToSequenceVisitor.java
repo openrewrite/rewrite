@@ -21,7 +21,6 @@ import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.marker.AlreadyReplaced;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.yaml.tree.Yaml;
 
@@ -33,6 +32,9 @@ import static java.util.Collections.sort;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 
+/// Appends a value to the sequences that `matcher` matches. The comment that ends the last item's line stays on that
+/// line only when the visit starts at the document or above it, as the parser keeps that comment in the prefix of what
+/// follows the sequence; a visit that starts below it leaves the comment to end the appended item's line instead.
 public class AppendToSequenceVisitor extends YamlIsoVisitor<ExecutionContext> {
     private final JsonPathMatcher matcher;
     private final String value;
@@ -49,15 +51,20 @@ public class AppendToSequenceVisitor extends YamlIsoVisitor<ExecutionContext> {
     @Override
     public Yaml.Sequence visitSequence(Yaml.Sequence existingSeq, ExecutionContext ctx) {
         Cursor parent = getCursor().getParent();
-        if (matcher.matches(parent) &&
-                existingSeq.getMarkers()
-                        .findAll(AlreadyReplaced.class).stream()
-                        .map(AlreadyReplaced::getFind)
-                        .noneMatch(value::equals) &&
-                checkExistingSequenceValues(existingSeq, parent)) {
+        if (matcher.matches(parent) && checkExistingSequenceValues(existingSeq, parent)) {
             return appendToSequence(existingSeq, this.value, ctx);
         }
-        return super.visitSequence(existingSeq, ctx);
+        return TrailingComments.visit(getCursor(), () -> super.visitSequence(existingSeq, ctx));
+    }
+
+    @Override
+    public Yaml.Mapping visitMapping(Yaml.Mapping mapping, ExecutionContext ctx) {
+        return TrailingComments.visit(getCursor(), () -> super.visitMapping(mapping, ctx));
+    }
+
+    @Override
+    public Yaml.Document visitDocument(Yaml.Document document, ExecutionContext ctx) {
+        return TrailingComments.visit(getCursor(), () -> super.visitDocument(document, ctx));
     }
 
     protected boolean checkExistingSequenceValues(final Yaml.Sequence seq, final Cursor cursor) {
@@ -94,6 +101,7 @@ public class AppendToSequenceVisitor extends YamlIsoVisitor<ExecutionContext> {
         boolean hasDash = false;
         Yaml.Scalar.Style style = Yaml.Scalar.Style.PLAIN;
         String entryPrefix = "";
+        String entryComment = "";
         String entryTrailingCommaPrefix = null;
         String itemPrefix = "";
         if (!entries.isEmpty()) {
@@ -112,17 +120,34 @@ public class AppendToSequenceVisitor extends YamlIsoVisitor<ExecutionContext> {
                 }
             } else if (block instanceof Yaml.Sequence.Scalar) {
                 itemPrefix = block.getPrefix();
-                style = ((Yaml.Sequence.Scalar) block).getStyle();
+                Yaml.Scalar.Style lastStyle = ((Yaml.Sequence.Scalar) block).getStyle();
+                if (lastStyle != Yaml.Scalar.Style.LITERAL && lastStyle != Yaml.Scalar.Style.FOLDED) {
+                    style = lastStyle;
+                }
             }
             if (!existingEntry.isDash()) {
                 entries.set(lastEntryIndex, existingEntry.withTrailingCommaPrefix(""));
+            } else if (TrailingComments.endsWithBlockScalar(existingEntry)) {
+                // The block scalar ending the last item holds the line break before the new item, which now needs
+                // one before what follows it
+                entryPrefix = TrailingComments.stripLeadingLineBreak(
+                        TrailingComments.withoutCommentLines(TrailingComments.withoutInlineComment(entryPrefix)));
+                TrailingComments.breakLineAfter(getCursor());
+            } else {
+                // The comment ending the last item's line stays on that line, which the new item now follows, and
+                // the comments on and above the line before it aren't copied
+                entryPrefix = TrailingComments.withoutCommentLines(TrailingComments.withoutInlineComment(entryPrefix));
+                String comment = TrailingComments.replace(getCursor(), null);
+                if (comment != null) {
+                    entryComment = comment;
+                }
             }
         }
 
         Yaml.Block newItem = parseYamlValue(value, itemPrefix, entryPrefix, style);
-        Yaml.Sequence.Entry newEntry = new Yaml.Sequence.Entry(randomId(), entryPrefix, Markers.EMPTY, newItem, hasDash, entryTrailingCommaPrefix);
+        Yaml.Sequence.Entry newEntry = new Yaml.Sequence.Entry(randomId(), entryComment + entryPrefix, Markers.EMPTY, newItem, hasDash, entryTrailingCommaPrefix);
         entries.add(newEntry);
-        return newSequence.withMarkers(existingSequence.getMarkers().addIfAbsent(new AlreadyReplaced(randomId(), value, value)));
+        return newSequence;
     }
 
     private Yaml.Block parseYamlValue(String value, String itemPrefix, String entryPrefix, Yaml.Scalar.Style style) {

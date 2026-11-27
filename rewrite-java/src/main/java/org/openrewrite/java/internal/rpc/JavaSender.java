@@ -52,6 +52,7 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
     public J visitArrayAccess(J.ArrayAccess arrayAccess, RpcSendQueue q) {
         q.getAndSend(arrayAccess, J.ArrayAccess::getIndexed, indexed -> visit(indexed, q));
         q.getAndSend(arrayAccess, J.ArrayAccess::getDimension, dim -> visit(dim, q));
+        q.getAndSend(arrayAccess, a -> asRef(a.getType()), type -> visitType(getValueNonNull(type), q));
         return arrayAccess;
     }
 

@@ -4187,6 +4187,87 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/10140")
+    @Test
+    void noSiblingExclusionWhenOldDependencyIsNotDeclared() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "org.bouncycastle",
+            "bcutil-jdk15on",
+            null,
+            "bcutil-jdk18on",
+            null,
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.example</groupId>
+                  <artifactId>example</artifactId>
+                  <version>1.0</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.bouncycastle</groupId>
+                          <artifactId>bcpkix-jdk18on</artifactId>
+                          <version>1.78.1</version>
+                          <exclusions>
+                              <exclusion>
+                                  <groupId>org.bouncycastle</groupId>
+                                  <artifactId>bcutil-jdk15on</artifactId>
+                              </exclusion>
+                          </exclusions>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/10140")
+    @Test
+    void noSiblingExclusionOnStarterWhenOldDependencyIsNotDeclared() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "javax.annotation",
+            "javax.annotation-api",
+            "jakarta.annotation",
+            "jakarta.annotation-api",
+            "1.3.x",
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <parent>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-parent</artifactId>
+                      <version>3.2.12</version>
+                      <relativePath/>
+                  </parent>
+                  <groupId>com.example</groupId>
+                  <artifactId>example</artifactId>
+                  <version>1.0</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.springframework.boot</groupId>
+                          <artifactId>spring-boot-starter</artifactId>
+                          <exclusions>
+                              <exclusion>
+                                  <groupId>javax.annotation</groupId>
+                                  <artifactId>javax.annotation-api</artifactId>
+                              </exclusion>
+                          </exclusions>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
     @Test
     void shouldNotChangeDependencyWithImplicitlyDefinedVersionProperty() {
         rewriteRun(
@@ -4419,4 +4500,118 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
         );
     }
 
+    @Test
+    void globSkipsDependenciesWhoseNewCoordinatesDoNotResolve() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "org.hibernate",
+            "hibernate-*",
+            "org.hibernate.orm",
+            null,
+            "6.0.x",
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.hibernate</groupId>
+                          <artifactId>hibernate-core</artifactId>
+                          <version>5.6.15.Final</version>
+                      </dependency>
+                      <dependency>
+                          <groupId>org.hibernate</groupId>
+                          <artifactId>hibernate-search-orm</artifactId>
+                          <version>5.11.12.Final</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.hibernate.orm</groupId>
+                          <artifactId>hibernate-core</artifactId>
+                          <version>6.0.2.Final</version>
+                      </dependency>
+                      <dependency>
+                          <groupId>org.hibernate</groupId>
+                          <artifactId>hibernate-search-orm</artifactId>
+                          <version>5.11.12.Final</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void globSkipsDependencyWithParentVersionPropertyWhoseNewCoordinatesDoNotResolve() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "org.hibernate",
+            "hibernate-*",
+            "org.hibernate.orm",
+            null,
+            "6.0.x",
+            null
+          )),
+          mavenProject("project",
+            //language=xml
+            pomXml(
+              """
+                <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>parent-project</artifactId>
+                  <version>1</version>
+                  <properties>
+                    <search.version>5.11.12.Final</search.version>
+                  </properties>
+                  <modules>
+                    <module>sub-project</module>
+                  </modules>
+                </project>
+                """,
+              spec -> spec.path("pom.xml")
+            ),
+            mavenProject("sub-project",
+              //language=xml
+              pomXml(
+                """
+                  <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>sub-project</artifactId>
+                    <version>1</version>
+                    <parent>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>parent-project</artifactId>
+                      <version>1</version>
+                      <relativePath>../pom.xml</relativePath>
+                    </parent>
+                    <dependencies>
+                      <dependency>
+                        <groupId>org.hibernate</groupId>
+                        <artifactId>hibernate-search-orm</artifactId>
+                        <version>${search.version}</version>
+                      </dependency>
+                    </dependencies>
+                  </project>
+                  """,
+                spec -> spec.path("sub-project/pom.xml")
+              )
+            )
+          )
+        );
+    }
 }

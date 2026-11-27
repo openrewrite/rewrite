@@ -561,6 +561,8 @@ public sealed class LstOutline
     {
         MethodInvocation mi => mi.MethodType,
         MethodDeclaration md => md.MethodType,
+        OperatorDeclaration od => od.MethodType,
+        ConversionOperatorDeclaration cod => cod.MethodType,
         NewClass nc => nc.ConstructorType,
         Expression e => e.Type,
         ClassDeclaration cd => cd.Type,

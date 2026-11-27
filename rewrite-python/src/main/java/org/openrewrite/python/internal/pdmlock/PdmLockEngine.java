@@ -22,6 +22,7 @@ import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.python.PythonPackageIndex;
+import org.openrewrite.python.internal.GroupedDeclarations;
 import org.openrewrite.python.internal.Hashing;
 import org.openrewrite.python.internal.LockFileRegeneration.Failure;
 import org.openrewrite.python.internal.LockFileRegeneration.Reason;
@@ -165,6 +166,19 @@ public final class PdmLockEngine {
         private Result run() {
             packages = new ArrayList<>(lock.getPackages());
             String newHash = PdmContentHash.hash(pyproject);
+            // a lock whose hash records another manifest than the one before the edit was already out of date, and
+            // pdm relocks that drift too, which the engine does not reproduce; refreshing the hash over it would
+            // also make a stale lock pass `pdm lock --check`
+            if (originalPyproject != null && !PdmContentHash.hash(originalPyproject).equals(lock.getContentHash())) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
+                        "pdm.lock is out of date with pyproject.toml before the edit (its content_hash records " +
+                                "another manifest); pdm would relock that drift, which the native engine does not reproduce");
+            }
+
+            if (originalPyproject != null) {
+                requireSameGroups(GroupedDeclarations.pdm(PyprojectData.toNestedMap(originalPyproject)),
+                        GroupedDeclarations.pdm(PyprojectData.toNestedMap(pyproject)));
+            }
 
             Map<String, @Nullable PythonVersionSpecifierSet> declared = collectDirectDeps(pyproject);
             Map<String, @Nullable PythonVersionSpecifierSet> originalDeclared =
@@ -210,6 +224,50 @@ public final class PdmLockEngine {
 
             PdmLock updated = lock.withPackages(packages).withContentHash(newHash);
             return Result.success(PdmLockWriter.write(updated));
+        }
+
+        /**
+         * pdm records each package's groups, and the markers it carries for them, from the groups whose declarations
+         * reach it. An edit that changes a declaration's extras, marker or source, or which groups reach a locked
+         * package, changes entries this engine does not compute.
+         */
+        private void requireSameGroups(GroupedDeclarations before, GroupedDeclarations after) {
+            String reshaped = before.firstReshaped(after);
+            if (reshaped != null) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, reshaped,
+                        "The edit changes more than the version of " + reshaped + "'s declaration (its extras, marker " +
+                                "or source), which changes the groups and markers pdm records; that requires resolution");
+            }
+            Map<String, Set<String>> was = before.reachableGroups(this::dependencyNames);
+            Map<String, Set<String>> now = after.reachableGroups(this::dependencyNames);
+            for (PdmLockPackage pkg : packages) {
+                String name = Pep508Requirement.canonicalize(pkg.getName());
+                Set<String> groups = now.get(name);
+                if (groups != null && !groups.equals(was.get(name))) {
+                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, pkg.getName(),
+                            "The edit changes the groups that reach " + pkg.getName() + " from " +
+                                    (was.containsKey(name) ? was.get(name) : "none") + " to " + groups +
+                                    ", which changes the groups and markers pdm records; that requires resolution");
+                }
+            }
+        }
+
+        private Collection<String> dependencyNames(String name) {
+            List<String> names = new ArrayList<>();
+            for (PdmLockPackage pkg : packages) {
+                if (!Pep508Requirement.canonicalize(pkg.getName()).equals(name)) {
+                    continue;
+                }
+                if (pkg.getDependencies() != null) {
+                    for (String dependency : pkg.getDependencies()) {
+                        Pep508Requirement req = Pep508Requirement.parse(dependency);
+                        if (req != null) {
+                                names.add(req.getCanonicalName());
+                        }
+                    }
+                }
+            }
+            return names;
         }
 
         private static @Nullable Set<String> changedNames(

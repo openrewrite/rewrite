@@ -17,6 +17,7 @@ package org.openrewrite.gradle.search;
 
 import org.assertj.core.api.Condition;
 import org.intellij.lang.annotations.Language;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -328,6 +329,7 @@ class DependencyInsightTest implements RewriteTest {
     }
 
     @Nested
+    @Disabled("2026-11-24 temporarily disabled: JBoss Maven repo is down, which stalls missing-artifact lookups")
     class VersionParameter {
 
         @ParameterizedTest

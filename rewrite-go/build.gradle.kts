@@ -188,6 +188,9 @@ testing {
                 all {
                     testTask.configure {
                         dependsOn(goBuild)
+                        inputs.files(goBuild.map { it.inputs.files })
+                            .withPathSensitivity(PathSensitivity.RELATIVE)
+                            .withPropertyName("goBuildSources")
                     }
                 }
             }

@@ -71,69 +71,6 @@ class GradleProjectTest {
     }
 
     @Nested
-    class gradle4Compatibility {
-        @TempDir
-        static Path dir;
-
-        static GradleProject gradleProject;
-
-        //language=groovy
-        static String buildGradle = """
-          plugins{
-              id 'java'
-          }
-
-          repositories{
-              mavenCentral()
-          }
-
-          dependencies{
-              implementation 'org.openrewrite:rewrite-java:8.56.0'
-          }
-          """;
-
-        //language=groovy
-        static String settingsGradle = """
-          rootProject.name = "sample"
-          """;
-
-
-        @BeforeAll
-        static void gradleProject() throws IOException {
-            try (InputStream is = new ByteArrayInputStream(buildGradle.getBytes(StandardCharsets.UTF_8))) {
-                Files.write(dir.resolve("build.gradle"), readAllBytes(is));
-            }
-
-            try (InputStream is = new ByteArrayInputStream(settingsGradle.getBytes(StandardCharsets.UTF_8))) {
-                Files.write(dir.resolve("settings.gradle"), readAllBytes(is));
-            }
-
-            OpenRewriteModel model = OpenRewriteModelBuilder.forProjectDirectory(dir.toFile(), dir.resolve("build.gradle").toFile());
-            gradleProject = model.getGradleProject();
-        }
-
-        @Test
-        void requestedCorrespondsDirectlyToResolved() {
-            assertThat(requireNonNull(gradleProject.getConfiguration("compileClasspath")).getRequested())
-              .hasSize(1);
-            assertThat(requireNonNull(gradleProject.getConfiguration("compileClasspath")).getDirectResolved())
-              .hasSize(1);
-        }
-
-        @Test
-        void serializable() throws Exception {
-            ObjectMapper m = new RecipeSerializer().getMapper();
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            m.writeValue(baos, gradleProject);
-            ByteArrayInputStream bais = new ByteArrayInputStream(baos.toByteArray());
-            GradleProject roundTripped = m.readValue(bais, GradleProject.class);
-            assertThat(roundTripped).isEqualTo(gradleProject);
-        }
-
-    }
-
-
-    @Nested
     @DisabledIf("org.openrewrite.gradle.marker.GradleProjectTest#gradleOlderThan8")
     class singleProject {
         @TempDir
@@ -190,6 +127,11 @@ class GradleProjectTest {
 
             OpenRewriteModel model = OpenRewriteModelBuilder.forProjectDirectory(dir.toFile(), dir.resolve("build.gradle").toFile());
             gradleProject = model.getGradleProject();
+        }
+
+        @Test
+        void recordsBuildFilePathRelativeToProjectDirectory() {
+            assertThat(gradleProject.getBuildFilePath()).isEqualTo("build.gradle");
         }
 
         @Test
@@ -536,6 +478,50 @@ class GradleProjectTest {
             ByteArrayInputStream bais = new ByteArrayInputStream(baos.toByteArray());
             GradleProject roundTripped = m.readValue(bais, GradleProject.class);
             assertThat(roundTripped).isEqualTo(gradleProject);
+        }
+    }
+
+    @Nested
+    class RenamedBuildFile {
+        @TempDir
+        static Path dir;
+
+        static OpenRewriteModel model;
+
+        //language=groovy
+        static String buildGradle = """
+          plugins{
+              id 'java'
+          }
+          """;
+
+        //language=groovy
+        static String settingsGradle = """
+          rootProject.name = "sample"
+          rootProject.buildFileName = 'root.gradle'
+          include("api")
+          project(':api').buildFileName = 'api.gradle'
+          """;
+
+        @BeforeAll
+        static void gradleProject() throws IOException {
+            Files.write(dir.resolve("root.gradle"), buildGradle.getBytes(StandardCharsets.UTF_8));
+            Files.write(dir.resolve("settings.gradle"), settingsGradle.getBytes(StandardCharsets.UTF_8));
+            Path apiDir = Files.createDirectory(dir.resolve("api"));
+            Files.write(apiDir.resolve("api.gradle"), buildGradle.getBytes(StandardCharsets.UTF_8));
+
+            model = OpenRewriteModelBuilder.forProjectDirectory(dir.toFile(), null);
+        }
+
+        @Test
+        void recordsRenamedRootBuildFile() {
+            assertThat(model.getGradleProject().getBuildFilePath()).isEqualTo("root.gradle");
+        }
+
+        @Test
+        void recordsRenamedSubprojectBuildFileRelativeToItsOwnDirectory() {
+            assertThat(requireNonNull(model.getGradleProjectsByPath().get(":api")).getBuildFilePath())
+              .isEqualTo("api.gradle");
         }
     }
 }

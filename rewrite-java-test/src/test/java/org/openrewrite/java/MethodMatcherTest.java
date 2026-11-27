@@ -41,6 +41,14 @@ import static org.openrewrite.java.tree.JavaType.ShallowClass.build;
 @SuppressWarnings("ConstantConditions")
 class MethodMatcherTest implements RewriteTest {
 
+    @ParameterizedTest
+    @ValueSource(strings = {"java.util.concurrent.CompletableFuture *Async(..)", "*..* *(..)", "java.util.concurrent.CompletableFuture runAsync(..)"})
+    void unnamedForeignMethodDoesNotMatch(String pattern) {
+        var method = new JavaType.Method(null, 0, build("java.util.concurrent.CompletableFuture"), null,
+          JavaType.Primitive.Void, emptyList(), emptyList(), emptyList(), emptyList(), null, emptyList());
+        assertThat(new MethodMatcher(pattern).matches(method)).isFalse();
+    }
+
     @Test
     void declaringTypeMatchPrefix() {
         // The literal prefix is everything in the declaring-type pattern up to the first wildcard.
@@ -473,7 +481,7 @@ class MethodMatcherTest implements RewriteTest {
     @Test
     void matcherForUnknownType() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none()),
+          spec -> spec.typeValidationOptions(TypeValidation.all().identifiers(false).methodDeclarations(false)),
           java(
             """
               class Test {

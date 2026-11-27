@@ -107,7 +107,8 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
             modifiers: await mapAsync(arrowFunction.modifiers, item => this.visitDefined<J.Modifier>(item, p)),
             typeParameters: arrowFunction.typeParameters && await this.visitDefined<J.TypeParameters>(arrowFunction.typeParameters, p),
             lambda: await this.visitDefined<J.Lambda>(arrowFunction.lambda, p),
-            returnTypeExpression: arrowFunction.returnTypeExpression && await this.visitDefined<TypedTree>(arrowFunction.returnTypeExpression, p)
+            returnTypeExpression: arrowFunction.returnTypeExpression && await this.visitDefined<TypedTree>(arrowFunction.returnTypeExpression, p),
+            methodType: await this.visitType(arrowFunction.methodType, p) as Type.Method | undefined
         }));
         return updateIfChanged(arrowFunction, updates);
     }
@@ -162,7 +163,8 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
             selfClosing: element.selfClosing && await this.visitSpace(element.selfClosing, p),
             children: element.children && await mapAsync(element.children, child => this.visit(child, p)),
             closingName: element.closingName && await this.visitLeftPadded(element.closingName, p),
-            afterClosingName: element.afterClosingName && await this.visitSpace(element.afterClosingName, p)
+            afterClosingName: element.afterClosingName && await this.visitSpace(element.afterClosingName, p),
+            methodType: await this.visitType(element.methodType, p) as Type.Method | undefined
         }));
         return updateIfChanged(element, updates);
     }

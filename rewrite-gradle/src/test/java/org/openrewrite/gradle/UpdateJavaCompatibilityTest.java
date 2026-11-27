@@ -31,7 +31,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
 
     private static GradleParser.Builder withAndroidGradlePlugin() {
         return GradleParser.builder().buildscriptClasspathFromResources(new InMemoryExecutionContext(),
-          "gradle-base-services", "gradle-core-api", "gradle-api");
+          "gradle-public-api-9.", "gradle-api");
     }
 
     @DocumentExample
@@ -567,6 +567,56 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
 
               tasks.named<JavaCompile>("compileJava") {
                   options.release.set(11)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void leaveTheBuildsOwnPropertiesAlone() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateJavaCompatibility(25, null, null, null, null)),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              ext.versions = [java: JavaVersion.VERSION_17]
+
+              java {
+                  sourceCompatibility = versions.java
+                  targetCompatibility = project.ext.versions.java
+                  toolchain {
+                      languageVersion = JavaLanguageVersion.of(versions.java.majorVersion)
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void leaveTheBuildsOwnPropertiesAloneInKotlinDSL() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateJavaCompatibility(25, null, null, null, null)),
+          buildGradleKts(
+            """
+              plugins {
+                  java
+              }
+
+              object Versions {
+                  val java = JavaVersion.VERSION_17
+              }
+
+              java {
+                  sourceCompatibility = Versions.java
+                  targetCompatibility = Versions.java
+                  toolchain {
+                      languageVersion.set(JavaLanguageVersion.of(JavaVersion.current().majorVersion))
+                  }
               }
               """
           )

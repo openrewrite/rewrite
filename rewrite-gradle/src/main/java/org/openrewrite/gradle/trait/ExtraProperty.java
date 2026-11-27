@@ -27,6 +27,9 @@ import org.openrewrite.kotlin.marker.By;
 import org.openrewrite.kotlin.marker.IndexedAccess;
 import org.openrewrite.trait.Trait;
 
+import static java.util.Collections.singletonList;
+import static java.util.Objects.requireNonNull;
+
 /**
  * Represents an extra property in a Gradle build script where the value is a string literal.
  * <p>
@@ -42,6 +45,7 @@ import org.openrewrite.trait.Trait;
  *   <li>ext.set() method: {@code ext.set("propertyName", "value")}</li>
  *   <li>ext subscript access: {@code ext['propertyName'] = 'value'} or Kotlin {@code extra["propertyName"] = "value"}</li>
  *   <li>set() in ext block: {@code ext { set('propertyName', 'value') }}</li>
+ *   <li>Kotlin delegated property: {@code val propertyName by extra("value")}</li>
  * </ul>
  */
 @Value
@@ -78,7 +82,11 @@ public class ExtraProperty implements Trait<J> {
         /**
          * set() method inside ext block: {@code ext { set('foo', 'bar') }}
          */
-        EXT_BLOCK_SET_METHOD
+        EXT_BLOCK_SET_METHOD,
+        /**
+         * Kotlin delegated property: {@code val foo by extra("bar")}
+         */
+        EXTRA_DELEGATE
     }
 
     public String getName() {
@@ -144,6 +152,17 @@ public class ExtraProperty implements Trait<J> {
                     return method.withArguments(ListUtils.mapLast(method.getArguments(), arg -> newValueLiteral));
                 }
                 break;
+
+            case EXTRA_DELEGATE:
+                J.VariableDeclarations.NamedVariable delegated = (J.VariableDeclarations.NamedVariable) tree;
+                if (delegated.getInitializer() instanceof J.MethodInvocation) {
+                    J.MethodInvocation extra = (J.MethodInvocation) delegated.getInitializer();
+                    if (extra.getArguments().get(0) instanceof J.Literal) {
+                        J.Literal newValueLiteral = ChangeStringLiteral.withStringValue((J.Literal) extra.getArguments().get(0), newValue);
+                        return delegated.withInitializer(extra.withArguments(singletonList(newValueLiteral)));
+                    }
+                }
+                break;
         }
 
         return tree;
@@ -191,13 +210,17 @@ public class ExtraProperty implements Trait<J> {
             Expression value;
             PropertySyntax syntax;
             if (node instanceof J.VariableDeclarations.NamedVariable) {
-                if (!matchVariableDeclarations) {
-                    return null;
-                }
                 J.VariableDeclarations.NamedVariable var = (J.VariableDeclarations.NamedVariable) node;
                 name = var.getSimpleName();
-                value = var.getInitializer();
-                syntax = PropertySyntax.VARIABLE_DECLARATION;
+                if (isDelegatedToExtra(cursor, var)) {
+                    value = ((J.MethodInvocation) requireNonNull(var.getInitializer())).getArguments().get(0);
+                    syntax = PropertySyntax.EXTRA_DELEGATE;
+                } else if (matchVariableDeclarations) {
+                    value = var.getInitializer();
+                    syntax = PropertySyntax.VARIABLE_DECLARATION;
+                } else {
+                    return null;
+                }
             } else if (node instanceof J.Assignment) {
                 J.Assignment assignment = (J.Assignment) node;
                 syntax = assignmentSyntax(assignment.getVariable(), cursor);
@@ -256,6 +279,12 @@ public class ExtraProperty implements Trait<J> {
                 default:
                     return false;
             }
+        }
+
+        private static boolean isDelegatedToExtra(Cursor cursor, J.VariableDeclarations.NamedVariable variable) {
+            J.VariableDeclarations declarations = cursor.firstEnclosing(J.VariableDeclarations.class);
+            return declarations != null && declarations.getMarkers().findFirst(By.class).isPresent() &&
+                   isExtraDelegate(variable.getInitializer());
         }
 
         private static boolean isExtraDelegate(@Nullable Expression initializer) {

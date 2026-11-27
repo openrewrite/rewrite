@@ -34,8 +34,7 @@ class NewClassTemplateTest implements RewriteTest {
     @Test
     void alreadyImportedTypeRendersWithoutStrayLeadingSpace() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none())
-            .recipe(toRecipe(() -> new KotlinVisitor<>() {
+          spec -> spec.recipe(toRecipe(() -> new KotlinVisitor<>() {
                 @Override
                 public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                     if ("placeholder".equals(method.getSimpleName())) {
@@ -71,8 +70,7 @@ class NewClassTemplateTest implements RewriteTest {
     @Test
     void freshlyImportedTypeIsShortenedAndRendersWithoutStrayLeadingSpace() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none())
-            .recipe(toRecipe(() -> new KotlinVisitor<>() {
+          spec -> spec.recipe(toRecipe(() -> new KotlinVisitor<>() {
                 @Override
                 public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                     if ("placeholder".equals(method.getSimpleName())) {
@@ -106,8 +104,7 @@ class NewClassTemplateTest implements RewriteTest {
     @Test
     void constructorWithTypeArgumentsRendersWithoutStrayLeadingSpace() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none())
-            .recipe(toRecipe(() -> new KotlinVisitor<>() {
+          spec -> spec.recipe(toRecipe(() -> new KotlinVisitor<>() {
                 @Override
                 public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                     if ("placeholder".equals(method.getSimpleName())) {
@@ -143,7 +140,7 @@ class NewClassTemplateTest implements RewriteTest {
     @Test
     void constructorInArgumentPositionRendersWithoutStrayLeadingSpace() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none())
+          spec -> spec.typeValidationOptions(TypeValidation.all().methodInvocations(false))
             .recipe(toRecipe(() -> new KotlinVisitor<>() {
                 @Override
                 public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {

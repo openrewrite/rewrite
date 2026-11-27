@@ -145,6 +145,7 @@ export namespace JS {
         readonly typeParameters?: J.TypeParameters;
         readonly lambda: J.Lambda;
         readonly returnTypeExpression?: TypeTree;
+        readonly methodType?: Type.Method;
     }
 
     /**
@@ -264,6 +265,7 @@ export namespace JS {
     export interface ImportClause extends JS {
         readonly kind: typeof Kind.ImportClause;
         readonly typeOnly: boolean;
+        readonly deferred: boolean;
         readonly name?: J.RightPadded<J.Identifier>;
         readonly namedBindings?: Expression;
     }
@@ -346,7 +348,8 @@ export namespace JS {
             IdentityNotEquals = "IdentityNotEquals",
             In = "In",
             QuestionQuestion = "QuestionQuestion",
-            Comma = "Comma"
+            Comma = "Comma",
+            Exponentiation = "Exponentiation"
         }
     }
 
@@ -580,6 +583,7 @@ export namespace JS {
             QuestionQuestion = "QuestionQuestion",
             And = "And",
             Or = "Or",
+            /** @deprecated `a ** b` is a {@link JS.Binary} of type {@link JS.Binary.Type.Exponentiation}. */
             Power = "Power",
             Exp = "Exp"
         }
@@ -901,6 +905,7 @@ export namespace JSX {
         readonly typeArguments?: J.Container<Expression>;
         readonly afterName: J.Space;
         readonly attributes: J.RightPadded<Attribute | SpreadAttribute>[];
+        readonly methodType?: Type.Method;
     }
 
     /**

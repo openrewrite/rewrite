@@ -865,6 +865,39 @@ public sealed class Empty(
 }
 
 /// <summary>
+/// Source code that does not parse, kept as its original text.
+/// </summary>
+public sealed class Erroneous(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    string text
+) : J, Statement, Expression, IEquatable<Erroneous>
+{
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public string Text { get; } = text;
+
+    public Erroneous WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, Text);
+    public Erroneous WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Text);
+    public Erroneous WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Text);
+    public Erroneous WithText(string text) =>
+        text == Text ? this : new(Id, Prefix, Markers, text);
+
+    public JavaType? Type => null;
+
+    Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(Erroneous? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as Erroneous);
+    public override int GetHashCode() => Id.GetHashCode();
+}
+
+/// <summary>
 /// A class, struct, interface, or record declaration.
 /// </summary>
 public sealed class ClassDeclaration(

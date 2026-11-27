@@ -224,6 +224,102 @@ class RemoveExclusionTest implements RewriteTest {
     }
 
     @Test
+    void keepsEffectiveWildcardExclusions() {
+        // https://github.com/openrewrite/rewrite/issues/10139
+        rewriteRun(
+          spec -> spec.recipe(new RemoveExclusion(
+            "*",
+            "*",
+            "*",
+            "*",
+            true
+          )),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>org.bouncycastle</groupId>
+                    <artifactId>bcpkix-jdk18on</artifactId>
+                    <version>1.78.1</version>
+                    <exclusions>
+                      <exclusion>
+                        <groupId>*</groupId>
+                        <artifactId>*</artifactId>
+                      </exclusion>
+                    </exclusions>
+                  </dependency>
+                  <dependency>
+                    <groupId>org.bouncycastle</groupId>
+                    <artifactId>bcpg-jdk18on</artifactId>
+                    <version>1.78.1</version>
+                    <exclusions>
+                      <exclusion>
+                        <groupId>org.bouncycastle</groupId>
+                        <artifactId>*</artifactId>
+                      </exclusion>
+                    </exclusions>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeIneffectiveWildcardExclusion() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveExclusion(
+            "*",
+            "*",
+            "*",
+            "*",
+            true
+          )),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>org.bouncycastle</groupId>
+                    <artifactId>bcpkix-jdk18on</artifactId>
+                    <version>1.78.1</version>
+                    <exclusions>
+                      <exclusion>
+                        <groupId>com.google.*</groupId>
+                        <artifactId>*</artifactId>
+                      </exclusion>
+                    </exclusions>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>org.bouncycastle</groupId>
+                    <artifactId>bcpkix-jdk18on</artifactId>
+                    <version>1.78.1</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
     void removeUsedExclusions() {
         rewriteRun(
           spec -> spec.recipe(new RemoveExclusion(

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import * as path from "path";
-import {describeJavaRpc, testJavaRpc} from "../../src/test/java-rpc";
+import {describeJavaRpc, testJavaRpc} from "../../src/test/java-rpc.mjs";
 import {TreePrinters} from "../../src/print";
 import {moduleDir, parse} from "./printer-parity";
 

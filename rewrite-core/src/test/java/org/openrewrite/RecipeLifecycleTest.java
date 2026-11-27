@@ -295,7 +295,6 @@ class RecipeLifecycleTest implements RewriteTest {
         rewriteRun(
           spec -> spec
             .recipes(testRecipe("Change1"), noop(), testRecipe("Change2"))
-            .validateRecipeSerialization(false)
             .afterRecipe(run -> {
                 var changes = run.getChangeset().getAllResults();
                 assertThat(changes).hasSize(1);

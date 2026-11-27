@@ -19,14 +19,16 @@ import lombok.experimental.UtilityClass;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.ToBeRemoved;
 import org.openrewrite.java.internal.HashMapJavaTypeCache;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.internal.JavaTypeFactory;
+import org.openrewrite.java.internal.JdkClassSharingTypeFactory;
 import org.openrewrite.java.internal.parser.RewriteClasspathJarClasspathLoader;
 import org.openrewrite.java.internal.parser.TypeTable;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.style.NamedStyles;
 
 import java.io.ByteArrayInputStream;
@@ -67,6 +69,15 @@ public interface JavaParser extends Parser {
      * The index outlives the parsers and holds what it read until memory runs short.
      */
     String SHARE_CLASSPATH_JAR_INDEX = "org.openrewrite.java.shareClasspathJarIndex";
+
+    /**
+     * Set to a {@code Collection<javax.tools.Diagnostic<? extends javax.tools.JavaFileObject>>} on an
+     * {@link ExecutionContext} supplied to parsing to have the parser add the errors that javac reports in the
+     * sources it parses. The parser then also runs javac's flow analysis, which reports errors such as an
+     * unreported exception.
+     */
+    @Incubating(since = "8.107.0")
+    String COMPILATION_ERRORS = "org.openrewrite.java.compilationErrors";
 
     static List<Path> runtimeClasspath() {
         return RuntimeClasspathCache.getRuntimeClasspath();
@@ -237,6 +248,23 @@ public interface JavaParser extends Parser {
      */
     void setClasspath(Collection<Path> classpath);
 
+    /**
+     * The type a fully qualified name has on this parser's classpath, with its members and supertypes, or
+     * {@code null} where the classpath has no such type. A nested type is named by its binary name, as
+     * {@code a.Outer$Inner}. Each call compiles a stub, which resets the parser.
+     */
+    default JavaType.@Nullable FullyQualified findType(String fullyQualifiedName) {
+        ExecutionContext ctx = new InMemoryExecutionContext();
+        ctx.putMessage(SKIP_SOURCE_SET_TYPE_GENERATION, true);
+        return reset().parse(ctx, "class $FindType { " + fullyQualifiedName.replace('$', '.') + " t; }")
+                .findFirst()
+                .filter(J.CompilationUnit.class::isInstance)
+                .map(cu -> ((J.CompilationUnit) cu).getClasses().get(0).getBody().getStatements().get(0))
+                .filter(J.VariableDeclarations.class::isInstance)
+                .map(field -> TypeUtils.asFullyQualified(((J.VariableDeclarations) field).getType()))
+                .orElse(null);
+    }
+
     @SuppressWarnings("unchecked")
     abstract class Builder<P extends JavaParser, B extends Builder<P, B>> extends Parser.Builder {
         protected Collection<Path> classpath = emptyList();
@@ -244,6 +272,8 @@ public interface JavaParser extends Parser {
         protected Collection<byte[]> classBytesClasspath = emptyList();
         protected JavaTypeCache javaTypeCache = new JavaTypeCache();
         private boolean typeCacheConfigured;
+        protected @Nullable Path javaPlatform;
+        protected @Nullable Integer sourceCompatibility;
 
         @Nullable
         protected JavaTypeFactory javaTypeFactory;
@@ -258,6 +288,36 @@ public interface JavaParser extends Parser {
 
         public Builder() {
             super(J.CompilationUnit.class);
+        }
+
+        /** Select the JDK home whose platform classes javac resolves, including internal APIs. */
+        public B javaPlatform(@Nullable Path javaHome) {
+            if (javaHome != null && !supportsCompilerConfiguration(null)) {
+                throw new UnsupportedOperationException(getClass().getName() + " does not support selecting a Java platform");
+            }
+            if (!Objects.equals(javaPlatform, javaHome) && !typeCacheConfigured && javaTypeFactory == null) {
+                javaTypeCache = new JavaTypeCache();
+            }
+            javaPlatform = javaHome;
+            return (B) this;
+        }
+
+        /** Whether this parser supports platform selection and, when supplied, this source version. */
+        protected boolean supportsCompilerConfiguration(@Nullable Integer sourceVersion) {
+            return false;
+        }
+
+        /** Select source syntax independently of the runtime API; null keeps the parser's default. */
+        public B sourceCompatibility(@Nullable Integer majorVersion) {
+            if (majorVersion != null && !supportsCompilerConfiguration(majorVersion)) {
+                throw new UnsupportedOperationException(getClass().getName() +
+                        " does not support source compatibility " + majorVersion);
+            }
+            if (!Objects.equals(sourceCompatibility, majorVersion) && !typeCacheConfigured && javaTypeFactory == null) {
+                javaTypeCache = new JavaTypeCache();
+            }
+            sourceCompatibility = majorVersion;
+            return (B) this;
         }
 
         public B logCompilationWarningsAndErrors(boolean logCompilationWarningsAndErrors) {
@@ -286,6 +346,14 @@ public interface JavaParser extends Parser {
             this.javaTypeCache = javaTypeCache;
             this.typeCacheConfigured = true;
             return (B) this;
+        }
+
+        /**
+         * @return The cache that the parsers this builder builds keep their types in, when it has no type factory.
+         * Building a parser can replace it with a cache that reads through to it.
+         */
+        public JavaTypeCache getTypeCache() {
+            return javaTypeCache;
         }
 
         public B typeFactory(@Nullable JavaTypeFactory javaTypeFactory) {
@@ -361,16 +429,6 @@ public interface JavaParser extends Parser {
             return (B) this;
         }
 
-        /**
-         * @deprecated prefer {@link #classpath} and {@link #classpathFromResources(ExecutionContext, String...)}.
-         */
-        @Deprecated
-        @ToBeRemoved(after = "2025-12-31", reason = "Use classpath or classpathFromResources instead.")
-        public B classpath(byte[]... classpath) {
-            this.classBytesClasspath = Arrays.asList(classpath);
-            return (B) this;
-        }
-
         public B styles(Iterable<? extends NamedStyles> styles) {
             for (NamedStyles style : styles) {
                 this.styles.add(style);
@@ -389,15 +447,21 @@ public interface JavaParser extends Parser {
 
         /**
          * Resolve the {@link JavaTypeFactory} to use for this parser. Returns the explicit
-         * factory set via {@link #typeFactory}, or {@code null} when none is configured —
-         * the caller falls back to a default factory.
+         * factory set via {@link #typeFactory}. When neither a factory nor a type cache is configured,
+         * returns the one {@link JdkClassSharingTypeFactory#forParser} gives in tests, or {@code null}
+         * elsewhere, and the caller falls back to a default factory.
          */
         protected @Nullable JavaTypeFactory resolvedTypeFactory() {
-            return javaTypeFactory;
+            if (javaTypeFactory != null || typeCacheConfigured || javaPlatform != null || sourceCompatibility != null) {
+                return javaTypeFactory;
+            }
+            return JdkClassSharingTypeFactory.forParser(resolvedTypeCache());
         }
 
         protected JavaTypeCache resolvedTypeCache() {
-            javaTypeCache = HashMapJavaTypeCache.forParser(javaTypeCache, typeCacheConfigured || javaTypeFactory != null);
+            boolean configured = typeCacheConfigured || javaTypeFactory != null || javaPlatform != null || sourceCompatibility != null;
+            javaTypeCache = HashMapJavaTypeCache.forParser(
+                    JdkClassSharingTypeFactory.cacheForParser(javaTypeCache, getClass(), configured), configured);
             return javaTypeCache;
         }
 

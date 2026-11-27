@@ -57,6 +57,24 @@ class YamlParserTest implements RewriteTest {
         assertThat(title.getValue()).isEqualTo("b");
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"  ", ""})
+    void anchoredBlockSequenceAcrossSnakeYamlBufferBoundary(String dashIndent) {
+        for (int padding = 0; padding < 1100; padding++) {
+            String source = """
+              # %s
+              rules:
+                - changes: &files
+              %s    - one
+              %s    - two
+              other: *files
+              """.formatted("x".repeat(padding), dashIndent, dashIndent);
+            SourceFile sourceFile = YamlParser.builder().build().parse(source).findFirst().orElseThrow();
+            assertThat(sourceFile).as("padding %d", padding).isNotInstanceOf(ParseError.class);
+            assertThat(sourceFile.printAll()).as("padding %d", padding).isEqualTo(source);
+        }
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/2062")
     @Test
     void fourBytesUnicode() {
@@ -1037,5 +1055,56 @@ class YamlParserTest implements RewriteTest {
             spec -> spec.path(".github/workflows/actions.lock")
           )
         );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "- alert: \tInbound\n",
+      "- alert:\tInbound\n",
+      "-\talert: Inbound\n",
+      "alert:\t\"Inbound\"\n",
+      "alert: \t{a: 1}\n",
+      "alert: \t[a, b]\n",
+      "alert:\t\n  - a\n",
+      "alert: \t|\n  text\n",
+      "alert: \t&x Inbound\nother: *x\n",
+      "? \tkey\n: \tvalue\n",
+      "\u00e9: \t\uD83D\uDE00\nb:\t1\n",
+    })
+    void tabSeparatingTokens(String source) {
+        rewriteRun(
+          yaml(source)
+        );
+    }
+
+    @Test
+    void tabSeparatorKeptInPrefixAndOutOfValues() {
+        rewriteRun(
+          yaml(
+            """
+              - alert: \tInbound
+              - script: |
+                  x: \ty
+              """,
+            spec -> spec.afterRecipe(docs -> {
+                Yaml.Sequence sequence = (Yaml.Sequence) docs.getDocuments().getFirst().getBlock();
+                Yaml.Scalar alert = (Yaml.Scalar) ((Yaml.Mapping) sequence.getEntries().get(0).getBlock()).getEntries().getFirst().getValue();
+                assertThat(alert.getPrefix()).isEqualTo(" \t");
+                assertThat(alert.getValue()).isEqualTo("Inbound");
+                Yaml.Scalar script = (Yaml.Scalar) ((Yaml.Mapping) sequence.getEntries().get(1).getBlock()).getEntries().getFirst().getValue();
+                assertThat(script.getValue()).contains("x: \ty");
+            })
+          )
+        );
+    }
+
+    @Test
+    void tabIndentationStillRejected() {
+        List<SourceFile> sources = YamlParser.builder().build().parse("a:\n\tb: c\n").toList();
+        assertThat(sources).singleElement().isInstanceOf(ParseError.class);
+        assertThat(((ParseError) sources.getFirst()).getMarkers().findFirst(ParseExceptionResult.class))
+          .get()
+          .extracting(ParseExceptionResult::getMessage, as(STRING))
+          .contains("found character '\\t(TAB)' that cannot start any token");
     }
 }

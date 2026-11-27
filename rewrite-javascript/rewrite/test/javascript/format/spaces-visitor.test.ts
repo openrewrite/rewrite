@@ -78,6 +78,7 @@ describe('SpacesVisitor', () => {
                 import{delta,gamma,zeta}from'delta.js';
                 import{b}from'qux.js';
                 import*as foo from'foo.js';
+                import defer   *as deferred from'deferred.js';
                 import a from'baz.js';
                 import'module-without-export.js';
                 import type{Models} from'../models';
@@ -92,6 +93,7 @@ describe('SpacesVisitor', () => {
                 import {delta, gamma, zeta} from 'delta.js';
                 import {b} from 'qux.js';
                 import * as foo from 'foo.js';
+                import defer * as deferred from 'deferred.js';
                 import a from 'baz.js';
                 import 'module-without-export.js';
                 import type {Models} from '../models';

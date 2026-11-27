@@ -17,11 +17,14 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JLeftPadded;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.Markers;
 
 import static java.util.Collections.emptyList;
@@ -71,21 +74,41 @@ public class ChangeAnnotationAttributeName extends Recipe {
                 if (!annotationMatcher.matches(a)) {
                     return a;
                 }
+                // the parser types an attribute's name as the annotation's method of that name
+                JavaType.FullyQualified type = TypeUtils.asFullyQualified(a.getType());
+                JavaType.Method attribute = TypeUtils.findDeclaredMethod(type, newAttributeName, emptyList()).orElse(null);
                 return a.withArguments(ListUtils.map(a.getArguments(), arg -> {
                     if (arg instanceof J.Assignment) {
                         if (!oldAttributeName.equals(newAttributeName)) {
                             J.Assignment assignment = (J.Assignment) arg;
                             J.Identifier variable = (J.Identifier) assignment.getVariable();
                             if (oldAttributeName.equals(variable.getSimpleName())) {
-                                return assignment.withVariable(variable.withSimpleName(newAttributeName));
+                                variable = variable.withSimpleName(newAttributeName);
+                                JavaType.Method renamed = attribute == null ? withNewName(variable.getType()) : attribute;
+                                return renamed == null ? assignment.withVariable(variable) :
+                                        assignment.withVariable(variable.withType(renamed))
+                                                .withType(renamed.getReturnType());
                             }
                         }
                     } else if ("value".equals(oldAttributeName) && !(arg instanceof J.Empty)) {
-                        J.Identifier name = new J.Identifier(randomId(), arg.getPrefix(), Markers.EMPTY, emptyList(), newAttributeName, arg.getType(), null);
-                        return new J.Assignment(randomId(), EMPTY, arg.getMarkers(), name, new JLeftPadded<>(SINGLE_SPACE, arg.withPrefix(SINGLE_SPACE), Markers.EMPTY), arg.getType());
+                        JavaType.Method renamed = attribute == null ?
+                                withNewName(TypeUtils.findDeclaredMethod(type, "value", emptyList()).orElse(null)) : attribute;
+                        J.Identifier name = new J.Identifier(randomId(), arg.getPrefix(), Markers.EMPTY, emptyList(), newAttributeName,
+                                renamed == null ? arg.getType() : renamed, null);
+                        return new J.Assignment(randomId(), EMPTY, arg.getMarkers(), name, new JLeftPadded<>(SINGLE_SPACE, arg.withPrefix(SINGLE_SPACE), Markers.EMPTY),
+                                renamed == null ? arg.getType() : renamed.getReturnType());
                     }
                     return arg;
                 }));
+            }
+
+            /**
+             * An annotation type can lack the new attribute, such as one a later {@link ChangeType} replaces,
+             * so the old attribute's method stands in for it under the new name.
+             */
+            private JavaType.@Nullable Method withNewName(@Nullable JavaType oldAttribute) {
+                return oldAttribute instanceof JavaType.Method ?
+                        ((JavaType.Method) oldAttribute).withName(newAttributeName) : null;
             }
         });
     }

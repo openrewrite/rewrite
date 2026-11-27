@@ -139,6 +139,16 @@ public class AddDependency extends ScanningRecipe<NodeDependencyEdits> {
     private String targetScope() { return scope == null ? "dependencies" : scope; }
 
     @Override
+    public boolean causesAnotherCycle() {
+        return NodeDependencyEdits.deferredThisCycle();
+    }
+
+    @Override
+    public void onComplete(ExecutionContext ctx) {
+        NodeDependencyEdits.reportUnresolvedDeferrals(ctx);
+    }
+
+    @Override
     public NodeDependencyEdits getInitialValue(ExecutionContext ctx) {
         return new NodeDependencyEdits(NodeDependencyEdits.rows(lockRegenerationFailures, editsDeclined,
                 packageName));

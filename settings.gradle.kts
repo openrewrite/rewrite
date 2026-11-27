@@ -28,6 +28,7 @@ val allProjects = listOf(
     "rewrite-android",
     "rewrite-benchmarks",
     "rewrite-bom",
+    "rewrite-coldfusion",
     "rewrite-core",
     "rewrite-csharp",
     "rewrite-docker",
