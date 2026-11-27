@@ -4375,6 +4375,64 @@ class ChangeTypeTest implements RewriteTest {
     }
 
     @Test
+    void fullyQualifyWhereInheritedMemberTypeMayTakeTargetSimpleName() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Old", "b.New", true)),
+          java("package a; public class Old {}", SourceSpec::skip),
+          java("package b; public class New {}", SourceSpec::skip),
+          java("package lib; public class Parent { public static class New {} }", SourceSpec::skip),
+          java(
+            """
+              class Qualified extends lib.Parent {
+                  a.Old value;
+              }
+              """,
+            """
+              class Qualified extends lib.Parent {
+                  b.New value;
+              }
+              """
+          ),
+          java(
+            """
+              import a.Old;
+
+              class Imported extends lib.Parent {
+                  Old value;
+              }
+              """,
+            """
+              class Imported extends lib.Parent {
+                  b.New value;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void fullyQualifyParameterizedOuterWhereInheritedMemberTypeMayTakeItsName() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Outer$Old", "b.Outer$New", true)),
+          java("package a; public class Outer<T> { public class Old {} }", SourceSpec::skip),
+          java("package b; public class Outer<T> { public class New {} }", SourceSpec::skip),
+          java("package lib; public class Parent { public static class Outer {} }", SourceSpec::skip),
+          java(
+            """
+              class C extends lib.Parent {
+                  a.Outer<String>.Old value;
+              }
+              """,
+            """
+              class C extends lib.Parent {
+                  b.Outer<String>.New value;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void shortenWhenFileOnlyQualifiesAnotherTypeOfTheSameName() {
         rewriteRun(
           spec -> spec.recipe(new ChangeType("a.A1", "b.Bar", true)),
@@ -4457,10 +4515,8 @@ class ChangeTypeTest implements RewriteTest {
               }
               """,
             """
-              import java.util.Collection;
-
               class Foo {
-                  Collection<String> l;
+                  java.util.Collection<String> l;
               }
               """,
             spec -> spec.mapBeforeRecipe(cu -> (J.CompilationUnit) new JavaIsoVisitor<>() {

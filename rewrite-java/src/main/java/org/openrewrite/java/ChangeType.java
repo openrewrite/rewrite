@@ -225,6 +225,8 @@ public class ChangeType extends Recipe implements RenamingRecipe {
         private final Set<String> declaredClassNames = new HashSet<>();
         private @Nullable Set<String> otherTypeNames;
         private @Nullable UUID otherTypeNamesOf;
+        private boolean inheritedNameMayBind;
+        private @Nullable UUID inheritedNameMayBindOf;
 
         private JavaChangeTypeVisitor(String oldFullyQualifiedTypeName, String newFullyQualifiedTypeName, @Nullable Boolean ignoreDefinition) {
             this(oldFullyQualifiedTypeName, JavaType.buildType(newFullyQualifiedTypeName), newFullyQualifiedTypeName,
@@ -458,7 +460,8 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                         if (fqTarget.getOwningClass() != null) {
                             J.FieldAccess fa = updateParameterizedFieldAccess(fieldAccess, originalType, fqTarget, ctx);
                             if (getCursor().firstEnclosing(J.Import.class) == null &&
-                                    getCursor().firstEnclosing(Javadoc.class) == null) {
+                                    getCursor().firstEnclosing(Javadoc.class) == null &&
+                                    !inheritedNameMayBind(getCursor().firstEnclosingOrThrow(JavaSourceFile.class), fqTarget)) {
                                 doAfterVisit(service(ImportService.class).shortenFullyQualifiedTypeReferencesIn(fa));
                             }
                             return fa;
@@ -471,7 +474,8 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                         return getCursor().firstEnclosing(J.Import.class) == null ? qualified : fieldAccess;
                     }
                     if (getCursor().firstEnclosing(J.Import.class) == null &&
-                            getCursor().firstEnclosing(Javadoc.class) == null) {
+                            getCursor().firstEnclosing(Javadoc.class) == null &&
+                            !inheritedNameMayBind(getCursor().firstEnclosingOrThrow(JavaSourceFile.class), fqTarget)) {
                         doAfterVisit(service(ImportService.class).shortenFullyQualifiedTypeReferencesIn((J) qualified));
                     }
                     return qualified;
@@ -835,7 +839,71 @@ public class ChangeType extends Recipe implements RenamingRecipe {
             Set<String> otherTypeNames = otherTypeNames(sf, newType);
             // a nested target is written through its outermost class, so that name has to be free as well
             return !otherTypeNames.contains(newType.getClassName()) &&
-                   !otherTypeNames.contains(getTopLevelClassName(newType).getClassName());
+                   !otherTypeNames.contains(getTopLevelClassName(newType).getClassName()) &&
+                   !inheritedNameMayBind(sf, newType);
+        }
+
+        /**
+         * Whether a member type inherited around a reference to the original may take the simple name the target is
+         * written by. Such a member type takes precedence over an import. Only the classes this file declares are
+         * known to {@link ShortenFullyQualifiedTypeReferencesSafely#inheritedNameIsProven}.
+         */
+        private boolean inheritedNameMayBind(JavaSourceFile sf, JavaType.FullyQualified newType) {
+            if (!(sf instanceof J.CompilationUnit)) {
+                return false;
+            }
+            // like otherTypeNames, this describes the file as it was first seen
+            if (sf.getId().equals(inheritedNameMayBindOf)) {
+                return inheritedNameMayBind;
+            }
+            inheritedNameMayBindOf = sf.getId();
+            JavaType.FullyQualified outermost = getTopLevelClassName(newType);
+            Map<JavaType.FullyQualified, ShortenFullyQualifiedTypeReferencesSafely.DeclaredMembers> declared = new IdentityHashMap<>();
+            new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Integer p) {
+                    if (classDecl.getType() != null) {
+                        declared.put(classDecl.getType(), ShortenFullyQualifiedTypeReferencesSafely.DeclaredMembers.of(classDecl));
+                    }
+                    return super.visitClassDeclaration(classDecl, p);
+                }
+            }.visit(sf, 0);
+            AtomicBoolean unproven = new AtomicBoolean();
+            new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.Import visitImport(J.Import anImport, Integer p) {
+                    return anImport;
+                }
+
+                @Override
+                public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Integer p) {
+                    if (fieldAccess.getName().getFieldType() == null &&
+                        fieldAccess.isFullyQualifiedClassReference(originalType.getFullyQualifiedName())) {
+                        check();
+                        return fieldAccess;
+                    }
+                    return super.visitFieldAccess(fieldAccess, p);
+                }
+
+                @Override
+                public J.Identifier visitIdentifier(J.Identifier identifier, Integer p) {
+                    if (identifier.getFieldType() == null &&
+                        TypeUtils.isOfClassType(identifier.getType(), originalType.getFullyQualifiedName()) &&
+                        !isDeclarationName(getCursor().getParentTreeCursor().getValue(), identifier)) {
+                        check();
+                    }
+                    return identifier;
+                }
+
+                private void check() {
+                    if (!ShortenFullyQualifiedTypeReferencesSafely.inheritedNameIsProven(getCursor(), outermost.getClassName(),
+                            outermost.getFullyQualifiedName(), declared)) {
+                        unproven.set(true);
+                    }
+                }
+            }.visit(sf, 0);
+            inheritedNameMayBind = unproven.get();
+            return inheritedNameMayBind;
         }
 
         /**

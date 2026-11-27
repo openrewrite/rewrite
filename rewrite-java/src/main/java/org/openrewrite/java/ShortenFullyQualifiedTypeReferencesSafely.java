@@ -94,16 +94,7 @@ public class ShortenFullyQualifiedTypeReferencesSafely extends ScanningRecipe<Ma
             public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration declaration, ExecutionContext ctx) {
                 if (declaration.getType() instanceof JavaType.Class && !(declaration.getType() instanceof JavaType.ShallowClass) &&
                     hasCompleteMemberDeclarations(declaration)) {
-                    DeclaredMembers members = new DeclaredMembers();
-                    for (Statement statement : declaration.getBody().getStatements()) {
-                        if (statement instanceof J.ClassDeclaration) {
-                            members.types.add(((J.ClassDeclaration) statement).getSimpleName());
-                        } else if (statement instanceof J.VariableDeclarations) {
-                            ((J.VariableDeclarations) statement).getVariables().forEach(variable -> members.variables.add(variable.getSimpleName()));
-                        } else if (statement instanceof J.EnumValueSet) {
-                            ((J.EnumValueSet) statement).getEnums().forEach(value -> members.variables.add(value.getName().getSimpleName()));
-                        }
-                    }
+                    DeclaredMembers members = DeclaredMembers.of(declaration);
                     synchronized (sources) {
                         DeclaredMembers known = sources.computeIfAbsent(declaration.getType(), key -> new DeclaredMembers());
                         known.types.addAll(members.types);
@@ -278,8 +269,14 @@ public class ShortenFullyQualifiedTypeReferencesSafely extends ScanningRecipe<Ma
         return false;
     }
 
-    private static boolean inheritedNameIsProven(Cursor cursor, String simpleName, String fullyQualifiedName,
-                                                  Map<JavaType.FullyQualified, DeclaredMembers> sources) {
+    /**
+     * Whether {@code simpleName} at the cursor provably binds to {@code fullyQualifiedName} rather than to a member
+     * type, or in an expression to a field, that an enclosing class inherits. {@code sources} holds the member names
+     * of the classes whose declarations are known. Any other enclosing class or supertype leaves the inherited names
+     * unknown, and then only a simple use of the type in the class body, attributed to it, proves the binding.
+     */
+    static boolean inheritedNameIsProven(Cursor cursor, String simpleName, String fullyQualifiedName,
+                                         Map<JavaType.FullyQualified, DeclaredMembers> sources) {
         J.Block body = null;
         boolean unknown = false;
         Deque<JavaType.FullyQualified> ancestors = new ArrayDeque<>();
@@ -356,6 +353,20 @@ public class ShortenFullyQualifiedTypeReferencesSafely extends ScanningRecipe<Ma
     static final class DeclaredMembers {
         final Set<String> types = new HashSet<>();
         final Set<String> variables = new HashSet<>();
+
+        static DeclaredMembers of(J.ClassDeclaration declaration) {
+            DeclaredMembers members = new DeclaredMembers();
+            for (Statement statement : declaration.getBody().getStatements()) {
+                if (statement instanceof J.ClassDeclaration) {
+                    members.types.add(((J.ClassDeclaration) statement).getSimpleName());
+                } else if (statement instanceof J.VariableDeclarations) {
+                    ((J.VariableDeclarations) statement).getVariables().forEach(variable -> members.variables.add(variable.getSimpleName()));
+                } else if (statement instanceof J.EnumValueSet) {
+                    ((J.EnumValueSet) statement).getEnums().forEach(value -> members.variables.add(value.getName().getSimpleName()));
+                }
+            }
+            return members;
+        }
     }
 
     private static class SimpleTypes {
