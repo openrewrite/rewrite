@@ -416,6 +416,50 @@ class CSharpRecipeTest implements RewriteTest {
     }
 
     @Test
+    void findMethodOnTypeNestedInGenericType() {
+        rewriteRun(
+          spec -> spec.recipe(new FindMethods("Outer.Inner M(..)", null)),
+          csproj(
+            """
+              <Project Sdk="Microsoft.NET.Sdk">
+                <PropertyGroup>
+                  <TargetFramework>net9.0</TargetFramework>
+                </PropertyGroup>
+              </Project>
+              """
+          ),
+          csharp(
+            """
+              class Outer<T> {
+                  public class Inner {
+                      public static void M() {
+                      }
+                  }
+              }
+              class Foo {
+                  void Test() {
+                      Outer<int>.Inner.M();
+                  }
+              }
+              """,
+            """
+              class Outer<T> {
+                  public class Inner {
+                      public static void /*~~>*/M() {
+                      }
+                  }
+              }
+              class Foo {
+                  void Test() {
+                      /*~~>*/Outer<int>.Inner.M();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void deleteMethodArgument() {
         rewriteRun(
           spec -> spec

@@ -274,6 +274,9 @@ public class TypesInUse {
                 declaredMethodIndex = index;
             }
         }
+        if (prefix.indexOf('`') >= 0) {
+            prefix = FqnTrie.withoutArity(prefix);
+        }
         for (int i = MethodEntry.lowerBound(index, prefix); i < index.length && index[i].key.startsWith(prefix); i++) {
             if (matcher.matches(index[i].method)) {
                 return true;
@@ -637,7 +640,8 @@ public class TypesInUse {
      * so that {@link MethodMatcher#getDeclaringTypeMatchPrefix() declaring-type prefixes} — exact FQNs, package
      * prefixes from {@code ..*} patterns, and the shorter prefixes of mid-string wildcards alike — all resolve to a
      * contiguous {@code startsWith} window. Canonicalizing here lets inner-class FQNs match either {@code .} or
-     * {@code $} prefix form, consistent with {@link TypeUtils#fullyQualifiedNamesAreEqual}.
+     * {@code $} prefix form, consistent with {@link TypeUtils#fullyQualifiedNamesAreEqual}. A .NET generic FQN's key
+     * drops its arities, so a prefix written without arity reaches a type nested in a generic one.
      */
     private static final class MethodEntry {
         private final String key;
@@ -658,7 +662,8 @@ public class TypesInUse {
                     continue;
                 }
                 String fqn = declaringType.getFullyQualifiedName();
-                entries[i++] = new MethodEntry(fqn.indexOf('$') < 0 ? fqn : fqn.replace('$', '.'), m);
+                String key = fqn.indexOf('$') < 0 ? fqn : fqn.replace('$', '.');
+                entries[i++] = new MethodEntry(key.indexOf('`') < 0 ? key : FqnTrie.withoutArity(key), m);
             }
             if (i != entries.length) {
                 entries = Arrays.copyOf(entries, i);
