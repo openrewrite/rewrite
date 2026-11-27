@@ -18,24 +18,54 @@ package org.openrewrite.xml;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.ParseExceptionResult;
 import org.openrewrite.Parser.Input;
 import org.openrewrite.SourceFile;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.tree.ParseError;
+import org.openrewrite.xml.marker.HtmlImpliedClose;
 import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Optional;
 
-import static java.util.Objects.requireNonNull;
-import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.xml.Assertions.html;
 import static org.openrewrite.xml.Assertions.xml;
 
 class HtmlParserTest implements RewriteTest {
+
+    @DocumentExample
+    @Test
+    void pageUsingEverything() {
+        rewriteRun(
+          html(
+            """
+              <!DOCTYPE html>
+              <html lang=en>
+              <head>
+                <meta charset=utf-8>
+                <title>Tom & Jerry</title>
+                <script>
+                  if (a < b && c) { document.write("<p>x</p>"); }
+                </script>
+              </head>
+              <body class=home>
+                <ul>
+                  <li>One
+                  <li *ngIf="x" (click)="go()">Two
+                </ul>
+                <input type=checkbox checked disabled>
+                <textarea>a < b</textarea>
+                <button onclick="if(a<b) go()">go</button>
+                <p>last
+              """
+          )
+        );
+    }
 
     @ParameterizedTest
     @CsvSource(delimiter = '|', value = {
@@ -50,14 +80,10 @@ class HtmlParserTest implements RewriteTest {
 
     @Test
     void reportsTheMismatchBehindAnUnclosedElement() {
-        SourceFile parsed = XmlParser.builder().build()
-          .parseInputs(List.of(Input.fromString(Path.of("rest.html"),
-            "<table><tr><td><label><details><summary>Request</summary></label></td></tr></table>")),
-            null, new InMemoryExecutionContext(t -> {
-          }))
-          .findFirst().orElseThrow();
-        assertThat(parsed.getMarkers().findFirst(ParseExceptionResult.class).orElseThrow().getMessage())
-          .contains("Mismatched closing tag </label>");
+        SourceFile parsed = parse("rest.html",
+          "<table><tr><td><label><details><summary>Request</summary></label></td></tr></table>");
+        assertThat(parsed.getMarkers().findFirst(ParseExceptionResult.class))
+          .hasValueSatisfying(e -> assertThat(e.getMessage()).contains("Mismatched closing tag </label>"));
     }
 
     @Test
@@ -76,24 +102,21 @@ class HtmlParserTest implements RewriteTest {
 
     @Test
     void booleanAttributeIsAnAttributeWithAnEmptyValue() {
-        Xml.Document doc = (Xml.Document) XmlParser.builder().build()
-          .parseInputs(List.of(Input.fromString(Path.of("a.html"), "<input checked name=q>")), null,
-            new InMemoryExecutionContext(Throwable::printStackTrace))
-          .findFirst().orElseThrow();
-        List<Xml.Attribute> attributes = doc.getRoot().getAttributes();
-        org.assertj.core.api.Assertions.assertThat(attributes.stream().map(Xml.Attribute::getKeyAsString)).containsExactly("checked", "name");
-        assertThat(attributes.get(0).getValueAsString()).isEmpty();
-        assertThat(attributes.get(1).getValueAsString()).isEqualTo("q");
+        rewriteRun(
+          html(
+            "<input checked name=q>",
+            spec -> spec.afterRecipe(doc -> {
+                List<Xml.Attribute> attributes = doc.getRoot().getAttributes();
+                assertThat(attributes).extracting(Xml.Attribute::getKeyAsString).containsExactly("checked", "name");
+                assertThat(attributes).extracting(Xml.Attribute::getValueAsString).containsExactly("", "q");
+            })
+          )
+        );
     }
 
     @Test
     void booleanAttributeIsStillAnErrorInXml() {
-        SourceFile parsed = XmlParser.builder().build()
-          .parseInputs(List.of(Input.fromString(Path.of("a.xml"), "<input checked/>")), null,
-            new InMemoryExecutionContext(t -> {
-            }))
-          .findFirst().orElseThrow();
-        assertThat(parsed).isInstanceOf(ParseError.class);
+        assertThat(parse("a.xml", "<input checked/>")).isInstanceOf(ParseError.class);
     }
 
     @Test
@@ -202,18 +225,24 @@ class HtmlParserTest implements RewriteTest {
 
     @Test
     void impliedCloseStructure() {
-        Xml.Document doc = (Xml.Document) XmlParser.builder().build()
-          .parseInputs(List.of(Input.fromString(Path.of("a.html"), "<ul><li>one<li>two</ul><p>a<p>b")), null,
-            new InMemoryExecutionContext(Throwable::printStackTrace))
-          .findFirst().orElseThrow();
-        assertThat(doc.getRoot().getName()).isEqualTo("ul");
-        List<? extends org.openrewrite.xml.tree.Content> items = doc.getRoot().getContent();
-        org.assertj.core.api.Assertions.assertThat(items).hasSize(2).allSatisfy(i -> {
-            assertThat(((Xml.Tag) i).getName()).isEqualTo("li");
-            assertThat(((Xml.Tag) i).getMarkers().findFirst(org.openrewrite.xml.marker.HtmlImpliedClose.class)).isPresent();
-            assertThat(((Xml.Tag) i).getClosing()).isNull();
-        });
-        assertThat(((Xml.Tag) items.get(0)).getValue()).contains("one");
+        rewriteRun(
+          html(
+            "<div><ul><li>one<li>two</ul><p>a<p>b</div>",
+            spec -> spec.afterRecipe(doc -> {
+                Xml.Tag div = doc.getRoot();
+                assertThat(div.getChildren()).extracting(Xml.Tag::getName).containsExactly("ul", "p", "p");
+                assertThat(div.getChildren().subList(1, 3)).extracting(Xml.Tag::getValue)
+                  .containsExactly(Optional.of("a"), Optional.of("b"));
+
+                Xml.Tag ul = div.getChildren().get(0);
+                assertThat(ul.getContent()).hasSize(2);
+                assertThat(ul.getChildren()).extracting(Xml.Tag::getValue)
+                  .containsExactly(Optional.of("one"), Optional.of("two"));
+                assertThat(div.getChildren().subList(1, 3)).allSatisfy(this::assertImpliedClose);
+                assertThat(ul.getChildren()).allSatisfy(this::assertImpliedClose);
+            })
+          )
+        );
     }
 
     @Test
@@ -245,51 +274,13 @@ class HtmlParserTest implements RewriteTest {
     }
 
     @Test
-    void pageUsingEverything() {
-        rewriteRun(
-          html(
-            """
-              <!DOCTYPE html>
-              <html lang=en>
-              <head>
-                <meta charset=utf-8>
-                <title>Tom & Jerry</title>
-                <script>
-                  if (a < b && c) { document.write("<p>x</p>"); }
-                </script>
-              </head>
-              <body class=home>
-                <ul>
-                  <li>One
-                  <li *ngIf="x" (click)="go()">Two
-                </ul>
-                <input type=checkbox checked disabled>
-                <textarea>a < b</textarea>
-                <button onclick="if(a<b) go()">go</button>
-                <p>last
-              """
-          )
-        );
-    }
-
-    @Test
     void stillRejectsGenuinelyBrokenMarkup() {
-        SourceFile parsed = XmlParser.builder().build()
-          .parseInputs(List.of(Input.fromString(Path.of("a.html"), "<div><span></div>")), null,
-            new InMemoryExecutionContext(t -> {
-            }))
-          .findFirst().orElseThrow();
-        assertThat(parsed).isInstanceOf(ParseError.class);
+        assertThat(parse("a.html", "<div><span></div>")).isInstanceOf(ParseError.class);
     }
 
     @Test
     void strictXmlIsUnaffectedByHtmlRules() {
-        SourceFile parsed = XmlParser.builder().build()
-          .parseInputs(List.of(Input.fromString(Path.of("a.xml"), "<a><li>x<li>y</a>")), null,
-            new InMemoryExecutionContext(t -> {
-            }))
-          .findFirst().orElseThrow();
-        assertThat(parsed).isInstanceOf(ParseError.class);
+        assertThat(parse("a.xml", "<a><li>x<li>y</a>")).isInstanceOf(ParseError.class);
     }
 
     @Test
@@ -304,17 +295,26 @@ class HtmlParserTest implements RewriteTest {
 
     @Test
     void whitespaceAfterImpliedEndTagPrefixesWhatFollows() {
-        Xml.Document doc = (Xml.Document) XmlParser.builder().build()
-          .parseInputs(List.of(Input.fromString(Path.of("a.html"), "<ul>\n  <li>a\n  <li>b\n</ul>")), null,
-            new InMemoryExecutionContext(Throwable::printStackTrace))
-          .findFirst().orElseThrow();
-        Xml.Tag ul = doc.getRoot();
-        for (Xml.Tag li : ul.getChildren()) {
-            assertThat(li.getPrefix()).isEqualTo("\n  ");
-            assertThat(((Xml.CharData) requireNonNull(li.getContent()).get(0)).getAfterText()).isEmpty();
-        }
-        assertNotNull(ul.getClosing());
-        assertThat(ul.getClosing().getPrefix()).isEqualTo("\n");
+        rewriteRun(
+          html(
+            """
+              <ul>
+                <li>a
+                <li>b
+              </ul>
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                Xml.Tag ul = doc.getRoot();
+                assertThat(ul.getChildren()).hasSize(2).allSatisfy(li -> {
+                    assertThat(li.getPrefix()).isEqualTo("\n  ");
+                    assertThat(li.getContent()).singleElement()
+                      .isInstanceOfSatisfying(Xml.CharData.class, text -> assertThat(text.getAfterText()).isEmpty());
+                });
+                assertThat(ul.getClosing()).isNotNull()
+                  .extracting(Xml.Tag.Closing::getPrefix).isEqualTo("\n");
+            })
+          )
+        );
     }
 
     @Test
@@ -328,5 +328,17 @@ class HtmlParserTest implements RewriteTest {
             spec -> spec.path("WEB-INF/jspf/header.jspf")
           )
         );
+    }
+
+    private void assertImpliedClose(Xml.Tag tag) {
+        assertThat(tag.getMarkers().findFirst(HtmlImpliedClose.class)).isPresent();
+        assertThat(tag.getClosing()).isNull();
+    }
+
+    private static SourceFile parse(String path, String source) {
+        return XmlParser.builder().build()
+          .parseInputs(List.of(Input.fromString(Path.of(path), source)), null, new InMemoryExecutionContext(t -> {
+          }))
+          .findFirst().orElseThrow();
     }
 }
