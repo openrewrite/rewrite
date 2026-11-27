@@ -29,6 +29,19 @@ import static org.openrewrite.scala.Assertions.scala;
 class MatchTest implements RewriteTest {
 
     @Test
+    void commentHoldingADotBeforeMatch() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                val r = 1 /* . */ match { case _ => 2 }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void atBindingIsNotCollapsedIntoSingleIdentifier() {
         AtomicReference<S.Binding> binding = new AtomicReference<>();
         rewriteRun(

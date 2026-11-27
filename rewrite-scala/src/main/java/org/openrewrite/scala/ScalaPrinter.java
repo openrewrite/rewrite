@@ -34,6 +34,7 @@ import org.openrewrite.java.tree.TypeTree;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.scala.marker.AmpersandIntersection;
 import org.openrewrite.scala.marker.AsInstanceOfPrefix;
+import org.openrewrite.scala.marker.EndMarker;
 import org.openrewrite.scala.marker.BlockArgument;
 import org.openrewrite.scala.marker.DottedMatch;
 import org.openrewrite.scala.marker.Given;
@@ -813,6 +814,9 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         }
 
         visitStatements(scu.getPadding().getStatements(), JRightPadded.Location.BLOCK_STATEMENT, p);
+        if (scu.getPackageDeclaration() != null) {
+            visitEndMarker(scu.getPackageDeclaration(), p);
+        }
 
         visitSpace(scu.getEof(), Space.Location.COMPILATION_UNIT_EOF, p);
         afterSyntax(scu, p);
@@ -2250,7 +2254,7 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             visit(ext.getTypeParameters(), p);
         }
         JContainer<Statement> params = ext.getPadding().getParameters();
-        p.append(params.getBefore().getWhitespace());
+        visitSpace(params.getBefore(), Space.Location.LANGUAGE_EXTENSION, p);
         p.append('(');
         List<JRightPadded<Statement>> paramList = params.getPadding().getElements();
         for (int i = 0; i < paramList.size(); i++) {
@@ -2328,5 +2332,29 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         }
         afterSyntax(enumerator.getMarkers(), p);
         return enumerator;
+    }
+
+    @Override
+    protected void afterSyntax(J j, PrintOutputCapture<P> p) {
+        // A file-level package's end marker closes the whole file, so the compilation unit prints it.
+        if (!(j instanceof J.Package)) {
+            visitEndMarker(j, p);
+        }
+        super.afterSyntax(j, p);
+    }
+
+    private void visitEndMarker(J j, PrintOutputCapture<P> p) {
+        EndMarker endMarker = j.getMarkers().findFirst(EndMarker.class).orElse(null);
+        if (endMarker == null) {
+            return;
+        }
+        String name = EndMarker.nameOf(j);
+        // A recipe can turn the element into a kind no end marker closes, which then prints without one.
+        if (name != null) {
+            visitSpace(endMarker.getBeforeEnd(), Space.Location.LANGUAGE_EXTENSION, p);
+            p.append("end");
+            visitSpace(endMarker.getBeforeName(), Space.Location.LANGUAGE_EXTENSION, p);
+            p.append(name);
+        }
     }
 }

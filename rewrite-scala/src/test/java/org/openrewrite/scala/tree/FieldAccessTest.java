@@ -24,6 +24,19 @@ import static org.openrewrite.scala.Assertions.scala;
 class FieldAccessTest implements RewriteTest {
 
     @Test
+    void commentHoldingADotBeforeQualifiedThis() {
+        rewriteRun(
+          scala(
+            """
+              class Outer {
+                val t = Outer /* . */ .this
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void simpleFieldAccess() {
         rewriteRun(
           scala(

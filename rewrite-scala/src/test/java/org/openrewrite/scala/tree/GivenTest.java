@@ -33,6 +33,19 @@ import static org.openrewrite.scala.Assertions.scala;
 class GivenTest implements RewriteTest {
 
     @Test
+    void commentHoldingAnEqualsBeforeTheValueOfAnAnonymousGiven() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                given Int /* = */ = 1
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void givenWithBodyIsAClassDeclarationWhoseMethodsAVisitorReaches() {
         rewriteRun(
           scala(

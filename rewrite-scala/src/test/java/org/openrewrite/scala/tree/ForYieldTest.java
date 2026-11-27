@@ -37,6 +37,20 @@ class ForYieldTest implements RewriteTest {
     }
 
     @Test
+    void nestedCommentHoldingAParenthesisInEnumerators() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                val xs = List(1, 2, 3)
+                val doubled = for (x <- xs /* ( /* ) */ ) */) yield x * 2
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void nestedGenerators() {
         rewriteRun(
           scala(
