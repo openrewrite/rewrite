@@ -18,10 +18,12 @@ package org.openrewrite.marketplace;
 import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.net.URLConnection;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
@@ -35,6 +37,9 @@ import static java.util.Collections.emptyList;
  */
 public class RecipeClassLoader extends URLClassLoader {
     private final ClassLoader parent;
+
+    // Closed in close() so that a stream a caller leaks does not keep its jar open past the loader
+    private final Map<InputStream, Void> openStreams = new WeakHashMap<>();
 
     // Classes whose FQN collides with a {@link #PARENT_DELEGATED_PREFIXES} entry by
     // accident — `org.openrewrite.RecipeBuilder` etc. all `startsWith("org.openrewrite.Recipe")`
@@ -213,6 +218,45 @@ public class RecipeClassLoader extends URLClassLoader {
             return parent.getResource(name);
         }
         return url;
+    }
+
+    /**
+     * Each stream from a jar reads through its own {@code JarFile}, which closing the stream or this loader closes.
+     * The inherited method reads through the JVM-wide {@code JarFile} cache and closes the cached
+     * {@code JarFile} in {@link #close()}, failing other loaders that are reading the same jar.
+     */
+    @Override
+    public @Nullable InputStream getResourceAsStream(String name) {
+        URL url = getResource(name);
+        if (url == null) {
+            return null;
+        }
+        try {
+            URLConnection connection = url.openConnection();
+            connection.setUseCaches(false);
+            InputStream in = connection.getInputStream();
+            synchronized (openStreams) {
+                openStreams.put(in, null);
+            }
+            return in;
+        } catch (IOException e) {
+            return null;
+        }
+    }
+
+    @Override
+    public void close() throws IOException {
+        synchronized (openStreams) {
+            for (InputStream stream : openStreams.keySet()) {
+                try {
+                    stream.close();
+                } catch (IOException ignored) {
+                    // the loader still has to release its own jars
+                }
+            }
+            openStreams.clear();
+        }
+        super.close();
     }
 
     @Override
