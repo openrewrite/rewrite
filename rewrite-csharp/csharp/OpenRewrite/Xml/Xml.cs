@@ -422,7 +422,7 @@ public sealed class Ident : Xml
     public Ident WithName(string name) => name == Name ? this : new Ident(Id, Prefix, Markers, name);
 }
 
-public sealed class JspDirective : Xml, Content
+public sealed class JspDirective : Xml, Content, Misc
 {
     public Guid Id { get; }
     public string Prefix { get; }
@@ -452,7 +452,7 @@ public sealed class JspDirective : Xml, Content
     public JspDirective WithBeforeDirectiveEndPrefix(string beforeDirectiveEndPrefix) => beforeDirectiveEndPrefix == BeforeDirectiveEndPrefix ? this : new JspDirective(Id, Prefix, Markers, BeforeTypePrefix, Type, Attributes, beforeDirectiveEndPrefix);
 }
 
-public sealed class JspScriptlet : Xml, Content
+public sealed class JspScriptlet : Xml, Content, Misc
 {
     public Guid Id { get; }
     public string Prefix { get; }
@@ -473,7 +473,7 @@ public sealed class JspScriptlet : Xml, Content
     public JspScriptlet WithJspContent(string jspContent) => jspContent == JspContent ? this : new JspScriptlet(Id, Prefix, Markers, jspContent);
 }
 
-public sealed class JspExpression : Xml, Content
+public sealed class JspExpression : Xml, Content, Misc
 {
     public Guid Id { get; }
     public string Prefix { get; }

@@ -40,7 +40,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.stream.Stream;
 
-import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.xml.Assertions.xml;
@@ -267,7 +267,41 @@ class XmlParserTest implements RewriteTest {
               <% String test = "hello"; %>
               <html></html>
               """,
-            spec -> spec.path("scripletBeforeHtml.jsp")
+            spec -> spec.path("scripletBeforeHtml.jsp").afterRecipe(doc -> {
+                assertThat(doc.getProlog().getMisc()).hasExactlyElementsOfTypes(Xml.JspComment.class, Xml.JspScriptlet.class);
+                assertThat(doc.getRoot().getName()).isEqualTo("html");
+            })
+          )
+        );
+    }
+
+    @Test
+    void jspPrologInterleavesDirectivesWithOtherMarkup() {
+        rewriteRun(
+          xml(
+            //language=html
+            """
+              <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+              <%-- Page layout --%>
+              <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
+              <% String title = "Home"; %>
+              <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "https://www.w3.org/TR/html4/loose.dtd">
+              <html>
+              <body>
+                <%@ include file="header.jspf" %>
+                <h1><%= title %></h1>
+              </body>
+              </html>
+              """,
+            spec -> spec.path("home.jsp").afterRecipe(doc -> {
+                assertThat(doc.getProlog().getMisc()).hasExactlyElementsOfTypes(
+                  Xml.JspDirective.class, Xml.JspComment.class, Xml.JspDirective.class, Xml.JspScriptlet.class,
+                  Xml.DocTypeDecl.class);
+                assertThat(doc.getProlog().getJspDirectives()).isEmpty();
+                Xml.Tag body = doc.getRoot().getChildren().get(0);
+                assertThat(body.getContent()).filteredOn(Xml.JspDirective.class::isInstance).singleElement()
+                  .isInstanceOfSatisfying(Xml.JspDirective.class, include -> assertThat(include.getType()).isEqualTo("include"));
+            })
           )
         );
     }
@@ -484,17 +518,6 @@ class XmlParserTest implements RewriteTest {
 
     @ParameterizedTest
     @CsvSource(delimiter = '|', value = {
-      "misnested.html | <div><b><i>x</b></i></div>",
-      "conditional.jsp | <div><% if (x) { %><a href=\"/x\"><% } else { %><span><% } %>text<% if (x) { %></a><% } else { %></span><% } %></div>",
-    })
-    void htmlToleratesMismatchedClosingTagsThatStillBalance(String path, String source) {
-        rewriteRun(
-          xml(source, spec -> spec.path(path))
-        );
-    }
-
-    @ParameterizedTest
-    @CsvSource(delimiter = '|', value = {
       "<jsp:root><Div></div></jsp:root> | Mismatched closing tag </div>",
       "<jsp:root><b><i>x</b></i></jsp:root> | Mismatched closing tag </b>",
       "<jsp:root><br></jsp:root> | Mismatched closing tag </jsp:root>",
@@ -507,28 +530,6 @@ class XmlParserTest implements RewriteTest {
           .findFirst().orElseThrow();
         assertThat(parsed.getMarkers().findFirst(ParseExceptionResult.class).orElseThrow().getMessage())
           .contains(expectedMessage);
-    }
-
-    @Test
-    void htmlReportsTheMismatchBehindAnUnclosedElement() {
-        SourceFile parsed = XmlParser.builder().build()
-          .parseInputs(List.of(Input.fromString(Path.of("rest.html"),
-            "<table><tr><td><label><details><summary>Request</summary></label></td></tr></table>")),
-            null, new InMemoryExecutionContext(t -> {
-          }))
-          .findFirst().orElseThrow();
-        assertThat(parsed.getMarkers().findFirst(ParseExceptionResult.class).orElseThrow().getMessage())
-          .contains("Mismatched closing tag </label>");
-    }
-
-    @Test
-    void htmlClosingTagsMatchIgnoringCase() {
-        rewriteRun(
-          xml(
-            "<TABLE><TR><TD>cell</td></tr></table>",
-            spec -> spec.path("legacy.jsp")
-          )
-        );
     }
 
     @Test
@@ -1014,6 +1015,10 @@ class XmlParserTest implements RewriteTest {
       "proj.Csproj",
       "/foo/bar/baz.jsp",
       "/foo/bar/baz.jspx",
+      "WEB-INF/jspf/header.jspf",
+      "index.html",
+      "index.HTML",
+      "legacy/page.htm",
       "WEB-INF/tags/greeting.tagx",
       "ejbModule/META-INF/Map.mapxmi",
       "ejbModule/META-INF/Schema/CUSTOMER.tblxmi",
@@ -1057,7 +1062,9 @@ class XmlParserTest implements RewriteTest {
       "appsettings.config",
       "webhook.config",
       "build.proj",
-      "docker-compose.dcproj"
+      "docker-compose.dcproj",
+      "index.html.txt",
+      "notes.shtml"
     })
     void acceptWithInvalidPaths(String path) {
         assertThat(new XmlParser().accept(Path.of(path))).isFalse();

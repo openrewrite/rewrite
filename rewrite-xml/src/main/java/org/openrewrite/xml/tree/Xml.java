@@ -213,8 +213,11 @@ public interface Xml extends Tree {
         @Nullable
         XmlDecl xmlDecl;
 
+        /// Everything before the root element, in source order, JSP directives and scriptlets included.
         List<Misc> misc;
 
+        /// Only populated in LSTs parsed before JSP directives were kept in order with the rest of [#misc];
+        /// a parser leaves it empty, and it prints after [#misc].
         List<JspDirective> jspDirectives;
 
         @Override
@@ -842,7 +845,7 @@ public interface Xml extends Tree {
 
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    class JspDirective implements Xml, Content {
+    class JspDirective implements Xml, Content, Misc {
         @EqualsAndHashCode.Include
         @With
         UUID id;
@@ -899,7 +902,7 @@ public interface Xml extends Tree {
 
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    class JspScriptlet implements Xml, Content {
+    class JspScriptlet implements Xml, Content, Misc {
         @EqualsAndHashCode.Include
         @With
         UUID id;
@@ -936,7 +939,7 @@ public interface Xml extends Tree {
 
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    class JspExpression implements Xml, Content {
+    class JspExpression implements Xml, Content, Misc {
         @EqualsAndHashCode.Include
         @With
         UUID id;

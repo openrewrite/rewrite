@@ -27,6 +27,9 @@ import org.openrewrite.marker.Markers;
 import org.openrewrite.xml.internal.grammar.XMLParser;
 import org.openrewrite.xml.internal.grammar.XMLParserBaseVisitor;
 import org.openrewrite.xml.marker.HtmlVoidElement;
+import org.openrewrite.xml.marker.HtmlBooleanAttribute;
+import org.openrewrite.xml.marker.HtmlImpliedClose;
+import org.openrewrite.xml.marker.HtmlUnquotedAttributeValue;
 import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Misc;
 import org.openrewrite.xml.tree.Xml;
@@ -100,7 +103,48 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
         if (unbalancedTag != null && (unclosedElement || !htmlMode)) {
             throw unbalancedTag;
         }
+        requireNothingAfterRoot(document.getEof());
         return document;
+    }
+
+    /// The grammar stops at the end of the root element and leaves the rest of the source to `eof`, which a
+    /// recipe never sees. Markup there is a second top-level element or end tags left over from misnesting, and
+    /// would be silently invisible.
+    private void requireNothingAfterRoot(String eof) {
+        int i = 0;
+        while (i < eof.length()) {
+            int end;
+            if (Character.isWhitespace(eof.charAt(i))) {
+                end = i + 1;
+            } else if (eof.startsWith("<!--", i)) {
+                end = endOf(eof, i, "-->");
+            } else if (eof.startsWith("<%--", i)) {
+                end = endOf(eof, i, "--%>");
+            } else if (eof.startsWith("<%", i)) {
+                end = endOf(eof, i, "%>");
+            } else if (eof.startsWith("<?", i)) {
+                end = endOf(eof, i, "?>");
+            } else {
+                end = -1;
+            }
+            if (end < 0) {
+                int offset = source.length() - eof.length() + i;
+                String before = source.substring(0, offset);
+                int line = (int) before.chars().filter(c -> c == '\n').count() + 1;
+                int column = offset - before.lastIndexOf('\n');
+                throw new IllegalStateException(String.format(
+                        "Content after the root element in %s at line %d, column %d. A document has a single " +
+                        "root element; this is likely an end tag that closes no open element, or a second " +
+                        "top-level element as in an HTML fragment or a page that leaves out <html>.",
+                        path, line, column));
+            }
+            i = end;
+        }
+    }
+
+    private static int endOf(String text, int start, String terminator) {
+        int end = text.indexOf(terminator, start);
+        return end < 0 ? -1 : end + terminator.length();
     }
 
     @Override
@@ -111,7 +155,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                 Markers.EMPTY,
                 visitXmldecl(ctx.xmldecl()),
                 ctx.misc().stream().map(this::visit).map(Misc.class::cast).collect(toList()),
-                ctx.jspdirective().stream().map(this::visit).map(Xml.JspDirective.class::cast).collect(toList()))
+                emptyList())
         );
     }
 
@@ -385,6 +429,11 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
 
                         recordUnbalancedTag(name, c);
 
+                        if (ctx.OPEN(1) != null && HtmlXmlLexer.isVirtual(ctx.OPEN(1).getSymbol())) {
+                            // HTML allows the end tag to be left off, which the lexer supplied without any width
+                            markers = markers.add(new HtmlImpliedClose(randomId()));
+                            content = withoutTrailingWhitespace(content, ctx.OPEN(1).getSymbol().getStartIndex());
+                        } else
                         // ANTLR may synthesize missing closing-tag tokens during error recovery
                         // on malformed input; tolerate any combination of null OPEN/Name/CLOSE.
                         if (ctx.OPEN(1) != null || ctx.Name(1) != null || ctx.CLOSE(1) != null) {
@@ -414,6 +463,30 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
         );
     }
 
+    /// Leaves the whitespace at the end of an element whose end tag was left off to be the prefix of whatever follows
+    /// the element, as it is when the end tag is there.
+    private List<Content> withoutTrailingWhitespace(List<Content> content, int end) {
+        if (content.isEmpty() || !(content.get(content.size() - 1) instanceof Xml.CharData)) {
+            return content;
+        }
+        Xml.CharData last = (Xml.CharData) content.get(content.size() - 1);
+        if (last.isCdata()) {
+            return content;
+        }
+        String trailing = last.getText().isEmpty() ? last.getPrefix() + last.getAfterText() : last.getAfterText();
+        if (trailing.isEmpty()) {
+            return content;
+        }
+        int start = end - trailing.length();
+        cursor = source.offsetByCodePoints(cursor, start - codePointCursor);
+        codePointCursor = start;
+        List<Content> withoutTrailing = new ArrayList<>(content.subList(0, content.size() - 1));
+        if (!last.getText().isEmpty()) {
+            withoutTrailing.add(last.withAfterText(""));
+        }
+        return withoutTrailing;
+    }
+
     /// Note an element whose closing tag is missing or names another element. The grammar does not compare the
     /// two names, so `<a><b></a>` would otherwise close `<b>` with `</a>` and shift every enclosing close tag by
     /// one level, leaving ANTLR to recover at end of input by discarding the outermost element's content.
@@ -423,6 +496,9 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
     /// unclosed is the first mismatch reported, as the likely cause of the shift.
     private void recordUnbalancedTag(String name, XMLParser.ElementContext ctx) {
         Token open = ctx.getStart();
+        if (ctx.OPEN(1) != null && HtmlXmlLexer.isVirtual(ctx.OPEN(1).getSymbol())) {
+            return;
+        }
         if (!isSourceToken(ctx.OPEN(1)) || !isSourceToken(ctx.SLASH()) ||
             !isSourceToken(ctx.Name(1)) || !isSourceToken(ctx.CLOSE(1))) {
             unclosedElement = true;
@@ -447,21 +523,39 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
     @Override
     public Xml.Attribute visitAttribute(XMLParser.AttributeContext ctx) {
         return convert(ctx, (c, prefix) -> {
+            boolean booleanAttribute = htmlMode && isSourceToken(c.Name()) && c.EQUALS() == null && c.STRING() == null;
             requireWellFormedAttribute(isXmlWhitespace(prefix) && isSourceToken(c.Name()) &&
-                                       isSourceToken(c.EQUALS()) && isSourceToken(c.STRING()), c);
+                                       (booleanAttribute ||
+                                        (isSourceToken(c.EQUALS()) && isSourceToken(c.STRING()))), c);
 
             Xml.Ident key = convert(c.Name(), (t, p) -> new Xml.Ident(randomId(), p, Markers.EMPTY, t.getText()));
 
+            if (booleanAttribute) {
+                // HTML allows an attribute without a value, such as `disabled`. Its value is an empty placeholder.
+                Xml.Attribute.Value value = new Xml.Attribute.Value(randomId(), "", Markers.EMPTY,
+                        Xml.Attribute.Value.Quote.Double, "");
+                return new Xml.Attribute(randomId(), prefix,
+                        Markers.build(singletonList(new HtmlBooleanAttribute(randomId()))), key, "", value);
+            }
+
             String beforeEquals = convert(c.EQUALS(), (e, p) -> p);
 
-            Xml.Attribute.Value value = convert(c.STRING(), (v, p) -> new Xml.Attribute.Value(
-                            randomId(),
-                            p,
-                            Markers.EMPTY,
-                            v.getText().startsWith("'") ? Xml.Attribute.Value.Quote.Single : Xml.Attribute.Value.Quote.Double,
-                            v.getText().substring(1, c.STRING().getText().length() - 1)
-                    )
-            );
+            Xml.Attribute.Value value = convert(c.STRING(), (v, p) -> {
+                String text = v.getText();
+                if (htmlMode && !text.startsWith("'") && !text.startsWith("\"")) {
+                    // HTML allows an attribute value without quotes, such as `class=main`
+                    return new Xml.Attribute.Value(randomId(), p,
+                            Markers.build(singletonList(new HtmlUnquotedAttributeValue(randomId()))),
+                            Xml.Attribute.Value.Quote.Double, text);
+                }
+                return new Xml.Attribute.Value(
+                        randomId(),
+                        p,
+                        Markers.EMPTY,
+                        text.startsWith("'") ? Xml.Attribute.Value.Quote.Single : Xml.Attribute.Value.Quote.Double,
+                        text.substring(1, text.length() - 1)
+                );
+            });
 
             requireWellFormedAttribute(isXmlWhitespace(beforeEquals) && isXmlWhitespace(value.getPrefix()), c);
 
@@ -606,7 +700,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
         }
 
         T t = conversion.apply(ctx, prefix(ctx));
-        if (ctx.getStop() != null) {
+        if (ctx.getStop() != null && !HtmlXmlLexer.isVirtual(ctx.getStop())) {
             advanceCursor(ctx.getStop().getStopIndex() + 1);
         }
 

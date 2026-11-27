@@ -98,7 +98,7 @@ public class TabsAndIndentsVisitor<P> extends XmlIsoVisitor<P> {
 
     @Override
     public @Nullable Xml visit(@Nullable Tree tree, P p) {
-        if (getCursor().getNearestMessage("stop") != null) {
+        if (getCursor().getNearestMessage("stop") != null || WhitespaceSensitiveContent.contains(tree, getCursor())) {
             return (Xml) tree;
         }
         return super.visit(tree, p);

@@ -41,7 +41,7 @@ document
     ;
 
 prolog
-    :   xmldecl? misc* jspdirective*
+    :   xmldecl? misc*
     ;
 
 xmldecl
@@ -49,7 +49,8 @@ xmldecl
     ;
 
 misc
-    :   (COMMENT | doctypedecl | processinginstruction | jspdeclaration | jspcomment)
+    :   (COMMENT | doctypedecl | processinginstruction | jspdirective | jspscriptlet | jspexpression | jspdeclaration |
+         jspcomment)
     ;
 
 doctypedecl
@@ -79,7 +80,7 @@ processinginstruction
 
 content
     :   (element | reference | processinginstruction | CDATA | COMMENT |
-         jspscriptlet | jspexpression | jspdeclaration | jspcomment | chardata) ;
+         jspdirective | jspscriptlet | jspexpression | jspdeclaration | jspcomment | chardata) ;
 
 element
     :   OPEN name=Name attribute*
@@ -120,7 +121,8 @@ reference
     :   (EntityRef | CharRef) ;
 
 attribute
-    :   Name '=' STRING ; // Our STRING is AttValue in spec
+    :   Name ('=' STRING)? ; // Our STRING is AttValue in spec. The value is optional only to admit HTML boolean
+                             // attributes like `<input disabled>`; XmlParserVisitor rejects its absence outside HTML.
 
 chardata
     :   (TEXT | QUESTION_MARK | SEA_WS) ;

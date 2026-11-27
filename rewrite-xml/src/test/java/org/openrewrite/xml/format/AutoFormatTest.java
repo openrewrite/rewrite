@@ -21,6 +21,7 @@ import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import static org.openrewrite.xml.Assertions.html;
 import static org.openrewrite.xml.Assertions.xml;
 
 class AutoFormatTest implements RewriteTest {
@@ -250,6 +251,102 @@ class AutoFormatTest implements RewriteTest {
               <project>
                 <excludes/>
               </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void htmlKeepsWhitespaceOfPreformattedContent() {
+        rewriteRun(
+          html(
+            """
+              <html>
+              <body>
+              <div>
+              <pre>
+                line one
+              \tline two
+              </pre>
+              <textarea name=t>
+                keep
+              </textarea>
+              <script>
+              if (a < b) {
+              \tgo();
+              }
+              </script>
+              <p>one<p>two
+              <ul>
+              <li>a
+              <li>b
+              </ul>
+              <input disabled>
+              </div>
+              </body>
+              </html>
+              """,
+            """
+              <html>
+                <body>
+                  <div>
+                    <pre>
+                line one
+              \tline two
+              </pre>
+                    <textarea name=t>
+                keep
+              </textarea>
+                    <script>
+              if (a < b) {
+              \tgo();
+              }
+              </script>
+                    <p>one
+                    <p>two
+                    <ul>
+                      <li>a
+                      <li>b
+                    </ul>
+                    <input disabled>
+                  </div>
+                </body>
+              </html>
+              """
+          )
+        );
+    }
+
+    @Test
+    void htmlKeepsWhitespaceBeforeEndOfPreformattedElementWithChildren() {
+        rewriteRun(
+          html(
+            """
+              <div>
+                <pre><b>x</b></pre>
+              </div>
+              """
+          )
+        );
+    }
+
+    @Test
+    void xmlElementsSharingHtmlNamesAreFormatted() {
+        rewriteRun(
+          xml(
+            """
+              <resources>
+              <style name="AppTheme">
+              <item name="a">b</item>
+              </style>
+              </resources>
+              """,
+            """
+              <resources>
+                <style name="AppTheme">
+                  <item name="a">b</item>
+                </style>
+              </resources>
               """
           )
         );

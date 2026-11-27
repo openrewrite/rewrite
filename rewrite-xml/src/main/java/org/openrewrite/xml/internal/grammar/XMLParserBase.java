@@ -23,19 +23,14 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 
-/**
- * Hand-written superclass for the generated {@link XMLParser} (wired via the {@code superClass} grammar option).
- * Holds the state needed by the void-element semantic predicate in {@code XMLParser.g4} so that the grammar
- * itself stays free of target-specific (Java) members and can also be generated for other targets.
- */
+/// Hand-written superclass for the generated [XMLParser] (wired via the `superClass` grammar option).
+/// Holds the state needed by the void-element semantic predicate in `XMLParser.g4` so that the grammar
+/// itself stays free of target-specific (Java) members and can also be generated for other targets.
 public abstract class XMLParserBase extends Parser {
 
-    /**
-     * When {@code true}, HTML <a href="https://developer.mozilla.org/en-US/docs/Glossary/Void_element">void
-     * elements</a> (e.g. {@code <br>}, {@code <img>}) may be written without a self-closing slash. Set by the
-     * parser driver for HTML-like sources (.jsp, .html, ...). Defaults to {@code false} so that strict XML
-     * parsing is unaffected.
-     */
+    /// When `true`, HTML [void elements](https://developer.mozilla.org/en-US/docs/Glossary/Void_element)
+    /// (e.g. `<br>`, `<img>`) may be written without a self-closing slash. Set by the parser driver for
+    /// HTML-like sources (.jsp, .html, ...). Defaults to `false` so that strict XML parsing is unaffected.
     public boolean htmlMode = false;
 
     private static final Set<String> VOID_ELEMENTS = new HashSet<>(Arrays.asList(
@@ -46,6 +41,11 @@ public abstract class XMLParserBase extends Parser {
     }
 
     public boolean isVoidElement(@Nullable String name) {
-        return htmlMode && name != null && VOID_ELEMENTS.contains(name.toLowerCase());
+        return htmlMode && isHtmlVoidElement(name);
+    }
+
+    /// @return Whether the name is that of an HTML void element, regardless of [#htmlMode].
+    public static boolean isHtmlVoidElement(@Nullable String name) {
+        return name != null && VOID_ELEMENTS.contains(name.toLowerCase());
     }
 }

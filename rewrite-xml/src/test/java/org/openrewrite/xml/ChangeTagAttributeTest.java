@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
+import static org.openrewrite.xml.Assertions.html;
 import static org.openrewrite.xml.Assertions.xml;
 
 class ChangeTagAttributeTest implements RewriteTest {
@@ -167,6 +168,39 @@ class ChangeTagAttributeTest implements RewriteTest {
                   <other id='myBean.subpackage.subpackage2'/>
               </beans>
               """
+          )
+        );
+    }
+
+    @Test
+    void htmlBooleanAttributeGetsAValue() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeTagAttribute("//input", "disabled", "disabled", null, null)),
+          html(
+            "<form><input disabled name=q></form>",
+            "<form><input disabled=\"disabled\" name=q></form>"
+          )
+        );
+    }
+
+    @Test
+    void htmlUnquotedValueStaysUnquotedWhenItCan() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeTagAttribute("//div", "class", "sidebar", null, null)),
+          html(
+            "<div class=main>text</div>",
+            "<div class=sidebar>text</div>"
+          )
+        );
+    }
+
+    @Test
+    void htmlUnquotedValueIsQuotedWhenItMustBe() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeTagAttribute("//div", "class", "main wide", null, null)),
+          html(
+            "<div class=main>text</div>",
+            "<div class=\"main wide\">text</div>"
           )
         );
     }

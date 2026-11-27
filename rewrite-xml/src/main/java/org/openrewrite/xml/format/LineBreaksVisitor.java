@@ -81,7 +81,8 @@ public class LineBreaksVisitor<P> extends XmlIsoVisitor<P> {
                 doc.getRoot().isScope(tag) &&
                         doc.getProlog().getXmlDecl() == null &&
                         doc.getProlog().getMisc().isEmpty() ? 0 : 1), 2);
-        if (t.getClosing() != null && !t.getChildren().isEmpty()) {
+        if (t.getClosing() != null && !t.getChildren().isEmpty() &&
+            !WhitespaceSensitiveContent.isWhitespaceSensitive(t, getCursor())) {
             t = t.withClosing(keepMaximumLines(minimumLines(t.getClosing(), 1), 2));
         }
         return t;
@@ -141,7 +142,7 @@ public class LineBreaksVisitor<P> extends XmlIsoVisitor<P> {
 
     @Override
     public @Nullable Xml visit(@Nullable Tree tree, P p) {
-        if (getCursor().getNearestMessage("stop") != null) {
+        if (getCursor().getNearestMessage("stop") != null || WhitespaceSensitiveContent.contains(tree, getCursor())) {
             return (Xml) tree;
         }
         return super.visit(tree, p);

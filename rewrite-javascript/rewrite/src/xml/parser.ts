@@ -127,6 +127,7 @@ class XmlParserReader {
         } else {
             throw this.error("Expected the root element");
         }
+        this.requireNothingAfterRoot();
         return {
             kind: Xml.Kind.Document,
             id: randomId(),
@@ -155,18 +156,12 @@ class XmlParserReader {
                 misc.push(this.parseJspComment(prefix));
             } else if (this.startsWith("<%!")) {
                 misc.push(this.parseDelimited(prefix, Xml.Kind.JspDeclaration, "<%!", "%>"));
-            } else {
-                this.cursor = start;
-                break;
-            }
-        }
-
-        const jspDirectives: Xml.JspDirective[] = [];
-        while (true) {
-            const start = this.cursor;
-            const prefix = this.markupWhitespace();
-            if (this.startsWith("<%@")) {
-                jspDirectives.push(this.parseJspDirective(prefix));
+            } else if (this.startsWith("<%@")) {
+                misc.push(this.parseJspDirective(prefix));
+            } else if (this.startsWith("<%=")) {
+                misc.push(this.parseDelimited(prefix, Xml.Kind.JspExpression, "<%=", "%>"));
+            } else if (this.startsWithJspScriptlet()) {
+                misc.push(this.parseDelimited(prefix, Xml.Kind.JspScriptlet, "<%", "%>"));
             } else {
                 this.cursor = start;
                 break;
@@ -180,7 +175,7 @@ class XmlParserReader {
             markers: emptyMarkers,
             xmlDecl,
             misc,
-            jspDirectives
+            jspDirectives: []
         };
     }
 
@@ -317,7 +312,9 @@ class XmlParserReader {
             return this.parseDelimited(prefix, Xml.Kind.JspDeclaration, "<%!", "%>");
         } else if (this.startsWith("<%=")) {
             return this.parseDelimited(prefix, Xml.Kind.JspExpression, "<%=", "%>");
-        } else if (this.startsWith("<%") && this.cursor + 2 < this.source.length && !"@-".includes(this.source[this.cursor + 2])) {
+        } else if (this.startsWith("<%@")) {
+            return this.parseJspDirective(prefix);
+        } else if (this.startsWithJspScriptlet()) {
             return this.parseDelimited(prefix, Xml.Kind.JspScriptlet, "<%", "%>");
         } else if (this.startsWith("<?") && !this.startsWithXmlDecl()) {
             return this.parseProcessingInstruction(prefix);
@@ -679,6 +676,36 @@ class XmlParserReader {
             throw this.error(`Expected '${s}' to close '${opened}'`);
         }
         return index;
+    }
+
+    private startsWithJspScriptlet(): boolean {
+        return this.startsWith("<%") && this.cursor + 2 < this.source.length && !"@-".includes(this.source[this.cursor + 2]);
+    }
+
+    /**
+     * What follows the root element is kept as `eof`, which a recipe never sees, so only what may follow a
+     * document's root is accepted there: whitespace, comments, processing instructions and JSP blocks.
+     */
+    private requireNothingAfterRoot(): void {
+        let i = this.cursor;
+        while (i < this.source.length) {
+            let end = -1;
+            if (isJavaWhitespace(this.source.charCodeAt(i))) {
+                end = i + 1;
+            } else {
+                for (const [open, close] of [["<!--", "-->"], ["<%--", "--%>"], ["<%", "%>"], ["<?", "?>"]]) {
+                    if (this.source.startsWith(open, i)) {
+                        const closeAt = this.source.indexOf(close, i + open.length);
+                        end = closeAt < 0 ? -1 : closeAt + close.length;
+                        break;
+                    }
+                }
+            }
+            if (end < 0) {
+                throw this.error("Content after the root element", i);
+            }
+            i = end;
+        }
     }
 
     private error(message: string, at: number = this.cursor): Error {

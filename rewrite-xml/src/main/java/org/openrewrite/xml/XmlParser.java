@@ -27,6 +27,7 @@ import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 import org.openrewrite.xml.internal.XmlParserVisitor;
+import org.openrewrite.xml.internal.HtmlXmlLexer;
 import org.openrewrite.xml.internal.grammar.XMLLexer;
 import org.openrewrite.xml.internal.grammar.XMLParser;
 import org.openrewrite.xml.tree.Xml;
@@ -49,7 +50,6 @@ public class XmlParser implements Parser {
             "tld",
             "jxb",
             "xjb",
-            "jsp",
             // JSP documents and tag files in XML syntax
             "jspx",
             "tagx",
@@ -95,6 +95,13 @@ public class XmlParser implements Parser {
             "jrxml"
             ));
 
+    private static final Set<String> HTML_FILE_EXTENSIONS = new HashSet<>(Arrays.asList(
+            "html",
+            "htm",
+            "jsp",
+            "jspf"
+    ));
+
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
@@ -104,12 +111,15 @@ public class XmlParser implements Parser {
             try (EncodingDetectingInputStream is = input.getSource(ctx)) {
                 String sourceStr = is.readFully();
 
-                XMLLexer lexer = new XMLLexer(CharStreams.fromString(sourceStr));
+                boolean htmlMode = isHtml(path);
+                XMLLexer lexer = htmlMode ?
+                        new HtmlXmlLexer(CharStreams.fromString(sourceStr)) :
+                        new XMLLexer(CharStreams.fromString(sourceStr));
                 lexer.removeErrorListeners();
                 lexer.addErrorListener(new ForwardingErrorListener(input.getPath(), ctx));
 
                 XMLParser parser = new XMLParser(new CommonTokenStream(lexer));
-                parser.htmlMode = isHtmlLike(path);
+                parser.htmlMode = htmlMode;
                 parser.removeErrorListeners();
                 parser.addErrorListener(new ForwardingErrorListener(input.getPath(), ctx));
 
@@ -135,26 +145,22 @@ public class XmlParser implements Parser {
         return parse(new InMemoryExecutionContext(), sources);
     }
 
-    /**
-     * Whether unclosed HTML void elements (e.g. {@code <br>}) should be tolerated for the given path.
-     * Enabled for HTML-like sources where void elements are idiomatically written without a slash.
-     */
-    private static boolean isHtmlLike(@Nullable Path path) {
-        if (path == null) {
-            return false;
-        }
-        String p = path.toString().toLowerCase();
-        return p.endsWith(".jsp") || p.endsWith(".html") || p.endsWith(".htm");
+    /// Whether a source at this path is parsed as HTML, which tolerates what HTML allows and XML does not.
+    public static boolean isHtml(Path sourcePath) {
+        return HTML_FILE_EXTENSIONS.contains(extension(sourcePath));
+    }
+
+    private static String extension(Path path) {
+        String p = path.toString();
+        int dot = p.lastIndexOf('.');
+        return 0 < dot && dot < (p.length() - 1) ? p.substring(dot + 1).toLowerCase() : "";
     }
 
     @Override
     public boolean accept(Path path) {
-        String p = path.toString();
-        int dot = p.lastIndexOf('.');
-        if (0 < dot && dot < (p.length() - 1)) {
-            if (ACCEPTED_FILE_EXTENSIONS.contains(p.substring(dot + 1).toLowerCase())) {
-                return true;
-            }
+        String extension = extension(path);
+        if (ACCEPTED_FILE_EXTENSIONS.contains(extension) || HTML_FILE_EXTENSIONS.contains(extension)) {
+            return true;
         }
         String fileName = path.getFileName().toString().toLowerCase();
         return "nuget.config".equals(fileName) ||

@@ -64,7 +64,8 @@ export namespace Xml {
     /**
      * What may appear in the prolog, mirroring `org.openrewrite.xml.tree.Misc`.
      */
-    export type Misc = Comment | DocTypeDecl | ProcessingInstruction | XmlDecl | JspDeclaration | JspComment;
+    export type Misc = Comment | DocTypeDecl | ProcessingInstruction | XmlDecl |
+        JspDirective | JspScriptlet | JspExpression | JspDeclaration | JspComment;
 
     export interface Document extends SourceFile, Xml {
         readonly kind: typeof Kind.Document
@@ -80,7 +81,14 @@ export namespace Xml {
     export interface Prolog extends Xml {
         readonly kind: typeof Kind.Prolog
         readonly xmlDecl?: XmlDecl
+        /**
+         * Everything before the root element, in source order, JSP directives and scriptlets included.
+         */
         readonly misc: Misc[]
+        /**
+         * Only populated in trees parsed before JSP directives were kept in order with the rest of `misc`;
+         * a parser leaves it empty, and it prints after `misc`.
+         */
         readonly jspDirectives: JspDirective[]
     }
 
