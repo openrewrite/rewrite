@@ -187,7 +187,7 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
     }
 
     public MavenPomCache getPomCache() {
-        return (MavenPomCache) getMessages().computeIfAbsent(MAVEN_POM_CACHE, k -> new InMemoryMavenPomCache());
+        return computeMessageIfAbsent(MAVEN_POM_CACHE, k -> new InMemoryMavenPomCache());
     }
 
     public MavenExecutionContextView setArtifactCache(MavenArtifactCache artifactCache) {
@@ -206,7 +206,7 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
      * any recipe visitor resolves artifacts.
      */
     public MavenArtifactCache getArtifactCache() {
-        return (MavenArtifactCache) getMessages().computeIfAbsent(MAVEN_ARTIFACT_CACHE, k -> defaultArtifactCache());
+        return computeMessageIfAbsent(MAVEN_ARTIFACT_CACHE, k -> defaultArtifactCache());
     }
 
     private static MavenArtifactCache defaultArtifactCache() {
