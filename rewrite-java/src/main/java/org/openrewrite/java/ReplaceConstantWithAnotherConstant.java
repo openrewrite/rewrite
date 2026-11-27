@@ -99,11 +99,7 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
         }
 
         private J replaceFieldAccess(Expression expression, JavaType.Variable fieldType, boolean hasNoConflictingImport) {
-            JavaType owner = fieldType.getOwner();
-            while (owner instanceof JavaType.FullyQualified) {
-                maybeRemoveImport(((JavaType.FullyQualified) owner).getFullyQualifiedName());
-                owner = ((JavaType.FullyQualified) owner).getOwningClass();
-            }
+            maybeRemoveTypeImports(TypeUtils.asFullyQualified(fieldType.getOwner()));
 
             if (expression instanceof J.Identifier) {
                 J.Identifier identifier = (J.Identifier) expression;
@@ -125,14 +121,17 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
                         JLeftPadded.build(identifier.withPrefix(Space.EMPTY)),
                         identifier.getType());
             } else if (expression instanceof J.FieldAccess) {
+                J.FieldAccess fieldAccess = (J.FieldAccess) expression;
+                Expression target = fieldAccess.getTarget();
+                if (isTypeReference(target)) {
+                    maybeRemoveTypeImports(TypeUtils.asFullyQualified(target.getType()));
+                }
                 if (hasNoConflictingImport) {
                     maybeAddImport(newOutermostType.getFullyQualifiedName(), false);
                 } else {
                     maybeShortenQualifiedReferences();
                 }
-                J.FieldAccess fieldAccess = (J.FieldAccess) expression;
-                Expression target = typeReference(newOwningType, fieldAccess.getTarget().getPrefix(),
-                        !hasNoConflictingImport);
+                target = typeReference(newOwningType, target.getPrefix(), !hasNoConflictingImport);
                 J.Identifier name = fieldAccess.getName();
                 name = name
                         .withFieldType(newFieldType(fieldType))
@@ -144,6 +143,21 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
                         .withName(name);
             }
             return expression;
+        }
+
+        private static boolean isTypeReference(Expression target) {
+            J.Identifier name = target instanceof J.FieldAccess ? ((J.FieldAccess) target).getName() :
+                    target instanceof J.Identifier ? (J.Identifier) target : null;
+            JavaType.FullyQualified type = TypeUtils.asFullyQualified(target.getType());
+            return name != null && name.getFieldType() == null && type != null &&
+                   simpleName(type.getFullyQualifiedName()).equals(name.getSimpleName());
+        }
+
+        private void maybeRemoveTypeImports(JavaType.@Nullable FullyQualified type) {
+            while (type != null) {
+                maybeRemoveImport(type.getFullyQualifiedName());
+                type = type.getOwningClass();
+            }
         }
 
         /**

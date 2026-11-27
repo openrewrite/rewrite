@@ -27,6 +27,7 @@ import org.openrewrite.java.tree.*;
 import org.openrewrite.style.Style;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.openrewrite.Tree.randomId;
@@ -158,6 +159,10 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                 String typeName = import_.getTypeName();
                 J.Identifier alias = import_.getAlias();
                 if (import_.isStatic()) {
+                    if (typeImportMayStay && import_.getQualid().isFullyQualifiedClassReference(type) &&
+                            usesUnqualifiedName(cu, alias != null ? alias.getSimpleName() : simpleName)) {
+                        return import_;
+                    }
                     String imported = import_.getQualid().getSimpleName();
                     if (TypeUtils.fullyQualifiedNamesAreEqual(typeName + "." + imported, type) &&
                             (force || !methodsAndFieldsUsed.contains(imported) && !fieldNamedLikeTypeUsed)) {
@@ -262,6 +267,30 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                 return super.visitIdentifier(identifier, names);
             }
         }.reduce(cu, new HashSet<>());
+    }
+
+    /// A name qualified like `Outer.Inner` does not rely on an import of `Inner`.
+    private static boolean usesUnqualifiedName(JavaSourceFile cu, String name) {
+        return new JavaIsoVisitor<AtomicBoolean>() {
+            @Override
+            public J.Import visitImport(J.Import import_, AtomicBoolean found) {
+                return import_;
+            }
+
+            @Override
+            public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, AtomicBoolean found) {
+                visit(fieldAccess.getTarget(), found);
+                return fieldAccess;
+            }
+
+            @Override
+            public J.Identifier visitIdentifier(J.Identifier identifier, AtomicBoolean found) {
+                if (identifier.getSimpleName().equals(name)) {
+                    found.set(true);
+                }
+                return identifier;
+            }
+        }.reduce(cu, new AtomicBoolean()).get();
     }
 
     private long countTrailingLinebreaks(Space space) {
