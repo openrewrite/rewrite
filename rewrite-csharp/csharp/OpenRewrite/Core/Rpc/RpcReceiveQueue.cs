@@ -602,6 +602,8 @@ public class RpcReceiveQueue
                 typeof(ImplicitTypeParameters),
 
             // DotNetProject marker
+            "org.openrewrite.csharp.marker.CSharpLanguageVersion$TargetFrameworkVersion" => typeof(CSharpLanguageVersion.TargetFrameworkVersion),
+            "org.openrewrite.csharp.marker.CSharpLanguageVersion" => typeof(CSharpLanguageVersion),
             "org.openrewrite.csharp.marker.DotNetProject" =>
                 typeof(DotNetProject),
 

@@ -22,7 +22,6 @@ val pluginLocalTestClasspath = configurations.create("pluginLocalTestClasspath")
 
 dependencies {
     constraints {
-        // last version which supports java 8, which testGradle4 runs on
         testImplementation("org.assertj:assertj-core:3.27.4!!")
     }
     implementation(gradleApi())
@@ -65,12 +64,28 @@ java {
     }
 }
 
+tasks.named<Test>("test") {
+    useJUnitPlatform {
+        excludeTags("gradle4")
+    }
+}
+
 val testGradle4 = tasks.register<Test>("testGradle4") {
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform {
+        includeTags("gradle4")
+    }
     systemProperty("org.openrewrite.test.gradleVersion", "4.10")
-    systemProperty("jarLocationForTest", tasks.named<Jar>("jar").get().archiveFile.get().asFile.absolutePath)
-    // Gradle 4 predates support for Java 11
-    javaLauncher.set(javaToolchains.launcherFor {
-        languageVersion.set(JavaLanguageVersion.of(8))
+    jvmArgumentProviders.add(object : CommandLineArgumentProvider {
+        @get:Nested
+        val gradleJavaLauncher: Provider<JavaLauncher> = javaToolchains.launcherFor {
+            languageVersion.set(JavaLanguageVersion.of(8))
+        }
+
+        override fun asArguments() = listOf(
+            "-Dorg.openrewrite.test.gradleJavaHome=${gradleJavaLauncher.get().metadata.installationPath.asFile.absolutePath}"
+        )
     })
 }
 
@@ -103,6 +118,7 @@ tasks.withType<Test>().configureEach {
     useJUnitPlatform()
     dependsOn(testManifestTask)
     val manifest = testManifestFile.get().asFile
+    val userHomesDir = temporaryDir.resolve("gradle-user-homes")
     jvmArgumentProviders.add(object : CommandLineArgumentProvider {
         // Track the actual classpath JARs for cache key (content-aware, path-insensitive)
         @get:Classpath
@@ -113,10 +129,16 @@ tasks.withType<Test>().configureEach {
         @get:Internal
         val manifestFile: File = manifest
 
+        // Each test JVM builds in a Gradle user home of its own in here (Assertions.withToolingApi)
+        @get:Internal
+        val userHomes: File = userHomesDir
+
         override fun asArguments() = listOf(
-            "-Dorg.openrewrite.gradle.local.use-embedded-classpath=${manifestFile.absolutePath}"
+            "-Dorg.openrewrite.gradle.local.use-embedded-classpath=${manifestFile.absolutePath}",
+            "-Dorg.openrewrite.gradle.local.gradle-user-homes=${userHomes.absolutePath}"
         )
     })
+    doFirst { userHomesDir.deleteRecursively() }
 }
 
 tasks.named("check").configure {

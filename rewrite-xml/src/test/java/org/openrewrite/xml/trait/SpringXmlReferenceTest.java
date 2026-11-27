@@ -18,24 +18,22 @@ package org.openrewrite.xml.trait;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.marker.SearchResult;
-import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.trait.Reference;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.openrewrite.xml.Assertions.xml;
 
 class SpringXmlReferenceTest implements RewriteTest {
-
-    @Override
-    public void defaults(RecipeSpec spec) {
-        spec.recipe(RewriteTest.toRecipe(() -> new SpringXmlReference.Provider().getMatcher()
-          .asVisitor(springJavaTypeReference -> SearchResult.found(springJavaTypeReference.getTree(), springJavaTypeReference.getValue()))));
-    }
 
     @DocumentExample
     @SuppressWarnings("SpringXmlModelInspection")
     @Test
     void xmlConfiguration() {
         rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new SpringXmlReference.Provider().getMatcher()
+            .asVisitor(ref -> SearchResult.found(ref.getTree(), ref.getValue())))),
           xml(
             //language=xml
             """
@@ -87,5 +85,154 @@ class SpringXmlReferenceTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Test
+    void springTypeAndPackageReferences() {
+        rewriteRun(xml(
+          """
+            <!DOCTYPE beans SYSTEM "spring-beans.dtd">
+            <beans>
+              <bean class="example.Bean">
+                <constructor-arg value="example.Implementation"/>
+                <property name="package"><value>example.scan</value></property>
+                <property name="ignored" value="example.scan"/>
+              </bean>
+            </beans>
+            """,
+          spec -> spec.beforeRecipe(doc -> assertThat(doc.getReferences().getReferences())
+            .extracting(Reference::getKind, Reference::getValue)
+            .containsExactlyInAnyOrder(tuple(Reference.Kind.TYPE, "example.Bean"),
+              tuple(Reference.Kind.TYPE, "example.Implementation"), tuple(Reference.Kind.PACKAGE, "example.scan")))
+        ));
+    }
+
+    @Test
+    void unrelatedSpringValues() {
+        rewriteRun(xml(
+          """
+            <beans xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="www.springframework.org/schema/beans" xmlns:other="urn:other">
+              <other:property value="example.Old"/>
+              <other:value>example.Old</other:value>
+              <other:props><prop>example.Old</prop></other:props>
+              <other:properties><prop>example.Old</prop></other:properties>
+              <bean value="example.Old">
+                <constructor-arg value="example.key"/>
+                <constructor-arg value="example.cache.CachingFilter.PAGE_CACHE"/>
+                <property value="https://example.Old"/>
+                <map><entry key="hibernate.dialect" value="example.key"/></map>
+                <property value="SimpleName"/>
+                <props>
+                  <prop key="number">42</prop>
+                  <prop key="url">https://example.Old</prop>
+                  <prop key="hibernate.dialect">example.setting</prop>
+                  <prop key="activeMQ.JMXURL">service:jmx:rmi:///jndi/rmi://localhost:2000/jmxrmi</prop>
+                </props>
+                <prop key="outside">example.Old</prop>
+                <prop key="example.Outside">value</prop>
+                <property name="basename" value="example.i18n.Messages"/>
+                <constructor-arg name="basename" value="example.i18n.Messages"/>
+              </bean>
+            </beans>
+            """,
+          spec -> spec.beforeRecipe(doc -> assertThat(doc.getReferences().getReferences()).isEmpty())
+        ));
+    }
+
+    @Test
+    void classNamesInKeysAndUtilProperties() {
+        rewriteRun(xml(
+          """
+            <beans xmlns="http://www.springframework.org/schema/beans"
+                   xmlns:u="http://www.springframework.org/schema/util">
+              <bean>
+                <property name="customEditors"><map><entry key="com.foo.Money" value="editor"/></map></property>
+              </bean>
+              <u:properties>
+                <prop key="com.foo.NotFoundException">error</prop>
+                <prop key="implementation">com.foo.Implementation</prop>
+              </u:properties>
+            </beans>
+            """,
+          spec -> spec.beforeRecipe(doc -> assertThat(doc.getReferences().getReferences())
+            .extracting(Reference::getValue)
+            .containsExactlyInAnyOrder("com.foo.Money", "com.foo.NotFoundException", "com.foo.Implementation"))
+        ));
+    }
+
+    @Test
+    void foreignDefaultNamespaceOnBeansRoot() {
+        rewriteRun(xml(
+          """
+            <b:beans xmlns:b="http://www.springframework.org/schema/beans"
+                     xmlns="http://www.springframework.org/schema/security">
+              <property value="example.Security"/><entry key="example.Key" value="example.Security"/>
+              <props><prop key="example.Error">example.Security</prop></props><value>example.Security</value>
+              <b:property value="example.Spring"/>
+            </b:beans>
+            """,
+          spec -> spec.beforeRecipe(doc -> assertThat(doc.getReferences().getReferences())
+            .extracting(Reference::getValue).containsExactly("example.Spring"))
+        ));
+    }
+
+    @Test
+    void nestedForeignDefaultNamespace() {
+        rewriteRun(xml(
+          """
+            <beans xmlns="http://www.springframework.org/schema/beans">
+              <camelContext xmlns="http://camel.apache.org/schema/spring">
+                <property value="example.Camel"/><props><prop>example.Camel</prop></props><value>example.Camel</value>
+              </camelContext>
+              <property value="example.Spring"/>
+            </beans>
+            """,
+          spec -> spec.beforeRecipe(doc -> assertThat(doc.getReferences().getReferences())
+            .extracting(Reference::getValue).containsExactly("example.Spring"))
+        ));
+    }
+
+    @Test
+    void schemaLocationUnderAnyPrefix() {
+        rewriteRun(
+          xml(
+            """
+              <beans xmlns:schema="http://www.w3.org/2001/XMLSchema-instance"
+                     schema:schemaLocation="http://www.springframework.org/schema/beans">
+                <bean class="example.Bean"/>
+              </beans>
+              """,
+            spec -> spec.beforeRecipe(doc -> assertThat(doc.getReferences().getReferences())
+              .extracting(Reference::getValue).containsExactly("example.Bean"))
+          ),
+          xml(
+            """
+              <beans xmlns:xsi="urn:other" xsi:schemaLocation="http://www.springframework.org/schema/beans">
+                <bean class="example.Bean"/>
+              </beans>
+              """,
+            spec -> spec.beforeRecipe(doc -> assertThat(doc.getReferences().getReferences()).isEmpty())
+          )
+        );
+    }
+
+    @Test
+    void propertyAndConstructorShortcuts() {
+        rewriteRun(xml(
+          """
+            <beans xmlns="http://www.springframework.org/schema/beans"
+                   xmlns:p="http://www.springframework.org/schema/p"
+                   xmlns:c="http://www.springframework.org/schema/c" xmlns:o="urn:other">
+              <bean class="example.Bean" p:dialect="example.Dialect" c:strategy="example.Strategy"
+                    c:_0="example.First" p:session-ref="example.Ref" p:age="10" p:key="example.key"
+                    o:dialect="example.Other" p:basename="example.i18n.Messages"/>
+            </beans>
+            """,
+          spec -> spec.beforeRecipe(doc -> assertThat(doc.getReferences().getReferences())
+            .extracting(Reference::getKind, Reference::getValue)
+            .containsExactlyInAnyOrder(tuple(Reference.Kind.TYPE, "example.Bean"),
+              tuple(Reference.Kind.TYPE, "example.Dialect"), tuple(Reference.Kind.TYPE, "example.Strategy"),
+              tuple(Reference.Kind.TYPE, "example.First")))
+        ));
     }
 }

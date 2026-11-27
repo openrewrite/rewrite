@@ -853,11 +853,7 @@ public class GolangPrinter<P> extends GolangVisitor<PrintOutputCapture<P>> {
     public J visitIndexList(Go.IndexList indexList, PrintOutputCapture<P> p) {
         beforeSyntax(indexList, p);
         visit(indexList.getTarget(), p);
-        JContainer<Expression> indices = indexList.getPadding().getIndices();
-        visitSpace(indices.getBefore(), p);
-        p.append('[');
-        printSeparated(indices.getPadding().getElements(), ",", p);
-        p.append(']');
+        printTypeArgs(indexList.getPadding().getIndices(), p);
         afterSyntax(indexList, p);
         return indexList;
     }

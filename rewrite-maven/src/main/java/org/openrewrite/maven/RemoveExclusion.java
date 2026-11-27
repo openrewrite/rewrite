@@ -122,7 +122,13 @@ public class RemoveExclusion extends Recipe {
             private boolean isEffectiveExclusion(Xml.Tag tag, GroupArtifact exclusion) {
                 final ResolvedDependency dependency = findDependency(tag);
                 if (dependency != null) {
-                    return dependency.getEffectiveExclusions().contains(exclusion);
+                    for (GroupArtifact excluded : dependency.getEffectiveExclusions()) {
+                        if (matchesGlob(excluded.getGroupId(), exclusion.getGroupId()) &&
+                            matchesGlob(excluded.getArtifactId(), exclusion.getArtifactId())) {
+                            return true;
+                        }
+                    }
+                    return false;
                 }
                 final ResolvedManagedDependency managedDependency = findManagedDependency(tag);
                 // With current code, if a dependency is only in dependencyManagement (and not an active dependency in some scope),

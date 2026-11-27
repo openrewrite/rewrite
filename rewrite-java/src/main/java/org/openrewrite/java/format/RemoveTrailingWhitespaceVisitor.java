@@ -56,8 +56,9 @@ public class RemoveTrailingWhitespaceVisitor<P> extends JavaIsoVisitor<P> {
         Space s = space;
         String whitespace = s.getWhitespace();
         int lastNewline = whitespace.lastIndexOf('\n');
-        // Skip import prefixes, leave those up to OrderImports which better understands that domain
-        if (lastNewline > 0 && loc != Space.Location.IMPORT_PREFIX) {
+        // Skip import prefixes, leave those up to OrderImports which better understands that domain.
+        // A backslash is a line continuation in languages like Python, and must stay at the end of its line.
+        if (lastNewline > 0 && loc != Space.Location.IMPORT_PREFIX && whitespace.indexOf('\\') < 0) {
             StringBuilder ws = new StringBuilder();
             for (int i = 0; i < whitespace.length(); i++) {
                 char c = whitespace.charAt(i);

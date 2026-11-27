@@ -29,6 +29,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Function;
 
+import static java.util.Objects.requireNonNull;
+
 /**
  * Port of @pnpm/resolving.npm-resolver src/pickPackage.ts (pnpm 11.2.2), the pickers it runs over a
  * packument.
@@ -190,15 +192,12 @@ final class PickPackage {
             return new PickResult(upgraded, pickMatchingVersionFinal(pickerOpts, spec, upgraded));
         }
         Map<String, @Nullable Object> meta = fetch(registry, registryUrl, name, fullMetadata, release);
+        // pnpm 10 fetches the packument in full from 10.34.0, whatever its modified
+        // (PnpmRelease#fetchesAFullPackumentForTheReleaseAge)
         if (pickerOpts.getPublishedBy() != null && !fullMetadata && meta.get("time") == null &&
-            !excluded(pickerOpts, name)) {
-            Instant modified = modifiedDate(meta);
-            // before 11.2.0 a packument modified at the cutoff is fetched in full too
-            if (modified == null || modified.isAfter(pickerOpts.getPublishedBy()) ||
-                modified.equals(pickerOpts.getPublishedBy()) &&
-                !release.takesAPackumentModifiedAtTheCutoffAsMature()) {
-                meta = fetch(registry, registryUrl, name, true, release);
-            }
+            !excluded(pickerOpts, name) && !matureByItsModifiedDate(pickerOpts, meta) &&
+            release.fetchesAFullPackumentForTheReleaseAge()) {
+            meta = fetch(registry, registryUrl, name, true, release);
         }
         if (filterMetadata) {
             meta = clearMeta(meta);
@@ -244,11 +243,19 @@ final class PickPackage {
         if (pickerOpts.getPublishedBy() == null || meta.get("time") != null || excluded(pickerOpts, spec.getName())) {
             return false;
         }
+        return !matureByItsModifiedDate(pickerOpts, meta);
+    }
+
+    // whether an abbreviated packument is mature by its modified, which pnpm 10 does not read
+    // (PnpmRelease#readsTheModifiedDateOfAnAbbreviatedPackument); before 11.2.0 one modified at the cutoff is not
+    private static boolean matureByItsModifiedDate(PickerOptions pickerOpts, Map<String, @Nullable Object> meta) {
         Instant modified = modifiedDate(meta);
-        // before 11.2.0 a packument modified at the cutoff is upgraded too
-        return modified == null || !(modified.isBefore(pickerOpts.getPublishedBy()) ||
-                                     modified.equals(pickerOpts.getPublishedBy()) &&
-                                     pickerOpts.getRelease().takesAPackumentModifiedAtTheCutoffAsMature());
+        Instant publishedBy = requireNonNull(pickerOpts.getPublishedBy());
+        if (modified == null || modified.isAfter(publishedBy) ||
+            modified.equals(publishedBy) && !pickerOpts.getRelease().takesAPackumentModifiedAtTheCutoffAsMature()) {
+            return false;
+        }
+        return pickerOpts.getRelease().readsTheModifiedDateOfAnAbbreviatedPackument();
     }
 
     private static final String[] VERSION_FIELDS = {"name", "version", "bin", "directories", "devDependencies",

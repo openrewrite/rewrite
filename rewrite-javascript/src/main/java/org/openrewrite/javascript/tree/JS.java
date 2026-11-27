@@ -411,6 +411,8 @@ public interface JS extends J {
         @Nullable
         TypeTree returnTypeExpression;
 
+        JavaType.@Nullable Method methodType;
+
         @Override
         public @Nullable JavaType getType() {
             return lambda.getType();

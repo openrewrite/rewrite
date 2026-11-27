@@ -1274,7 +1274,7 @@ class LombokTest implements RewriteTest {
         @Test
         void extensionMethod() {
             rewriteRun(
-              spec -> spec.typeValidationOptions(TypeValidation.none()),
+              spec -> spec.typeValidationOptions(TypeValidation.all().methodInvocations(false)),
               java(
                 """
                   import lombok.experimental.ExtensionMethod;
@@ -1306,7 +1306,7 @@ class LombokTest implements RewriteTest {
         @Test
         void helper() {
             rewriteRun(
-              spec -> spec.typeValidationOptions(TypeValidation.none()),
+              spec -> spec.typeValidationOptions(TypeValidation.all().methodInvocations(false)),
               java(
                 """
                   import lombok.experimental.Helper;

@@ -83,28 +83,32 @@ class NpmResolverTest {
 
     @Test
     void workspacePrefToNpmResolvesWorkspaceOnlyVersionAliases() {
-        assertThat(NpmResolver.workspacePrefToNpm("workspace:")).isEqualTo("*");
-        assertThat(NpmResolver.workspacePrefToNpm("workspace:*")).isEqualTo("*");
-        assertThat(NpmResolver.workspacePrefToNpm("workspace:^")).isEqualTo("*");
-        assertThat(NpmResolver.workspacePrefToNpm("workspace:~")).isEqualTo("*");
+        assertThat(NpmResolver.workspacePrefToNpm("workspace:", PnpmRelease.PORTED)).isEqualTo("*");
+        assertThat(NpmResolver.workspacePrefToNpm("workspace:*", PnpmRelease.PORTED)).isEqualTo("*");
+        assertThat(NpmResolver.workspacePrefToNpm("workspace:^", PnpmRelease.PORTED)).isEqualTo("*");
+        assertThat(NpmResolver.workspacePrefToNpm("workspace:~", PnpmRelease.PORTED)).isEqualTo("*");
+        assertThat(NpmResolver.workspacePrefToNpm("workspace:", PnpmRelease.of("10.28.2"))).isEmpty();
     }
 
     @Test
     void workspacePrefToNpmResolvesPackageNameAliases() {
-        assertThat(NpmResolver.workspacePrefToNpm("workspace:is-positive@3.0.0")).isEqualTo("npm:is-positive@3.0.0");
-        assertThat(NpmResolver.workspacePrefToNpm("workspace:is-positive@*")).isEqualTo("npm:is-positive@*");
-        assertThat(NpmResolver.workspacePrefToNpm("workspace:is-positive@^")).isEqualTo("npm:is-positive@*");
+        assertThat(NpmResolver.workspacePrefToNpm("workspace:is-positive@3.0.0", PnpmRelease.PORTED))
+          .isEqualTo("npm:is-positive@3.0.0");
+        assertThat(NpmResolver.workspacePrefToNpm("workspace:is-positive@*", PnpmRelease.PORTED))
+          .isEqualTo("npm:is-positive@*");
+        assertThat(NpmResolver.workspacePrefToNpm("workspace:is-positive@^", PnpmRelease.PORTED))
+          .isEqualTo("npm:is-positive@*");
     }
 
     @Test
     void workspacePrefToNpmResolvesScopedPackageNameAliases() {
-        assertThat(NpmResolver.workspacePrefToNpm("workspace:@scope/is-positive@1.2.3"))
+        assertThat(NpmResolver.workspacePrefToNpm("workspace:@scope/is-positive@1.2.3", PnpmRelease.PORTED))
           .isEqualTo("npm:@scope/is-positive@1.2.3");
-        assertThat(NpmResolver.workspacePrefToNpm("workspace:@scope/is-positive@^1.2.3"))
+        assertThat(NpmResolver.workspacePrefToNpm("workspace:@scope/is-positive@^1.2.3", PnpmRelease.PORTED))
           .isEqualTo("npm:@scope/is-positive@^1.2.3");
-        assertThat(NpmResolver.workspacePrefToNpm("workspace:@scope/is-positive@*"))
+        assertThat(NpmResolver.workspacePrefToNpm("workspace:@scope/is-positive@*", PnpmRelease.PORTED))
           .isEqualTo("npm:@scope/is-positive@*");
-        assertThat(NpmResolver.workspacePrefToNpm("workspace:@scope/is-positive@~"))
+        assertThat(NpmResolver.workspacePrefToNpm("workspace:@scope/is-positive@~", PnpmRelease.PORTED))
           .isEqualTo("npm:@scope/is-positive@*");
     }
 

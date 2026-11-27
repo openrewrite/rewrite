@@ -18,6 +18,7 @@ using OpenRewrite.Xml;
 
 namespace OpenRewrite.Tests.Xml;
 
+[Collection(ProcessEnvironmentCollection.Name)]
 public class DotNetBuildContextTests : IDisposable
 {
     private readonly string temp = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());

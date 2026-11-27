@@ -15,12 +15,15 @@
  */
 package org.openrewrite.groovy.style;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.SourceFile;
 import org.openrewrite.groovy.GroovyParser;
 import org.openrewrite.java.style.TabsAndIndentsStyle;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.List;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -51,5 +54,44 @@ class AutodetectTest implements RewriteTest {
         assertThat(tabsAndIndents.getTabSize()).isEqualTo(4);
         assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
         assertThat(tabsAndIndents.getContinuationIndent()).isEqualTo(8);
+    }
+    @Test
+    void mergedAndSerializedDetectorsMatchOneDetectorThatSampledEverything() throws Exception {
+        List<SourceFile> sources = GroovyParser.builder().build().parse(
+          """
+            class A {
+            	def a() {
+            		if(true) {
+            			println "a"
+            		}
+            	}
+            }
+            """,
+          """
+            class B {
+                def b() {
+                    if (true) {
+                        println "b"
+                    }
+                }
+            }
+            """
+        ).toList();
+
+        Autodetect.Detector all = Autodetect.detector();
+        sources.forEach(all::sample);
+        Autodetect.Detector first = Autodetect.detector();
+        first.sample(sources.get(0));
+        Autodetect.Detector second = Autodetect.detector();
+        second.sample(sources.get(1));
+
+        ObjectMapper mapper = new ObjectMapper().findAndRegisterModules();
+        Autodetect.Detector merged = mapper.readValue(mapper.writeValueAsBytes(second), Autodetect.Detector.class)
+          .merge(mapper.readValue(mapper.writeValueAsBytes(first), Autodetect.Detector.class));
+
+        assertThat(merged.build().getStyles())
+          .usingRecursiveComparison()
+          .withEqualsForType((a, b) -> a.pattern().equals(b.pattern()), Pattern.class)
+          .isEqualTo(all.build().getStyles());
     }
 }

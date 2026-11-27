@@ -1791,6 +1791,7 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
               java(
                 """
                   import org.example.Foo;
+                  import org.example.Values;
                   
                   @Foo(Values.TWO)
                   public class A {
@@ -1798,6 +1799,7 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
                   """,
                 """
                   import org.example.Foo;
+                  import org.example.Values;
                   
                   @Foo(name = "hello", value = Values.TWO)
                   public class A {

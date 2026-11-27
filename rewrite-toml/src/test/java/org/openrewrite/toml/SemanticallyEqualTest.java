@@ -180,6 +180,19 @@ class SemanticallyEqualTest {
     }
 
     @Test
+    void inlineTablesDifferingOnlyInSpaceOrTrailingCommaAreEqual() {
+        assertThat(SemanticallyEqual.areEqual(parseToml("t = { }"), parseToml("t = {}"))).isTrue();
+        assertThat(SemanticallyEqual.areEqual(parseToml("t = { a = 1, }"), parseToml("t = { a = 1 }"))).isTrue();
+        assertThat(SemanticallyEqual.areEqual(parseToml("t = { }"), parseToml("t = { a = 1 }"))).isFalse();
+    }
+
+    @Test
+    void arraysDifferingOnlyInTrailingCommaAreEqual() {
+        assertThat(SemanticallyEqual.areEqual(parseToml("a = [1, 2,]"), parseToml("a = [1, 2]"))).isTrue();
+        assertThat(SemanticallyEqual.areEqual(parseToml("a = [1,]"), parseToml("a = [1, 2]"))).isFalse();
+    }
+
+    @Test
     void nestedArraysAreEqual() {
         String toml = "matrix = [[1, 2], [3, 4]]";
         Toml.Document doc1 = parseToml(toml);
@@ -194,6 +207,19 @@ class SemanticallyEqualTest {
         Toml.Document doc2 = parseToml("matrix = [[1, 2], [3, 5]]");
 
         assertThat(SemanticallyEqual.areEqual(doc1, doc2)).isFalse();
+    }
+
+    @Test
+    void nullIsNotEqualToNonNull() {
+        Toml.Document doc = parseToml("key = \"value\"");
+
+        assertThat(SemanticallyEqual.areEqual(null, doc)).isFalse();
+        assertThat(SemanticallyEqual.areEqual(doc, null)).isFalse();
+    }
+
+    @Test
+    void nullIsEqualToNull() {
+        assertThat(SemanticallyEqual.areEqual(null, null)).isTrue();
     }
 
     private Toml.Document parseToml(String content) {

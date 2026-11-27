@@ -113,7 +113,7 @@ class RewriteRpcTest implements RewriteTest {
         var clientFormatter = new JsonMessageFormatter(new ParameterNamesModule());
         var serverFormatter = new JsonMessageFormatter(new ParameterNamesModule());
 
-        var clientJsonRpc = new JsonRpc(new HeaderDelimitedMessageHandler(clientFormatter, clientIn, clientOut));
+        var clientJsonRpc = new JsonRpc(new HeaderDelimitedMessageHandler(clientFormatter, clientIn, clientOut), new JsonMessageFormatter());
         client = new RewriteRpc(clientJsonRpc, marketplace) {
             @Override
             protected <P> P send(String method, @Nullable RpcRequest body, Class<P> responseType) {
@@ -122,7 +122,7 @@ class RewriteRpcTest implements RewriteTest {
             }
         }.batchSize(1);
 
-        serverJsonRpc = new JsonRpc(new HeaderDelimitedMessageHandler(serverFormatter, serverIn, serverOut));
+        serverJsonRpc = new JsonRpc(new HeaderDelimitedMessageHandler(serverFormatter, serverIn, serverOut), new JsonMessageFormatter());
         server = new RewriteRpc(serverJsonRpc, marketplace, List.of(new TestRecipeBundleResolver()))
           .batchSize(1);
     }
@@ -863,8 +863,7 @@ class RewriteRpcTest implements RewriteTest {
 
         rewriteRun(
           spec -> spec
-            .recipe(new CompositeRecipe(List.of(r1, r2)))
-            .validateRecipeSerialization(false),
+            .recipe(new CompositeRecipe(List.of(r1, r2))),
           text(
             "hello",
             "step2"
@@ -899,8 +898,7 @@ class RewriteRpcTest implements RewriteTest {
 
         rewriteRun(
           spec -> spec
-            .recipe(new CompositeRecipe(List.of(r1, r2, r3)))
-            .validateRecipeSerialization(false),
+            .recipe(new CompositeRecipe(List.of(r1, r2, r3))),
           text(
             "hello",
             "C"
@@ -922,8 +920,7 @@ class RewriteRpcTest implements RewriteTest {
 
         rewriteRun(
           spec -> spec
-            .recipe(new CompositeRecipe(List.of(r1, r2, r3)))
-            .validateRecipeSerialization(false),
+            .recipe(new CompositeRecipe(List.of(r1, r2, r3))),
           text(
             "hello",
             "B",
@@ -955,8 +952,7 @@ class RewriteRpcTest implements RewriteTest {
 
         rewriteRun(
           spec -> spec
-            .recipe(new CompositeRecipe(List.of(rpc1, local)))
-            .validateRecipeSerialization(false),
+            .recipe(new CompositeRecipe(List.of(rpc1, local))),
           text(
             "hello",
             "from-local"
@@ -974,8 +970,7 @@ class RewriteRpcTest implements RewriteTest {
 
         rewriteRun(
           spec -> spec
-            .recipe(new CompositeRecipe(List.of(r)))
-            .validateRecipeSerialization(false),
+            .recipe(new CompositeRecipe(List.of(r))),
           text(
             "hello",
             "only"
@@ -1199,7 +1194,6 @@ class RewriteRpcTest implements RewriteTest {
               client.prepareRecipe("org.openrewrite.text.FindAndReplace", Map.of("find", "hello", "replace", "kept")),
               editGatedBy(new Precondition("org.openrewrite.text.Find", Map.of("find", "kept"), null, null),
                 "org.openrewrite.text.FindAndReplace", Map.of("find", "kept", "replace", "found")))))
-            .validateRecipeSerialization(false)
             .cycles(1)
             .expectedCyclesThatMakeChanges(1),
           text(

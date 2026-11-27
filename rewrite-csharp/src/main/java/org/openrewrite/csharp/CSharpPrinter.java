@@ -1487,6 +1487,14 @@ public class CSharpPrinter<P> extends CSharpVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
+    public J visitErroneous(J.Erroneous erroneous, PrintOutputCapture<P> p) {
+        beforeSyntax(erroneous, p);
+        p.append(erroneous.getText());
+        afterSyntax(erroneous, p);
+        return erroneous;
+    }
+
+    @Override
     public <T extends J> J visitControlParentheses(J.ControlParentheses<T> controlParens, PrintOutputCapture<P> p) {
         JRightPadded<T> tree = controlParens.getPadding().getTree();
         if (tree.getElement() instanceof J.VariableDeclarations) {

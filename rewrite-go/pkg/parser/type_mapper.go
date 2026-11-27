@@ -18,6 +18,8 @@ package parser
 
 import (
 	"go/types"
+	"slices"
+	"sort"
 	"strings"
 	"unicode"
 
@@ -36,25 +38,17 @@ type typeMapper struct {
 	ownPkg func(pkgPath string) bool
 	// depth counts nested mapType frames. See maxTypeDepth.
 	depth int
-	// mappingOrigin holds the class for each generic whose mapping is
-	// still on the stack, keyed by its origin. See mapNamed.
-	mappingOrigin map[*types.Named]*java.JavaTypeClass
 	// fieldOwner leads from a struct field back to its declaring type.
 	fieldOwner map[*types.Var]java.JavaType
 	// The RPC ref table interns by identity, so a type rebuilt at every use is resent at every use.
 	packages  map[string]*java.JavaTypeClass
 	methods   map[*types.Func]*java.JavaTypeMethod
-	variables map[variableKey]*java.JavaTypeVariable
+	variables map[*types.Var]*java.JavaTypeVariable
 	// visible, while a package's files are mapped, holds the interfaces that package can see,
 	// for mapNamed to record which of them each of the package's own types satisfies.
 	visible *visibleInterfaces
 	// declaredInterfaces keeps each imported package's interfaces for the next package that imports it.
 	declaredInterfaces map[*types.Package][]*types.Named
-}
-
-type variableKey struct {
-	v         *types.Var
-	enclosing java.JavaType
 }
 
 // maxTypeDepth bounds how deep type attribution follows a type into its
@@ -64,13 +58,12 @@ const maxTypeDepth = 64
 
 func newTypeMapper() *typeMapper {
 	return &typeMapper{
-		cache:         make(map[types.Type]java.JavaType),
-		namedCache:    make(map[*types.Named]*java.JavaTypeClass),
-		mappingOrigin: make(map[*types.Named]*java.JavaTypeClass),
-		fieldOwner:    make(map[*types.Var]java.JavaType),
-		packages:      make(map[string]*java.JavaTypeClass),
-		methods:       make(map[*types.Func]*java.JavaTypeMethod),
-		variables:     make(map[variableKey]*java.JavaTypeVariable),
+		cache:      make(map[types.Type]java.JavaType),
+		namedCache: make(map[*types.Named]*java.JavaTypeClass),
+		fieldOwner: make(map[*types.Var]java.JavaType),
+		packages:   make(map[string]*java.JavaTypeClass),
+		methods:    make(map[*types.Func]*java.JavaTypeMethod),
+		variables:  make(map[*types.Var]*java.JavaTypeVariable),
 
 		declaredInterfaces: make(map[*types.Package][]*types.Named),
 	}
@@ -114,6 +107,9 @@ func (m *typeMapper) doMapType(t types.Type) java.JavaType {
 		// Go 1.22+ materializes transparent aliases (including the predeclared `any`); map the target.
 		return m.mapType(types.Unalias(v))
 	case *types.Named:
+		if v.TypeArgs().Len() > 0 {
+			return m.mapInstance(v)
+		}
 		if m.ownPkg != nil {
 			if pkg := v.Obj().Pkg(); pkg != nil && !m.ownPkg(pkg.Path()) {
 				return m.mapShallow(v)
@@ -227,22 +223,32 @@ func (m *typeMapper) mapShallow(named *types.Named) *java.JavaTypeShallowClass {
 	}}
 }
 
-// mapNamed maps a named type (struct, interface, etc.) to JavaTypeClass.
+// mapInstance maps an instantiated generic such as `Stack[string]` to a
+// JavaTypeParameterized over the generic's own class, as Java's
+// `List<String>` is a Parameterized over `java.util.List`.
+func (m *typeMapper) mapInstance(named *types.Named) java.JavaType {
+	generic, ok := m.mapType(named.Origin()).(java.FullyQualified)
+	if !ok {
+		return java.UnknownType
+	}
+	args := named.TypeArgs()
+	typeArgs := make([]java.JavaType, 0, args.Len())
+	for i := 0; i < args.Len(); i++ {
+		typeArgs = append(typeArgs, m.mapType(args.At(i)))
+	}
+	return &java.JavaTypeParameterized{Type: generic, TypeParameters: typeArgs}
+}
+
+// mapNamed maps a named type (struct, interface, etc.) to JavaTypeClass. An
+// instantiation maps to its generic's class, which is what declares its
+// fields and methods.
 func (m *typeMapper) mapNamed(named *types.Named) *java.JavaTypeClass {
+	if origin := named.Origin(); origin != nil && origin != named {
+		return m.mapNamed(origin)
+	}
 	// Check for already-created class (handles circular references)
 	if cached, ok := m.namedCache[named]; ok {
 		return cached
-	}
-
-	// `func (R[P]) m(R[R[P]])` names a fresh *types.Named at every
-	// nesting, so pointer identity never repeats and the caches never
-	// hit. An instantiation reached while its own generic is still being
-	// mapped resolves to that one instead.
-	origin := named.Origin()
-	if origin != nil && origin != named {
-		if cls, ok := m.mappingOrigin[origin]; ok {
-			return cls
-		}
 	}
 
 	obj := named.Obj()
@@ -254,13 +260,19 @@ func (m *typeMapper) mapNamed(named *types.Named) *java.JavaTypeClass {
 	}
 	// Cache early to break cycles
 	m.namedCache[named] = cls
-	if origin != nil {
-		if _, ok := m.mappingOrigin[origin]; !ok {
-			m.mappingOrigin[origin] = cls
-			defer delete(m.mappingOrigin, origin)
+	m.cache[named] = cls
+
+	tparams := named.TypeParams()
+	for i := 0; i < tparams.Len(); i++ {
+		cls.TypeParameters = append(cls.TypeParameters, m.mapType(tparams.At(i)))
+	}
+	for i := 0; i < named.NumMethods(); i++ {
+		sig := named.Method(i).Type().(*types.Signature)
+		recvParams := sig.RecvTypeParams()
+		for j := 0; j < recvParams.Len(); j++ {
+			m.cache[recvParams.At(j)] = cls.TypeParameters[j]
 		}
 	}
-	m.cache[named] = cls
 
 	// Map the underlying type to determine kind and populate members/methods
 	underlying := named.Underlying()
@@ -271,17 +283,10 @@ func (m *typeMapper) mapNamed(named *types.Named) *java.JavaTypeClass {
 	case *types.Interface:
 		cls.Kind = "Interface"
 		cls.Methods = m.interfaceMethods(u, cls)
+		cls.Interfaces = m.embeddedInterfaces(u)
 	default:
 		// Named type wrapping a basic type (e.g., type MyInt int)
 		cls.Kind = "Class"
-	}
-
-	// Map type parameters (generics)
-	tparams := named.TypeParams()
-	if tparams != nil && tparams.Len() > 0 {
-		for i := 0; i < tparams.Len(); i++ {
-			cls.TypeParameters = append(cls.TypeParameters, m.mapType(tparams.At(i)))
-		}
 	}
 
 	// Map methods
@@ -293,16 +298,40 @@ func (m *typeMapper) mapNamed(named *types.Named) *java.JavaTypeClass {
 	}
 
 	// Go satisfies an interface by method set alone, so a type of the package under parse
-	// names the interfaces it satisfies among those the package can see. Another package's
+	// also names the interfaces it satisfies among those the package can see. Another package's
 	// type is mapped without them, as is a generic type, whose method set varies with its arguments.
 	if m.visible != nil && obj.Pkg() == m.visible.pkg && obj.Parent() == obj.Pkg().Scope() &&
 		(tparams == nil || tparams.Len() == 0) {
 		for _, iface := range m.visible.satisfiedBy(named) {
-			cls.Interfaces = append(cls.Interfaces, m.mapNamed(iface))
+			if satisfied := java.FullyQualified(m.mapNamed(iface)); !slices.Contains(cls.Interfaces, satisfied) {
+				cls.Interfaces = append(cls.Interfaces, satisfied)
+			}
 		}
 	}
+	sort.SliceStable(cls.Interfaces, func(i, j int) bool {
+		return java.FQNOf(cls.Interfaces[i]) < java.FQNOf(cls.Interfaces[j])
+	})
 
 	return cls
+}
+
+// embeddedInterfaces maps the named interfaces iface embeds, which are its direct supertypes, as an interface's
+// extends clause is in Java. A constraint's other type-set terms are no supertypes.
+func (m *typeMapper) embeddedInterfaces(iface *types.Interface) []java.FullyQualified {
+	var embedded []java.FullyQualified
+	for i := 0; i < iface.NumEmbeddeds(); i++ {
+		named, ok := types.Unalias(iface.EmbeddedType(i)).(*types.Named)
+		if !ok {
+			continue
+		}
+		if _, ok := named.Underlying().(*types.Interface); !ok {
+			continue
+		}
+		if fq, ok := m.mapType(named).(java.FullyQualified); ok {
+			embedded = append(embedded, fq)
+		}
+	}
+	return embedded
 }
 
 // mapSignature maps a function signature to JavaTypeMethod.
@@ -418,6 +447,16 @@ func (m *typeMapper) mapChanType(ch *types.Chan) java.JavaType {
 	}
 }
 
+// classOf is the class a mapped type is an instance of, which for an
+// instantiated generic is the generic's own class.
+func classOf(t java.JavaType) *java.JavaTypeClass {
+	if p, ok := t.(*java.JavaTypeParameterized); ok {
+		t = p.Type
+	}
+	cls, _ := t.(*java.JavaTypeClass)
+	return cls
+}
+
 // isNamedClass reports whether a mapped type is a class Go gave a name.
 func isNamedClass(t java.JavaType) bool {
 	cls, ok := t.(*java.JavaTypeClass)
@@ -526,8 +565,7 @@ func (m *typeMapper) mapObjectToVariable(obj types.Object, enclosing java.JavaTy
 	}
 	switch o := obj.(type) {
 	case *types.Var:
-		key := variableKey{o, enclosing}
-		if v, ok := m.variables[key]; ok {
+		if v, ok := m.variables[o]; ok {
 			return v
 		}
 		v := &java.JavaTypeVariable{
@@ -536,7 +574,7 @@ func (m *typeMapper) mapObjectToVariable(obj types.Object, enclosing java.JavaTy
 			Owner:       m.ownerType(o, enclosing),
 			Type:        m.mapType(o.Type()),
 		}
-		m.variables[key] = v
+		m.variables[o] = v
 		return v
 	default:
 		return nil
@@ -550,7 +588,8 @@ func (m *typeMapper) mapObjectToVariable(obj types.Object, enclosing java.JavaTy
 // comes from the index built while mapping the struct.
 func (m *typeMapper) ownerType(v *types.Var, enclosing java.JavaType) java.JavaType {
 	if v.IsField() {
-		if owner, ok := m.fieldOwner[v]; ok {
+		// An instantiation's fields are copies of its generic's.
+		if owner, ok := m.fieldOwner[v.Origin()]; ok {
 			return owner
 		}
 		return nil

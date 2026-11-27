@@ -79,4 +79,56 @@ class UpdateMavenModelTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void managedVersionsFollowTheChangeWhenADependencyCanNoLongerBeResolved() {
+        rewriteRun(
+          spec -> spec
+            .recipes(
+              // Spring Boot 3 manages Groovy as org.apache.groovy, so groovy-jsr223 is left without a version
+              new UpgradeDependencyVersion("org.springframework.boot", "spring-boot-dependencies", "3.0.x", null, null, null),
+              // Spring Boot 2.7 manages jaxb-api, Spring Boot 3 doesn't
+              new AddDependency("javax.xml.bind", "jaxb-api", "2.3.x", null, "runtime", true, null, null, null, false, null, null)
+            )
+            .cycles(1)
+            .expectedCyclesThatMakeChanges(1),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.springframework.boot</groupId>
+                              <artifactId>spring-boot-dependencies</artifactId>
+                              <version>2.7.7</version>
+                              <type>pom</type>
+                              <scope>import</scope>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.codehaus.groovy</groupId>
+                          <artifactId>groovy-jsr223</artifactId>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            spec -> spec
+              .after(actual -> {
+                  assertThat(actual).containsPattern(
+                    "<artifactId>jaxb-api</artifactId>\\s*<version>2\\.3\\.1</version>");
+                  return actual;
+              })
+              .afterRecipe(p -> {
+                  var result = p.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                  assertThat(result.getPom().getManagedVersion("org.springframework.boot", "spring-boot", null, null))
+                    .startsWith("3.0.");
+              })
+          )
+        );
+    }
 }

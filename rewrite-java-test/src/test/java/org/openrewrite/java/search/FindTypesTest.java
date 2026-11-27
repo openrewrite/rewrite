@@ -618,7 +618,6 @@ class FindTypesTest implements RewriteTest {
     @Test
     void springXml() {
         rewriteRun(
-          spec -> spec.recipe(new FindTypes("a.A1", false)),
           xml(
             """
               <?xml version="1.0" encoding="UTF-8"?>
@@ -696,12 +695,12 @@ class FindTypesTest implements RewriteTest {
           spec -> spec.recipe(new FindTypes(type, false)),
           xml(
             """
-              <beans xsi:schemaLocation="www.springframework.org/schema/beans">
+              <beans xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="www.springframework.org/schema/beans">
                 <bean id="testBean" class="a.b.Outer$Inner"/>
               </beans>
               """,
             """
-              <beans xsi:schemaLocation="www.springframework.org/schema/beans">
+              <beans xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="www.springframework.org/schema/beans">
                 <bean id="testBean" <!--~~>-->class="a.b.Outer$Inner"/>
               </beans>
               """
@@ -739,4 +738,28 @@ class FindTypesTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void stringSupertypeWithStringLiteral() {
+        rewriteRun(
+          spec -> spec.recipe(new FindTypes("java.io.Serializable", true)),
+          java(
+            """
+              class WelcomeController {
+                  public String welcome() {
+                      return "welcome";
+                  }
+              }
+              """,
+            """
+              class WelcomeController {
+                  public /*~~>*/String welcome() {
+                      return "welcome";
+                  }
+              }
+              """
+          )
+        );
+    }
+
 }

@@ -2249,8 +2249,6 @@ class JavadocTest implements RewriteTest {
     @Test
     void varargsWithPrefix() {
         rewriteRun(
-          // for some reason the compiler AST's type attribution is incomplete here
-          spec -> spec.typeValidationOptions(TypeValidation.none()),
           java(
             """
               class A {
@@ -2767,6 +2765,28 @@ class JavadocTest implements RewriteTest {
     }
 
     @Test
+    void tabAfterMarginBeforeHtmlElement() {
+        rewriteRun(
+          java(
+            """
+              /**
+               * States: <br>
+               * <ol>
+               * \t<li> 1. Pending read
+               *  <li> 2. Header assembled
+               * </ol>
+               * <ul>
+               * \t<li><b>100:</b> Local storage</li>
+               * </ul>
+               * @author Someone
+               */
+              class Test {}
+              """
+          )
+        );
+    }
+
+    @Test
     void nonBreakingSpaceAfterMargin() {
         rewriteRun(
           java(
@@ -2777,6 +2797,172 @@ class JavadocTest implements RewriteTest {
                */
               class Test {}
               """
+          )
+        );
+    }
+
+    @Test
+    void tabAfterMarginOnLaterLine() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  /**
+                   * Text.
+                   * \tmore
+                   */
+                  void m() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void tabsAfterMarginBeforeHtml() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  /**
+                   * Text.
+                   * \t\t<b>bold</b>
+                   */
+                  void m() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void tabAfterMarginOnPreCodeLine() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  /**
+                   * Text.
+                   * <pre><code>
+                   * \tcode
+                   * </code></pre>
+                   */
+                  void m() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void unicodeEscapeAfterMarginOnPreCodeLine() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  /**
+                   * Text.
+                   * <pre><code>
+                   * \\u0041bc
+                   * </code></pre>
+                   */
+                  void m() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void tabAfterMarginInMultiLineInlineCode() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  /**
+                   * Text {@code a
+                   * \tb}
+                   */
+                  void m() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void tabAfterMarginInParamContinuation() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  /**
+                   * Text.
+                   * @param x desc
+                   * \tmore
+                   */
+                  void m(int x) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void tabAfterMarginBelowWhitespaceOnlyLine() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  /**
+                   * Text.
+                   * \t
+                   * \tmore
+                   */
+                  void m() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void tabAfterMarginOnLaterLineWithoutLeadingAsterisk() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  /**
+                     Text.
+                     \tmore
+                   */
+                  void m() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void tabAfterMarginOnLaterLineWithCrlf() {
+        rewriteRun(
+          java("" +
+               "class Test {\r\n" +
+               "    /**\r\n" +
+               "     * Text.\r\n" +
+               "     * \tmore\r\n" +
+               "     */\r\n" +
+               "    void m() {\r\n" +
+               "    }\r\n" +
+               "}\r\n"
           )
         );
     }
@@ -3178,6 +3364,40 @@ class JavadocTest implements RewriteTest {
     @MinimumJava25
     class MarkdownDocComment {
         @Test
+        void tripleSlashTabAfterMarginOnLaterLine() {
+            rewriteRun(
+              java(
+                """
+                  class Test {
+                      /// Text.
+                      /// \tmore
+                      void m() {
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void tripleSlashTabInFencedCodeBlock() {
+            rewriteRun(
+              java(
+                """
+                  class Test {
+                      /// Text.
+                      /// ```
+                      /// \tcode
+                      /// ```
+                      void m() {
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
         void tripleSlashDoubledCarriageReturnBeforeLineFeed() {
             rewriteRun(
               java("" +
@@ -3417,5 +3637,116 @@ class JavadocTest implements RewriteTest {
               )
             );
         }
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9877")
+    @Test
+    void aMarginStarOnTheOpeningLine() {
+        rewriteRun(
+          java(
+            """
+              class C {
+                /**   * Get x
+                 * @return x
+                 **/  int x() { return 1; }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9877")
+    @Test
+    void withAClosingLine() {
+        rewriteRun(
+          java(
+            """
+              class C {
+                /**   * Get x
+                 */
+                int x() { return 1; }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9877")
+    @Test
+    void twoStars() {
+        rewriteRun(
+          java(
+            """
+              class C {
+                /**  ** Get x
+                 */
+                int x() { return 1; }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9877")
+    @Test
+    void oneLineParsesAlready() {
+        rewriteRun(
+          java(
+            """
+              class C {
+                /** * Get x */
+                int x() { return 1; }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9877")
+    @Test
+    void noMarginParsesAlready() {
+        rewriteRun(
+          java(
+            """
+              class C {
+                /** Get x
+                 */
+                int x() { return 1; }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9877")
+    @Test
+    void parsesAlready() {
+        rewriteRun(
+          java(
+            """
+              class C {
+                /*** Get x
+                 */
+                int x() { return 1; }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9877")
+    @Test
+    void aStarInTheText() {
+        rewriteRun(
+          java(
+            """
+              class C {
+                /** a * b
+                 */
+                int x() { return 1; }
+              }
+              """
+          )
+        );
     }
 }

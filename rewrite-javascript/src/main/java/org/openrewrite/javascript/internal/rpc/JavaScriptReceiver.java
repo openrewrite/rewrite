@@ -81,7 +81,8 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
                 .withModifiers(q.receiveList(arrowFunction.getModifiers(), mod -> (J.Modifier) visitNonNull(mod, q)))
                 .withTypeParameters(q.receive(arrowFunction.getTypeParameters(), params -> (J.TypeParameters) visitNonNull(params, q)))
                 .withLambda(q.receive(arrowFunction.getLambda(), tree -> (J.Lambda) visitNonNull(tree, q)))
-                .withReturnTypeExpression(q.receive(arrowFunction.getReturnTypeExpression(), tree -> (TypeTree) visitNonNull(tree, q)));
+                .withReturnTypeExpression(q.receive(arrowFunction.getReturnTypeExpression(), tree -> (TypeTree) visitNonNull(tree, q)))
+                .withMethodType(q.receive(arrowFunction.getMethodType(), t -> (JavaType.Method) visitType(t, q)));
     }
 
     @Override
@@ -466,7 +467,8 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
                 .withSelfClosing(q.receive(tag.getSelfClosing(), space1 -> visitSpace(space1, q)))
                 .withChildren(q.receiveList(tag.getChildren(), child -> (Expression) visitNonNull(child, q)))
                 .getPadding().withClosingName(q.receive(tag.getPadding().getClosingName(), name -> visitLeftPadded(name, q)))
-                .withAfterClosingName(q.receive(tag.getAfterClosingName(), space -> visitSpace(space, q)));
+                .withAfterClosingName(q.receive(tag.getAfterClosingName(), space -> visitSpace(space, q)))
+                .withMethodType(q.receive(tag.getMethodType(), t -> (JavaType.Method) visitType(t, q)));
     }
 
     @Override

@@ -1,0 +1,4 @@
+packages:
+  - packages/*
+catalog:
+  dep: ^1.0.0

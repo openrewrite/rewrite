@@ -34,6 +34,8 @@ class LargeSourceSetCheckingExpectedCycles extends InMemoryLargeSourceSet {
     private final @Nullable AddedMarkers addedMarkers;
     private final @Nullable UnchangedTreeIdentity unchangedTreeIdentity;
     private final @Nullable AccumulatorContents accumulatorContents;
+    private final @Nullable RecipeFields recipeFields;
+    private final @Nullable Collection<String> scannerEdits;
     private int cyclesThatResultedInChanges = 0;
 
     /**
@@ -42,18 +44,22 @@ class LargeSourceSetCheckingExpectedCycles extends InMemoryLargeSourceSet {
     private Map<UUID, @Nullable SourceFile> lastCycleVersions = emptyMap();
 
     LargeSourceSetCheckingExpectedCycles(int expectedCyclesThatMakeChanges, List<SourceFile> ls) {
-        this(expectedCyclesThatMakeChanges, ls, null, null, null);
+        this(expectedCyclesThatMakeChanges, ls, null, null, null, null, null);
     }
 
     LargeSourceSetCheckingExpectedCycles(int expectedCyclesThatMakeChanges, List<SourceFile> ls,
                                          @Nullable AddedMarkers addedMarkers,
                                          @Nullable UnchangedTreeIdentity unchangedTreeIdentity,
-                                         @Nullable AccumulatorContents accumulatorContents) {
+                                         @Nullable AccumulatorContents accumulatorContents,
+                                         @Nullable RecipeFields recipeFields,
+                                         @Nullable Collection<String> scannerEdits) {
         super(ls);
         this.expectedCyclesThatMakeChanges = expectedCyclesThatMakeChanges;
         this.addedMarkers = addedMarkers;
         this.unchangedTreeIdentity = unchangedTreeIdentity;
         this.accumulatorContents = accumulatorContents;
+        this.recipeFields = recipeFields;
+        this.scannerEdits = scannerEdits;
     }
 
     private LargeSourceSetCheckingExpectedCycles(LargeSourceSetCheckingExpectedCycles from, @Nullable Map<SourceFile, List<Recipe>> deletions, List<SourceFile> mapped) {
@@ -62,6 +68,8 @@ class LargeSourceSetCheckingExpectedCycles extends InMemoryLargeSourceSet {
         this.addedMarkers = from.addedMarkers;
         this.unchangedTreeIdentity = from.unchangedTreeIdentity;
         this.accumulatorContents = from.accumulatorContents;
+        this.recipeFields = from.recipeFields;
+        this.scannerEdits = from.scannerEdits;
         this.cyclesThatResultedInChanges = from.cyclesThatResultedInChanges;
         this.lastCycleVersions = from.lastCycleVersions;
     }
@@ -76,11 +84,20 @@ class LargeSourceSetCheckingExpectedCycles extends InMemoryLargeSourceSet {
         return accumulatorContents;
     }
 
+    @Nullable
+    Collection<String> getScannerEdits() {
+        return scannerEdits;
+    }
+
     @Override
     public void setRecipe(List<Recipe> recipeStack) {
         super.setRecipe(recipeStack);
+        Recipe recipe = recipeStack.get(recipeStack.size() - 1);
         if (accumulatorContents != null) {
-            accumulatorContents.ran(recipeStack.get(recipeStack.size() - 1));
+            accumulatorContents.ran(recipe);
+        }
+        if (recipeFields != null) {
+            recipeFields.ran(recipe);
         }
     }
 

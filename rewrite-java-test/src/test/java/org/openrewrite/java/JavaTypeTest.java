@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
@@ -24,12 +25,21 @@ import org.openrewrite.test.RewriteTest;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 
 @SuppressWarnings("ConstantConditions")
 class JavaTypeTest implements RewriteTest {
+
+    @Test
+    void withFlagsKeepsTheMarkOfAnExtensionMethod() {
+        // C# marks an extension method with a bit that isn't one of the flags
+        JavaType.Method extension = new JavaType.Method(null, 1L << 20, JavaType.ShallowClass.build("A"), "m",
+          JavaType.Primitive.Void, List.of(), List.of(), List.of(), List.of(), null, List.of());
+        assertThat(extension.withFlags(Set.of(Flag.Public)).isExtensionMethod()).isTrue();
+    }
 
     @Test
     void recursiveGenericEqualityContract() {

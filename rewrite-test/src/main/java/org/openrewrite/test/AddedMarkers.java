@@ -44,13 +44,9 @@ import static org.assertj.core.api.Assertions.fail;
 final class AddedMarkers {
 
     /**
-     * Markers that recipes in rewrite add on purpose: to apply a change only once, to steer the formatting of a
-     * merged YAML scalar, or to say which method a search matched.
+     * Markers that recipes in rewrite add on purpose: to say which method a search matched.
      */
     private static final Set<String> REWRITE_RECIPE_MARKERS = new HashSet<>(Arrays.asList(
-            "org.openrewrite.marker.AlreadyReplaced",
-            "org.openrewrite.maven.marker.AlreadyIncremented",
-            "org.openrewrite.yaml.MultilineScalarChanged",
             "org.openrewrite.java.search.UsesMethod$MethodMatch"
     ));
 
@@ -157,6 +153,27 @@ final class AddedMarkers {
         if (after instanceof Quark || after instanceof Binary || after instanceof Remote || after instanceof ParseError) {
             return null;
         }
+        return reparse(after, printed(after, relativeTo), others, parsersFor, relativeTo, ctx);
+    }
+
+    /**
+     * A fresh parse of {@code text} as the content of {@code like}'s file, by the first parser that turns it into the
+     * same kind of source, parsed together with {@code others}.
+     */
+    static @Nullable SourceFile reparse(SourceFile like, String text, Collection<SourceFile> others,
+                                        Function<SourceFile, List<Parser.Builder>> parsersFor,
+                                        @Nullable Path relativeTo, ExecutionContext ctx) {
+        if (like instanceof Quark || like instanceof Binary || like instanceof Remote || like instanceof ParseError) {
+            return null;
+        }
+        Charset charset = like.getCharset() == null ? StandardCharsets.UTF_8 : like.getCharset();
+        Path sourcePath = relativeTo == null ? like.getSourcePath() : relativeTo.resolve(like.getSourcePath());
+        return reparse(like, Parser.Input.fromString(sourcePath, text, charset), others, parsersFor, relativeTo, ctx);
+    }
+
+    private static @Nullable SourceFile reparse(SourceFile after, Parser.Input input, Collection<SourceFile> others,
+                                                Function<SourceFile, List<Parser.Builder>> parsersFor,
+                                                @Nullable Path relativeTo, ExecutionContext ctx) {
         for (Parser.Builder builder : parsersFor.apply(after)) {
             try {
                 ExecutionContext reparseCtx = new InMemoryExecutionContext(t -> {
@@ -165,7 +182,7 @@ final class AddedMarkers {
                 reparseCtx.putMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, false);
 
                 List<Parser.Input> inputs = new ArrayList<>(others.size() + 1);
-                inputs.add(printed(after, relativeTo));
+                inputs.add(input);
                 for (SourceFile other : others) {
                     inputs.add(printed(other, relativeTo));
                 }

@@ -57,9 +57,9 @@ class JsonSendReceiveTest implements RewriteTest {
         var serverFormatter = new JsonMessageFormatter(new ParameterNamesModule());
         var clientFormatter = new JsonMessageFormatter(new ParameterNamesModule());
 
-        server = new RewriteRpc(new JsonRpc(new TraceMessageHandler("server", new HeaderDelimitedMessageHandler(serverFormatter, serverIn, serverOut))), env.toMarketplace(runtimeClasspath()))
+        server = new RewriteRpc(new JsonRpc(new TraceMessageHandler("server", new HeaderDelimitedMessageHandler(serverFormatter, serverIn, serverOut)), new JsonMessageFormatter()), env.toMarketplace(runtimeClasspath()))
           .batchSize(1);
-        client = new RewriteRpc(new JsonRpc(new TraceMessageHandler("client", new HeaderDelimitedMessageHandler(clientFormatter, clientIn, clientOut))), env.toMarketplace(runtimeClasspath()))
+        client = new RewriteRpc(new JsonRpc(new TraceMessageHandler("client", new HeaderDelimitedMessageHandler(clientFormatter, clientIn, clientOut)), new JsonMessageFormatter()), env.toMarketplace(runtimeClasspath()))
           .batchSize(1);
     }
 

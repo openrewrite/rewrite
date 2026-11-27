@@ -16,6 +16,7 @@
 package org.openrewrite.toml;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.toml.tree.Toml;
 import org.openrewrite.toml.tree.TomlKey;
 
@@ -30,7 +31,10 @@ public class SemanticallyEqual {
     private SemanticallyEqual() {
     }
 
-    public static boolean areEqual(Toml first, Toml second) {
+    public static boolean areEqual(@Nullable Toml first, @Nullable Toml second) {
+        if (first == null || second == null) {
+            return first == second;
+        }
         SemanticallyEqualVisitor sme = new SemanticallyEqualVisitor();
         sme.visit(first, second);
         return sme.areEqual;
@@ -72,8 +76,8 @@ public class SemanticallyEqual {
                 return null;
             }
 
-            // Compare table values
-            visitList(table.getValues(), otherTable.getValues());
+            // Compare table values, ignoring the placeholders that hold `{ }` or a trailing comma
+            visitList(withoutEmpty(table.getValues()), withoutEmpty(otherTable.getValues()));
             return null;
         }
 
@@ -145,8 +149,9 @@ public class SemanticallyEqual {
             }
             Toml.Array otherArray = (Toml.Array) other;
 
-            List<Toml> values1 = array.getValues();
-            List<Toml> values2 = otherArray.getValues();
+            // A trailing comma leaves a placeholder as the last element
+            List<Toml> values1 = withoutEmpty(array.getValues());
+            List<Toml> values2 = withoutEmpty(otherArray.getValues());
 
             if (values1.size() != values2.size()) {
                 areEqual = false;
@@ -184,6 +189,10 @@ public class SemanticallyEqual {
                 areEqual = false;
             }
             return null;
+        }
+
+        private List<Toml> withoutEmpty(List<Toml> values) {
+            return ListUtils.filter(values, v -> !(v instanceof Toml.Empty));
         }
 
         private void visitList(@Nullable List<? extends Toml> list1, @Nullable List<? extends Toml> list2) {

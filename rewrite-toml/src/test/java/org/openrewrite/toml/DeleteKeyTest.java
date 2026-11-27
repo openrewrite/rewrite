@@ -247,4 +247,36 @@ class DeleteKeyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void keepTheSpaceBeforeTheBraceOfAnInlineTable() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteKey("lib.b")),
+          toml(
+            """
+              lib = { a = 1, b = 2 }
+              only = { b = 2 }
+              """,
+            """
+              lib = { a = 1 }
+              only = { b = 2 }
+              """
+          )
+        );
+    }
+
+    @Test
+    void deleteTheOnlyEntryOfAnInlineTable() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteKey("only.b")),
+          toml(
+            """
+              only = { b = 2 }
+              """,
+            """
+              only = { }
+              """
+          )
+        );
+    }
 }

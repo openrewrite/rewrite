@@ -1,0 +1,31 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    dependencies:
+      cli:
+        specifier: 1.0.0
+        version: 1.0.0
+      other:
+        specifier: 1.0.0
+        version: 1.0.0
+
+packages:
+
+  cli@1.0.0:
+    resolution: {integrity: sha512-Ei3f2HUbK2ON3rnHduNOntardKTcg/BXAWUsjEsFfqU7IgUAaOrBlmuYzY2mb4xtBHjbUDTxDYKvTjKQ8e6AzA==}
+    engines: {runtime: {name: node, version: 22.19.0, onFail: download}}
+
+  other@1.0.0:
+    resolution: {integrity: sha512-2rIGHtpVVbZDHOOUIT09k2hG3wEqJ4dO3OrpI0ET8WtrhdHQ0RzK5Q3550C2P4tV3h6cQF/S1h/NXR/m37DK/A==}
+
+snapshots:
+
+  cli@1.0.0: {}
+
+  other@1.0.0: {}

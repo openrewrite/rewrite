@@ -20,8 +20,10 @@ import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.ParseExceptionResult;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
+import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.toml.internal.TomlParserVisitor;
 import org.openrewrite.toml.internal.grammar.TomlLexer;
 import org.openrewrite.toml.tree.Toml;
@@ -29,7 +31,6 @@ import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
-import java.io.InputStream;
 import java.nio.file.Path;
 import java.util.stream.Stream;
 
@@ -39,25 +40,47 @@ public class TomlParser implements Parser {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
         return acceptedInputs(sourceFiles).map(input -> {
             parsingListener.startedParsing(input);
-            try (InputStream sourceStream = input.getSource(ctx)) {
-                TomlLexer lexer = new TomlLexer(CharStreams.fromStream(sourceStream));
+            ForwardingErrorListener errorListener = new ForwardingErrorListener(input.getPath(), ctx);
+            try (EncodingDetectingInputStream sourceStream = input.getSource(ctx)) {
+                // Lex the same decoded text the visitor reads, or a file that is not UTF-8 lexes to different text
+                String source = sourceStream.readFully();
+                TomlLexer lexer = new TomlLexer(CharStreams.fromString(source));
                 lexer.removeErrorListeners();
-                lexer.addErrorListener(new ForwardingErrorListener(input.getPath(), ctx));
+                lexer.addErrorListener(errorListener);
 
                 org.openrewrite.toml.internal.grammar.TomlParser parser = new org.openrewrite.toml.internal.grammar.TomlParser(new CommonTokenStream(lexer));
                 parser.removeErrorListeners();
-                parser.addErrorListener(new ForwardingErrorListener(input.getPath(), ctx));
+                parser.addErrorListener(errorListener);
 
                 Toml.Document document = new TomlParserVisitor(
                         input.getRelativePath(relativeTo),
                         input.getFileAttributes(),
-                        input.getSource(ctx)
+                        source,
+                        sourceStream.getCharset(),
+                        sourceStream.isCharsetBomMarked()
                 ).visitDocument(parser.document());
+                TomlParsingException syntaxError = errorListener.firstError;
+                if (syntaxError != null) {
+                    // Unlike JsonParser and ProtoParser, which turn any syntax error into a ParseError, a tree
+                    // that ANTLR recovered and that prints back as written stays a document, so that files
+                    // which parsed before keep parsing. It may not mean what the file does, so it is marked
+                    // with the syntax error, which FindParseFailures reports.
+                    document = document.withMarkers(document.getMarkers().add(ParseExceptionResult.build(this, syntaxError)));
+                }
                 parsingListener.parsed(input, document);
-                return requirePrintEqualsInput(document, input, relativeTo, ctx);
+                SourceFile sourceFile = requirePrintEqualsInput(document, input, relativeTo, ctx);
+                if (syntaxError != null && sourceFile instanceof ParseError) {
+                    // the recovered tree did not print back: the syntax error is the reason
+                    return ParseError.build(this, input, relativeTo, ctx, syntaxError)
+                            .withErroneous(((ParseError) sourceFile).getErroneous());
+                }
+                return sourceFile;
             } catch (Throwable t) {
+                // The listener already reported each syntax error, so report only the visitor's failure,
+                // but build the ParseError from the syntax error, which is the reason the visitor failed
                 ctx.getOnError().accept(t);
-                return ParseError.build(this, input, relativeTo, ctx, t);
+                TomlParsingException syntaxError = errorListener.firstError;
+                return ParseError.build(this, input, relativeTo, ctx, syntaxError != null ? syntaxError : t);
             }
         });
     }
@@ -89,6 +112,9 @@ public class TomlParser implements Parser {
         private final Path sourcePath;
         private final ExecutionContext ctx;
 
+        @Nullable
+        TomlParsingException firstError;
+
         private ForwardingErrorListener(Path sourcePath, ExecutionContext ctx) {
             this.sourcePath = sourcePath;
             this.ctx = ctx;
@@ -97,8 +123,12 @@ public class TomlParser implements Parser {
         @Override
         public void syntaxError(Recognizer<?, ?> recognizer, Object offendingSymbol,
                                 int line, int charPositionInLine, String msg, RecognitionException e) {
-            ctx.getOnError().accept(new TomlParsingException(sourcePath,
-                    String.format("Syntax error in %s at line %d:%d %s.", sourcePath, line, charPositionInLine, msg), e));
+            TomlParsingException error = new TomlParsingException(sourcePath,
+                    String.format("Syntax error in %s at line %d:%d %s.", sourcePath, line, charPositionInLine, msg), e);
+            if (firstError == null) {
+                firstError = error;
+            }
+            ctx.getOnError().accept(error);
         }
     }
 

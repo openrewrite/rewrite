@@ -20,7 +20,7 @@ import {randomId, UUID} from "../../uuid";
 import {SourceFile} from "../../tree";
 import {Parsers} from "../../parser";
 import {withMetrics} from "./metrics";
-import {replaceMarkerByKind} from "../../markers";
+import {Marker, replaceMarkerByKind} from "../../markers";
 import {setLastParsedProject} from "./last-parsed-project";
 
 /**
@@ -177,60 +177,50 @@ export class ParseProject {
                             relativeTo
                         });
 
-                        // Check if Prettier is available
-                        const detection = await prettierLoader.detectPrettier();
-
-                        if (detection.available) {
-                            // Prettier is available: add per-file PrettierStyle markers
-                            const generator = parser.parse(...discovered.jsFiles);
-
+                        const prettierMarkers = new Map<string, Marker>();
+                        for (const filePath of discovered.jsFiles) {
+                            const marker = await prettierLoader.getConfigMarker(filePath);
+                            if (marker) {
+                                prettierMarkers.set(filePath, marker);
+                            }
+                        }
+                        const generator = parser.parse(...discovered.jsFiles);
+                        if (prettierMarkers.size === discovered.jsFiles.length) {
                             for (const filePath of discovered.jsFiles) {
+                                const marker = prettierMarkers.get(filePath)!;
                                 const id = randomId();
                                 localObjects.set(id, async (id: string) => {
                                     const sourceFile: SourceFile = (await generator.next()).value;
-                                    // Add PrettierStyle marker if Prettier is available
-                                    const prettierMarker = await prettierLoader.getConfigMarker(filePath);
                                     return {
                                         ...sourceFile,
                                         id,
-                                        markers: prettierMarker
-                                            ? replaceMarkerByKind(sourceFile.markers, prettierMarker)
-                                            : sourceFile.markers
+                                        markers: replaceMarkerByKind(sourceFile.markers, marker)
                                     };
                                 });
                                 resultItems.push({
                                     id,
-                                    sourceFileType: "org.openrewrite.javascript.tree.JS$CompilationUnit", // break cycle
+                                    sourceFileType: "org.openrewrite.javascript.tree.JS$CompilationUnit",
                                     sourcePath: path.relative(relativeTo, filePath)
                                 });
                             }
                         } else {
-                            // Prettier is NOT available: auto-detect styles from parsed files
-                            // Parse all files first to sample them
                             const parsedFiles: {id: string, sourceFile: SourceFile, filePath: string}[] = [];
                             let fileIndex = 0;
-                            for await (const sourceFile of parser.parse(...discovered.jsFiles)) {
-                                const id = randomId();
-                                parsedFiles.push({id, sourceFile, filePath: discovered.jsFiles[fileIndex++]});
+                            for await (const sourceFile of generator) {
+                                parsedFiles.push({id: randomId(), sourceFile, filePath: discovered.jsFiles[fileIndex++]});
                             }
-
-                            // Sample all parsed files and build Autodetect marker using ProjectParser helper
                             const autodetectMarker = await projectParser.buildAutodetectMarker(
-                                parsedFiles.map(p => p.sourceFile)
+                                parsedFiles.filter(p => !prettierMarkers.has(p.filePath)).map(p => p.sourceFile)
                             );
-
-                            // Store thunks that add the Autodetect marker
                             for (const {id, sourceFile, filePath} of parsedFiles) {
-                                localObjects.set(id, async (newId: string) => {
-                                    return {
-                                        ...sourceFile,
-                                        id: newId,
-                                        markers: replaceMarkerByKind(sourceFile.markers, autodetectMarker)
-                                    };
-                                });
+                                localObjects.set(id, async (newId: string) => ({
+                                    ...sourceFile,
+                                    id: newId,
+                                    markers: replaceMarkerByKind(sourceFile.markers, prettierMarkers.get(filePath) ?? autodetectMarker)
+                                }));
                                 resultItems.push({
                                     id,
-                                    sourceFileType: "org.openrewrite.javascript.tree.JS$CompilationUnit", // break cycle
+                                    sourceFileType: "org.openrewrite.javascript.tree.JS$CompilationUnit",
                                     sourcePath: path.relative(relativeTo, filePath)
                                 });
                             }

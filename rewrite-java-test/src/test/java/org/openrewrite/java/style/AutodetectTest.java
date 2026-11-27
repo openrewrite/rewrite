@@ -15,13 +15,21 @@
  */
 package org.openrewrite.java.style;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
+import org.openrewrite.SourceFile;
+import org.openrewrite.internal.ObjectMappers;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.test.RewriteTest;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.style.LineWrapSetting.DoNotWrap;
@@ -782,6 +790,376 @@ class AutodetectTest implements RewriteTest {
         assertThat(spacesStyle.getOther().getAfterTypeCast()).isTrue();
     }
 
+    @Test
+    void afterTypeCastDefaultsToSpaceWithoutCasts() {
+        var cus = jp().parse(
+          """
+            class T {
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
+
+        assertThat(spacesStyle.getOther().getAfterTypeCast()).isTrue();
+    }
+
+    @SuppressWarnings("StatementWithEmptyBody")
+    @Test
+    void detectSpaceAfterForSemicolon() {
+        var cus = jp().parse(
+          """
+            class T {
+                void m(int x) {
+                    for (int i = 0; i < x; i++) {}
+                    for (int j = 0; j < x; j++) {}
+                    for (int k = 0;k < x;k++) {}
+                }
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
+
+        assertThat(spacesStyle.getOther().getAfterForSemicolon()).isTrue();
+    }
+
+    @SuppressWarnings("StatementWithEmptyBody")
+    @Test
+    void detectNoSpaceAfterForSemicolon() {
+        var cus = jp().parse(
+          """
+            class T {
+                void m(int x) {
+                    for (int i = 0;i < x;i++) {}
+                    for (int j = 0;j < x;j++) {}
+                    for (int k = 0; k < x; k++) {}
+                }
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
+
+        assertThat(spacesStyle.getOther().getAfterForSemicolon()).isFalse();
+    }
+
+    @SuppressWarnings("StatementWithEmptyBody")
+    @Test
+    void detectSpaceBeforeForSemicolon() {
+        var cus = jp().parse(
+          """
+            class T {
+                void m(int x) {
+                    for (int i = 0 ; i < x ; i++) {}
+                    for (int j = 0 ; j < x ; j++) {}
+                    for (int k = 0; k < x; k++) {}
+                }
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
+
+        assertThat(spacesStyle.getOther().getBeforeForSemicolon()).isTrue();
+    }
+
+    @SuppressWarnings("StatementWithEmptyBody")
+    @Test
+    void emptyForLoopPartsDoNotVoteOnSemicolonSpacing() {
+        var cus = jp().parse(
+          """
+            class T {
+                void m(int x) {
+                    for (int i = 0 ; i < x ; i++) {}
+                    for (;;) { break; }
+                    for (;;) { break; }
+                    for (;;) { break; }
+                }
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
+
+        assertThat(spacesStyle.getOther().getBeforeForSemicolon()).isTrue();
+        assertThat(spacesStyle.getOther().getAfterForSemicolon()).isTrue();
+    }
+
+    @SuppressWarnings({"StatementWithEmptyBody", "ForLoopReplaceableByWhile"})
+    @Test
+    void forLoopWithoutConditionVotesOnSpaceAfterSemicolon() {
+        var cus = jp().parse(
+          """
+            class T {
+                void m(int x) {
+                    for (int i = 0;;i++) {
+                        if (i > x) break;
+                    }
+                }
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
+
+        assertThat(spacesStyle.getOther().getAfterForSemicolon()).isFalse();
+    }
+
+    @Test
+    void detectSpaceBeforeArrayInitializerBrace() {
+        var cus = jp().parse(
+          """
+            class T {
+                int[] a = new int[] {1, 2};
+                int[] b = new int[] {3, 4};
+                int[] c = new int[]{5, 6};
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
+
+        assertThat(spacesStyle.getBeforeLeftBrace().getArrayInitializerLeftBrace()).isTrue();
+    }
+
+    @Test
+    void detectNoSpaceBeforeArrayInitializerBrace() {
+        var cus = jp().parse(
+          """
+            class T {
+                int[] a = new int[]{1, 2};
+                int[] b = new int[]{3, 4};
+                int[] c = new int[] {5, 6};
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
+
+        assertThat(spacesStyle.getBeforeLeftBrace().getArrayInitializerLeftBrace()).isFalse();
+    }
+
+    @Test
+    void initializersWithoutTypeDoNotVoteOnSpaceBeforeArrayInitializerBrace() {
+        var cus = jp().parse(
+          """
+            class T {
+                int[] a = new int[] {1, 2};
+                int[] b = {3, 4};
+                @SuppressWarnings({"a", "b"})
+                int[] c = {5, 6};
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
+
+        assertThat(spacesStyle.getBeforeLeftBrace().getArrayInitializerLeftBrace()).isTrue();
+    }
+
+    @Test
+    void detectSpacesWithinArrayInitializerBraces() {
+        var cus = jp().parse(
+          """
+            class T {
+                int[] a = { 1, 2 };
+                int[] b = new int[]{ 3, 4 };
+                int[] c = {5, 6};
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
+
+        assertThat(spacesStyle.getWithin().getArrayInitializerBraces()).isTrue();
+    }
+
+    @Test
+    void detectNoSpacesWithinArrayInitializerBraces() {
+        var cus = jp().parse(
+          """
+            class T {
+                int[] a = {1, 2};
+                int[] b = new int[]{3, 4};
+                int[] c = { 5, 6 };
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
+
+        assertThat(spacesStyle.getWithin().getArrayInitializerBraces()).isFalse();
+    }
+
+    @Test
+    void multiLineArrayInitializersDoNotVoteOnSpacesWithinBraces() {
+        var cus = jp().parse(
+          """
+            class T {
+                int[] a = {1, 2};
+                int[] b = {
+                    3,
+                    4
+                };
+                int[] c = {
+                    5,
+                    6
+                };
+                int[] d = {
+                    7,
+                    8
+                };
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
+
+        assertThat(spacesStyle.getWithin().getArrayInitializerBraces()).isFalse();
+    }
+
+    @Test
+    void closingBraceOnTheSameLineAsElementsVotesOnSpacesWithinBraces() {
+        var cus = jp().parse(
+          """
+            class T {
+                int[] a = {1, 2};
+                int[] b = {
+                    3, 4 };
+                int[] c = {
+                    5, 6 };
+                int[] d = {
+                    7, 8 };
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
+
+        assertThat(spacesStyle.getWithin().getArrayInitializerBraces()).isTrue();
+    }
+
+    @Test
+    void openingBraceOnTheSameLineAsElementsVotesOnSpacesWithinBraces() {
+        var cus = jp().parse(
+          """
+            class T {
+                int[] a = {1, 2};
+                int[] b = { 3,
+                    4
+                };
+                int[] c = { 5,
+                    6
+                };
+                int[] d = { 7,
+                    8
+                };
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
+
+        assertThat(spacesStyle.getWithin().getArrayInitializerBraces()).isTrue();
+    }
+
+    @Test
+    void emptyArrayInitializersDoNotVoteOnSpacesWithinBraces() {
+        var cus = jp().parse(
+          """
+            class T {
+                int[] a = { 1, 2 };
+                int[] b = {};
+                int[] c = {};
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
+
+        assertThat(spacesStyle.getWithin().getArrayInitializerBraces()).isTrue();
+    }
+
+    @Test
+    void trailingCommaVotesOnSpaceBeforeClosingBrace() {
+        var cus = jp().parse(
+          """
+            class T {
+                int[] a = { 1, 2, };
+                int[] b = { 3, 4, };
+                int[] c = { 5, 6, };
+                int[] d = {7, 8};
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
+
+        assertThat(spacesStyle.getWithin().getArrayInitializerBraces()).isTrue();
+    }
+
+    @Test
+    void multiLineArrayInitializersWithTrailingCommaDoNotVoteOnSpacesWithinBraces() {
+        var cus = jp().parse(
+          """
+            class T {
+                int[] a = { 1, 2 };
+                int[] b = {
+                    3,
+                    4,
+                };
+                int[] c = {
+                    5,
+                    6,
+                };
+                int[] d = {
+                    7,
+                    8,
+                };
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
+
+        assertThat(spacesStyle.getWithin().getArrayInitializerBraces()).isTrue();
+    }
+
     @SuppressWarnings("StatementWithEmptyBody")
     @Test
     void detectBeforeForSemicolon() {
@@ -1141,6 +1519,181 @@ class AutodetectTest implements RewriteTest {
         assertThat(tabsAndIndents.getTabSize()).isEqualTo(4);
         assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
         assertThat(tabsAndIndents.getContinuationIndent()).isEqualTo(12);
+    }
+
+    private WrappingAndBracesStyle.KeepWhenFormatting detectKeepWhenFormatting(String source) {
+        var cus = jp().parse(source);
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        return detector.build().getStyle(WrappingAndBracesStyle.class).getKeepWhenFormatting();
+    }
+
+    @Test
+    void detectEmptyMethodsOnOneLine() {
+        var keep = detectKeepWhenFormatting(
+          """
+            class T {
+                T() {}
+                void a() {}
+                void b() { }
+                void c() {
+                }
+            }
+            """
+        );
+        assertThat(keep.getSimpleMethodsInOneLine()).isTrue();
+    }
+
+    @Test
+    void detectEmptyMethodsOnSeparateLines() {
+        var keep = detectKeepWhenFormatting(
+          """
+            class T {
+                void a() {
+                }
+                void b() {
+                }
+                void c() {}
+            }
+            """
+        );
+        assertThat(keep.getSimpleMethodsInOneLine()).isFalse();
+    }
+
+    @Test
+    void detectEmptyClassesOnOneLine() {
+        var keep = detectKeepWhenFormatting(
+          """
+            class T {
+                static class A {}
+                static class B {}
+                static class C {
+                }
+            }
+            """
+        );
+        assertThat(keep.getSimpleClassesInOneLine()).isTrue();
+        assertThat(keep.getSimpleMethodsInOneLine()).isFalse();
+    }
+
+    @Test
+    void detectEmptyLambdasAndBlocksOnOneLine() {
+        var keep = detectKeepWhenFormatting(
+          """
+            class T {
+                Runnable a = () -> {};
+                Runnable b = () -> {};
+                static {}
+                void m(boolean x) {
+                    if (x) {}
+                    try {} finally {}
+                }
+            }
+            """
+        );
+        assertThat(keep.getSimpleLambdasInOneLine()).isTrue();
+        assertThat(keep.getSimpleBlocksInOneLine()).isTrue();
+    }
+
+    @Test
+    void tiedEmptyBodiesKeepDefaults() {
+        var keep = detectKeepWhenFormatting(
+          """
+            class T {
+                void a() {}
+                void b() {
+                }
+            }
+            """
+        );
+        assertThat(keep.getSimpleMethodsInOneLine()).isFalse();
+    }
+
+    @Test
+    void emptyBodiesWithCommentsAndNoEvidenceKeepDefaults() {
+        var keep = detectKeepWhenFormatting(
+          """
+            class T {
+                void a() { /* nothing */ }
+                void b() {
+                    // nothing
+                }
+                int c() { return 1; }
+            }
+            """
+        );
+        assertThat(keep.getSimpleMethodsInOneLine()).isFalse();
+        assertThat(keep.getSimpleClassesInOneLine()).isFalse();
+        assertThat(keep.getSimpleLambdasInOneLine()).isFalse();
+        assertThat(keep.getSimpleBlocksInOneLine()).isFalse();
+    }
+
+    @Test
+    void anonymousClassAndEnumConstantBodiesVoteAsBlocks() {
+        var keep = detectKeepWhenFormatting(
+          """
+            class T {
+                Object a = new Object() {};
+                Object b = new Object() {};
+                enum E {
+                    A {},
+                    B {}
+                }
+                static class C {
+                }
+            }
+            """
+        );
+        assertThat(keep.getSimpleBlocksInOneLine()).isTrue();
+        assertThat(keep.getSimpleClassesInOneLine()).isFalse();
+    }
+
+    @Test
+    void recordInterfaceAndEnumDeclarationsVoteAsClasses() {
+        var keep = detectKeepWhenFormatting(
+          """
+            class T {
+                record R(int x) {}
+                interface I {}
+                enum E {}
+                void m() {
+                }
+            }
+            """
+        );
+        assertThat(keep.getSimpleClassesInOneLine()).isTrue();
+        assertThat(keep.getSimpleMethodsInOneLine()).isFalse();
+    }
+
+    @Test
+    void detectEmptyClassesLambdasAndBlocksOnSeparateLines() {
+        var keep = detectKeepWhenFormatting(
+          """
+            class T {
+                static class A {
+                }
+                static class B {
+                }
+                static class C {}
+                Runnable r = () -> {
+                };
+                Runnable s = () -> {
+                };
+                Runnable t = () -> {};
+                void m(boolean x) {
+                    if (x) {
+                    }
+                    try {
+                    } finally {
+                    }
+                    while (x) {}
+                }
+            }
+            """
+        );
+        assertThat(keep.getSimpleClassesInOneLine()).isFalse();
+        assertThat(keep.getSimpleLambdasInOneLine()).isFalse();
+        assertThat(keep.getSimpleBlocksInOneLine()).isFalse();
     }
 
     @Nested
@@ -1631,4 +2184,157 @@ class AutodetectTest implements RewriteTest {
 
     }
 
+    @Nested
+    class Merge {
+        // Each file disagrees with the others somewhere, so the merged result has to reproduce the vote
+        private final List<SourceFile> sources = jp().parse(
+          """
+            import com.fasterxml.jackson.annotation.JsonCreator;
+
+            import org.openrewrite.internal.StringUtils;
+            import org.openrewrite.internal.ListUtils;
+
+            import javax.net.ssl.SSLContext;
+            import java.util.List;
+            import java.util.Map;
+
+            import static java.util.Collections.emptyList;
+
+            class A {
+            	List<String> a(Object o) {
+            		if(o == null) {
+            			return emptyList();
+            		}
+            		return (List<String>) o;
+            	}
+            }
+            """,
+          """
+            import static java.util.Collections.emptyMap;
+
+            import javax.net.ssl.SSLContext;
+            import java.io.File;
+            import java.util.Map;
+
+            class B {
+                Map<String, String> b(int n) {
+                    if (n > 0) {
+                        return emptyMap();
+                    }
+                    for(int i = 0;i < n;i++) {
+                        foo (i);
+                    }
+                    return null;
+                }
+            }
+            """,
+          """
+            import java.io.File;
+            import java.util.List;
+            import java.util.Set;
+
+            class C {
+              @Deprecated
+              void c(String s) {
+                if(s == null) {
+                  s = (String)s;
+                }
+                else {
+                  bar(s , s);
+                }
+              }
+            }
+            """,
+          "class D {\r\n    void d() {\r\n        try {\r\n        } catch(Exception e) {\r\n        }\r\n    }\r\n}\r\n",
+          """
+            class E {
+                @Deprecated int e;
+            }
+            """
+        ).toList();
+
+        @Test
+        void mergedDetectorsMatchOneDetectorThatSampledEverything() {
+            var all = detector(sources);
+            var first = detector(sources.subList(0, 2));
+            var second = detector(sources.subList(2, 3));
+            var third = detector(sources.subList(3, 5));
+
+            assertSameStyles(Autodetect.detector().merge(first).merge(second).merge(third), all);
+            assertSameStyles(detector(sources.subList(3, 5)).merge(detector(sources.subList(2, 3))).merge(detector(sources.subList(0, 2))), all);
+        }
+
+        @Test
+        void importLayoutDoesNotDependOnSampleOrder() {
+            // Block sequences of the same length, so neither file is the obvious choice
+            var tied = jp().parse(
+              """
+                import java.util.List;
+
+                import org.openrewrite.internal.StringUtils;
+
+                class X {
+                }
+                """,
+              """
+                import org.openrewrite.internal.StringUtils;
+
+                import java.util.List;
+
+                class Y {
+                }
+                """
+            ).toList();
+            var reversed = new ArrayList<>(tied);
+            Collections.reverse(reversed);
+
+            assertThat(detector(reversed).build().getStyle(ImportLayoutStyle.class))
+              .usingRecursiveComparison()
+              .withEqualsForType(Merge::samePattern, Pattern.class)
+              .isEqualTo(detector(tied).build().getStyle(ImportLayoutStyle.class));
+        }
+
+        @Test
+        void buildIsRepeatable() {
+            var detector = detector(sources);
+            assertThat(detector.build().getStyles())
+              .usingRecursiveComparison()
+              .withEqualsForType(Merge::samePattern, Pattern.class)
+              .isEqualTo(detector.build().getStyles());
+        }
+
+        @Test
+        void serializedDetectorsRoundTrip() throws Exception {
+            var all = detector(sources);
+            for (ObjectMapper mapper : List.of(new ObjectMapper().findAndRegisterModules(), ObjectMappers.propertyBasedMapper(null))) {
+                var first = mapper.readValue(mapper.writeValueAsBytes(detector(sources.subList(0, 3))), Autodetect.Detector.class);
+                var second = mapper.readValue(mapper.writeValueAsBytes(detector(sources.subList(3, 5))), Autodetect.Detector.class);
+                assertSameStyles(first.merge(second), all);
+            }
+        }
+
+        @Test
+        void packageNamesAreSerializedOncePerDetector() throws Exception {
+            // java.util is imported by three of the files
+            var json = new ObjectMapper().findAndRegisterModules().writeValueAsString(detector(sources));
+            assertThat(json.split("\"java\\.util\"", -1)).hasSize(2);
+        }
+
+        private Autodetect.Detector detector(List<SourceFile> sources) {
+            var detector = Autodetect.detector();
+            sources.forEach(detector::sample);
+            return detector;
+        }
+
+        private void assertSameStyles(Autodetect.Detector actual, Autodetect.Detector expected) {
+            assertThat(actual.build().getStyles())
+              .usingRecursiveComparison()
+              .withEqualsForType(Merge::samePattern, Pattern.class)
+              .isEqualTo(expected.build().getStyles());
+        }
+
+        private static boolean samePattern(Pattern a, Pattern b) {
+            return a.pattern().equals(b.pattern());
+        }
+    }
 }

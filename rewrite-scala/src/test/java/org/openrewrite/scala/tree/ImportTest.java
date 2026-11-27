@@ -16,11 +16,58 @@
 package org.openrewrite.scala.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.scala.ScalaIsoVisitor;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.scala.Assertions.scala;
 
 class ImportTest implements RewriteTest {
+
+    @Test
+    void importOfMembersOfAnObjectOrClassIsStatic() {
+        rewriteRun(
+          scala(
+            """
+              import scala.collection.JavaConverters._
+              import scala.concurrent.ExecutionContext.Implicits.global
+              import java.lang.System.out
+              import java.util.UUID
+              import scala.collection.mutable
+              import scala.math.max
+              import java.util.Map.Entry
+              import java.util.UUID, scala.util.Properties.versionString
+              object A {
+                val config = new Object
+                import config._
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> assertThat(new ScalaIsoVisitor<List<String>>() {
+                @Override
+                public J.Import visitImport(J.Import i, List<String> imports) {
+                    imports.add(i.getQualid().getSimpleName() + (i.isStatic() ? " static " + i.getTypeName() : ""));
+                    return i;
+                }
+            }.reduce(cu, new ArrayList<>()))
+              .containsExactly(
+                "_ static scala.collection.JavaConverters$_",
+                "global static scala.concurrent.ExecutionContext$Implicits",
+                "out static java.lang.System",
+                "UUID",
+                "mutable",
+                "max",
+                "Entry",
+                "UUID",
+                "versionString static scala.util.Properties",
+                "_"
+              ))
+          )
+        );
+    }
 
     @Test
     void singleImport() {

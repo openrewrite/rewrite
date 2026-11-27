@@ -1,0 +1,10 @@
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Progress: resolved 3, reused 0, downloaded 0, added 0, done
+ ERR_PNPM_PEER_DEP_ISSUES  Unmet peer dependencies
+
+.
+└─┬ host 1.0.0
+  └── ✕ unmet peer p@^2.0.0: found 1.0.0
+hint: If you don't want pnpm to fail on peer dependency issues, add "strict-peer-dependencies=false" to an .npmrc file at the root of your project.
+
+exit 1

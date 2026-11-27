@@ -365,8 +365,14 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     @Override
     public J visitClassInitializer(KtClassInitializer initializer, ExecutionContext data) {
-        J.Block staticInit = requireNonNull(initializer.getBody()).accept(this, data).withPrefix(deepPrefix(initializer));
-        return staticInit.getPadding().withStatic(padRight(true, prefix(initializer.getBody())));
+        ownerStack.push(initializer);
+        try {
+            J.Block staticInit = requireNonNull(initializer.getBody()).accept(this, data)
+                    .withPrefix(deepPrefix(initializer));
+            return staticInit.getPadding().withStatic(padRight(true, prefix(initializer.getBody())));
+        } finally {
+            ownerStack.pop();
+        }
     }
 
     @Override
@@ -967,7 +973,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                     .withPrefix(prefix(parameter));
         }
 
-        JavaType.Variable vt = variableType(parameter, owner(parameter));
+        JavaType.Variable vt = variableType(parameter, psiElementAssociations.localVariableOwner(parameter));
         J.Identifier name = createIdentifier(requireNonNull(parameter.getNameIdentifier()), vt, consumedSpaces);
 
         if (parameter.getTypeReference() != null) {
@@ -2447,7 +2453,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                             .withPrefix(prefix(multiDeclaration.getInitializer())));
         }
 
-        JavaType.Variable vt = variableType(multiDeclaration, owner(multiDeclaration));
+        JavaType.Variable vt = variableType(multiDeclaration,
+                psiElementAssociations.localVariableOwner(multiDeclaration));
         J.VariableDeclarations.NamedVariable namedVariable = new J.VariableDeclarations.NamedVariable(
                 randomId(),
                 Space.EMPTY,
@@ -2579,13 +2586,19 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         ASTNode node = importDirective.getNode().findChildByType(KtTokens.IMPORT_KEYWORD);
         LeafPsiElement importPsi = (LeafPsiElement) node;
 
-        PsiElement first = PsiTreeUtil.skipWhitespacesAndCommentsForward(importPsi);
-        PsiElement last = findLastChild(importDirective, psi -> !(psi instanceof KtImportAlias) &&
-                                                                !isSpace(psi.getNode()) &&
-                                                                psi.getNode().getElementType() != KtTokens.SEMICOLON);
-
-        String text = nodeRangeText(getNodeOrNull(first), getNodeOrNull(last));
-        TypeTree reference = TypeTree.build(text, '`');
+        KtExpression importedReference = requireNonNull(importDirective.getImportedReference());
+        TypeTree reference = buildImportReference(importedReference, new StringBuilder());
+        if (importDirective.isAllUnder()) {
+            PsiElement star = requireNonNull(importDirective.getNode().findChildByType(KtTokens.MUL)).getPsi();
+            reference = new J.FieldAccess(
+                    randomId(),
+                    Space.EMPTY,
+                    Markers.EMPTY,
+                    (Expression) reference.withPrefix(Space.EMPTY),
+                    padLeft(suffix(importedReference), createIdentifier(star, null)),
+                    null
+            );
+        }
         reference = reference.withPrefix(suffix(importPsi));
 
         JavaType jt = type(importDirective);
@@ -2615,6 +2628,27 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 // Aliases contain Kotlin `Name` and do not resolve to a type. The aliases type is the import directive, so we set the type to match the import.
                 alias != null ? padLeft(prefix(alias), createIdentifier(requireNonNull(alias.getNameIdentifier()), jt)) : null
         );
+    }
+
+    private TypeTree buildImportReference(KtExpression expression, StringBuilder fullName) {
+        if (expression instanceof KtDotQualifiedExpression) {
+            KtDotQualifiedExpression qualified = (KtDotQualifiedExpression) expression;
+            TypeTree target = buildImportReference(qualified.getReceiverExpression(), fullName);
+            J.Identifier name = createIdentifier(requireNonNull(qualified.getSelectorExpression()), null);
+            fullName.append('.').append(name.getSimpleName());
+            return new J.FieldAccess(
+                    randomId(),
+                    Space.EMPTY,
+                    Markers.EMPTY,
+                    (Expression) target,
+                    padLeft(suffix(qualified.getReceiverExpression()), name),
+                    Character.isUpperCase(name.getSimpleName().charAt(0)) ?
+                            JavaType.ShallowClass.build(fullName.toString()) : null
+            );
+        }
+        J.Identifier name = createIdentifier(expression, null);
+        fullName.append(name.getSimpleName());
+        return name;
     }
 
     private @Nullable FirResolvedImport getResolvedImport(KtImportDirective importDirective) {
@@ -2963,7 +2997,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         }
 
         Markers rpMarker = Markers.EMPTY;
-        JavaType.Variable vt = variableType(property, owner(property));
+        JavaType.Variable vt = variableType(property,
+                property.isLocal() ? psiElementAssociations.localVariableOwner(property) : owner(property));
         J.VariableDeclarations.NamedVariable namedVariable =
                 new J.VariableDeclarations.NamedVariable(
                         randomId(),
@@ -4172,18 +4207,6 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         return node instanceof PsiErrorElementImpl && "\r".equals(node.getText());
     }
 
-    private String nodeRangeText(@Nullable ASTNode first, @Nullable ASTNode last) {
-        StringBuilder builder = new StringBuilder();
-        while (first != null) {
-            builder.append(first.getText());
-            if (first == last) {
-                break;
-            }
-            first = first.getTreeNext();
-        }
-        return builder.toString();
-    }
-
     // Visits the annotation list's own children rather than the flattened entries, so that a bracketed
     // list like `@file:[JvmName("Foo") JvmMultifileClass]` keeps its use-site target and brackets.
     private List<J.Annotation> mapFileAnnotations(@Nullable KtFileAnnotationList fileAnnotationList, ExecutionContext data) {
@@ -4206,7 +4229,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     }
 
     private J mapDestructuringDeclaration(KtDestructuringDeclaration ktDestructuringDeclaration, ExecutionContext data) {
-        JavaType.Variable vt = variableType(ktDestructuringDeclaration, owner(ktDestructuringDeclaration));
+        JavaType.Variable vt = variableType(ktDestructuringDeclaration,
+                psiElementAssociations.localVariableOwner(ktDestructuringDeclaration));
         J.VariableDeclarations.NamedVariable namedVariable = new J.VariableDeclarations.NamedVariable(
                 randomId(),
                 Space.EMPTY,
@@ -4246,7 +4270,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 }
             }
 
-            JavaType.Variable entryType = variableType(entry, owner(entry));
+            JavaType.Variable entryType = variableType(entry, psiElementAssociations.localVariableOwner(entry));
             J.Identifier name = createIdentifier(requireNonNull(entry.getNameIdentifier()), entryType);
             name = annotations.isEmpty() ? name.withPrefix(beforeEntry) : name.withAnnotations(annotations);
 

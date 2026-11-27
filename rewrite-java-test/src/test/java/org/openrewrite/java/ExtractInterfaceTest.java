@@ -68,6 +68,13 @@ class ExtractInterfaceTest implements RewriteTest {
             }
             J.CompilationUnit cu = (J.CompilationUnit) JavaParser.fromJavaVersion().build().parse(acc.get())
               .findFirst().orElseThrow();
+            // the parser leaves a declaration's name untyped, and other recipes, such as ChangeType, type it
+            cu = (J.CompilationUnit) new JavaIsoVisitor<ExecutionContext>() {
+                @Override
+                public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                    return method.withName(method.getName().withType(method.getMethodType()));
+                }
+            }.visitNonNull(cu, ctx);
             return List.of((SourceFile) new ExtractInterface.CreateInterface("org.openrewrite.interfaces.ITest")
               .visitNonNull(cu, ctx));
         }

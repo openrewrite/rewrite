@@ -1,0 +1,36 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+catalogs:
+  default:
+    dep:
+      specifier: ^1.0.0
+      version: 1.0.0
+
+importers:
+
+  .: {}
+
+  packages/app:
+    dependencies:
+      lib:
+        specifier: workspace:*
+        version: link:../lib
+
+  packages/lib:
+    dependencies:
+      dep:
+        specifier: 'catalog:'
+        version: 1.0.0
+
+packages:
+
+  dep@1.0.0:
+    resolution: {integrity: sha512-NzO39QoH58JUNqckEGJNMQWLpUzKGsg+pK7EoemRzxCu8D6DPyPgN9BiaduMOzFb9SFGlqkFsJ7pSRM97Mt/Ew==}
+
+snapshots:
+
+  dep@1.0.0: {}

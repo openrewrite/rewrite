@@ -80,8 +80,8 @@ class SwitchCliVersionTest {
      * is asked for it: an exact pin, a range without 11.2.2, a locked release the range admits, or a member's range.
      */
     @ParameterizedTest
-    @CsvSource(delimiter = '|', value = {"9.15.0|false||", "10.18.3|false||", "^10.0.0|true||", ">=12|true||",
-      "^10.0.0|true|10.18.3|", "^10.0.0|true||packages/a"})
+    @CsvSource(delimiter = '|', value = {"9.15.0|false||", "10.31.0|false||", "^10.0.0|true||", ">=12|true||",
+      "^10.0.0|true|10.31.0|", "^10.0.0|true||packages/a"})
     void anotherReleaseIsCannotKnowBeforeAnyResolution(String version, boolean fromDevEngines,
                                                        @Nullable String locked, @Nullable String lockDir) {
         assertThatThrownBy(() -> switchCliVersion(pm(version, fromDevEngines),

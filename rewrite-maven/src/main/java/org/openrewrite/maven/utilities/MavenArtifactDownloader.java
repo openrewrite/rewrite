@@ -52,6 +52,7 @@ import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toMap;
 import static org.openrewrite.internal.StreamUtils.readAllBytes;
+import static org.openrewrite.internal.StringUtils.isNullOrEmpty;
 
 public class MavenArtifactDownloader {
     private static final RetryPolicy<Object> retryPolicy = RetryPolicy.builder()
@@ -134,7 +135,8 @@ public class MavenArtifactDownloader {
                           dependency.getVersion() + '/' +
                           dependency.getArtifactId() + '-' +
                           (dependency.getDatedSnapshotVersion() == null ? dependency.getVersion() : dependency.getDatedSnapshotVersion()) +
-                          (dependency.getClassifier() == null ? "" : "-" + dependency.getClassifier()) +
+                          // An empty classifier is unclassified, as it is to Maven: a POM may spell the absence out
+                          (isNullOrEmpty(dependency.getClassifier()) ? "" : "-" + dependency.getClassifier()) +
                           ".jar";
             String uri = baseUri + (baseUri.endsWith("/") ? "" : "/") + path;
 
@@ -169,6 +171,10 @@ public class MavenArtifactDownloader {
                     }
                     // Retry with credentials if the anonymous request failed with a client error
                     if (responseBytes == null && !preemptive && isClientSideError(responseCode) && hasAuthentication(repository)) {
+                        // Only a 401 asks for credentials: a 403 is a decision about credentials already sent,
+                        // and a 407 asks on the proxy's behalf. Without a challenge this endpoint must not be
+                        // remembered, or credentials would go to a repository that serves anonymously.
+                        boolean challenged = responseCode == 401;
                         HttpSender.Request.Builder request = applyAuthentication(repository, httpSender.get(uri));
                         try (HttpSender.Response response = Failsafe.with(retryPolicy).get(() -> httpSender.send(request.build()));
                              InputStream body = response.getBody()) {
@@ -178,15 +184,14 @@ public class MavenArtifactDownloader {
                                 responseBytes = readAllBytes(body);
                             }
                         }
-                        if (responseBytes != null && endpoint != null) {
-                            // Remember so later artifacts from this host authenticate preemptively
+                        if (endpoint != null && challenged && isCredentialsAccepted(responseCode)) {
                             authenticationRequiredEndpoints.add(endpoint);
                         }
                     }
                     if (responseBytes == null) {
                         onError.accept(new MavenDownloadingException(String.format("Unable to download dependency %s:%s:%s%s from %s. Response was %d%s",
                                 dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion(),
-                                dependency.getClassifier() == null ? "" : ":" + dependency.getClassifier(),
+                                isNullOrEmpty(dependency.getClassifier()) ? "" : ":" + dependency.getClassifier(),
                                 uri, responseCode, ProxyStatus.render(proxyStatus)), null,
                                 dependency.getRequested().getGav()));
                         return null;
@@ -233,6 +238,16 @@ public class MavenArtifactDownloader {
             return false;
         }
         return responseCode != 408 && responseCode != 425 && responseCode != 429;
+    }
+
+    /**
+     * Whether a credentialed response, sent in answer to a challenge, was not refused. A 404 qualifies — the
+     * repository simply does not carry this artifact — and it is the usual answer from every repository but the one
+     * an artifact comes from, so arming only on a 200 would leave most artifacts paying another anonymous
+     * round-trip.
+     */
+    private static boolean isCredentialsAccepted(int responseCode) {
+        return responseCode >= 100 && (responseCode < 401 || responseCode > 403);
     }
 
     private List<MavenSettings.HttpHeader> resolveHttpHeaders(MavenRepository repository) {

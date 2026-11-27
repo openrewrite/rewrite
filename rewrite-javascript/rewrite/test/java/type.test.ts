@@ -21,3 +21,54 @@ describe('Type.isFullyQualified', () => {
         expect(Type.isFullyQualified(array)).toBe(false);
     });
 });
+
+describe('Type.isOfTypeWithName', () => {
+    function classType(fullyQualifiedName: string): Type.Class {
+        return {
+            kind: Type.Kind.Class,
+            flags: 0,
+            classKind: Type.Class.Kind.Interface,
+            fullyQualifiedName,
+            typeParameters: [],
+            annotations: [],
+            interfaces: [],
+            members: [],
+            methods: []
+        } as Type.Class;
+    }
+
+    test('finds a name its heritage records', () => {
+        const request = classType('express-serve-static-core.Request');
+        const incomingMessage = classType('http.IncomingMessage');
+        const readable = classType('stream.Readable');
+        request.interfaces.push(incomingMessage);
+        incomingMessage.supertype = readable;
+
+        expect(Type.isOfTypeWithName(request, true, name => name === 'stream.Readable')).toBe(true);
+        expect(Type.isOfTypeWithName(request, false, name => name === 'stream.Readable')).toBe(false);
+    });
+
+    test('ends where the heritage cycles back through an interface', () => {
+        const request = classType('express.Request');
+        const coreRequest = classType('express-serve-static-core.Request');
+        const incomingMessage = classType('http.IncomingMessage');
+        request.interfaces.push(coreRequest);
+        coreRequest.interfaces.push(request, incomingMessage);
+
+        expect(Type.isOfTypeWithName(request, true, () => false)).toBe(false);
+        expect(Type.isOfTypeWithName(request, true, name => name === 'http.IncomingMessage')).toBe(true);
+    });
+
+    test('ends where the heritage cycles back through a parameterized supertype', () => {
+        const application = classType('express-serve-static-core.Application');
+        const parameterized: Type.Parameterized = {
+            kind: Type.Kind.Parameterized,
+            type: application,
+            typeParameters: [Type.Primitive.String]
+        } as Type.Parameterized;
+        application.classKind = Type.Class.Kind.Class;
+        application.supertype = parameterized as unknown as Type.Class;
+
+        expect(Type.isOfTypeWithName(parameterized, true, () => false)).toBe(false);
+    });
+});

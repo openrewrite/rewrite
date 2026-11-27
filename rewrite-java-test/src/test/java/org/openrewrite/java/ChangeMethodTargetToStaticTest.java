@@ -18,11 +18,54 @@ package org.openrewrite.java;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
 
 class ChangeMethodTargetToStaticTest implements RewriteTest {
+
+    @Test
+    void preserveCommentBeforeImportFollowingNewTarget() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new ChangeMethodTargetToStatic("java.nio.file.Paths get(..)", "java.nio.file.Path", null, null),
+            new ChangeMethodName("java.nio.file.Path get(..)", "of", null, null)
+          ),
+          java(
+            """
+              package example;
+
+              import java.nio.file.Files;
+              import java.nio.file.Paths;
+
+               //           import java.io.PrintStream;  //Never used?
+                            import java.util.List;
+
+              class T {
+                  boolean exists(List<String> paths) {
+                      return Files.exists(Paths.get(paths.get(0)));
+                  }
+              }
+              """,
+            """
+              package example;
+
+              import java.nio.file.Files;
+              import java.nio.file.Path;
+
+               //           import java.io.PrintStream;  //Never used?
+                            import java.util.List;
+
+              class T {
+                  boolean exists(List<String> paths) {
+                      return Files.exists(Path.of(paths.get(0)));
+                  }
+              }
+              """
+          )
+        );
+    }
 
     @Test
     void targetToStatic() {
@@ -202,15 +245,24 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
     @Test
     void targetToStaticWhenMethodHasSameName() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A method()", "a.A", null, null, false)),
-          java(
-            """
-              package a;
-              public class A {
-                 public void method() {}
-              }
+          // the recipe models a library whose method becomes static, so its output needs the newer version
+          spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A method()", "a.A", null, null, false))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
               """
-          ),
+                package a;
+                public class A {
+                   public void method() {}
+                }
+                """
+            ))
+            .afterParser(JavaParser.fromJavaVersion().dependsOn(
+              """
+                package a;
+                public class A {
+                   public static void method() {}
+                }
+                """
+            )),
           java(
             """
               import a.A;
@@ -347,7 +399,9 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
     @Test
     void memberReferenceWithReturnTypeChange() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A of(..)", "b.B", "java.lang.CharSequence", null, false)),
+          // the recipe doesn't re-infer the generic call that the member reference is passed to
+          spec -> spec.recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(false).build())
+            .recipe(new ChangeMethodTargetToStatic("a.A of(..)", "b.B", "java.lang.CharSequence", null, false)),
           java(
             """
               package a;

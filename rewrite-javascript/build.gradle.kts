@@ -301,7 +301,12 @@ testing {
             targets {
                 all {
                     testTask.configure {
-                        dependsOn(npmBuild, npmFixturesBuild)
+                        inputs.files(npmBuild)
+                            .withPathSensitivity(PathSensitivity.RELATIVE)
+                            .withPropertyName("npmBuild")
+                        inputs.files(npmFixturesBuild)
+                            .withPathSensitivity(PathSensitivity.RELATIVE)
+                            .withPropertyName("npmFixturesBuild")
                     }
                 }
             }
@@ -464,6 +469,8 @@ extensions.configure<LicenseExtension> {
         "**/semver/fixtures-*", "**/semver/release-differences", "**/bun/hosted-git-info-valid", "**/bun/ini-cases",
         "**/npm-resolver/gh-acme-private", "**/npm-resolver/jsr-*"
     ))
+    // Real pnpm's recorded inputs and outcomes, compared byte for byte
+    exclude("**/pnpm/pnpm10/**")
 //    includePatterns.addAll(
 //        listOf("**/*.ts")
 //    )
@@ -472,7 +479,7 @@ extensions.configure<LicenseExtension> {
 // The lock regeneration test fixtures (recorded package-manager output, ~37000 files including binary tarballs)
 // live in openrewrite/rewrite-javascript-lock-fixtures. A change that needs new fixtures moves the pin with it.
 // Gradle reruns this task when a fixture goes missing, and the rerun extracts the downloaded archive again.
-val lockFixturesCommit = "02275f5f655265fa0d1f6827779e37b0ef21e743"
+val lockFixturesCommit = "0aad80f208ebd25aa311f97870b9dd63b708baa6"
 val lockFixturesDir = layout.buildDirectory.dir("lock-fixtures")
 val syncLockFixtures = tasks.register("syncLockFixtures") {
     inputs.property("commit", lockFixturesCommit)

@@ -15,15 +15,23 @@
  */
 package org.openrewrite.maven;
 
+import okhttp3.OkHttpClient;
+import okhttp3.mockwebserver.MockResponse;
+import okhttp3.mockwebserver.MockWebServer;
+import okhttp3.mockwebserver.QueueDispatcher;
+import okhttp3.tls.HandshakeCertificates;
+import okhttp3.tls.HeldCertificate;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.*;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.maven.cache.InMemoryMavenPomCache;
+import org.openrewrite.maven.http.OkHttpSender;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.MavenRepository;
+import org.openrewrite.maven.tree.MavenRepositoryMirror;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.test.RewriteTest;
@@ -31,6 +39,7 @@ import org.openrewrite.test.TypeValidation;
 import org.openrewrite.xml.XmlIsoVisitor;
 import org.openrewrite.xml.tree.Xml;
 
+import java.net.InetAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -145,80 +154,96 @@ class MavenDependencyFailuresTest implements RewriteTest {
 
         MavenRepository mavenLocal = MavenRepository.builder().id("local").uri(localRepository.toUri().toString())
           .snapshots(false).knownToExist(true).build();
-        MavenExecutionContextView recipeCtx = MavenCentralMirrorExtension.withMavenCentralMirror(
-          MavenExecutionContextView.view(new InMemoryExecutionContext())
-            .setLocalRepository(mavenLocal)
-            .setPomCache(new InMemoryMavenPomCache()));
-        // Maven Central, or the mirror that stands in for it, as the downloader names it: at https unless only http
-        // answers, as for a mirror on the build's own loopback address
-        MavenRepository central = requireNonNull(new MavenPomDownloader(recipeCtx)
-          .normalizeRepository(MavenRepository.MAVEN_CENTRAL, recipeCtx, null));
+        HeldCertificate certificate = new HeldCertificate.Builder()
+          .addSubjectAlternativeName(InetAddress.getByName("localhost").getCanonicalHostName())
+          .build();
+        try (MockWebServer centralMirror = new MockWebServer()) {
+            centralMirror.useHttps(new HandshakeCertificates.Builder().heldCertificate(certificate).build().sslSocketFactory(), false);
+            QueueDispatcher notFound = new QueueDispatcher();
+            notFound.setFailFast(new MockResponse().setResponseCode(404));
+            centralMirror.setDispatcher(notFound);
+            HandshakeCertificates trustMirror = new HandshakeCertificates.Builder()
+              .addTrustedCertificate(certificate.certificate())
+              .build();
+            OkHttpSender httpSender = new OkHttpSender(new OkHttpClient.Builder()
+              .sslSocketFactory(trustMirror.sslSocketFactory(), trustMirror.trustManager())
+              .build());
+            List<MavenRepositoryMirror> mirrors = List.of(new MavenRepositoryMirror(
+              "central-mirror", centralMirror.url("/").toString(), "central", null, null, null));
+            MavenExecutionContextView recipeCtx = MavenExecutionContextView.view(
+                new HttpSenderExecutionContextView(new InMemoryExecutionContext()).setHttpSender(httpSender))
+              .setLocalRepository(mavenLocal)
+              .setMirrors(mirrors)
+              .setPomCache(new InMemoryMavenPomCache());
+            MavenRepository central = requireNonNull(new MavenPomDownloader(recipeCtx)
+              .normalizeRepository(MavenRepository.MAVEN_CENTRAL, recipeCtx, null));
 
-        rewriteRun(
-          spec -> spec
-            .recipe(updateModel())
-            .executionContext(MavenCentralMirrorExtension.withMavenCentralMirror(
-              MavenExecutionContextView.view(new InMemoryExecutionContext())
-                .setLocalRepository(mavenLocal)
-            ))
-            .recipeExecutionContext(recipeCtx),
-          pomXml(
-            """
-              <project>
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-                <dependencies>
-                  <dependency>
-                    <groupId>com.bad</groupId>
-                    <artifactId>bad-artifact</artifactId>
+            rewriteRun(
+              spec -> spec
+                .recipe(updateModel())
+                .executionContext(MavenExecutionContextView.view(
+                    new HttpSenderExecutionContextView(new InMemoryExecutionContext()).setHttpSender(httpSender))
+                  .setLocalRepository(mavenLocal)
+                  .setMirrors(mirrors))
+                .recipeExecutionContext(recipeCtx),
+              pomXml(
+                """
+                  <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
                     <version>1</version>
-                  </dependency>
-                </dependencies>
-              </project>
-              """,
-            """
-              <project>
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-                <dependencies>
-                  <!--~~(doesnotexist:doesnotexist:1 failed. Unable to download POM: doesnotexist:doesnotexist:1. Tried repositories:
-              %1$s: HTTP 404)~~>--><!--~~(doesnotexist:another:1 failed. Unable to download POM: doesnotexist:another:1. Tried repositories:
-              %1$s: HTTP 404)~~>--><dependency>
-                    <groupId>com.bad</groupId>
-                    <artifactId>bad-artifact</artifactId>
+                    <dependencies>
+                      <dependency>
+                        <groupId>com.bad</groupId>
+                        <artifactId>bad-artifact</artifactId>
+                        <version>1</version>
+                      </dependency>
+                    </dependencies>
+                  </project>
+                  """,
+                """
+                  <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
                     <version>1</version>
-                  </dependency>
-                </dependencies>
-              </project>
-              """.formatted(central.getUri()),
-            spec -> spec.beforeRecipe(maven ->
-                // make the local pom bad before running the recipe
-                Files.writeString(localPom,
-                  //language=xml
-                  """
-                     <project>
-                       <groupId>com.bad</groupId>
-                       <artifactId>bad-artifact</artifactId>
-                       <version>1</version>
-                       <dependencies>
-                         <dependency>
-                           <groupId>doesnotexist</groupId>
-                           <artifactId>doesnotexist</artifactId>
+                    <dependencies>
+                      <!--~~(doesnotexist:doesnotexist:1 failed. Unable to download POM: doesnotexist:doesnotexist:1. Tried repositories:
+                  %1$s: HTTP 404)~~>--><!--~~(doesnotexist:another:1 failed. Unable to download POM: doesnotexist:another:1. Tried repositories:
+                  %1$s: HTTP 404)~~>--><dependency>
+                        <groupId>com.bad</groupId>
+                        <artifactId>bad-artifact</artifactId>
+                        <version>1</version>
+                      </dependency>
+                    </dependencies>
+                  </project>
+                  """.formatted(central.getUri()),
+                spec -> spec.beforeRecipe(maven ->
+                    // make the local pom bad before running the recipe
+                    Files.writeString(localPom,
+                      //language=xml
+                      """
+                         <project>
+                           <groupId>com.bad</groupId>
+                           <artifactId>bad-artifact</artifactId>
                            <version>1</version>
-                         </dependency>
-                         <dependency>
-                           <groupId>doesnotexist</groupId>
-                           <artifactId>another</artifactId>
-                           <version>1</version>
-                         </dependency>
-                       </dependencies>
-                     </project>
-                    """
-                ))
-          )
-        );
+                           <dependencies>
+                             <dependency>
+                               <groupId>doesnotexist</groupId>
+                               <artifactId>doesnotexist</artifactId>
+                               <version>1</version>
+                             </dependency>
+                             <dependency>
+                               <groupId>doesnotexist</groupId>
+                               <artifactId>another</artifactId>
+                               <version>1</version>
+                             </dependency>
+                           </dependencies>
+                         </project>
+                        """
+                    ))
+              )
+            );
+        }
     }
 
     @Test
@@ -349,10 +374,7 @@ class MavenDependencyFailuresTest implements RewriteTest {
     @Test
     void unresolvableTgzDependencyShouldNotFailBuild() {
         rewriteRun(
-          spec -> spec.executionContext(new InMemoryExecutionContext())
-            .typeValidationOptions(TypeValidation.builder()
-              .dependencyModel(false)
-              .build()),
+          spec -> spec.executionContext(new InMemoryExecutionContext()),
           pomXml(
             """
               <project>

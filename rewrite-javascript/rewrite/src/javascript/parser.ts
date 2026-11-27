@@ -2554,7 +2554,8 @@ export class JavaScriptParserVisitor {
                 body: this.convert(node.body),
                 type: this.mapType(node)
             },
-            returnTypeExpression: this.mapTypeInfo(node)
+            returnTypeExpression: this.mapTypeInfo(node),
+            methodType: this.mapMethodType(node)
         };
     }
 
@@ -4136,7 +4137,8 @@ export class JavaScriptParserVisitor {
                 ),
             children: this.mapJsxChildren<JSX.EmbeddedExpression | JSX.Tag | J.Identifier | J.Literal>(node.children),
             closingName: this.leftPadded(this.prefix(node.closingElement.tagName), this.visit(node.closingElement.tagName)),
-            afterClosingName: this.suffix(node.closingElement.tagName)
+            afterClosingName: this.suffix(node.closingElement.tagName),
+            methodType: this.mapMethodType(node.openingElement)
         };
     }
 
@@ -4159,6 +4161,7 @@ export class JavaScriptParserVisitor {
                     () => emptyMarkers
                 ),
             selfClosing: this.prefix(this.findChildNode(node, ts.SyntaxKind.SlashToken)!),
+            methodType: this.mapMethodType(node)
         };
     }
 

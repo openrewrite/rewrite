@@ -17,16 +17,21 @@ package org.openrewrite.kotlin;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.java.AddCommentToMethodInvocations;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
 class AddCommentToMethodInvocationsTest implements RewriteTest {
 
+  @Override
+  public void defaults(RecipeSpec spec) {
+    spec.recipe(new AddCommentToMethodInvocations("TODO: review for migration", "Foo bar(..)"));
+  }
+
     @Test
     void addCommentToKotlinMethodInvocation() {
         rewriteRun(
-          spec -> spec.recipe(new AddCommentToMethodInvocations("TODO: review for migration", "Foo bar(..)")),
           kotlin(
             """
               class Foo {
@@ -56,7 +61,6 @@ class AddCommentToMethodInvocationsTest implements RewriteTest {
     @Test
     void doesNotAddCommentIfKotlinSourceAlreadyHasIt() {
         rewriteRun(
-          spec -> spec.recipe(new AddCommentToMethodInvocations("TODO: review for migration", "Foo bar(..)")),
           kotlin(
             """
               class Foo {

@@ -80,7 +80,7 @@ public class MethodMatcher
                 }
                 else
                 {
-                    matchers.Add(new TypeArgMatcher(GlobToRegex(part), part));
+                    matchers.Add(TypeArgMatcher.Of(part));
                 }
             }
             _argMatchers = matchers.ToArray();
@@ -97,7 +97,7 @@ public class MethodMatcher
             return Matches(mi.MethodType);
 
         // Fallback: name-only matching when type info is unavailable
-        return _methodNamePattern.IsMatch(mi.Name.SimpleName);
+        return _methodNamePattern.IsMatch(Cs.GetValueText(mi.Name));
     }
 
     /// <summary>
@@ -128,7 +128,7 @@ public class MethodMatcher
         if (md.MethodType != null)
             return Matches(md.MethodType);
 
-        return _methodNamePattern.IsMatch(md.Name.SimpleName);
+        return _methodNamePattern.IsMatch(Cs.GetValueText(md.Name));
     }
 
     private bool MatchesDeclaringType(JavaType.Method methodType)
@@ -308,18 +308,48 @@ public class MethodMatcher
     {
         private readonly Regex _pattern;
         private readonly Regex? _fqnPattern;
+        private readonly int _arrayDimensions;
 
-        public TypeArgMatcher(Regex pattern, string originalGlob)
+        private TypeArgMatcher(string elementGlob, int arrayDimensions)
         {
-            _pattern = pattern;
+            _pattern = GlobToRegex(elementGlob);
+            _arrayDimensions = arrayDimensions;
             // If the pattern is a C# keyword, also match the fully-qualified name
-            if (KeywordToFqn.TryGetValue(originalGlob, out var fqn))
+            if (KeywordToFqn.TryGetValue(elementGlob, out var fqn))
                 _fqnPattern = GlobToRegex(fqn);
+        }
+
+        public static TypeArgMatcher Of(string glob)
+        {
+            var dimensions = 0;
+            while (glob.EndsWith("[]", StringComparison.Ordinal))
+            {
+                glob = glob[..^2].TrimEnd();
+                dimensions++;
+            }
+            return new TypeArgMatcher(glob, dimensions);
         }
 
         public override bool Matches(JavaType paramType)
         {
+            for (var i = 0; i < _arrayDimensions; i++)
+            {
+                if (paramType is not JavaType.Array { ElemType: { } elemType })
+                    return false;
+                paramType = elemType;
+            }
+
+            return paramType is not JavaType.Array && MatchesElement(paramType);
+        }
+
+        private bool MatchesElement(JavaType paramType)
+        {
             var fqn = TypeUtils.GetFullyQualifiedName(paramType);
+            if (paramType is JavaType.Primitive primitive &&
+                KeywordToFqn.TryGetValue(primitive.Kind == JavaType.PrimitiveKind.Boolean ? "bool" : primitive.Keyword,
+                    out var primitiveFqn))
+                fqn = primitiveFqn;
+
             if (fqn != null)
             {
                 if (_pattern.IsMatch(fqn)) return true;

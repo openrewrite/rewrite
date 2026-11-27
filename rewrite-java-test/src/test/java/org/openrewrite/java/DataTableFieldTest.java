@@ -56,7 +56,7 @@ class DataTableFieldTest implements RewriteTest {
                   private Date today;
 
                   public Test() {
-                      this.today = new Date();
+                     this.today = new Date();
                   }
               }
               """,
@@ -75,6 +75,34 @@ class DataTableFieldTest implements RewriteTest {
                     return super.visitAssignment(assignment, o);
                 }
             }.visit(cu, 0))
+          )
+        );
+    }
+
+    @Test
+    void keepLocalWhereTheClassHasAFieldOfItsName() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
+                  boolean isLocalVariable = getCursor().dropParentUntil(J.Block.class::isInstance).getParentTreeCursor().getValue() instanceof J.MethodDeclaration;
+                  if (isLocalVariable) {
+                      doAfterVisit(new ExtractField<>(multiVariable));
+                  }
+                  return multiVariable;
+              }
+          })),
+          java(
+            """
+              import java.util.Date;
+              class Test {
+                  private String today;
+
+                  public Test() {
+                     Date today = new Date();
+                  }
+              }
+              """
           )
         );
     }

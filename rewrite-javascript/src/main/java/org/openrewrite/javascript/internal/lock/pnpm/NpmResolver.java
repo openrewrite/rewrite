@@ -179,7 +179,8 @@ final class NpmResolver {
         } catch (PnpmError e) {
             if (workspacePackages != null && opts.projectDir != null) {
                 try {
-                    return tryResolveFromWorkspacePackages(workspacePackages, spec, wantedDependency, opts, false);
+                    return tryResolveFromWorkspacePackages(workspacePackages, spec, wantedDependency, opts,
+                            opts.update != null && !release.fallsBackOnAWorkspacePackageWithinTheRange());
                 } catch (PnpmError workspaceErr) {
                     // the registry's error is the one pnpm reports, but from 11.10.0 after a 404 that no version of
                     // the workspace matches (PnpmRelease#reportsTheWorkspaceVersionsTheRegistryLacks)
@@ -197,7 +198,8 @@ final class NpmResolver {
         if (pickedPackage == null) {
             if (workspacePackages != null && opts.projectDir != null) {
                 try {
-                    return tryResolveFromWorkspacePackages(workspacePackages, spec, wantedDependency, opts, false);
+                    return tryResolveFromWorkspacePackages(workspacePackages, spec, wantedDependency, opts,
+                            opts.update != null && !release.fallsBackOnAWorkspacePackageWithinTheRange());
                 } catch (PnpmError workspaceErr) {
                     // pnpm reports that no version matches, from 11.10.0 that none of the workspace does
                     // (PnpmRelease#reportsTheWorkspaceVersionsTheRegistryLacks)
@@ -251,7 +253,7 @@ final class NpmResolver {
         if (integrity != null) {
             result.resolution.put("integrity", integrity);
         }
-        result.resolution.put("tarball", normalizeRegistryUrl(Js.string(dist.get("tarball"))));
+        result.resolution.put("tarball", normalizeTarballUrl(Js.string(dist.get("tarball"))));
         if (opts.calcSpecifier) {
             result.normalizedBareSpecifier = spec.getNormalizedBareSpecifier() != null ?
                     spec.getNormalizedBareSpecifier() :
@@ -463,7 +465,7 @@ final class NpmResolver {
         if (integrity != null) {
             result.resolution.put("integrity", integrity);
         }
-        result.resolution.put("tarball", normalizeRegistryUrl(Js.string(dist.get("tarball"))));
+        result.resolution.put("tarball", normalizeTarballUrl(Js.string(dist.get("tarball"))));
         result.manifest = pickedPackage;
         result.latest = latestOf(meta);
         Object time = meta.get("time");
@@ -493,7 +495,7 @@ final class NpmResolver {
     private @Nullable ResolveResult tryResolveFromWorkspace(ResolveDependencies.WantedDependency wantedDependency,
                                                             String defaultTag, String registryUrl,
                                                             PackageRequester.RequestPackageOptions opts) {
-        String bareSpecifier = workspacePrefToNpm(wantedDependency.getBareSpecifier());
+        String bareSpecifier = workspacePrefToNpm(wantedDependency.getBareSpecifier(), release);
         PickPackageFromMeta.RegistryPackageSpec spec = PickPackageFromMeta.parseBareSpecifier(bareSpecifier,
                 wantedDependency.getAlias(), defaultTag, registryUrl, release);
         if (spec == null) {
@@ -558,7 +560,8 @@ final class NpmResolver {
 
     // @pnpm/workspace.range-resolver, over the node-semver the release bundles (any of them reads * alike)
     static @Nullable String resolveWorkspaceRange(String range, List<String> versions, PnpmRelease release) {
-        if ("*".equals(range) || "^".equals(range) || "~".equals(range) || range.isEmpty()) {
+        if ("*".equals(range) || "^".equals(range) || "~".equals(range) ||
+            range.isEmpty() && release.readsABareWorkspaceSpecAsAny()) {
             return NodeSemver.maxSatisfying(versions, "*", NodeSemver.Options.INCLUDE_PRERELEASE);
         }
         return release.underSemver(semver -> NodeSemver.maxSatisfying(versions, range,
@@ -768,14 +771,15 @@ final class NpmResolver {
     /**
      * workspacePrefToNpm.ts with @pnpm/workspace.spec-parser's {@code WorkspaceSpec.parse}.
      */
-    static String workspacePrefToNpm(String workspaceBareSpecifier) {
+    static String workspacePrefToNpm(String workspaceBareSpecifier, PnpmRelease release) {
         Matcher m = WORKSPACE_SPEC.matcher(workspaceBareSpecifier);
         if (!m.matches()) {
             throw new JsError(JsError.ERROR, "Invalid workspace spec: " + workspaceBareSpecifier);
         }
         String alias = m.group(1);
         String version = m.group(2);
-        String versionPart = "^".equals(version) || "~".equals(version) || version.isEmpty() ? "*" : version;
+        String versionPart = "^".equals(version) || "~".equals(version) ||
+                             version.isEmpty() && release.readsABareWorkspaceSpecAsAny() ? "*" : version;
         return alias != null ? "npm:" + alias + "@" + versionPart : versionPart;
     }
 
@@ -796,6 +800,11 @@ final class NpmResolver {
                                                              Js.string(dist.get("shasum")));
         }
         return integrity.toString();
+    }
+
+    // resolveNpm's and resolveJsr's tarball (PnpmRelease#normalizesATarballUrl)
+    private String normalizeTarballUrl(String url) {
+        return release.normalizesATarballUrl() ? normalizeRegistryUrl(url) : url;
     }
 
     static String normalizeRegistryUrl(String url) {

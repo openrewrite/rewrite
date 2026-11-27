@@ -139,7 +139,8 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
 
     String description = "Change a Maven dependency coordinates. The `newGroupId` or `newArtifactId` **MUST** be different from before. " +
                 "Matching `<dependencyManagement>` coordinates are also updated if a `newVersion` or `versionPattern` is provided. " +
-                "Exclusions that reference the old dependency coordinates are preserved, and a sibling exclusion for the new coordinates is added alongside them.";
+                "Exclusions that reference the old dependency coordinates are preserved. When the project declares the old dependency directly, " +
+                "a sibling exclusion for the new coordinates is added alongside them.";
 
     @Override
     public Validated<Object> validate() {
@@ -206,6 +207,9 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                     String resolvedVersion = resolveSemverVersion(ctx, groupId, artifactId, currentVersion);
                     storeParentPomProperty(getResolutionResult().getParent(), propertyName, resolvedVersion, acc);
                 } catch (MavenDownloadingException e) {
+                    if (isGlobPattern()) {
+                        return super.visitTag(tag, ctx);
+                    }
                     return e.warn(tag);
                 }
                 return super.visitTag(tag, ctx);
@@ -271,8 +275,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
         return new MavenVisitor<ExecutionContext>() {
             @Nullable
             final VersionComparator versionComparator = newVersion != null ? Semver.validate(newVersion, versionPattern).getValue() : null;
-            @Nullable
-            private Collection<String> availableVersions;
+            private final Map<String, List<String>> availableVersionsByArtifact = new HashMap<>();
             private Set<String> safeVersionPlaceholdersToChange = new HashSet<>();
             private final String effectiveNewGroupId = renamedGroupId(oldGroupId);
             private final String effectiveNewArtifactId = renamedArtifactId(oldArtifactId);
@@ -296,8 +299,10 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                             newArtifactId,
                             newVersion, versionPattern).getVisitor());
                 }
-                // Add sibling exclusions for the new coordinates alongside existing old exclusions
-                if (newGroupId != null || newArtifactId != null) {
+                // Without a direct dependency on the old coordinates the new ones are only reachable
+                // transitively, so excluding them could strip something the excluding dependency needs.
+                if ((newGroupId != null || newArtifactId != null) &&
+                        !directDependencies(oldGroupId, oldArtifactId).isEmpty()) {
                     doAfterVisit(new MavenVisitor<ExecutionContext>() {
                         @Override
                         public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
@@ -592,15 +597,18 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                     return newVersion;
                 }
                 String finalCurrentVersion = currentVersion != null ? currentVersion : newVersion;
-                if (availableVersions == null) {
-                    availableVersions = new ArrayList<>();
+                String key = groupId + ':' + artifactId;
+                List<String> versions = availableVersionsByArtifact.get(key);
+                if (versions == null) {
                     MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx));
-                    for (String v : mavenMetadata.getVersioning().getVersions()) {
-                        if (versionComparator.isValid(finalCurrentVersion, v)) {
-                            availableVersions.add(v);
-                        }
+                    versions = mavenMetadata.getVersioning().getVersions();
+                    availableVersionsByArtifact.put(key, versions);
+                }
+                List<String> availableVersions = new ArrayList<>();
+                for (String v : versions) {
+                    if (versionComparator.isValid(finalCurrentVersion, v)) {
+                        availableVersions.add(v);
                     }
-
                 }
                 return availableVersions.isEmpty() ? newVersion : max(availableVersions, versionComparator);
             }

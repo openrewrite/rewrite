@@ -28,7 +28,12 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter-params")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
     testRuntimeOnly(project(":rewrite-java-25"))
+    testRuntimeOnly("com.google.guava:guava:latest.release")
     testRuntimeOnly("org.antlr:antlr4-runtime:4.13.2")
+    // Pinned for ScalaTypeAttributionTest.compilerCrashAfterTypingKeepsTypes
+    testRuntimeOnly("org.scalatest:scalatest_2.13:3.0.9")
+    // Scala 2 compiled: tests read types from its pickles, and XML literals are typed against it
+    testRuntimeOnly("org.scala-lang.modules:scala-xml_2.13:1.2.0")
 
     // Not latest.release: log4j publishes 3.0.0 betas as releases
     constraints {

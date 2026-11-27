@@ -55,7 +55,8 @@ public final class FindPackages {
      */
     public static List<String> workspaceProjects(@Nullable Map<String, @Nullable Object> workspaceManifest,
                                                  Collection<String> manifestDirs) {
-        return findWorkspaceProjects(manifestDirs, PnpmOptions.workspacePackagePatterns(workspaceManifest));
+        return findWorkspaceProjects(manifestDirs, PnpmOptions.workspacePackagePatterns(workspaceManifest,
+                PnpmRelease.PORTED));
     }
 
     /**

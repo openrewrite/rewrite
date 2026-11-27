@@ -10,7 +10,7 @@ import {
 import {emptySpace, J, rightPadded, Type} from "../../src/java";
 import {emptyMarkers} from "../../src/markers";
 import {randomId} from "../../src/uuid";
-import {ExecutionContext} from "../../src";
+import {ExecutionContext, foundSearchResult} from "../../src";
 
 function captureBindings(seen: {moduleSystem?: string, module?: string, binding?: string},
                           localName: string = "Button", moduleName: string = "sap/m/Button") {
@@ -189,6 +189,18 @@ describe("moduleBindings", () => {
         expect(seen.elementBinding).toBe("Elem");
 
         expect(seen.pathBinding).toBeUndefined();
+    });
+
+    test("import X = require binds the module object, as a require does", async () => {
+        const spec = new RecipeSpec();
+        const seen: {module?: string, binding?: string} = {};
+        spec.recipe = fromVisitor(captureModuleBindings(bindings => {
+            seen.module = bindings.moduleOf("Elem");
+            seen.binding = bindings.bindingOf("sap/ui/core/Element");
+        }));
+        //language=typescript
+        await spec.rewriteRun(typescript(`import Elem = require("sap/ui/core/Element");`));
+        expect(seen).toEqual({module: "sap/ui/core/Element", binding: "Elem"});
     });
 });
 
@@ -816,6 +828,29 @@ describe("maybeBind", () => {
         expect(bound.name).toBe("Elem");
     });
 
+    test("an import X = require binding answers a plain module request and a namespace request, as a require does", async () => {
+        const spec = new RecipeSpec();
+        let bound: (string | undefined)[] | undefined;
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                bound ??= [
+                    maybeBind(this, {module: "sap/ui/core/Element", onlyIfReferenced: false}),
+                    maybeBind(this, {module: "sap/ui/core/Element", member: "*", onlyIfReferenced: false})
+                ];
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+                import Elem = require("sap/ui/core/Element");
+
+                target();
+            `
+        ));
+        expect(bound).toEqual(["Elem", "Elem"]);
+    });
+
     test("a whole-module await import answers a namespace request but not a plain module request", async () => {
         const namespaceRequest = new RecipeSpec();
         const namespaceName: {value?: string} = {};
@@ -1093,6 +1128,47 @@ function installHttpPackages(root: string) {
     });
 }
 
+/** The old and the new name of one API, side by side in one package. */
+function installHttpApi(root: string) {
+    installPackage(root, "http-api", {
+        "package.json": `{"name":"http-api","version":"1.0.0","types":"index.d.ts"}`,
+        "index.d.ts": `
+            export declare class Http { get(url: string): string; }
+            export declare class HttpClient { get(url: string): string; }
+            export declare function request(url: string): string;
+            export declare function send(url: string): string;
+        `
+    });
+}
+
+/** The attribution of `before` once `move` ran on it, and of `after` parsed fresh, beside the packages `install` writes. */
+async function attributionsAfter(
+    move: MaybeRebindOptions,
+    install: (root: string) => void,
+    before: string,
+    after: string
+): Promise<{rebound: string[], parsed: string[]}> {
+    const spec = new RecipeSpec();
+    spec.recipe = rebindEach([move]);
+    const attributions = {rebound: [] as string[], parsed: [] as string[]};
+    await withDir(async (repo) => {
+        install(repo.path);
+        await spec.rewriteRun(npm(repo.path, {
+            ...typescript(before, after),
+            afterRecipe: async (cu: JS.CompilationUnit) => {
+                attributions.rebound = await attributionOf(cu);
+            }
+        } as any, packageJson(`{"name":"t"}`)));
+        await new RecipeSpec().rewriteRun(npm(repo.path, {
+            ...typescript(after),
+            afterRecipe: async (cu: JS.CompilationUnit) => {
+                attributions.parsed = await attributionOf(cu);
+            }
+        } as any, packageJson(`{"name":"t"}`)));
+    }, {unsafeCleanup: true});
+    return attributions;
+}
+
 /** The signature of every type a tree outside the imports of `cu` is attributed to. */
 async function attributionOf(cu: JS.CompilationUnit): Promise<string[]> {
     const render = Type.signature;
@@ -1133,6 +1209,40 @@ function rebindTo(to: MaybeRebindOptions["to"], bound: {name?: string}, from: Ma
             return super.visitJsCompilationUnit(cu, p);
         }
     });
+}
+
+/** Calls `maybeRebind` once per move, as a recipe moving several members does. */
+function rebindEach(moves: MaybeRebindOptions[], then?: JavaScriptVisitor<any>) {
+    return fromVisitor(new class extends JavaScriptVisitor<any> {
+        override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+            for (const move of moves) {
+                maybeRebind(this, move);
+            }
+            if (then !== undefined) {
+                this.afterVisit.push(then);
+            }
+            return super.visitJsCompilationUnit(cu, p);
+        }
+    });
+}
+
+function markDeclaringType(...names: string[]): JavaScriptVisitor<any> {
+    const declaredOn = (method: Type.Method | undefined) => method === undefined ? "no type" :
+        `${Type.FullyQualified.getFullyQualifiedName(method.declaringType)}#${method.name}`;
+    return new class extends JavaScriptVisitor<any> {
+        override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+            const visited = await super.visitMethodInvocation(method, p) as J.MethodInvocation;
+            return names.includes(method.name.simpleName) ? foundSearchResult(visited, declaredOn(method.methodType)) : visited;
+        }
+
+        override async visitNewClass(newClass: J.NewClass, p: any): Promise<J | undefined> {
+            const visited = await super.visitNewClass(newClass, p) as J.NewClass;
+            const clazz = newClass.class;
+            const name = clazz?.kind === J.Kind.FieldAccess ? (clazz as J.FieldAccess).name.element.simpleName :
+                clazz?.kind === J.Kind.Identifier ? (clazz as J.Identifier).simpleName : undefined;
+            return name !== undefined && names.includes(name) ? foundSearchResult(visited, declaredOn(newClass.constructorType)) : visited;
+        }
+    };
 }
 
 describe("maybeBind and type-only imports", () => {
@@ -1812,8 +1922,8 @@ describe("maybeRebind", () => {
 
             a(b);`,
             `
-            import {x as b} from "m3";
             import {x} from "m2";
+            import {x as b} from "m3";
             import {x as x_1} from "m4";
 
             x(b);`
@@ -2402,7 +2512,7 @@ describe("maybeRebind", () => {
             `const modules = [${module}];\n` +
             `export {${http === "Http" ? http : `${http} as Http`}};\n`;
         const after = `import {request} from 'legacy-http';\n` +
-            `import {HttpClient, HttpClientModule, HttpHeaders} from '@acme/common/http';\n\n` +
+            `import {HttpHeaders, HttpClient, HttpClientModule} from '@acme/common/http';\n\n` +
             body("HttpClient", "HttpHeaders", "HttpClientModule");
         let rebound: string[] = [];
         let parsed: string[] = [];
@@ -2809,7 +2919,6 @@ describe("maybeRebind", () => {
             //language=javascript
             `
             import act from "new";
-
             const fs = require("fs");
 
             act();`
@@ -2943,6 +3052,306 @@ describe("maybeRebind", () => {
             const x = [a, b];`
         ));
     });
+
+    test("a moved member keeps its import attributes, and joins only a statement of the target that carries the same", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebindEach([
+            {from: {module: "./legacy.ts", member: "buildTime"}, to: {module: "./build.ts", member: "buildTime"}},
+            {from: {module: "./util.ts", member: "formatDate"}, to: {module: "./build.ts", member: "formatDate"}},
+            {from: {module: "./old.json", member: "limits"}, to: {module: "./new.json", member: "limits"}},
+            {from: {module: "m", member: "Old"}, to: {module: "m2", member: "New"}}
+        ]);
+        await spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `
+                import {buildTime} from "./legacy.ts" with {type: "macro"};
+                import {formatDate} from "./util.ts";
+                import {limits, schema} from "./old.json" assert {type: "json"};
+                import {gitHash} from "./build.ts";
+                import {version} from "./build.ts" with { "type": 'macro' };
+                import {defaults} from "./new.json" with {type: "json"};
+
+                buildTime(formatDate, limits, schema, gitHash, version, defaults);`,
+                `
+                import {schema} from "./old.json" assert {type: "json"};
+                import {limits} from "./new.json" assert {type: "json"};
+                import {formatDate, gitHash} from "./build.ts";
+                import {buildTime, version} from "./build.ts" with { "type": 'macro' };
+                import {defaults} from "./new.json" with {type: "json"};
+
+                buildTime(formatDate, limits, schema, gitHash, version, defaults);`
+            ),
+            // A re-export joins by the same rule
+            //language=typescript
+            typescript(
+                `
+                export {buildTime} from "./legacy.ts" with {type: "macro"};
+                export {gitHash} from "./build.ts";
+                `,
+                `
+                export {buildTime} from "./build.ts" with {type: "macro"};
+                export {gitHash} from "./build.ts";
+                `
+            ),
+            // The target's name is taken where its import carries other attributes
+            //language=typescript
+            typescript(
+                `
+                import {New} from "m2" with {type: "json"};
+                import {Old} from "m";
+
+                Old(New);`,
+                `
+                import {New} from "m2" with {type: "json"};
+                import {New as Old} from "m2";
+
+                Old(New);`
+            )
+        );
+    });
+});
+
+describe("maybeRebind keeps the file's import layout", () => {
+    /** One `maybeRebind` per move, in the order given, all in one visit. */
+    function rebinding(...moves: [from: string, to: string, member: string, toMember?: string][]) {
+        return fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                for (const [from, to, member, toMember] of moves) {
+                    maybeRebind(this, {from: {module: from, member}, to: {module: to, member: toMember ?? member}});
+                }
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+    }
+
+    test("members split across modules land where their import was, in the order written, one line per lone member", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebinding(
+            ["@acme/ui", "@acme/ui/dialog", "DialogModule"],
+            ["@acme/ui", "@acme/ui/button", "ButtonModule"],
+            ["@acme/ui", "@acme/ui/dialog", "Dialog"]
+        );
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+            import {Module} from '@acme/core';
+            import {
+                DialogModule,
+                ButtonModule,
+                Dialog,
+            } from '@acme/ui';
+            import {Other} from 'other';
+
+            const used = [Module, DialogModule, ButtonModule, Dialog, Other];`,
+            `
+            import {Module} from '@acme/core';
+            import {ButtonModule} from '@acme/ui/button';
+            import {
+                DialogModule,
+                Dialog,
+            } from '@acme/ui/dialog';
+            import {Other} from 'other';
+
+            const used = [Module, DialogModule, ButtonModule, Dialog, Other];`
+        ));
+    });
+
+    test("the member left last in a multi-line import collapses onto one line, sorted among the imports split from it", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebinding(
+            ["@acme/ui", "@acme/ui/card", "CardModule"],
+            ["@acme/ui", "@acme/ui/tooltip", "Tooltip"],
+            ["@acme/ui", "@acme/ui/core", "DATE_FORMATS"]
+        );
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+            import {
+                Tooltip as Tip,
+                DATE_FORMATS,
+                CardModule
+            } from "@acme/ui";
+            import {Other} from "other";
+
+            const used = [Tip, DATE_FORMATS, CardModule, Other];`,
+            `
+            import {CardModule} from "@acme/ui/card";
+            import {DATE_FORMATS} from "@acme/ui/core";
+            import {Tooltip as Tip} from "@acme/ui/tooltip";
+            import {Other} from "other";
+
+            const used = [Tip, DATE_FORMATS, CardModule, Other];`
+        ));
+    });
+
+    test("an import that replaces a dropped one takes its place", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebinding(["old", "new", "act", "default"]);
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+            import {a} from "first";
+            import {act} from "old";
+            import {z} from "last";
+
+            act(a, z);`,
+            `
+            import {a} from "first";
+            import act from "new";
+            import {z} from "last";
+
+            act(a, z);`
+        ));
+    });
+
+    test("imports split from a dropped statement keep the comment before it, sorted below it", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebinding(["m", "z", "A"], ["m", "a", "B", "default"]);
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+            import {x} from "first";
+            // ui
+            import {A, B} from "m";
+
+            use(x, A, B);`,
+            `
+            import {x} from "first";
+            // ui
+            import B from "a";
+            import {A} from "z";
+
+            use(x, A, B);`
+        ));
+    });
+
+    test("a named member moved beside a default of the same module goes on one line", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebinding(["m", "n", "A"], ["m", "n", "B", "default"]);
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+            import {
+                A,
+                B,
+            } from "m";
+
+            use(A, B);`,
+            `
+            import {A} from "n";
+            import B from "n";
+
+            use(A, B);`
+        ));
+    });
+
+    test("an import that replaces the file's last statement takes its place and its comment", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebinding(["m", "n", "A", "default"]);
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+            import {x} from "first";
+            // ui
+            import {A} from "m";`,
+            `
+            import {x} from "first";
+            // ui
+            import A from "n";`
+        ));
+    });
+
+    test("a type-only member and a value moved to one module each go on one line", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebinding(["m", "n", "T"], ["m", "n", "V"]);
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+            import {
+                type T,
+                V,
+            } from "m";
+
+            let t: T = V;`,
+            `
+            import {V} from "n";
+            import type {T} from "n";
+
+            let t: T = V;`
+        ));
+    });
+
+    test("members renamed within their module keep the order written, whichever rename runs first", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebinding(["lodash", "lodash", "zeta", "zed"], ["lodash", "lodash", "extend", "assign"]);
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+            import {zeta, extend, alpha} from "lodash";
+
+            zeta(extend, alpha);`,
+            `
+            import {zed, assign, alpha} from "lodash";
+
+            zed(assign, alpha);`
+        ));
+    });
+
+    test("an import split from a multi-line list spaces its braces as the file's export lists do", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebinding(["m", "n", "b"]);
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+            import {
+                a,
+                b,
+            } from "m";
+
+            export { a, b };`,
+            `
+            import {
+                a,
+            } from "m";
+            import { b } from "n";
+
+            export { a, b };`
+        ));
+    });
+
+    test("a comment ending the line of the statement a member leaves stays on that line", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebinding(["m", "x", "b"], ["d", "x", "default", "D"]);
+        await spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `
+                import {a, b} from "m"; // note
+                import {z} from "z";
+
+                a(b, z);`,
+                `
+                import {a} from "m"; // note
+                import {b} from "x";
+                import {z} from "z";
+
+                a(b, z);`
+            ),
+            // The statement is replaced, at the end of the file
+            //language=typescript
+            typescript(
+                `
+                import {z} from "z";
+                import D from "d"; // note
+                `,
+                `
+                import {z} from "z";
+                import {D} from "x"; // note
+                `
+            )
+        );
+    });
 });
 
 // Why test.fails?
@@ -3016,6 +3425,916 @@ function dropModule(module: string, member?: string) {
         }
     };
 }
+
+describe("maybeRebind and the member's other spellings", () => {
+    test("a member read through a namespace import is renamed, as a type and as a value", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = rebindTo({module: "m", member: "New"}, bound);
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+                import * as NS from "m";
+
+                let a: NS.Old<{}>;
+                let b: typeof NS.Old;
+                NS.Old();
+                new NS.Old();
+            `,
+            `
+                import * as NS from "m";
+
+                let a: NS.New<{}>;
+                let b: typeof NS.New;
+                NS.New();
+                new NS.New();
+            `
+        ));
+        expect(bound.name).toBeUndefined();
+    });
+
+    test("the named binding and the namespace spelling move together", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = rebindTo({module: "m", member: "New"}, bound);
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+                import { Old } from "m";
+                import * as NS from "m";
+
+                let a: Old;
+                let b: NS.Old;
+            `,
+            `
+                import { New } from "m";
+                import * as NS from "m";
+
+                let a: New;
+                let b: NS.New;
+            `
+        ));
+        expect(bound.name).toBe("New");
+    });
+
+    test("a member read through a required module object is renamed", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebindTo({module: "m", member: "New"}, {});
+        await spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `
+                    import NS = require("m");
+
+                    let a: NS.Old;
+                `,
+                `
+                    import NS = require("m");
+
+                    let a: NS.New;
+                `
+            ),
+            //language=javascript
+            javascript(
+                `
+                    const NS = require("m");
+
+                    NS.Old();
+                `,
+                `
+                    const NS = require("m");
+
+                    NS.New();
+                `
+            )
+        );
+    });
+
+    test("a member read through a module object is renamed as a JSX tag, and through an awaited import", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebindTo({module: "m", member: "New"}, {});
+        //language=tsx
+        await spec.rewriteRun(tsx(
+            `
+                import * as NS from "m";
+                const Lazy = await import("m");
+
+                const a = <NS.Old x={1} />;
+                const b = <Lazy.Old>hi</Lazy.Old>;
+            `,
+            `
+                import * as NS from "m";
+                const Lazy = await import("m");
+
+                const a = <NS.New x={1} />;
+                const b = <Lazy.New>hi</Lazy.New>;
+            `
+        ));
+    });
+
+    test("a reassignable module object is left alone", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebindTo({module: "m", member: "New"}, {});
+        await spec.rewriteRun(
+            //language=javascript
+            javascript(`
+                let NS = require("m");
+                NS = {Old: () => 1};
+                NS.Old();
+            `),
+            //language=javascript
+            javascript(`
+                var NS = require("m");
+                NS = {Old: () => 1};
+                NS.Old();
+            `),
+            //language=javascript
+            javascript(`
+                let NS = await import("m");
+                NS = {Old: () => 1};
+                NS.Old();
+            `),
+            //language=javascript
+            javascript(`
+                let NS = require("m");
+                function reset() { NS = {Old: () => 1}; }
+                NS.Old();
+            `)
+        );
+    });
+
+    test("a let or var module object the file never assigns to reads the member too", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebindTo({module: "m", member: "New"}, {});
+        await spec.rewriteRun(
+            //language=javascript
+            javascript(
+                `
+                    let NS = require("m");
+                    NS.Old();
+                `,
+                `
+                    let NS = require("m");
+                    NS.New();
+                `
+            ),
+            //language=javascript
+            javascript(
+                `
+                    var NS = require("m");
+                    NS.Old();
+                `,
+                `
+                    var NS = require("m");
+                    NS.New();
+                `
+            ),
+            //language=javascript
+            javascript(
+                `
+                    let NS = await import("m");
+                    NS.Old();
+                `,
+                `
+                    let NS = await import("m");
+                    NS.New();
+                `
+            )
+        );
+    });
+
+    test("the types naming a member moved only through a module object name it as a fresh parse of the result would", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                for (const [from, to] of [["Http", "HttpClient"], ["request", "send"]]) {
+                    maybeRebind(this, {from: {module: "http-api", member: from}, to: {module: "http-api", member: to}});
+                }
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        const after = `
+            import * as api from 'http-api';
+
+            const client: api.HttpClient = new api.HttpClient();
+            client.get('u');
+            api.send('x');
+        `;
+        let rebound: string[] = [];
+        let parsed: string[] = [];
+        await withDir(async (repo) => {
+            installHttpApi(repo.path);
+            await spec.rewriteRun(npm(repo.path, {
+                ...typescript(`
+                    import * as api from 'http-api';
+
+                    const client: api.Http = new api.Http();
+                    client.get('u');
+                    api.request('x');
+                `, after),
+                afterRecipe: async (cu: JS.CompilationUnit) => {
+                    rebound = await attributionOf(cu);
+                }
+            } as any, packageJson(`{"name":"t"}`)));
+            await new RecipeSpec().rewriteRun(npm(repo.path, {
+                ...typescript(after),
+                afterRecipe: async (cu: JS.CompilationUnit) => {
+                    parsed = await attributionOf(cu);
+                }
+            } as any, packageJson(`{"name":"t"}`)));
+        }, {unsafeCleanup: true});
+        expect(rebound).toEqual(parsed);
+    }, 60000);
+
+    test("an import() type and a re-export moved within their module are typed as a fresh parse of the result types them", async () => {
+        const {rebound, parsed} = await attributionsAfter(
+            {from: {module: "http-api", member: "Http"}, to: {module: "http-api", member: "HttpClient"}},
+            installHttpApi,
+            `
+                declare const client: import('http-api').Http;
+                export {Http} from 'http-api';
+                export {Http as Client} from 'http-api';
+            `,
+            `
+                declare const client: import('http-api').HttpClient;
+                export {HttpClient as Http} from 'http-api';
+                export {HttpClient as Client} from 'http-api';
+            `
+        );
+        expect(rebound).toEqual(parsed);
+    }, 60000);
+
+    test("an import() type and a re-export moved to another module are typed as a fresh parse of the result types them", async () => {
+        const {rebound, parsed} = await attributionsAfter(
+            {from: {module: "legacy-http", member: "Http"}, to: {module: "@acme/common/http", member: "HttpClient"}},
+            installHttpPackages,
+            `
+                declare const client: import('legacy-http').Http;
+                export {Http} from 'legacy-http';
+            `,
+            `
+                declare const client: import('@acme/common/http').HttpClient;
+                export {HttpClient as Http} from '@acme/common/http';
+            `
+        );
+        expect(rebound).toEqual(parsed);
+    }, 60000);
+
+    describe("a member moved to another module, beside a module object that stays on the old one", () => {
+        test("a call through a namespace import keeps its type", async () => {
+            const move = {
+                from: {module: "pkg", member: "f"},
+                to: {module: "other", member: "g"}
+            };
+            const spec = new RecipeSpec();
+            spec.recipe = rebindEach([move], markDeclaringType("f", "g"));
+            await withDir(async repo => {
+                installPackage(repo.path, "pkg", {
+                    "package.json": `{"name": "pkg", "version": "1.0.0", "types": "index.d.ts"}`,
+                    "index.d.ts": `export declare function f(): string;`
+                });
+                installPackage(repo.path, "other", {
+                    "package.json": `{"name": "other", "version": "1.0.0", "types": "index.d.ts"}`,
+                    "index.d.ts": `export declare function g(): string;`
+                });
+                await spec.rewriteRun(npm(repo.path,
+                    typescript(
+                        `
+                            import {f} from 'pkg';
+                            import * as h from 'pkg';
+                            f();
+                            h.f();
+                            (h).f();
+                        `,
+                        `
+                            import {g} from 'other';
+                            import * as h from 'pkg';
+                            /*~~(other#g)~~>*/g();
+                            /*~~(pkg#f)~~>*/h.f();
+                            /*~~(pkg#f)~~>*/(h).f();
+                        `
+                    ),
+                    packageJson(`{"name": "t"}`)
+                ));
+            }, {unsafeCleanup: true});
+        }, 60000);
+
+        test("a call through any other module object keeps its type, a reassigned one too", async () => {
+            const move = {
+                from: {module: "pkg", member: "f"},
+                to: {module: "other", member: "g"}
+            };
+            const spec = new RecipeSpec();
+            spec.recipe = rebindEach([move], markDeclaringType("f", "g"));
+            await withDir(async repo => {
+                installPackage(repo.path, "pkg", {
+                    "package.json": `{"name": "pkg", "version": "1.0.0", "types": "index.d.ts"}`,
+                    "index.d.ts": `export declare function f(): string;`
+                });
+                installPackage(repo.path, "other", {
+                    "package.json": `{"name": "other", "version": "1.0.0", "types": "index.d.ts"}`,
+                    "index.d.ts": `export declare function g(): string;`
+                });
+                await spec.rewriteRun(npm(repo.path,
+                    typescript(
+                        `
+                            import {f} from 'pkg';
+                            import h1 = require('pkg');
+                            const h2 = require('pkg');
+                            const h3 = await import('pkg');
+                            let h4 = await import('pkg');
+                            h4 = h4;
+                            f();
+                            h1.f();
+                            h2.f();
+                            h3.f();
+                            h4.f();
+                        `,
+                        `
+                            import {g} from 'other';
+                            import h1 = require('pkg');
+                            const h2 = require('pkg');
+                            const h3 = await import('pkg');
+                            let h4 = await import('pkg');
+                            h4 = h4;
+                            /*~~(other#g)~~>*/g();
+                            /*~~(pkg#f)~~>*/h1.f();
+                            /*~~(pkg#f)~~>*/h2.f();
+                            /*~~(pkg#f)~~>*/h3.f();
+                            /*~~(pkg#f)~~>*/h4.f();
+                        `
+                    ),
+                    packageJson(`{"name": "t"}`)
+                ));
+            }, {unsafeCleanup: true});
+        }, 60000);
+
+        test("a construction through a namespace import keeps its constructor", async () => {
+            const move = {
+                from: {module: "pkg", member: "K"},
+                to: {module: "other", member: "L"}
+            };
+            const spec = new RecipeSpec();
+            spec.recipe = rebindEach([move], markDeclaringType("K", "L"));
+            await withDir(async repo => {
+                installPackage(repo.path, "pkg", {
+                    "package.json": `{"name": "pkg", "version": "1.0.0", "types": "index.d.ts"}`,
+                    "index.d.ts": `export declare class K {}`
+                });
+                installPackage(repo.path, "other", {
+                    "package.json": `{"name": "other", "version": "1.0.0", "types": "index.d.ts"}`,
+                    "index.d.ts": `export declare class L {}`
+                });
+                await spec.rewriteRun(npm(repo.path,
+                    typescript(
+                        `
+                            import {K} from 'pkg';
+                            import * as h from 'pkg';
+                            new K();
+                            new h.K();
+                        `,
+                        `
+                            import {L} from 'other';
+                            import * as h from 'pkg';
+                            /*~~(other#L)~~>*/new L();
+                            /*~~(pkg#K)~~>*/new h.K();
+                        `
+                    ),
+                    packageJson(`{"name": "t"}`)
+                ));
+            }, {unsafeCleanup: true});
+        }, 60000);
+
+        test("a call through a namespace import keeps its type beside a moved re-export", async () => {
+            const move = {
+                from: {module: "pkg", member: "f"},
+                to: {module: "other", member: "g"}
+            };
+            const spec = new RecipeSpec();
+            spec.recipe = rebindEach([move], markDeclaringType("f", "g"));
+            await withDir(async repo => {
+                installPackage(repo.path, "pkg", {
+                    "package.json": `{"name": "pkg", "version": "1.0.0", "types": "index.d.ts"}`,
+                    "index.d.ts": `export declare function f(): string;`
+                });
+                installPackage(repo.path, "other", {
+                    "package.json": `{"name": "other", "version": "1.0.0", "types": "index.d.ts"}`,
+                    "index.d.ts": `export declare function g(): string;`
+                });
+                await spec.rewriteRun(npm(repo.path,
+                    typescript(
+                        `
+                            import * as h from 'pkg';
+                            export {f} from 'pkg';
+                            h.f();
+                        `,
+                        `
+                            import * as h from 'pkg';
+                            export {g as f} from 'other';
+                            /*~~(pkg#f)~~>*/h.f();
+                        `
+                    ),
+                    packageJson(`{"name": "t"}`)
+                ));
+            }, {unsafeCleanup: true});
+        }, 60000);
+
+        test("a call through a namespace import of a subpath keeps its type", async () => {
+            const move = {
+                from: {module: "pkg/sub", member: "f"},
+                to: {module: "other/sub", member: "g"}
+            };
+            const spec = new RecipeSpec();
+            spec.recipe = rebindEach([move], markDeclaringType("f", "g"));
+            await withDir(async repo => {
+                installPackage(repo.path, "pkg", {
+                    "package.json": `{"name": "pkg", "version": "1.0.0", "types": "index.d.ts"}`,
+                    "index.d.ts": `export {};`,
+                    "sub.d.ts": `export declare function f(): string;`
+                });
+                installPackage(repo.path, "other", {
+                    "package.json": `{"name": "other", "version": "1.0.0", "types": "index.d.ts"}`,
+                    "index.d.ts": `export {};`,
+                    "sub.d.ts": `export declare function g(): string;`
+                });
+                await spec.rewriteRun(npm(repo.path,
+                    typescript(
+                        `
+                            import {f} from 'pkg/sub';
+                            import * as h from 'pkg/sub';
+                            f();
+                            h.f();
+                        `,
+                        `
+                            import {g} from 'other/sub';
+                            import * as h from 'pkg/sub';
+                            /*~~(other/sub#g)~~>*/g();
+                            /*~~(pkg/sub#f)~~>*/h.f();
+                        `
+                    ),
+                    packageJson(`{"name": "t"}`)
+                ));
+            }, {unsafeCleanup: true});
+        }, 60000);
+
+        test("a call through a namespace import of a subpath keeps its type beside a moved re-export", async () => {
+            const move = {
+                from: {module: "pkg/sub", member: "f"},
+                to: {module: "other/sub", member: "g"}
+            };
+            const spec = new RecipeSpec();
+            spec.recipe = rebindEach([move], markDeclaringType("f", "g"));
+            await withDir(async repo => {
+                installPackage(repo.path, "pkg", {
+                    "package.json": `{"name": "pkg", "version": "1.0.0", "types": "index.d.ts"}`,
+                    "index.d.ts": `export {};`,
+                    "sub.d.ts": `export declare function f(): string;`
+                });
+                installPackage(repo.path, "other", {
+                    "package.json": `{"name": "other", "version": "1.0.0", "types": "index.d.ts"}`,
+                    "index.d.ts": `export {};`,
+                    "sub.d.ts": `export declare function g(): string;`
+                });
+                await spec.rewriteRun(npm(repo.path,
+                    typescript(
+                        `
+                            import * as h from 'pkg/sub';
+                            export {f} from 'pkg/sub';
+                            h.f();
+                        `,
+                        `
+                            import * as h from 'pkg/sub';
+                            export {g as f} from 'other/sub';
+                            /*~~(pkg/sub#f)~~>*/h.f();
+                        `
+                    ),
+                    packageJson(`{"name": "t"}`)
+                ));
+            }, {unsafeCleanup: true});
+        }, 60000);
+    });
+
+    test("a member read through its module object by a string-literal index moves too", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebindTo({module: "m", member: "New"}, {});
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+                import * as NS from "m";
+                declare const other: any;
+                const key = "Old";
+                NS["Old"]();
+                const v = NS['Old'];
+                NS[key]();
+                other["Old"]();
+            `,
+            `
+                import * as NS from "m";
+                declare const other: any;
+                const key = "Old";
+                NS["New"]();
+                const v = NS['New'];
+                NS[key]();
+                other["Old"]();
+            `
+        ));
+    });
+
+    test("a parenthesized module object reads the member too", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebindTo({module: "m", member: "New"}, {});
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+                import * as NS from "m";
+                (NS).Old();
+                const v = ((NS)).Old;
+            `,
+            `
+                import * as NS from "m";
+                (NS).New();
+                const v = ((NS)).New;
+            `
+        ));
+    });
+
+    test("a destructuring of the module object reads the member, keeping the name it binds", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebindTo({module: "m", member: "New"}, {});
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+                import * as NS from "m";
+                declare const other: any;
+                const {Old} = NS;
+                const {Old: X, Other} = NS;
+                const {Old: New} = NS;
+                let {Old: Y = X} = (NS);
+                const {Old: Z} = other;
+                Old(); X(); New(); Y(); Z(); Other();
+            `,
+            `
+                import * as NS from "m";
+                declare const other: any;
+                const {New: Old} = NS;
+                const {New: X, Other} = NS;
+                const {New} = NS;
+                let {New: Y = X} = (NS);
+                const {Old: Z} = other;
+                Old(); X(); New(); Y(); Z(); Other();
+            `
+        ));
+    });
+
+    test("a module object stays constant in a declaration list", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebindTo({module: "m", member: "New"}, {});
+        //language=javascript
+        await spec.rewriteRun(javascript(
+            `
+            const NS = require("m"), Other = require("other");
+            NS.Old();
+            Other.Old();`,
+            `
+            const NS = require("m"), Other = require("other");
+            NS.New();
+            Other.Old();`
+        ));
+    });
+
+    test("a default import, another module's namespace and a shadowed namespace are left alone", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebindTo({module: "m", member: "New"}, {});
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+                import D from "m";
+                import * as Other from "other";
+                import * as NS from "m";
+
+                let a: D.Old;
+                let b: Other.Old;
+                function f(NS: any) { return NS.Old; }
+            `
+        ));
+    });
+
+    test("a move to another module leaves a namespace spelling alone, since the namespace still names the old module", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebindTo({module: "m2", member: "New"}, {});
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+                import * as NS from "m";
+
+                let a: NS.Old;
+            `
+        ));
+    });
+
+    test("an import() type follows the move, to another module too", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebindTo({module: "m", member: "New"}, {});
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+                let a: import("m").Old;
+                let b: import("m").Old<{}>;
+                let c: typeof import("m").Old;
+                let d: import("m").Old.Inner;
+                let e: typeof import("m").Old.factory;
+                let other: import("m").Other.Old;
+            `,
+            `
+                let a: import("m").New;
+                let b: import("m").New<{}>;
+                let c: typeof import("m").New;
+                let d: import("m").New.Inner;
+                let e: typeof import("m").New.factory;
+                let other: import("m").Other.Old;
+            `
+        ));
+
+        const toOther = new RecipeSpec();
+        toOther.recipe = rebindTo({module: "m2", member: "New"}, {});
+        //language=typescript
+        await toOther.rewriteRun(typescript(
+            `
+                let a: import('m').Old;
+                let b: import('m').Old.Inner;
+            `,
+            `
+                let a: import('m2').New;
+                let b: import('m2').New.Inner;
+            `
+        ));
+    });
+
+    test("a re-export straight from the module keeps the name it publishes", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebindTo({module: "m", member: "New"}, {});
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+                export { Old } from "m";
+                export { Old as Renamed } from "m";
+                export type { Old as T } from "m";
+            `,
+            `
+                export { New as Old } from "m";
+                export { New as Renamed } from "m";
+                export type { New as T } from "m";
+            `
+        ));
+    });
+
+    test("a re-export spelling the member as a string literal reads it by name", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebindTo({module: "m", member: "New"}, {});
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+                export { "Old" } from "m";
+                export { "Old" as Renamed } from "m";
+            `,
+            `
+                export { New as "Old" } from "m";
+                export { New as Renamed } from "m";
+            `
+        ));
+    });
+
+    test("a re-export moving to another module leaves what else its statement re-exports, and joins a re-export of the target", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebindTo({module: "m2", member: "New"}, {});
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+                export { Old } from "m";
+                export { Old as O, Other } from "m";
+            `,
+            `
+                export { New as Old, New as O } from "m2";
+                export { Other } from "m";
+            `
+        ));
+    });
+
+    test("a re-export with no re-export of the target to join takes a statement of its own after the one it left", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebindTo({module: "m2", member: "New"}, {});
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+                export {
+                    Other,
+                    Old,
+                } from "m";
+                const x = 1;
+            `,
+            `
+                export {
+                    Other,
+                } from "m";
+                export {
+                    New as Old,
+                } from "m2";
+                const x = 1;
+            `
+        ));
+    });
+
+    test("re-exports whose every member moves end up as one statement of the target", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebindEach([
+            {from: {module: "react", member: "Validator"}, to: {module: "prop-types", member: "Validator"}},
+            {from: {module: "react", member: "ValidationMap"}, to: {module: "prop-types", member: "ValidationMap"}}
+        ]);
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+                export { Validator, ValidationMap } from "react";
+            `,
+            `
+                export { Validator, ValidationMap } from "prop-types";
+            `
+        ));
+    });
+
+    test("moved members leave the rest behind and join the target's re-export of the same kind", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebindEach([
+            {from: {module: "react", member: "Validator"}, to: {module: "prop-types", member: "Validator"}},
+            {from: {module: "react", member: "ValidationMap"}, to: {module: "prop-types", member: "ValidationMap"}}
+        ]);
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+                export type { Validator as V, ReactNode, ValidationMap } from "react";
+                export { checkPropTypes } from "prop-types";
+                export type { Requireable } from "prop-types";
+            `,
+            `
+                export type { ReactNode } from "react";
+                export { checkPropTypes } from "prop-types";
+                export type { Requireable, Validator as V, ValidationMap } from "prop-types";
+            `
+        ));
+    });
+
+    test("a re-export moving to another module under the member's own name keeps its specifier as written", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebindTo({module: "m2", member: "Old"}, {});
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+                export { Old, Old as Renamed, "Old" as Quoted } from "m";
+            `,
+            `
+                export { Old, Old as Renamed, "Old" as Quoted } from "m2";
+            `
+        ));
+    });
+
+    test("a re-export a moved member empties goes, and the statement after it keeps its comment", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebindTo({module: "m2", member: "New"}, {});
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+                export { Other } from "m2";
+                export { Old } from "m";
+                // Important docs
+                export const x = 1;
+            `,
+            `
+                export { Other, New as Old } from "m2";
+                // Important docs
+                export const x = 1;
+            `
+        ));
+    });
+
+    test("a re-export split between two modules keeps each specifier's comment with it", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebindTo({module: "m2", member: "New"}, {});
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+                export { /* keep */ Other, /* move */ Old } from "m";
+            `,
+            `
+                export { /* keep */ Other } from "m";
+                export { /* move */ New as Old } from "m2";
+            `
+        ));
+    });
+
+    test("a comment trailing the re-export a moved member leaves stays on its line, also at the end of the file", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebindTo({module: "m2", member: "New"}, {});
+        await spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `
+                    export { A, Old } from "m"; // note
+                    export const x = 1;
+                `,
+                `
+                    export { A } from "m"; // note
+                    export { New as Old } from "m2";
+                    export const x = 1;
+                `
+            ),
+            //language=typescript
+            typescript(
+                `
+                    export { A, Old } from "m"; // note
+                `,
+                `
+                    export { A } from "m"; // note
+                    export { New as Old } from "m2";
+                `
+            )
+        );
+    });
+
+    test("a re-export joining an empty re-export of the target takes the place of its empty entry", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebindTo({module: "m2", member: "New"}, {});
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+                export {Old} from "m";
+                export {} from "m2";
+            `,
+            `
+                export {New as Old} from "m2";
+            `
+        ));
+    });
+
+    test("a re-export joining the target's keeps its own comment, not another specifier's", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = rebindTo({module: "m2", member: "New"}, {});
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+                export { A, /* b */ B } from "m2";
+                export { /* move */ Old, Other } from "m";
+            `,
+            `
+                export { A, /* b */ B, /* move */ New as Old } from "m2";
+                export { Other } from "m";
+            `
+        ));
+    });
+
+    test("a refused require leaves all member spellings unchanged", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = rebindTo({module: "m", member: "New"}, bound);
+        await spec.rewriteRun(
+            //language=typescript
+            typescript(`
+                const {Old, ...rest} = require("m");
+                const NS = require("m");
+                Old();
+                NS.Old();
+                type T = import("m").Old;
+                export {Old} from "m";
+            `),
+            //language=typescript
+            typescript(`
+                const {Old}: any = require("m");
+                const NS = require("m");
+                Old();
+                NS.Old();
+                type T = import("m").Old;
+                export {Old} from "m";
+            `)
+        );
+        expect(bound.name).toBeUndefined();
+    });
+
+    test("a move refused for the named binding renames no other spelling either", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = rebindTo({module: "m", member: "New", alias: "Taken"}, bound);
+        //language=typescript
+        await spec.rewriteRun(typescript(
+            `
+                import { Old } from "m";
+                import * as NS from "m";
+
+                const Taken = 1;
+                let a: Old;
+                let b: NS.Old;
+            `
+        ));
+        expect(bound.name).toBeUndefined();
+    });
+});
 
 describe("maybeUnbind on an AMD block", () => {
     test("an unreferenced dependency goes with its parameter", async () => {
@@ -3343,42 +4662,42 @@ describe("a node: specifier and the bare name of its built-in", () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
-                maybeRebind(this, {from: {module: "_stream_duplex"}, to: {module: "stream", member: "Duplex"}});
-                maybeRebind(this, {from: {module: "_tls_wrap"}, to: {module: "tls"}});
+                maybeRebind(this, {from: {module: "assert"}, to: {module: "assert/strict", member: "strict"}});
+                maybeRebind(this, {from: {module: "net"}, to: {module: "tls"}});
                 return super.visitJsCompilationUnit(cu, p);
             }
         });
         //language=typescript
         await spec.rewriteRun(typescript(
             `
-            import D from 'node:_stream_duplex';
-            import tlsWrap from 'node:_tls_wrap';
+            import a from 'node:assert';
+            import net from 'node:net';
 
-            new D(tlsWrap);`,
+            a(net);`,
             `
-            import tlsWrap from 'node:tls';
-            import {Duplex as D} from 'node:stream';
+            import {strict as a} from 'node:assert/strict';
+            import net from 'node:tls';
 
-            new D(tlsWrap);`
+            a(net);`
         ));
 
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
-                maybeRebind(this, {from: {module: "_stream_duplex", member: "Duplex"}, to: {module: "stream", member: "Duplex"}});
+                maybeRebind(this, {from: {module: "assert", member: "strict"}, to: {module: "assert/strict", member: "strict"}});
                 return super.visitJsCompilationUnit(cu, p);
             }
         });
         //language=typescript
         await spec.rewriteRun(typescript(
             `
-            import {Duplex, x} from 'node:_stream_duplex';
+            import {strict, ok} from 'node:assert';
 
-            new Duplex(x);`,
+            strict(ok);`,
             `
-            import {x} from 'node:_stream_duplex';
-            import {Duplex} from 'node:stream';
+            import {ok} from 'node:assert';
+            import {strict} from 'node:assert/strict';
 
-            new Duplex(x);`
+            strict(ok);`
         ));
     });
 });
@@ -3402,28 +4721,28 @@ describe("maybeRebind on a require", () => {
 
     test("a whole module moves to a member, keeping the name the file chose and its node: spelling", async () => {
         const bound: (string | undefined)[] = [];
-        const spec = rebind({module: "_stream_duplex"}, {module: "stream", member: "Duplex"}, bound);
+        const spec = rebind({module: "assert"}, {module: "assert/strict", member: "strict"}, bound);
         await spec.rewriteRun(
             //language=javascript
             javascript(`
-                const Duplex = require('_stream_duplex');
+                const strict = require('assert');
 
-                new Duplex();`,
+                strict(true);`,
                 `
-                const {Duplex} = require('stream');
+                const {strict} = require('assert/strict');
 
-                new Duplex();`),
+                strict(true);`),
             //language=javascript
             javascript(`
-                const D = require('node:_stream_duplex');
+                const a = require('node:assert');
 
-                new D();`,
+                a(true);`,
                 `
-                const {Duplex: D} = require('node:stream');
+                const {strict: a} = require('node:assert/strict');
 
-                new D();`)
+                a(true);`)
         );
-        expect(bound).toEqual(["Duplex", "D"]);
+        expect(bound).toEqual(["strict", "a"]);
     });
 
     test("a whole module moves to a whole module, and a member to a member", async () => {

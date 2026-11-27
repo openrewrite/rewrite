@@ -1,0 +1,56 @@
+{
+ "dep2": {
+  "name": "dep2",
+  "dist-tags": {
+   "latest": "1.0.0"
+  },
+  "versions": {
+   "2.0.0": {
+    "name": "dep2",
+    "version": "2.0.0",
+    "dist": {
+     "tarball": "http://localhost:4881/dep2/-/dep2-2.0.0.tgz",
+     "integrity": "sha512-KuDFQNAfjX9BtMnIbuc0WMseKMJV94CFGVkbSObencmtV3MfE0DqyxEPyzAG+P/LuwA2Pj5dTqFv+ZcJ7xvIQg==",
+     "shasum": "a89eb0821cc57fcd7844e52b0d916c5f47e4e004"
+    }
+   },
+   "1.0.0": {
+    "name": "dep2",
+    "version": "1.0.0",
+    "dist": {
+     "tarball": "http://localhost:4881/dep2/-/dep2-1.0.0.tgz",
+     "integrity": "sha512-661G/HpiNsKUqLWwKtMiLChjJZdy+EB68EhWwrhYyQ71uHCCnHnV9tw7UB4dTl1eCc+kz2D32//EOU4ftZR7sw==",
+     "shasum": "5f7903d5c74060acdeba0bfd81db9511601b53d4"
+    }
+   }
+  },
+  "time": {
+   "created": "2020-01-01T00:00:00.000Z",
+   "modified": "2020-01-01T00:00:00.000Z",
+   "2.0.0": "2020-01-01T00:00:00.000Z",
+   "1.0.0": "2020-01-01T00:00:00.000Z"
+  }
+ },
+ "other": {
+  "name": "other",
+  "dist-tags": {
+   "latest": "1.0.0"
+  },
+  "versions": {
+   "1.0.0": {
+    "name": "other",
+    "version": "1.0.0",
+    "dist": {
+     "tarball": "http://localhost:4881/other/-/other-1.0.0.tgz",
+     "integrity": "sha512-UDb2DLTnxn2yIVANGXhYJRUzlDYJ3QwHITTeW4BG3VknLeb32CF2BGRNvf82sLc8mSH4SIe1V2ZKCe3r5lYNYQ==",
+     "shasum": "5188c4352a144b374439b5e776afef327d1454ca"
+    }
+   }
+  },
+  "time": {
+   "created": "2020-01-01T00:00:00.000Z",
+   "modified": "2020-01-01T00:00:00.000Z",
+   "1.0.0": "2020-01-01T00:00:00.000Z"
+  }
+ }
+}

@@ -25,6 +25,8 @@ import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.internal.StringUtils;
 
 import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Files;
@@ -35,11 +37,15 @@ import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.Properties;
+import java.util.jar.JarEntry;
+import java.util.jar.JarOutputStream;
 
+import static java.util.Collections.emptyList;
 import static org.objectweb.asm.Opcodes.ACC_PUBLIC;
 import static org.objectweb.asm.Opcodes.V1_8;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class RecipeClassLoaderTest {
 
@@ -123,6 +129,51 @@ class RecipeClassLoaderTest {
                 assertThat(text).isEqualTo("file1");
             }
         }
+    }
+
+    @Test
+    void closingALoaderLeavesAnotherLoaderReadingTheSameJar(@TempDir Path tempDir) throws Exception {
+        Path jar = writeJar(tempDir.resolve("recipes.jar"), "text");
+
+        try (RecipeClassLoader reading = new RecipeClassLoader(jar, emptyList());
+             InputStream in = reading.getResourceAsStream("rewrite.txt")) {
+            try (RecipeClassLoader closing = new RecipeClassLoader(jar, emptyList())) {
+                closing.getResourceAsStream("rewrite.txt").close();
+            }
+            assertThat(StringUtils.readFully(in)).isEqualTo("text");
+        }
+    }
+
+    @Test
+    void closedLoaderLeavesNoCachedJarBehind(@TempDir Path tempDir) throws Exception {
+        Path jar = writeJar(tempDir.resolve("recipes.jar"), "text");
+        try (RecipeClassLoader classLoader = new RecipeClassLoader(jar, emptyList())) {
+            assertThat(StringUtils.readFully(classLoader.getResourceAsStream("rewrite.txt"))).isEqualTo("text");
+        }
+
+        writeJar(jar, "rebuilt text");
+        try (RecipeClassLoader classLoader = new RecipeClassLoader(jar, emptyList())) {
+            assertThat(StringUtils.readFully(classLoader.getResourceAsStream("rewrite.txt"))).isEqualTo("rebuilt text");
+        }
+    }
+
+    @Test
+    void closingALoaderClosesTheStreamsItOpened(@TempDir Path tempDir) throws Exception {
+        Path jar = writeJar(tempDir.resolve("recipes.jar"), "text");
+
+        RecipeClassLoader classLoader = new RecipeClassLoader(jar, emptyList());
+        InputStream in = classLoader.getResourceAsStream("rewrite.txt");
+        classLoader.close();
+
+        assertThatThrownBy(in::read).isInstanceOf(IOException.class);
+    }
+
+    private static Path writeJar(Path jar, String text) throws Exception {
+        try (JarOutputStream out = new JarOutputStream(Files.newOutputStream(jar))) {
+            out.putNextEntry(new JarEntry("rewrite.txt"));
+            out.write(text.getBytes());
+        }
+        return jar;
     }
 
     @Test
@@ -311,6 +362,57 @@ class RecipeClassLoaderTest {
                   .isSameAs(parent);
             }
         }
+    }
+
+    @Test
+    void parsersAndTheTypeCacheComeFromTheHostWhenTheRecipeShipsThemToo(@TempDir Path tempDir) throws Exception {
+        String[] shared = {
+          "org/openrewrite/gradle/GradleParser",
+          "org/openrewrite/gradle/GradleParser$Builder",
+          "org/openrewrite/java/internal/JavaTypeCache"
+        };
+
+        Path parentLib = stubLib(tempDir.resolve("parent"), shared);
+        Path childLib = stubLib(tempDir.resolve("child"), shared);
+
+        try (URLClassLoader parent = new URLClassLoader(new URL[]{parentLib.toUri().toURL()}, null);
+             RecipeClassLoader classLoader = new RecipeClassLoader(new URL[]{childLib.toUri().toURL()}, parent)) {
+            for (String type : shared) {
+                assertThat(classLoader.loadClass(type.replace('/', '.')).getClassLoader())
+                  .as(type)
+                  .isSameAs(parent);
+            }
+        }
+    }
+
+    @Test
+    void groovyParserComesFromTheLoaderGradleParserComesFrom(@TempDir Path tempDir) throws Exception {
+        String gradleParser = "org/openrewrite/gradle/GradleParser";
+        String groovyParser = "org/openrewrite/groovy/GroovyParser";
+        Path hostWithGroovy = stubLib(tempDir.resolve("host"), groovyParser);
+        Path recipeWithGradle = stubLib(tempDir.resolve("recipeWithGradle"), groovyParser, gradleParser);
+        Path recipeWithGroovy = stubLib(tempDir.resolve("recipeWithGroovy"), groovyParser);
+
+        try (URLClassLoader parent = new URLClassLoader(new URL[]{hostWithGroovy.toUri().toURL()}, null);
+             RecipeClassLoader classLoader = new RecipeClassLoader(
+               new URL[]{recipeWithGradle.toUri().toURL()}, parent)) {
+            assertThat(classLoader.loadClass(groovyParser.replace('/', '.')).getClassLoader()).isSameAs(classLoader);
+        }
+
+        try (URLClassLoader parent = new URLClassLoader(new URL[]{hostWithGroovy.toUri().toURL()}, null);
+             RecipeClassLoader classLoader = new RecipeClassLoader(
+               new URL[]{recipeWithGroovy.toUri().toURL()}, parent)) {
+            assertThat(classLoader.loadClass(groovyParser.replace('/', '.')).getClassLoader()).isSameAs(parent);
+        }
+    }
+
+    private static Path stubLib(Path lib, String... internalNames) throws Exception {
+        for (String internalName : internalNames) {
+            Path classFile = lib.resolve(internalName + ".class");
+            Files.createDirectories(classFile.getParent());
+            Files.write(classFile, stubClass(internalName));
+        }
+        return lib;
     }
 
     @Test

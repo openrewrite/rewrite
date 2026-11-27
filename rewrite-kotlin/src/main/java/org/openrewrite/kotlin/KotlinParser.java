@@ -124,6 +124,7 @@ public class KotlinParser implements Parser {
     private final boolean isKotlinScript;
     private final List<String> scriptImplicitReceivers;
     private final List<String> scriptDefaultImports;
+    private final List<String> samWithReceiverAnnotations;
 
     @Override
     public Stream<SourceFile> parse(@Language("kotlin") String... sources) {
@@ -299,6 +300,7 @@ public class KotlinParser implements Parser {
         private boolean isKotlinScript = false;
         private List<String> scriptImplicitReceivers = emptyList();
         private List<String> scriptDefaultImports = emptyList();
+        private List<String> samWithReceiverAnnotations = emptyList();
 
         public Builder() {
             super(K.CompilationUnit.class);
@@ -319,6 +321,7 @@ public class KotlinParser implements Parser {
             this.isKotlinScript = base.isKotlinScript;
             this.scriptImplicitReceivers = base.scriptImplicitReceivers;
             this.scriptDefaultImports = base.scriptDefaultImports;
+            this.samWithReceiverAnnotations = base.samWithReceiverAnnotations;
         }
 
         public Builder logCompilationWarningsAndErrors(boolean logCompilationWarningsAndErrors) {
@@ -338,6 +341,15 @@ public class KotlinParser implements Parser {
 
         public Builder scriptDefaultImports(String... packages) {
             this.scriptDefaultImports = Arrays.asList(packages);
+            return this;
+        }
+
+        /**
+         * Annotations, by fully qualified name, of the Java SAM interfaces that take a lambda with the SAM's first
+         * parameter as its receiver instead of as {@code it}, as the Kotlin compiler's sam-with-receiver plugin does.
+         */
+        public Builder samWithReceiverAnnotations(String... fqns) {
+            this.samWithReceiverAnnotations = Arrays.asList(fqns);
             return this;
         }
 
@@ -433,7 +445,7 @@ public class KotlinParser implements Parser {
             if (factory == null) {
                 factory = new DefaultJavaTypeFactory(typeCache);
             }
-            return new KotlinParser(cp, dependsOn, styles, logCompilationWarningsAndErrors, typeCache, factory, moduleName, languageLevel, isKotlinScript, scriptImplicitReceivers, scriptDefaultImports);
+            return new KotlinParser(cp, dependsOn, styles, logCompilationWarningsAndErrors, typeCache, factory, moduleName, languageLevel, isKotlinScript, scriptImplicitReceivers, scriptDefaultImports, samWithReceiverAnnotations);
         }
 
         @Override
@@ -564,13 +576,14 @@ public class KotlinParser implements Parser {
     }
 
     private static String buildFilename(Input source, int index) {
-        String pathName = source.getPath().toString();
-        if ("openRewriteFile.kt".equals(pathName)) {
-            return "openRewriteFile" + index + ".kt";
-        } else if ("openRewriteFile.kts".equals(pathName)) {
-            return "openRewriteFile" + index + ".kts";
+        Path path = source.getPath();
+        String fileName = String.valueOf(path.getFileName());
+        if ("openRewriteFile.kt".equals(fileName)) {
+            return path.resolveSibling("openRewriteFile" + index + ".kt").toString();
+        } else if ("openRewriteFile.kts".equals(fileName)) {
+            return path.resolveSibling("openRewriteFile" + index + ".kts").toString();
         } else {
-            return pathName;
+            return path.toString();
         }
     }
 
@@ -612,11 +625,15 @@ public class KotlinParser implements Parser {
         compilerConfiguration.put(INCREMENTAL_COMPILATION, true);
         compilerConfiguration.put(LINK_VIA_SIGNATURES, true);
 
+        List<CompilerPluginRegistrar> registrars = new ArrayList<>(2);
         if (!scriptImplicitReceivers.isEmpty() || !scriptDefaultImports.isEmpty()) {
-            compilerConfiguration.put(
-                    CompilerPluginRegistrar.Companion.getCOMPILER_PLUGIN_REGISTRARS(),
-                    singletonList(new ScriptCompilerPlugin(scriptImplicitReceivers, scriptDefaultImports))
-            );
+            registrars.add(new ScriptCompilerPlugin(scriptImplicitReceivers, scriptDefaultImports));
+        }
+        if (!samWithReceiverAnnotations.isEmpty()) {
+            registrars.add(new SamWithReceiverCompilerPlugin(samWithReceiverAnnotations));
+        }
+        if (!registrars.isEmpty()) {
+            compilerConfiguration.put(CompilerPluginRegistrar.Companion.getCOMPILER_PLUGIN_REGISTRARS(), registrars);
         }
 
         addJvmSdkRoots(compilerConfiguration, PathUtil.getJdkClassesRootsFromCurrentJre());

@@ -20,6 +20,8 @@ import {javascript, JavaScriptVisitor, JS, npm, packageJson, tsx, typescript} fr
 import {J, Type} from "../../src/java";
 import {ExecutionContext, foundSearchResult, Recipe} from "../../src";
 import {withDir} from "tmp-promise";
+import * as fs from "node:fs";
+import * as path from "node:path";
 import FullyQualified = Type.FullyQualified;
 
 describe('JavaScript type mapping', () => {
@@ -1035,7 +1037,7 @@ describe('JavaScript type mapping', () => {
                         declare function either(): { a: number } | { b: string };
                         const spread = {
                             ...either(),
-                            /*~~(declared by Unknown)~~>*/method(value: string) { return value; }
+                            /*~~(declared by Class)~~>*/method(value: string) { return value; }
                         };
                     `
                 )
@@ -1063,6 +1065,104 @@ describe('JavaScript type mapping', () => {
                 //@formatter:on
             );
             src.path = 'main.ts';
+            await spec.rewriteRun(src);
+        });
+
+        test('a member of a type literal that is a type alias\'s body is declared on the alias, as its calls are', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) => {
+                if ((node?.kind === J.Kind.MethodDeclaration || node?.kind === J.Kind.MethodInvocation) && Type.isMethod(type)) {
+                    return FullyQualified.getFullyQualifiedName(type.declaringType);
+                }
+                if (node?.kind === J.Kind.Identifier && (node as J.Identifier).simpleName === 'prop' && node.fieldType) {
+                    return `owner ${FullyQualified.getFullyQualifiedName((node.fieldType as Type.Variable).owner as FullyQualified)}`;
+                }
+                return null;
+            });
+
+            const src = typescript(
+                `
+                    export type Inst = { create(input: string): Inst; prop: (n: number) => string; get size(): number };
+                    export type Api<T> = { get(): T };
+                    declare const i: Inst;
+                    declare const a: Api<string>;
+                    i.create('b');
+                    i.prop(1);
+                    a.get();
+                `,
+                //@formatter:off
+                `
+                    export type Inst = { /*~~(src/main.Inst)~~>*/create(input: string): Inst; /*~~(owner src/main.Inst)~~>*/prop: (n: number) => string; /*~~(src/main.Inst)~~>*/get size(): number };
+                    export type Api<T> = { /*~~(src/main.Api)~~>*/get(): T };
+                    declare const i: Inst;
+                    declare const a: Api<string>;
+                    /*~~(src/main.Inst)~~>*/i.create('b');
+                    /*~~(src/main.Inst)~~>*/i./*~~(owner src/main.Inst)~~>*/prop(1);
+                    /*~~(src/main.Api)~~>*/a.get();
+                `
+                //@formatter:on
+            );
+            src.path = 'src/main.ts';
+            await spec.rewriteRun(src);
+        });
+
+        test('a type literal typing a property of a named type is named after the property, and one elsewhere declares no type for its members', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) =>
+                node?.kind === J.Kind.MethodDeclaration && Type.isMethod(type) ?
+                    FullyQualified.getFullyQualifiedName(type.declaringType) : null);
+
+            const src = typescript(
+                `
+                    export type Wrapped = { nested: { deep(): void } };
+                    export type Both = { a(): void } & { b(): void };
+                    function f(o: { inline(): void }) {}
+                `,
+                //@formatter:off
+                `
+                    export type Wrapped = { nested: { /*~~(src/main.Wrapped.nested)~~>*/deep(): void } };
+                    export type Both = { /*~~(<unknown>)~~>*/a(): void } & { /*~~(<unknown>)~~>*/b(): void };
+                    /*~~(src/main)~~>*/function f(o: { /*~~(<unknown>)~~>*/inline(): void }) {}
+                `
+                //@formatter:on
+            );
+            src.path = 'src/main.ts';
+            await spec.rewriteRun(src);
+        });
+
+        test('a call or construct signature has no method type, as a call to the value it types is declared on its module', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) => {
+                if (node?.kind === J.Kind.MethodDeclaration) {
+                    return type ? FullyQualified.getFullyQualifiedName((type as Type.Method).declaringType) : 'no method type';
+                }
+                if ((node?.kind === J.Kind.MethodInvocation || node?.kind === JS.Kind.FunctionCall) && Type.isMethod(type)) {
+                    return `${FullyQualified.getFullyQualifiedName(type.declaringType)}{${type.name}}`;
+                }
+                return null;
+            });
+
+            const src = typescript(
+                `
+                    export type Inst = { (input: string): number; new (input: string): Inst };
+                    export interface Callable { (input: string): number }
+                    declare const i: Inst;
+                    declare const c: Callable;
+                    i('a');
+                    c('a');
+                `,
+                //@formatter:off
+                `
+                    export type Inst = { /*~~(no method type)~~>*/(input: string): number; /*~~(no method type)~~>*/new (input: string): Inst };
+                    export interface Callable { /*~~(no method type)~~>*/(input: string): number }
+                    declare const i: Inst;
+                    declare const c: Callable;
+                    /*~~(src/main{i})~~>*/i('a');
+                    /*~~(src/main{c})~~>*/c('a');
+                `
+                //@formatter:on
+            );
+            src.path = 'src/main.ts';
             await spec.rewriteRun(src);
         });
 
@@ -2096,6 +2196,52 @@ describe('JavaScript type mapping', () => {
             }, {unsafeCleanup: true});
         });
 
+        test('should map a variable read through a namespace import with the module as owner', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, _type) => {
+                if (node?.kind === J.Kind.Identifier && (node as J.Identifier).simpleName === 'ajax') {
+                    const owner = (node as J.Identifier).fieldType?.owner;
+                    return `Variable<owner=${Type.isFullyQualified(owner) ? Type.FullyQualified.getFullyQualifiedName(owner) : 'no-owner'}>`;
+                }
+                return null;
+            });
+
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                                import {ajax} from 'rxjs/ajax';
+                                import * as requests from 'rxjs/ajax';
+
+                                const named = ajax;
+                                const qualified = requests.ajax;
+                            `,
+                            `
+                                import {/*~~(Variable<owner=rxjs/ajax>)~~>*/ajax} from 'rxjs/ajax';
+                                import * as requests from 'rxjs/ajax';
+
+                                const named = /*~~(Variable<owner=rxjs/ajax>)~~>*/ajax;
+                                const qualified = requests./*~~(Variable<owner=rxjs/ajax>)~~>*/ajax;
+                            `
+                        ),
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "rxjs": "^7.0.0"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
         test('should map variable used as standalone assignment', async () => {
             const spec = new RecipeSpec();
             spec.recipe = markTypes((node, type) => {
@@ -2333,6 +2479,199 @@ describe('JavaScript type mapping', () => {
         );
         main.path = 'main.ts';
         await withDir(async repo => spec.rewriteRun(npm(repo.path, util, main)), {unsafeCleanup: true});
+    });
+
+    describe('a member call on an object of no class, built in a parsed source', () => {
+        const markMembers = () => markTypes((node, type) =>
+            (node?.kind === J.Kind.MethodDeclaration || node?.kind === J.Kind.MethodInvocation || node?.kind === JS.Kind.ArrowFunction) &&
+            Type.isMethod(type) && type.name !== 'require' ?
+                `${FullyQualified.getFullyQualifiedName(type.declaringType)}#${type.name}` : null);
+
+        test('is declared on the file of the object literal that holds the function', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markMembers();
+            const plain = javascript(
+                `
+                    module.exports = createApplication;
+                    function createApplication() {
+                        return {
+                            use: function (fn) { return this; },
+                            short(x) { return this; },
+                            arrow: (y) => y
+                        };
+                    }
+                `,
+                //@formatter:off
+                `
+                    module.exports = createApplication;
+                    /*~~(lib/plain#createApplication)~~>*/function createApplication() {
+                        return {
+                            use: /*~~(lib/plain#use)~~>*/function (fn) { return this; },
+                            /*~~(lib/plain#short)~~>*/short(x) { return this; },
+                            arrow: /*~~(lib/plain#arrow)~~>*/(y) => y
+                        };
+                    }
+                `
+                //@formatter:on
+            );
+            plain.path = 'lib/plain.js';
+            const test = javascript(
+                `
+                    var plain = require('../lib/plain');
+                    plain().use(1).use(2);
+                    plain().short(3);
+                    plain().arrow(4);
+                `,
+                //@formatter:off
+                `
+                    var plain = require('../lib/plain');
+                    /*~~(lib/plain#use)~~>*//*~~(lib/plain#use)~~>*//*~~(lib/plain#createApplication)~~>*/plain().use(1).use(2);
+                    /*~~(lib/plain#short)~~>*//*~~(lib/plain#createApplication)~~>*/plain().short(3);
+                    /*~~(lib/plain#arrow)~~>*//*~~(lib/plain#createApplication)~~>*/plain().arrow(4);
+                `
+                //@formatter:on
+            );
+            test.path = 'test/app.js';
+            await withDir(async repo => spec.rewriteRun(npm(repo.path, plain, test)), {unsafeCleanup: true});
+        });
+
+        test('is declared on the file that assigns the function to a property of the object', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markMembers();
+            const application = javascript(
+                `
+                    var app = exports = module.exports = {};
+                    app.use = function use(fn) { return this; };
+                    app.listen = function () {};
+                `,
+                //@formatter:off
+                `
+                    var app = exports = module.exports = {};
+                    app.use = /*~~(lib/application#use)~~>*/function use(fn) { return this; };
+                    app.listen = /*~~(lib/application#listen)~~>*/function () {};
+                `
+                //@formatter:on
+            );
+            application.path = 'lib/application.js';
+            const express = javascript(
+                `
+                    var proto = require('./application');
+                    module.exports = createApplication;
+                    function createApplication() {
+                        var app = function (req, res, next) {};
+                        return Object.assign(app, proto);
+                    }
+                `,
+                //@formatter:off
+                `
+                    var proto = require('./application');
+                    module.exports = createApplication;
+                    /*~~(lib/express#createApplication)~~>*/function createApplication() {
+                        var app = /*~~(lib/express#app)~~>*/function (req, res, next) {};
+                        return /*~~(Object#assign)~~>*/Object.assign(app, proto);
+                    }
+                `
+                //@formatter:on
+            );
+            express.path = 'lib/express.js';
+            const test = javascript(
+                `
+                    var express = require('../lib/express');
+                    var app = express();
+                    app.use(1).listen();
+                `,
+                //@formatter:off
+                `
+                    var express = require('../lib/express');
+                    var app = /*~~(lib/express#createApplication)~~>*/express();
+                    /*~~(lib/application#listen)~~>*//*~~(lib/application#use)~~>*/app.use(1).listen();
+                `
+                //@formatter:on
+            );
+            test.path = 'test/app.js';
+            await withDir(async repo => spec.rewriteRun(npm(repo.path, application, express, test)), {unsafeCleanup: true});
+        });
+
+        test('is declared on the function a shorthand or a cast property holds', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markMembers();
+            const plain = javascript(
+                `
+                    module.exports = createApplication;
+                    function createApplication() {
+                        function use(fn) { return this; }
+                        return {
+                            use,
+                            cast: (function (x) { return x; }),
+                            arrow: ((y) => y)
+                        };
+                    }
+                `,
+                //@formatter:off
+                `
+                    module.exports = createApplication;
+                    /*~~(lib/plain#createApplication)~~>*/function createApplication() {
+                        /*~~(lib/plain#use)~~>*/function use(fn) { return this; }
+                        return {
+                            use,
+                            cast: (/*~~(lib/plain#cast)~~>*/function (x) { return x; }),
+                            arrow: (/*~~(lib/plain#arrow)~~>*/(y) => y)
+                        };
+                    }
+                `
+                //@formatter:on
+            );
+            plain.path = 'lib/plain.js';
+            const test = javascript(
+                `
+                    var plain = require('../lib/plain');
+                    plain().use(1);
+                    plain().cast(2);
+                    plain().arrow(3);
+                `,
+                //@formatter:off
+                `
+                    var plain = require('../lib/plain');
+                    /*~~(lib/plain#use)~~>*//*~~(lib/plain#createApplication)~~>*/plain().use(1);
+                    /*~~(lib/plain#cast)~~>*//*~~(lib/plain#createApplication)~~>*/plain().cast(2);
+                    /*~~(lib/plain#arrow)~~>*//*~~(lib/plain#createApplication)~~>*/plain().arrow(3);
+                `
+                //@formatter:on
+            );
+            test.path = 'test/app.js';
+            await withDir(async repo => spec.rewriteRun(npm(repo.path, plain, test)), {unsafeCleanup: true});
+        });
+
+        test('is not taken for a function assigned to a member of a class instance or prototype', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markMembers();
+            const source = javascript(
+                `
+                    function Foo() {}
+                    Foo.prototype.bar = function () {};
+                    class C {
+                        constructor() {
+                            this.h = () => 1;
+                            this.g = function () {};
+                        }
+                    }
+                `,
+                //@formatter:off
+                `
+                    /*~~(lib/a#Foo)~~>*/function Foo() {}
+                    Foo.prototype.bar = /*~~(lib/a#<anonymous>)~~>*/function () {};
+                    class C {
+                        /*~~(C#<constructor>)~~>*/constructor() {
+                            this.h = () => 1;
+                            this.g = /*~~(lib/a#<anonymous>)~~>*/function () {};
+                        }
+                    }
+                `
+                //@formatter:on
+            );
+            source.path = 'lib/a.js';
+            await withDir(async repo => spec.rewriteRun(npm(repo.path, source)), {unsafeCleanup: true});
+        });
     });
 
     test('FindMissingTypes produces no results on a complex class', async () => {
@@ -3117,6 +3456,126 @@ describe('JavaScript type mapping', () => {
             }, {unsafeCleanup: true});
         });
 
+        test('a call through a namespace import of a subpath attributes to the subpath, like a named import', async () => {
+            // The namespace object's type is named after its declaration file, which was cut to the
+            // package, so \`client.createRoot\` was declared on \`react-dom\` and missed a matcher on the subpath.
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes(declaringTypeAndName);
+
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        //language=typescript
+                        typescript(
+                            `
+                                import {createRoot} from 'react-dom/client';
+                                import * as client from 'react-dom/client';
+                                import required = require('react-dom/client');
+                                declare const container: Element;
+
+                                createRoot(container);
+                                client.createRoot(container);
+                                required.createRoot(container);
+                            `,
+                            //@formatter:off
+                            `
+                                import {createRoot} from 'react-dom/client';
+                                import * as client from 'react-dom/client';
+                                import required = require('react-dom/client');
+                                declare const container: Element;
+
+                                /*~~(react-dom/client#createRoot)~~>*/createRoot(container);
+                                /*~~(react-dom/client#createRoot)~~>*/client.createRoot(container);
+                                /*~~(react-dom/client#createRoot)~~>*/required.createRoot(container);
+                            `
+                            //@formatter:on
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "react-dom": "^18.2.0"
+                                },
+                                "devDependencies": {
+                                  "@types/react-dom": "^18.2.0"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
+        test('a namespace call keeps the module the checker types its receiver as, where the binding names another', async () => {
+            // Only an import's specifier is taken, since an import holds the module it names. A reassigned
+            // variable and a local function named \`require\` both read \`beta\` here; the \`brand\` constants
+            // keep the two module types apart, so the union is not reduced to one.
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes(declaringTypeAndName);
+
+            await withDir(async (repo) => {
+                const install = (pkg: string, files: Record<string, string>) => {
+                    for (const [file, text] of Object.entries(files)) {
+                        const target = path.join(repo.path, 'node_modules', pkg, file);
+                        fs.mkdirSync(path.dirname(target), {recursive: true});
+                        fs.writeFileSync(target, text);
+                    }
+                };
+                install('alpha', {
+                    'package.json': '{"name": "alpha", "version": "1.0.0", "types": "index.d.ts"}',
+                    'index.d.ts': 'export {};',
+                    'sub.d.ts': "export declare const brand: 'alpha'; export declare function f(): void;"
+                });
+                install('beta', {
+                    'package.json': '{"name": "beta", "version": "1.0.0", "types": "index.d.ts"}',
+                    'index.d.ts': "export declare const brand: 'beta'; export declare function f(): void;"
+                });
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        //language=typescript
+                        typescript(
+                            `
+                                import * as beta from 'beta';
+
+                                function local(require: (name: string) => typeof beta) {
+                                    require('alpha/sub').f();
+                                }
+
+                                async function reassigned() {
+                                    let m: typeof import('alpha/sub') | typeof import('beta') = await import('alpha/sub');
+                                    m = await import('beta');
+                                    m.f();
+                                }
+                            `,
+                            //@formatter:off
+                            `
+                                import * as beta from 'beta';
+
+                                function local(require: (name: string) => typeof beta) {
+                                    /*~~(beta#f)~~>*/require('alpha/sub').f();
+                                }
+
+                                async function reassigned() {
+                                    let m: typeof import('alpha/sub') | typeof import('beta') = await import('alpha/sub');
+                                    m = await import('beta');
+                                    /*~~(beta#f)~~>*/m.f();
+                                }
+                            `
+                            //@formatter:on
+                        ),
+                        //language=json
+                        packageJson(`{"name": "test-project", "version": "1.0.0"}`)
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
         test('imports of a package without type declarations attribute to the package', async () => {
             // An untyped package's bindings are \`any\`, so only the import specifier identifies the module.
             const spec = new RecipeSpec();
@@ -3198,7 +3657,7 @@ describe('JavaScript type mapping', () => {
                 //@formatter:off
                 `
                     import * as ns from './local';
-                    ns./*~~(<unknown>#bar)~~>*/bar.length;
+                    ns./*~~(./local#bar)~~>*/bar.length;
                 `
                 //@formatter:on
             );
@@ -3452,6 +3911,15 @@ function markTypes(predicate: (node: any, type: Type | undefined) => string | nu
                 async visitLambda(lambda: J.Lambda, p: ExecutionContext): Promise<J.Lambda> {
                     const visited = await super.visitLambda(lambda, p) as J.Lambda;
                     const description = predicate(visited, (visited as any).methodType);
+                    if (description) {
+                        return foundSearchResult(visited, description);
+                    }
+                    return visited;
+                }
+
+                async visitArrowFunction(arrowFunction: JS.ArrowFunction, p: ExecutionContext): Promise<JS.ArrowFunction> {
+                    const visited = await super.visitArrowFunction(arrowFunction, p) as JS.ArrowFunction;
+                    const description = predicate(visited, visited.methodType);
                     if (description) {
                         return foundSearchResult(visited, description);
                     }

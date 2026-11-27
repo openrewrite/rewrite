@@ -145,6 +145,7 @@ export namespace JS {
         readonly typeParameters?: J.TypeParameters;
         readonly lambda: J.Lambda;
         readonly returnTypeExpression?: TypeTree;
+        readonly methodType?: Type.Method;
     }
 
     /**
@@ -904,6 +905,7 @@ export namespace JSX {
         readonly typeArguments?: J.Container<Expression>;
         readonly afterName: J.Space;
         readonly attributes: J.RightPadded<Attribute | SpreadAttribute>[];
+        readonly methodType?: Type.Method;
     }
 
     /**

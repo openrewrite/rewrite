@@ -51,9 +51,11 @@ public final class TomlString {
                 case 'e': out.append('\u001b'); i += 2; break;
                 case '"': out.append('"'); i += 2; break;
                 case '\\': out.append('\\'); i += 2; break;
+                case 'x':
                 case 'u':
                 case 'U': {
-                    int digits = e == 'u' ? 4 : 8;
+                    // \xHH is TOML 1.1 and, like the u and U escapes, names a code point
+                    int digits = e == 'x' ? 2 : e == 'u' ? 4 : 8;
                     if (i + 2 + digits <= raw.length() && isHex(raw, i + 2, i + 2 + digits)) {
                         try {
                             out.appendCodePoint(Integer.parseInt(raw.substring(i + 2, i + 2 + digits), 16));

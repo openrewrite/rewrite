@@ -47,6 +47,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             Break brk => VisitBreak(brk, p),
             Continue cont => VisitContinue(cont, p),
             Empty emp => VisitEmpty(emp, p),
+            Erroneous err => VisitErroneous(err, p),
             Literal lit => VisitLiteral(lit, p),
             Identifier id => VisitIdentifier(id, p),
             FieldAccess fa => VisitFieldAccess(fa, p),
@@ -576,6 +577,24 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
 
         var exprResult = VisitExpression(s1, p);
         if (exprResult is not Empty node) return exprResult;
+
+        return node;
+    }
+
+    // -----------------------------------------------------------------------
+    // Erroneous : Statement, Expression
+    // -----------------------------------------------------------------------
+    public virtual J VisitErroneous(Erroneous err, P p)
+    {
+        err = err
+            .WithPrefix(VisitSpace(err.Prefix, p))
+            .WithMarkers(VisitMarkers(err.Markers, p));
+
+        var stmtResult = VisitStatement(err, p);
+        if (stmtResult is not Erroneous s1) return stmtResult;
+
+        var exprResult = VisitExpression(s1, p);
+        if (exprResult is not Erroneous node) return exprResult;
 
         return node;
     }

@@ -18,7 +18,11 @@ package org.openrewrite.scala;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ParseWarning;
 import org.openrewrite.SourceFile;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.internal.JdkClassSharingTypeFactory;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.scala.tree.S;
 import org.openrewrite.tree.ParseError;
@@ -36,6 +40,10 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class ScalaParserTest {
+
+    static {
+        JdkClassSharingTypeFactory.useForParsers();
+    }
 
     @Test
     void parseSimpleValDeclaration() {
@@ -306,5 +314,52 @@ class ScalaParserTest {
               .filter(p -> p.getFileName().toString().startsWith("rewrite-scala"))
               .collect(Collectors.toCollection(HashSet::new));
         }
+    }
+
+    @Test
+    void scalaParsersShareTheClassesOfJavaPackagesAmongThemselves() {
+        JavaType first = typeOfS(ScalaParser.builder().build().parse("class A { val s: String = \"\" }"));
+        JavaType second = typeOfS(ScalaParser.builder().build().parse("class B { val s: String = \"\" }"));
+        assertThat(second).isSameAs(first);
+
+        JavaType java = typeOfS(JavaParser.fromJavaVersion().build().parse("class C { String s; }"));
+        assertThat(java).isNotSameAs(first);
+    }
+
+    @Test
+    void scalaParsersOfOneClasspathShareTheClassesOfTheScalaLibrary() {
+        JavaType first = typeOfS(ScalaParser.builder().build().parse("class A { val s: scala.util.Random = null }"));
+        JavaType second = typeOfS(ScalaParser.builder().build().parse("class B { val s: scala.util.Random = null }"));
+        assertThat(second).isSameAs(first);
+
+        JavaType otherClasspath = typeOfS(ScalaParser.builder().classpath(JavaParser.runtimeClasspath()).build()
+          .parse("class C { val s: scala.util.Random = null }"));
+        assertThat(otherClasspath).isNotSameAs(first);
+    }
+
+    @Test
+    void aSourceClassInAScalaPackageIsNotShared() {
+        ScalaParser.builder().build().parse("package scala.foo\nclass Bar\nclass A { val s: Bar = null }").findFirst();
+        JavaType bar = typeOfS(ScalaParser.builder().build()
+          .parse("package scala.foo\nclass Bar { val x = 1 }\nclass B { val s: Bar = null }"));
+        assertThat(((JavaType.FullyQualified) bar).getMembers())
+          .extracting(JavaType.Variable::getName)
+          .containsExactly("x");
+    }
+
+    private static JavaType typeOfS(Stream<SourceFile> parsed) {
+        SourceFile sourceFile = parsed.findFirst().orElseThrow();
+        if (!(sourceFile instanceof J cu)) {
+            throw new AssertionError("Not parsed: " + sourceFile);
+        }
+        return new JavaIsoVisitor<List<JavaType>>() {
+            @Override
+            public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, List<JavaType> types) {
+                if (variable.getSimpleName().equals("s")) {
+                    types.add(variable.getType());
+                }
+                return variable;
+            }
+        }.reduce(cu, new java.util.ArrayList<>()).getFirst();
     }
 }

@@ -23,3 +23,8 @@ type: specs.openrewrite.org/v1beta/category
 name: AI
 packageName: org.openrewrite.java.ai
 description: Recipes supporting AI code generation and analysis.
+---
+type: specs.openrewrite.org/v1beta/category
+name: Sonar rules
+packageName: org.openrewrite.java.sonar
+description: Recipes that cover SonarQube Java rules, grouped by the default Sonar severity of each rule.

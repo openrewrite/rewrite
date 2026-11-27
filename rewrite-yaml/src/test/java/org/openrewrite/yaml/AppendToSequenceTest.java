@@ -17,11 +17,14 @@ package org.openrewrite.yaml;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.List;
 
+import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.yaml.Assertions.yaml;
 
 class AppendToSequenceTest implements RewriteTest {
@@ -642,6 +645,166 @@ class AppendToSequenceTest implements RewriteTest {
                     - name: command 5
                     - name: command 6
                     - name: all commands
+              """
+          )
+        );
+    }
+
+    @Test
+    void appendToFlowSequenceEndingInPair() {
+        rewriteRun(
+          spec -> spec.recipe(new AppendToSequence("$.key", "c", null, null)),
+          yaml(
+            "key: [a: 1, b: 2]",
+            "key: [a: 1, b: 2, c]"
+          )
+        );
+    }
+
+    @Test
+    void keepsTheCommentOfTheLastItemOnItsLine() {
+        rewriteRun(
+          spec -> spec.recipe(new AppendToSequence("$.jobs.test.strategy.matrix.os", "windows-latest", null, null)),
+          yaml(
+            """
+              jobs:
+                test:
+                  strategy:
+                    matrix:
+                      node-version: [16, 18]
+                      os:
+                        - ubuntu-latest # LTS runner
+                lint:
+                  runs-on: ubuntu-latest
+              """,
+            """
+              jobs:
+                test:
+                  strategy:
+                    matrix:
+                      node-version: [16, 18]
+                      os:
+                        - ubuntu-latest # LTS runner
+                        - windows-latest
+                lint:
+                  runs-on: ubuntu-latest
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotCopyTheCommentOfTheItemBeforeTheLast() {
+        rewriteRun(
+          spec -> spec.recipe(new AppendToSequence("$.a", "z", null, null)),
+          yaml(
+            """
+              a:
+                - x # one
+                - y # two
+              b: 1
+              """,
+            """
+              a:
+                - x # one
+                - y # two
+                - z
+              b: 1
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepsTheCommentOfTheLastItemAtTheEndOfTheFile() {
+        rewriteRun(
+          spec -> spec.recipe(new AppendToSequence("$.a", "y", null, null)),
+          yaml(
+            """
+              a:
+                - x # one
+              """,
+            """
+              a:
+                - x # one
+                - y
+              """
+          )
+        );
+    }
+
+    @Test
+    void appendsAfterABlockScalar() {
+        rewriteRun(
+          spec -> spec.recipe(new AppendToSequence("$.a", "y", null, null)),
+          yaml(
+            """
+              a:
+                - |
+                  t
+              b: 1
+              """,
+            """
+              a:
+                - |
+                  t
+                - y
+              b: 1
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotCopyTheCommentLinesAboveTheLastItem() {
+        rewriteRun(
+          spec -> spec.recipe(new AppendToSequence("$.a", "z", null, null)),
+          yaml(
+            """
+              a:
+                - x
+                # about y
+                - y # y
+              b: 1
+              """,
+            """
+              a:
+                - x
+                # about y
+                - y # y
+                - z
+              b: 1
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotDuplicateTheCommentOfTheLastItemWhenVisitingPartOfTheTree() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new YamlIsoVisitor<>() {
+              @Override
+              public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext ctx) {
+                  if ("a".equals(entry.getKey().getValue())) {
+                      return (Yaml.Mapping.Entry) new AppendToSequenceVisitor(new JsonPathMatcher("$.a"), "z", List.of("x", "y"), false)
+                        .visitNonNull(entry, ctx, getCursor().getParentOrThrow());
+                  }
+                  return super.visitMappingEntry(entry, ctx);
+              }
+          })),
+          yaml(
+            """
+              a:
+                - x # one
+                - y # two
+              b: 1
+              """,
+            """
+              a:
+                - x # one
+                - y
+                - z # two
+              b: 1
               """
           )
         );

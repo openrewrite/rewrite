@@ -82,6 +82,7 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         q.getAndSend(arrowFunction, JS.ArrowFunction::getTypeParameters, el -> visit(el, q));
         q.getAndSend(arrowFunction, JS.ArrowFunction::getLambda, el -> visit(el, q));
         q.getAndSend(arrowFunction, JS.ArrowFunction::getReturnTypeExpression, el -> visit(el, q));
+        q.getAndSend(arrowFunction, a -> asRef(a.getMethodType()), type -> visitType(getValueNonNull(type), q));
         return arrowFunction;
     }
 
@@ -458,6 +459,7 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         q.getAndSendList(tag, JSX.Tag::getChildren, Tree::getId, child -> visit(child, q));
         q.getAndSend(tag, el -> el.getPadding().getClosingName(), el -> visitLeftPadded(el, q));
         q.getAndSend(tag, t -> spaceRef(t.getAfterClosingName()), space -> visitSpace(getValueNonNull(space), q));
+        q.getAndSend(tag, t -> asRef(t.getMethodType()), type -> visitType(getValueNonNull(type), q));
 
         return tag;
     }

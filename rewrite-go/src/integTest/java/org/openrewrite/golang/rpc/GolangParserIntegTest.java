@@ -162,7 +162,7 @@ class GolangParserIntegTest implements RewriteTest {
                                     .isNotNull();
 
                             // Run a no-op visitor — should preserve the tree unchanged
-                            var noopVisitor = new org.openrewrite.java.JavaIsoVisitor<org.openrewrite.ExecutionContext>() {};
+                            var noopVisitor = new JavaIsoVisitor<org.openrewrite.ExecutionContext>() {};
                             var noopResult = (Go.CompilationUnit) noopVisitor.visit(goCu, new org.openrewrite.InMemoryExecutionContext());
                             assertThat(noopResult).as("no-op visitor should not return null").isNotNull();
                             assertThat(noopResult.getPadding().getPackageDecl())

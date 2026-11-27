@@ -22,6 +22,7 @@ import org.openrewrite.Tree;
 import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.style.Style;
 import org.openrewrite.yaml.YamlIsoVisitor;
+import org.openrewrite.yaml.internal.MultilineScalarIndents;
 import org.openrewrite.yaml.style.Autodetect;
 import org.openrewrite.yaml.style.IndentsStyle;
 import org.openrewrite.yaml.style.YamlDefaultStyles;
@@ -45,10 +46,12 @@ public class AutoFormatVisitor<P> extends YamlIsoVisitor<P> {
 
         y = new MinimumViableSpacingVisitor<>(stopAfter).visitNonNull(y, p, cursor.fork());
 
+        Cursor indentsCursor = cursor.fork();
+        MultilineScalarIndents.forward(cursor, indentsCursor);
         y = new IndentsVisitor<>(
                 Style.from(IndentsStyle.class, docs, () -> Autodetect.tabsAndIndents(docs, YamlDefaultStyles.indents())),
                     stopAfter)
-                .visitNonNull(y, p, cursor.fork());
+                .visitNonNull(y, p, indentsCursor);
 
         return new NormalizeLineBreaksVisitor<>(
                 Style.from(GeneralFormatStyle.class, docs, () -> Autodetect.generalFormat(docs)),

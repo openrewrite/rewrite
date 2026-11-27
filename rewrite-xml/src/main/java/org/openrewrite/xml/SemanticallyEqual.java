@@ -33,7 +33,10 @@ public class SemanticallyEqual {
     private SemanticallyEqual() {
     }
 
-    public static boolean areEqual(Xml first, Xml second) {
+    public static boolean areEqual(@Nullable Xml first, @Nullable Xml second) {
+        if (first == null || second == null) {
+            return first == second;
+        }
         SemanticallyEqualVisitor sme = new SemanticallyEqualVisitor();
         sme.visit(first, second);
         return sme.areEqual;

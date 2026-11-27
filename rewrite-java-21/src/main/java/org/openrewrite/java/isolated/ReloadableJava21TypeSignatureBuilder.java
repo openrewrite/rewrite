@@ -27,15 +27,20 @@ import org.openrewrite.java.tree.JavaType;
 import javax.lang.model.type.NullType;
 import javax.lang.model.type.TypeMirror;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Set;
 import java.util.StringJoiner;
 
+import static java.util.Collections.newSetFromMap;
 import static org.openrewrite.java.isolated.ReloadableJava21TypeMapping.isUnknownType;
 
 class ReloadableJava21TypeSignatureBuilder implements JavaTypeSignatureBuilder {
     @Nullable
     private Set<String> typeVariableNameStack;
+
+    @Nullable
+    private Set<Type.CapturedType> capturedTypeStack;
 
     @Override
     public String signature(@Nullable Object t) {
@@ -128,13 +133,21 @@ class ReloadableJava21TypeSignatureBuilder implements JavaTypeSignatureBuilder {
     @Override
     public String genericSignature(Object type) {
         Type.TypeVar generic = (Type.TypeVar) type;
+        if (generic instanceof Type.CapturedType && !((Type.CapturedType) generic).lower.hasTag(TypeTag.BOT)) {
+            return "Generic{? super " + signature(((Type.CapturedType) generic).lower) + "}";
+        }
         String name = generic instanceof Type.CapturedType ? "?" : generic.tsym.name.toString();
 
         if (typeVariableNameStack == null) {
             typeVariableNameStack = new HashSet<>();
         }
+        if (capturedTypeStack == null) {
+            capturedTypeStack = newSetFromMap(new IdentityHashMap<>());
+        }
 
-        if (!typeVariableNameStack.add(name)) {
+        if (generic instanceof Type.CapturedType ?
+                !capturedTypeStack.add((Type.CapturedType) generic) :
+                !typeVariableNameStack.add(name)) {
             return "Generic{" + name + "}";
         }
 
@@ -164,7 +177,11 @@ class ReloadableJava21TypeSignatureBuilder implements JavaTypeSignatureBuilder {
             s.append(" extends ").append(boundSigStr);
         }
 
-        typeVariableNameStack.remove(name);
+        if (generic instanceof Type.CapturedType) {
+            capturedTypeStack.remove(generic);
+        } else {
+            typeVariableNameStack.remove(name);
+        }
 
         return s.append("}").toString();
     }

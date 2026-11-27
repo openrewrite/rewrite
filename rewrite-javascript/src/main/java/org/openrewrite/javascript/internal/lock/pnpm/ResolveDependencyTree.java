@@ -199,7 +199,10 @@ final class ResolveDependencyTree {
         String projectId = name != null ? Js.string(name) : rootDir;
         for (String depName : Js.keys(peerDependencies)) {
             String version = Js.string(peerDependencies.get(depName));
-            if (ReadPackageHook.isValidPeerRange(version, release)) {
+            if (release.acceptsAWorkspaceOrCatalogPeerWithinARange() ?
+                    ReadPackageHook.isValidPeerRange(version, release) :
+                    ResolveDependencies.validRange(version, release) != null ||
+                    version.startsWith("workspace:") || version.startsWith("catalog:")) {
                 continue;
             }
             boolean acceptable = ReadPackageHook.isAcceptablePeerSpec(version, release);

@@ -1027,6 +1027,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   id 'io.spring.dependency-management' version '1.1.5'
               }
               repositories { mavenCentral() }
+
               configurations.all {
                   resolutionStrategy.eachDependency { details ->
                       if (details.requested.group == 'com.fasterxml.jackson.core' && details.requested.name == 'jackson-core') {
@@ -1037,7 +1038,6 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               }
 
               dependencies {
-
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
               }
               """
@@ -1143,6 +1143,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                       mavenBom 'org.springframework.boot:spring-boot-dependencies:2.5.7'
                   }
               }
+
               configurations.all {
                   resolutionStrategy.eachDependency { details ->
                       if (details.requested.group == 'org.springframework.boot' && details.requested.name == 'spring-boot-autoconfigure') {
@@ -1152,7 +1153,6 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               }
 
               dependencies {
-
                   implementation 'org.springframework.boot:spring-boot-starter:2.5.6'
               }
               """
@@ -1241,6 +1241,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               }
               repositories { mavenCentral() }
               apply from: 'dependencies.gradle'
+
               configurations.all {
                   resolutionStrategy.eachDependency { details ->
                       if (details.requested.group == 'com.fasterxml.jackson.core' && details.requested.name == 'jackson-core') {
@@ -1484,6 +1485,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   id("io.spring.dependency-management") version "1.1.5"
               }
               repositories { mavenCentral() }
+
               configurations.all {
                   resolutionStrategy.eachDependency { details ->
                       if (details.requested.group == "com.fasterxml.jackson.core" && details.requested.name == "jackson-core") {
@@ -1494,7 +1496,6 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               }
 
               dependencies {
-
                   implementation("org.openrewrite:rewrite-java:7.0.0")
               }
               """
