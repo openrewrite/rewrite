@@ -184,6 +184,40 @@ class CSharpParseProjectTest implements RewriteTest {
     }
 
     @Test
+    void resolvedPackageHasSourceRepositoryOfItsNuspec(@TempDir Path tempDir) throws Exception {
+        Files.writeString(tempDir.resolve("App.csproj"),
+          """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+              <ItemGroup>
+                <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+              </ItemGroup>
+            </Project>
+            """);
+        Files.writeString(tempDir.resolve("A.cs"), "class A { }\n");
+
+        CSharpRewriteRpc rpc = CSharpRewriteRpc.getOrStart();
+        List<SourceFile> sourceFiles = rpc.parseSolution(
+          tempDir.resolve("App.csproj"), tempDir, new InMemoryExecutionContext()).toList();
+
+        MSBuildProject marker = sourceFiles.stream()
+          .flatMap(sf -> sf.getMarkers().findFirst(MSBuildProject.class).stream())
+          .findFirst()
+          .orElseThrow(() -> new AssertionError("MSBuildProject marker not found"));
+        assertThat(marker.getTargetFrameworks().getFirst().getResolvedPackages())
+          .filteredOn(p -> "Newtonsoft.Json".equals(p.getName()))
+          .singleElement()
+          .satisfies(newtonsoft -> {
+              assertThat(newtonsoft.getRepositoryUrl()).isEqualTo("https://github.com/JamesNK/Newtonsoft.Json");
+              assertThat(newtonsoft.getRepositoryType()).isEqualTo("git");
+              assertThat(newtonsoft.getRepositoryCommit()).isEqualTo("0a2e291c0d9c0c7675d445703e51750363a549ef");
+              assertThat(newtonsoft.getProjectUrl()).isEqualTo("https://www.newtonsoft.com/json");
+          });
+    }
+
+    @Test
     void generatedFilesExcludedFromLst() {
         rewriteRun(
           csproj(

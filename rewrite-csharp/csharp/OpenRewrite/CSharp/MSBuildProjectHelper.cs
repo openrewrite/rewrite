@@ -151,11 +151,13 @@ public static class MSBuildProjectHelper
     }
 
     private static readonly string[] VersionProperties = ["Version", "VersionPrefix", "VersionSuffix", "PackageVersion"];
-    private static readonly string[] IdentityProperties = ["PackageId", "AssemblyName"];
+    private static readonly string[] IdentityProperties =
+        ["PackageId", "AssemblyName", "IsPackable", "RepositoryUrl", "RepositoryType", "PackageProjectUrl"];
 
     /// <summary>
-    ///     The project's identity and version properties, as MSBuild evaluates them. A property counts only when a
-    ///     file under <paramref name="rootDir"/> sets it, so SDK defaults (the implicit <c>1.0.0</c>) are left out.
+    ///     The project's identity, packaging and version properties, as MSBuild evaluates them. A property counts only
+    ///     when a file under <paramref name="rootDir"/> sets it, so SDK defaults (the implicit <c>1.0.0</c>, a
+    ///     <c>PackageId</c> taken from the assembly name, <c>IsPackable</c>) are left out.
     ///     <c>Version</c> and <c>PackageVersion</c> derive from <c>VersionPrefix</c>/<c>VersionSuffix</c> and from
     ///     each other in the SDK, so once the repository sets any version property their evaluated values are
     ///     recorded too, without a <see cref="PropertyValue.DefinedIn"/> when the SDK did the derivation.
@@ -280,6 +282,8 @@ public static class MSBuildProjectHelper
                 libraryFiles[library.Name + "/" + library.Version] = library.Files;
         }
 
+        var packageFolders = lockFile.PackageFolders.Select(folder => folder.Path).ToList();
+
         var tfmList = new List<TargetFramework>();
         foreach (var target in lockFile.Targets)
         {
@@ -352,6 +356,8 @@ public static class MSBuildProjectHelper
                     }
                 }
 
+                var nuspec = NuspecMetadata.Find(library.Name, library.Version, packageFolders);
+
                 packageNodes[library.Name] = new ResolvedPackage(
                     library.Name,
                     library.Version.ToNormalizedString(),
@@ -369,7 +375,11 @@ public static class MSBuildProjectHelper
                     hasInstallScripts: hasInstallScripts,
                     hasXdtTransforms: hasXdt,
                     hasLegacyContentFolder: hasLegacyContent,
-                    dependencyRanges: dependencyRanges);
+                    dependencyRanges: dependencyRanges,
+                    repositoryUrl: nuspec?.RepositoryUrl,
+                    repositoryType: nuspec?.RepositoryType,
+                    repositoryCommit: nuspec?.RepositoryCommit,
+                    projectUrl: nuspec?.ProjectUrl);
             }
 
             // Depth is the shortest distance from a directly-declared dependency or a directly

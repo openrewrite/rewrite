@@ -532,4 +532,200 @@ public class CsprojParserTests
             Directory.Delete(root, true);
         }
     }
+
+    private const string NewtonsoftNuspec = """
+        <?xml version="1.0" encoding="utf-8"?>
+        <package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
+          <metadata>
+            <id>Newtonsoft.Json</id>
+            <version>13.0.3</version>
+            <projectUrl>https://www.newtonsoft.com/json</projectUrl>
+            <repository type="git" url="https://github.com/JamesNK/Newtonsoft.Json" commit="0a2e291c0d9c0c7675d445703e51750363a549ef" />
+          </metadata>
+        </package>
+        """;
+
+    /// <summary>A lock file resolving Newtonsoft.Json 13.0.3 and Legacy.Pkg 2.0.0 from <paramref name="packageFolder"/>.</summary>
+    private static LockFile LockFileRestoredTo(string packageFolder)
+    {
+        var lockFileJson = $$"""
+            {
+              "version": 3,
+              "targets": {
+                "net8.0": {
+                  "Newtonsoft.Json/13.0.3": { "type": "package" },
+                  "Legacy.Pkg/2.0.0": { "type": "package" }
+                }
+              },
+              "libraries": {
+                "Newtonsoft.Json/13.0.3": { "type": "package", "path": "newtonsoft.json/13.0.3", "files": [] },
+                "Legacy.Pkg/2.0.0": { "type": "package", "path": "legacy.pkg/2.0.0", "files": [] }
+              },
+              "projectFileDependencyGroups": {
+                "net8.0": ["Newtonsoft.Json >= 13.0.3", "Legacy.Pkg >= 2.0.0"]
+              },
+              "packageFolders": {
+                {{System.Text.Json.JsonSerializer.Serialize(packageFolder)}}: {}
+              },
+              "project": {
+                "version": "1.0.0",
+                "restore": {
+                  "projectName": "TestProject",
+                  "projectStyle": "PackageReference",
+                  "originalTargetFrameworks": ["net8.0"],
+                  "frameworks": {
+                    "net8.0": { "targetAlias": "net8.0" }
+                  }
+                },
+                "frameworks": {
+                  "net8.0": {
+                    "targetAlias": "net8.0",
+                    "dependencies": {
+                      "Newtonsoft.Json": { "target": "Package", "version": "[13.0.3, )" },
+                      "Legacy.Pkg": { "target": "Package", "version": "[2.0.0, )" }
+                    }
+                  }
+                }
+              }
+            }
+            """;
+        return new LockFileFormat().Parse(lockFileJson, "in-memory");
+    }
+
+    private static void WriteNuspec(string packageFolder, string id, string version, string content)
+    {
+        var directory = Path.Combine(packageFolder, id.ToLowerInvariant(), version);
+        Directory.CreateDirectory(directory);
+        File.WriteAllText(Path.Combine(directory, id.ToLowerInvariant() + ".nuspec"), content);
+    }
+
+    [Fact]
+    public void ResolvedPackageRecordsTheRepositoryAndProjectUrlOfItsNuspec()
+    {
+        var packageFolder = Path.Combine(Path.GetTempPath(), "openrewrite-nuspec-" + Guid.NewGuid().ToString("N")[..8]);
+        try
+        {
+            WriteNuspec(packageFolder, "Newtonsoft.Json", "13.0.3", NewtonsoftNuspec);
+            // Older packages name a home page and no repository.
+            WriteNuspec(packageFolder, "Legacy.Pkg", "2.0.0", """
+                <?xml version="1.0"?>
+                <package xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
+                  <metadata>
+                    <id>Legacy.Pkg</id>
+                    <version>2.0.0</version>
+                    <projectUrl>https://example.org/legacy</projectUrl>
+                  </metadata>
+                </package>
+                """);
+
+            var marker = MSBuildProjectHelper.CreateFromLockFile(
+                "Microsoft.NET.Sdk", LockFileRestoredTo(packageFolder), Path.GetTempPath());
+
+            var packages = Assert.Single(marker.TargetFrameworks).ResolvedPackages;
+            var newtonsoft = packages.Single(p => p.Name == "Newtonsoft.Json");
+            Assert.Equal("https://github.com/JamesNK/Newtonsoft.Json", newtonsoft.RepositoryUrl);
+            Assert.Equal("git", newtonsoft.RepositoryType);
+            Assert.Equal("0a2e291c0d9c0c7675d445703e51750363a549ef", newtonsoft.RepositoryCommit);
+            Assert.Equal("https://www.newtonsoft.com/json", newtonsoft.ProjectUrl);
+
+            var legacy = packages.Single(p => p.Name == "Legacy.Pkg");
+            Assert.Null(legacy.RepositoryUrl);
+            Assert.Null(legacy.RepositoryType);
+            Assert.Null(legacy.RepositoryCommit);
+            Assert.Equal("https://example.org/legacy", legacy.ProjectUrl);
+        }
+        finally
+        {
+            Directory.Delete(packageFolder, true);
+        }
+    }
+
+    [Fact]
+    public void ResolvedPackageHasNoRepositoryWhenItsNuspecIsNotOnDisk()
+    {
+        var packageFolder = Path.Combine(Path.GetTempPath(), "openrewrite-nuspec-" + Guid.NewGuid().ToString("N")[..8]);
+        Directory.CreateDirectory(packageFolder);
+        try
+        {
+            var marker = MSBuildProjectHelper.CreateFromLockFile(
+                "Microsoft.NET.Sdk", LockFileRestoredTo(packageFolder), Path.GetTempPath());
+
+            Assert.All(Assert.Single(marker.TargetFrameworks).ResolvedPackages, package =>
+            {
+                Assert.Null(package.RepositoryUrl);
+                Assert.Null(package.RepositoryType);
+                Assert.Null(package.RepositoryCommit);
+                Assert.Null(package.ProjectUrl);
+            });
+        }
+        finally
+        {
+            Directory.Delete(packageFolder, true);
+        }
+    }
+
+    [Fact]
+    public void NuspecIsReadOnceHoweverManyProjectsResolveThePackage()
+    {
+        var packageFolder = Path.Combine(Path.GetTempPath(), "openrewrite-nuspec-" + Guid.NewGuid().ToString("N")[..8]);
+        try
+        {
+            WriteNuspec(packageFolder, "Newtonsoft.Json", "13.0.3", NewtonsoftNuspec);
+
+            for (var project = 0; project < 3; project++)
+            {
+                var marker = MSBuildProjectHelper.CreateFromLockFile(
+                    "Microsoft.NET.Sdk", LockFileRestoredTo(packageFolder), Path.GetTempPath());
+                Assert.Equal("https://github.com/JamesNK/Newtonsoft.Json",
+                    Assert.Single(marker.TargetFrameworks).ResolvedPackages.Single(p => p.Name == "Newtonsoft.Json").RepositoryUrl);
+            }
+
+            Assert.Equal(1, OpenRewrite.CSharp.NuGet.NuspecMetadata.ReadsUnder(packageFolder));
+        }
+        finally
+        {
+            Directory.Delete(packageFolder, true);
+        }
+    }
+
+    [Fact]
+    public void PackagingPropertiesSetByTheRepositoryAreRecorded()
+    {
+        var docs = new CsprojParser().ParseAll(
+        [
+            (
+                """
+                <Project>
+                  <PropertyGroup>
+                    <RepositoryUrl>https://github.com/contoso/app</RepositoryUrl>
+                    <RepositoryType>git</RepositoryType>
+                    <PackageProjectUrl>https://contoso.example/app</PackageProjectUrl>
+                  </PropertyGroup>
+                </Project>
+                """,
+                "Directory.Build.props"
+            ),
+            (
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                    <IsPackable>false</IsPackable>
+                  </PropertyGroup>
+                </Project>
+                """,
+                "src/App/App.csproj"
+            )
+        ]);
+
+        var properties = docs[1].Markers.FindFirst<MSBuildProject>()!.Properties;
+        Assert.Equal("false", properties["IsPackable"].Value);
+        Assert.Equal("src/App/App.csproj", properties["IsPackable"].DefinedIn);
+        Assert.Equal("https://github.com/contoso/app", properties["RepositoryUrl"].Value);
+        Assert.Equal("Directory.Build.props", properties["RepositoryUrl"].DefinedIn);
+        Assert.Equal("git", properties["RepositoryType"].Value);
+        Assert.Equal("https://contoso.example/app", properties["PackageProjectUrl"].Value);
+        // Still only what the repository sets: no PackageId, AssemblyName or Version from the SDK.
+        Assert.Equal(4, properties.Count);
+    }
 }
