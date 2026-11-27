@@ -28,3 +28,8 @@ type: specs.openrewrite.org/v1beta/category
 name: Maven Utilities
 packageName: org.openrewrite.maven.utilities
 description: Recipes that report on a Maven build rather than change it.
+---
+type: specs.openrewrite.org/v1beta/category
+name: Sonar rules
+packageName: org.openrewrite.maven.sonar
+description: Recipes that cover SonarQube rules, grouped by the default Sonar severity of each rule.

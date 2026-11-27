@@ -23,13 +23,15 @@ import java.util.regex.Pattern;
 
 /**
  * Port of validate-npm-package-name's errors, all that {@code validForOldPackages} counts: 4.0.0, which pnpm 11.2.2's
- * @pnpm/npm-package-arg calls, 7.0.2, which npm-package-arg 13.0.2 and pnpm's parse-overrides call, and the releases
- * npm 11 bundled before it (6.0.0, 6.0.1, and 6.0.2, whose code 7.0.0 keeps).
+ * @pnpm/npm-package-arg calls, 5.0.0, which pnpm 10 checks dependency names with, 7.0.2, which npm-package-arg 13.0.2
+ * and pnpm's parse-overrides call, and the releases npm 11 bundled before it (6.0.0, 6.0.1, and 6.0.2, whose code
+ * 7.0.0 keeps). 4.0.0, 5.0.0 and 6.0.0 give the same errors.
  */
 public final class ValidateNpmPackageName {
 
     public enum Release {
         V4_0_0,
+        V5_0_0,
         V6_0_0,
         V6_0_1,
         V6_0_2,

@@ -1,0 +1,22 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    dependencies:
+      dep:
+        specifier: ^2.0.0
+        version: 1.0.0
+
+packages:
+
+  dep@1.0.0:
+    resolution: {integrity: sha512-UXBaQ9HDjVhatbwme+7x2NAmqLdqs2qfEuCu9Gm40ImHTsOyA8mnLhsYwbE/wcuAdo0NUo+vgOOLpmXuxrUEWw==}
+
+snapshots:
+
+  dep@1.0.0: {}

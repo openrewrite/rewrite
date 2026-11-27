@@ -24,6 +24,7 @@ import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Heavyweight;
+import org.openrewrite.Validated;
 import org.openrewrite.gradle.attributes.Category;
 import org.openrewrite.gradle.attributes.ProjectAttribute;
 import org.openrewrite.internal.ListUtils;
@@ -38,6 +39,8 @@ import org.openrewrite.maven.MavenDownloadingExceptions;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.semver.Semver;
+import org.openrewrite.semver.VersionComparator;
+import org.openrewrite.semver.XRange;
 
 import java.io.Serializable;
 import java.nio.file.Paths;
@@ -45,6 +48,7 @@ import java.util.*;
 import java.util.function.Function;
 
 import static java.util.Collections.*;
+import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
 
@@ -54,6 +58,8 @@ import static java.util.stream.Collectors.toMap;
 @AllArgsConstructor(onConstructor_ = {@JsonCreator})
 @Builder
 public class GradleDependencyConfiguration implements Heavyweight, Serializable, Attributed {
+    private static final String LATEST_STATUS_PREFIX = "latest.";
+
     /**
      * The name of the dependency configuration. Unique within a given project.
      */
@@ -256,11 +262,23 @@ public class GradleDependencyConfiguration implements Heavyweight, Serializable,
         }
 
         private void doResolve(boolean resolveTransitives) {
+            List<MavenRepository> repositories = this.repositories;
             if (repositories == null || ctx == null) {
                 return;
             }
             if (isCanBeResolved) {
                 MavenPomDownloader mpd = new MavenPomDownloader(ctx);
+                // A platform/BOM dependency manages the versions of every other dependency here, so
+                // selectors are resolved for the whole list rather than only for the dependency being
+                // resolved. One that resolves to nothing is dropped; the failure is recorded when that
+                // dependency's own turn in the loop below throws again.
+                List<Dependency> requestedConcrete = ListUtils.map(requested, dep -> {
+                    try {
+                        return withConcreteVersion(dep, mpd, repositories);
+                    } catch (MavenDownloadingException ignored) {
+                        return null;
+                    }
+                });
                 List<ResolvedDependency> newResolved = new ArrayList<>(requested.size());
                 Map<GroupArtifact, ResolvedDependency> gaToOriginalDirectResolved = null;
                 for (Dependency dep : requested) {
@@ -274,7 +292,7 @@ public class GradleDependencyConfiguration implements Heavyweight, Serializable,
                                     .build();
                             newResolved.add(resolved);
                         } else {
-                            Pom singlePom = singleDependencyPom(dep, requested, repositories, ctx);
+                            Pom singlePom = singleDependencyPom(withConcreteVersion(dep, mpd, repositories), requestedConcrete, repositories, ctx);
                             ResolvedPom singleDependencyResolved = singlePom.resolve(emptyList(), mpd, ctx);
                             List<ResolvedDependency> resolvedList = resolveTransitives
                                     ? singleDependencyResolved.resolveDependencies(Scope.Compile, mpd, ctx)
@@ -767,6 +785,46 @@ public class GradleDependencyConfiguration implements Heavyweight, Serializable,
         }
 
         return managed;
+    }
+
+    /**
+     * Whether a declared version is one of Gradle's dynamic version notations. Maven has no concept of
+     * these, so {@link org.openrewrite.maven.internal.VersionRequirement} carries them through to a POM
+     * request verbatim. Maven version ranges and {@code LATEST}/{@code RELEASE} it does resolve from
+     * metadata itself, so those are deliberately left to it.
+     */
+    private static boolean isGradleDynamicVersion(String version) {
+        return version.regionMatches(true, 0, LATEST_STATUS_PREFIX, 0, LATEST_STATUS_PREFIX.length()) ||
+               XRange.build(version, null).isValid();
+    }
+
+    /**
+     * Resolve a Gradle dynamic version to a concrete version published in the module's
+     * {@code maven-metadata.xml}. The selector names a set of candidate versions rather than an artifact,
+     * so a POM requested at its literal path asks for a file that cannot exist.
+     *
+     * @throws MavenDownloadingException if the selector cannot be resolved, so that no POM is requested for
+     *                                   it and the caller treats it as any other resolution failure.
+     */
+    private static Dependency withConcreteVersion(Dependency dep, MavenPomDownloader mpd, List<MavenRepository> repositories) throws MavenDownloadingException {
+        String declaredVersion = dep.getVersion();
+        if (declaredVersion == null || dep.getGroupId() == null || !isGradleDynamicVersion(declaredVersion)) {
+            return dep;
+        }
+        GroupArtifact ga = dep.getGav().asGroupArtifact();
+        String version = null;
+        // Gradle accepts any status after "latest.", including statuses no comparator models. Such a
+        // selector is unresolvable, so not even metadata is requested for it.
+        Validated<VersionComparator> selector = Semver.validate(declaredVersion, null);
+        if (selector.isValid()) {
+            MavenMetadata metadata = mpd.downloadMetadata(ga, null, repositories);
+            version = requireNonNull(selector.getValue()).maxSatisfying(metadata.getVersioning().getVersions()).orElse(null);
+        }
+        if (version == null) {
+            throw new MavenDownloadingException("Unable to resolve the dynamic version \"" + declaredVersion +
+                                                "\" of " + ga + " to a published version.", null, dep.getGav());
+        }
+        return dep.withGav(dep.getGav().withVersion(version));
     }
 
     /**

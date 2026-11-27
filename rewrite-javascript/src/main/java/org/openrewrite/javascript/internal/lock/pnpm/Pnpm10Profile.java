@@ -19,6 +19,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.JsYaml;
 import org.openrewrite.javascript.internal.lock.Spec;
+import org.openrewrite.javascript.semver.NodeSemver;
 
 import java.util.Arrays;
 import java.util.Map;
@@ -73,6 +74,12 @@ final class Pnpm10Profile {
                     return reason(field + " runtime or package manager fields");
                 }
             }
+            if (entry.getKey().isEmpty()) {
+                String switching = packageManagerSwitch(manifest.get("packageManager"), release);
+                if (switching != null) {
+                    return switching;
+                }
+            }
             Object pnpm = manifest.get("pnpm");
             if (pnpm instanceof Map) {
                 if (Js.jsonStringify(pnpm).contains("${")) {
@@ -103,6 +110,10 @@ final class Pnpm10Profile {
                 Object workspace = JsYaml.load(file.getValue());
                 if (workspace instanceof Map) {
                     String unsupported = settings((Map<String, @Nullable Object>) workspace);
+                    if (unsupported == null) {
+                        unsupported = policy(((Map<?, ?>) workspace).get("minimumReleaseAge"),
+                                ((Map<?, ?>) workspace).get("trustPolicy"), release);
+                    }
                     if (unsupported != null) {
                         return unsupported;
                     }
@@ -127,14 +138,32 @@ final class Pnpm10Profile {
                 }
                 // Advanced .npmrc settings use npm-conf/nopt in pnpm 10, rather than pnpm 11's schema parser.
                 for (String line : file.getValue().split("\n")) {
-                    String key = line.trim().split("=", 2)[0].trim();
+                    String[] pair = line.trim().split("=", 2);
+                    String key = pair[0].trim();
+                    String unsupported = pair.length < 2 ? null : policy(
+                            "minimum-release-age".equals(key) ? pair[1].trim() : null,
+                            "trust-policy".equals(key) ? pair[1].trim() : null, release);
+                    if (unsupported != null) {
+                        return unsupported;
+                    }
                     if (Arrays.asList("shared-workspace-lockfile", "global", "pnpmfile", "pnpmfiles",
                             "use-node-version", "node-version", "resolution-mode", "inject-workspace-packages",
                             "dedupe-peers").contains(key)) {
                         return reason("advanced .npmrc setting " + key);
                     }
+                    // the file npm-conf then loads as the user's or global config is no input
+                    // (PnpmRelease#loadsTheUserAndGlobalConfigFromTrustedSettings)
+                    if (Arrays.asList("userconfig", "globalconfig", "prefix").contains(key) &&
+                        !release.loadsTheUserAndGlobalConfigFromTrustedSettings()) {
+                        return reason("a project .npmrc naming " + key + ", which names the file loaded as the " +
+                                      ("userconfig".equals(key) ? "user's" : "global") + " config");
+                    }
                 }
             }
+        }
+        String pnpmfile = pnpmfile(inputs, release);
+        if (pnpmfile != null) {
+            return pnpmfile;
         }
         String lock = inputs.getLock();
         if (lock != null) {
@@ -161,6 +190,20 @@ final class Pnpm10Profile {
                     }
                 }
             }
+        }
+        return null;
+    }
+
+    // the release age and trust rules pnpm 10.16.0 to 10.32.x change (PnpmRelease#readsAReleaseAgeThePortDoesNot,
+    // PnpmRelease#readsATrustPolicyThePortDoesNot)
+    private static @Nullable String policy(@Nullable Object minimumReleaseAge, @Nullable Object trustPolicy,
+                                           PnpmRelease release) {
+        if (minimumReleaseAge != null && Js.toNumber(minimumReleaseAge) != 0 &&
+            release.readsAReleaseAgeThePortDoesNot()) {
+            return reason("minimumReleaseAge, whose rules changed six times from 10.16.0 to 10.32.x");
+        }
+        if ("no-downgrade".equals(trustPolicy) && release.readsATrustPolicyThePortDoesNot()) {
+            return reason("trustPolicy no-downgrade, whose rules changed five times from 10.21.0 to 10.32.x");
         }
         return null;
     }
@@ -197,6 +240,55 @@ final class Pnpm10Profile {
         } catch (IllegalArgumentException invalid) {
             return true;
         }
+    }
+
+    // the default pnpmfile, whose hooks pnpm runs but where ignorePnpmfile is set where the release reads it:
+    // .npmrc, or pnpm-workspace.yaml from 10.6.0 (PnpmRelease#readsEverySettingFromTheWorkspaceManifest)
+    private static @Nullable String pnpmfile(PnpmLockRegenerator.Inputs inputs, PnpmRelease release) {
+        String found = null;
+        for (String name : new String[]{".pnpmfile.cjs", ".pnpmfile.mjs"}) {
+            if (inputs.getFiles().containsKey(name)) {
+                found = name;
+                break;
+            }
+        }
+        if (found == null) {
+            return null;
+        }
+        String npmrc = inputs.getFiles().get(".npmrc");
+        if (npmrc != null) {
+            for (String line : npmrc.split("\n")) {
+                String[] pair = line.trim().split("=", 2);
+                if (pair.length == 2 && "ignore-pnpmfile".equals(pair[0].trim()) && "true".equals(pair[1].trim())) {
+                    return null;
+                }
+            }
+        }
+        String workspaceManifest = inputs.getFiles().get("pnpm-workspace.yaml");
+        if (workspaceManifest != null && release.readsEverySettingFromTheWorkspaceManifest()) {
+            Object workspace = JsYaml.load(workspaceManifest);
+            if (workspace instanceof Map && Boolean.TRUE.equals(((Map<?, ?>) workspace).get("ignorePnpmfile"))) {
+                return null;
+            }
+        }
+        return reason("the hooks of " + found);
+    }
+
+    // switchCliVersion switches to a version that is not clean, as semver.valid cleans it from 10.2.1
+    // (pnpm/pnpm#9049), which the engine does not follow; from 10.4.0 the running release installs
+    private static @Nullable String packageManagerSwitch(@Nullable Object packageManager, PnpmRelease release) {
+        if (!(packageManager instanceof String) || !((String) packageManager).startsWith("pnpm@") ||
+            release.keepsTheRunningReleaseForAPackageManagerVersionThatIsNotClean()) {
+            return null;
+        }
+        String version = ((String) packageManager).substring("pnpm@".length()).split("\\+", 2)[0];
+        String clean = release.underSemver(semver -> NodeSemver.valid(version,
+                NodeSemver.Options.DEFAULT.release(semver)));
+        if (clean == null || clean.equals(version) ||
+            release.atLeast(10, 2, 1) && clean.equals(release.toString())) {
+            return null;
+        }
+        return reason("packageManager " + packageManager + ", which pnpm " + release + " switches to");
     }
 
     static String reason(String feature) {

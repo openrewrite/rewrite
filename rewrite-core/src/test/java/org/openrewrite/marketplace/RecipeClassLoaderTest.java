@@ -25,6 +25,8 @@ import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.internal.StringUtils;
 
 import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Files;
@@ -35,11 +37,15 @@ import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.Properties;
+import java.util.jar.JarEntry;
+import java.util.jar.JarOutputStream;
 
+import static java.util.Collections.emptyList;
 import static org.objectweb.asm.Opcodes.ACC_PUBLIC;
 import static org.objectweb.asm.Opcodes.V1_8;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class RecipeClassLoaderTest {
 
@@ -123,6 +129,51 @@ class RecipeClassLoaderTest {
                 assertThat(text).isEqualTo("file1");
             }
         }
+    }
+
+    @Test
+    void closingALoaderLeavesAnotherLoaderReadingTheSameJar(@TempDir Path tempDir) throws Exception {
+        Path jar = writeJar(tempDir.resolve("recipes.jar"), "text");
+
+        try (RecipeClassLoader reading = new RecipeClassLoader(jar, emptyList());
+             InputStream in = reading.getResourceAsStream("rewrite.txt")) {
+            try (RecipeClassLoader closing = new RecipeClassLoader(jar, emptyList())) {
+                closing.getResourceAsStream("rewrite.txt").close();
+            }
+            assertThat(StringUtils.readFully(in)).isEqualTo("text");
+        }
+    }
+
+    @Test
+    void closedLoaderLeavesNoCachedJarBehind(@TempDir Path tempDir) throws Exception {
+        Path jar = writeJar(tempDir.resolve("recipes.jar"), "text");
+        try (RecipeClassLoader classLoader = new RecipeClassLoader(jar, emptyList())) {
+            assertThat(StringUtils.readFully(classLoader.getResourceAsStream("rewrite.txt"))).isEqualTo("text");
+        }
+
+        writeJar(jar, "rebuilt text");
+        try (RecipeClassLoader classLoader = new RecipeClassLoader(jar, emptyList())) {
+            assertThat(StringUtils.readFully(classLoader.getResourceAsStream("rewrite.txt"))).isEqualTo("rebuilt text");
+        }
+    }
+
+    @Test
+    void closingALoaderClosesTheStreamsItOpened(@TempDir Path tempDir) throws Exception {
+        Path jar = writeJar(tempDir.resolve("recipes.jar"), "text");
+
+        RecipeClassLoader classLoader = new RecipeClassLoader(jar, emptyList());
+        InputStream in = classLoader.getResourceAsStream("rewrite.txt");
+        classLoader.close();
+
+        assertThatThrownBy(in::read).isInstanceOf(IOException.class);
+    }
+
+    private static Path writeJar(Path jar, String text) throws Exception {
+        try (JarOutputStream out = new JarOutputStream(Files.newOutputStream(jar))) {
+            out.putNextEntry(new JarEntry("rewrite.txt"));
+            out.write(text.getBytes());
+        }
+        return jar;
     }
 
     @Test

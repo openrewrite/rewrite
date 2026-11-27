@@ -1330,7 +1330,8 @@ final class ResolveDependencies {
         resolveDependencyOpts.pinnedVersion = options.getPinnedVersion();
 
         ParentPkg parentPkg = options.getParentPkg();
-        if ("workspace".equals(parentPkg.getResolvedVia()) && parentPkg.getPkgId().startsWith("file:")) {
+        if ("workspace".equals(parentPkg.getResolvedVia()) && parentPkg.getPkgId().startsWith("file:") &&
+            ctx.getRelease().replacesTheCatalogProtocolOfAnInjectedWorkspacePackage()) {
             Catalogs.Resolution catalogResult = Catalogs.resolveFromCatalog(ctx.getCatalogs(), wanted.getAlias(),
                     wanted.getBareSpecifier());
             if ("misconfiguration".equals(catalogResult.getType())) {
@@ -2261,7 +2262,8 @@ final class ResolveDependencies {
             pkg = copy;
         }
         Object engines = pkg.get("engines");
-        if (engines instanceof Map && ((Map<?, ?>) engines).get("runtime") != null) {
+        if (engines instanceof Map && ((Map<?, ?>) engines).get("runtime") != null &&
+            ctx.getRelease().convertsTheEnginesRuntimeOfADependency()) {
             PkgManifestUtils.convertEnginesRuntimeToDependencies(pkg, "engines", "dependencies", ctx.getRelease());
         }
         if (!Js.truthy(pkg.get("name"))) {
@@ -2299,12 +2301,13 @@ final class ResolveDependencies {
                 pkg.put("deprecated", dependencyLockfile.getDeprecated());
             }
             Object bin = pkg.get("bin");
-            if (dependencyLockfile != null && dependencyLockfile.getHasBin() != null && !Js.truthy(bin)) {
+            if (dependencyLockfile != null && dependencyLockfile.getHasBin() != null && !Js.truthy(bin) &&
+                ctx.getRelease().keepsTheLockedHasBinOfAManifestWithoutBin()) {
                 hasBin = Js.truthy(dependencyLockfile.getHasBin());
+            } else if (bin == null || bin == Js.UNDEFINED) {
+                hasBin = Js.truthy(asMap(pkg.get("directories")).get("bin"));
             } else {
-                boolean binPresent = Js.truthy(bin) &&
-                                     !("".equals(bin) || bin instanceof Map && ((Map<?, ?>) bin).isEmpty());
-                hasBin = binPresent || Js.truthy(asMap(pkg.get("directories")).get("bin"));
+                hasBin = Js.truthy(bin) && !("".equals(bin) || bin instanceof Map && ((Map<?, ?>) bin).isEmpty());
             }
         }
 
@@ -2581,19 +2584,29 @@ final class ResolveDependencies {
     }
 
     /**
-     * validateDependencyAlias.ts' {@code assertValidDependencyAliases}, with validate-npm-package-name 7.0.2, where
-     * {@code release} makes it ({@link PnpmRelease#rejectsAnInvalidDependencyName}).
+     * validateDependencyAlias.ts' {@code assertValidDependencyAliases}, with the validate-npm-package-name
+     * {@code release} bundles, where it makes it ({@link PnpmRelease#rejectsAnInvalidDependencyName}).
      */
     static void assertValidDependencyAliases(@Nullable Object deps, String parentPkgDescription, PnpmRelease release) {
         if (deps == null || deps == Js.UNDEFINED) {
             return;
         }
         for (String alias : Js.ownKeys(deps)) {
-            if (!ValidateNpmPackageName.validForOldPackages(alias, ValidateNpmPackageName.Release.V7_0_2) &&
-                release.rejectsAnInvalidDependencyName()) {
+            if (!isValidPackageName(alias, release) && release.rejectsAnInvalidDependencyName()) {
                 throw invalidDependencyName(alias, parentPkgDescription);
             }
         }
+    }
+
+    /**
+     * {@code validateNpmPackageName(name).validForOldPackages} under the validate-npm-package-name {@code release}
+     * bundles ({@link PnpmRelease#validateNpmPackageName}), asked where pnpm 10's and 11's differ.
+     */
+    static boolean isValidPackageName(String name, PnpmRelease release) {
+        boolean pnpm11 = ValidateNpmPackageName.validForOldPackages(name, ValidateNpmPackageName.Release.V7_0_2);
+        boolean pnpm10 = ValidateNpmPackageName.validForOldPackages(name, ValidateNpmPackageName.Release.V5_0_0);
+        return pnpm11 == pnpm10 ? pnpm11 :
+                ValidateNpmPackageName.validForOldPackages(name, release.validateNpmPackageName());
     }
 
     /**
@@ -2759,8 +2772,19 @@ final class ResolveDependencies {
                             legacyNonVersions.add(selector.getKey());
                         }
                     }
-                    String highest = release.underSemver(semver -> NodeSemver.maxSatisfying(legacyVersions, "*",
-                            NodeSemver.Options.INCLUDE_PRERELEASE.release(semver)));
+                    // from 10.30.2 an exact peer version takes a preferred version it names
+                    // (PnpmRelease#hoistsAnExactPeerVersion)
+                    boolean isExactVersion = release.hoistsAnExactPeerVersion() &&
+                                             NodeSemver.valid(range, NodeSemver.Options.DEFAULT) != null;
+                    String satisfying = isExactVersion ? release.underSemver(semver -> NodeSemver.maxSatisfying(
+                            legacyVersions, range, NodeSemver.Options.INCLUDE_PRERELEASE.release(semver))) : null;
+                    if (isExactVersion && satisfying == null && autoInstallPeers) {
+                        dependencies.put(peerName, range);
+                        continue;
+                    }
+                    String highest = satisfying != null ? satisfying : release.underSemver(semver ->
+                            NodeSemver.maxSatisfying(legacyVersions, "*",
+                                    NodeSemver.Options.INCLUDE_PRERELEASE.release(semver)));
                     List<String> parts = new ArrayList<>();
                     parts.add(highest == null ? "" : highest);
                     parts.addAll(legacyNonVersions);

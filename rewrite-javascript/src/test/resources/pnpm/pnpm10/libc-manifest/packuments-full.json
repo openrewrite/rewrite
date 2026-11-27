@@ -1,0 +1,49 @@
+{
+  "dep": {
+    "name": "dep",
+    "dist-tags": {
+      "latest": "1.0.0"
+    },
+    "versions": {
+      "1.0.0": {
+        "name": "dep",
+        "version": "1.0.0",
+        "libc": [
+          "musl"
+        ],
+        "dist": {
+          "integrity": "sha512-8SJdD8OAh6gwRNtJifci6p6D6jOrPGP9YiYkNqgFTsBFLCszduDtPWgbdXZW4BKkijbWFdIiGyunW3aQCmxTbA==",
+          "shasum": "72ba922b525152a2a8000277bf0d9f7357c4fb3f",
+          "tarball": "http://localhost:4882/dep/-/dep-1.0.0.tgz"
+        }
+      }
+    },
+    "time": {
+      "created": "2020-01-01T00:00:00.000Z",
+      "modified": "2020-01-01T00:00:00.000Z",
+      "1.0.0": "2020-01-01T00:00:00.000Z"
+    }
+  },
+  "other": {
+    "name": "other",
+    "dist-tags": {
+      "latest": "1.0.0"
+    },
+    "versions": {
+      "1.0.0": {
+        "name": "other",
+        "version": "1.0.0",
+        "dist": {
+          "integrity": "sha512-QZQOh7FpO5Y+5BdBlfYPSWalxyhg524h8/vIw4hfkTCNZK56GUnINaAVbOatH2jfsTKV+cqCiopwry1QURPdXA==",
+          "shasum": "fe9832e85b7b2e3441acf88de2fcdca744719938",
+          "tarball": "http://localhost:4882/other/-/other-1.0.0.tgz"
+        }
+      }
+    },
+    "time": {
+      "created": "2020-01-01T00:00:00.000Z",
+      "modified": "2020-01-01T00:00:00.000Z",
+      "1.0.0": "2020-01-01T00:00:00.000Z"
+    }
+  }
+}

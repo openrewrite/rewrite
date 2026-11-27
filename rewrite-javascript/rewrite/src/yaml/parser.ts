@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {emptyMarkers, markers, MarkersKind, ParseExceptionResult} from "../markers";
-import {omitColon} from "./markers";
+import {omitColon, tagBeforeAnchor} from "./markers";
 import {Parser, ParserInput, parserInputRead, Parsers} from "../parser";
 import {randomId} from "../uuid";
 import {SourceFile} from "../tree";
@@ -33,6 +33,19 @@ type CstFlowCollection = CST.FlowCollection;
 type CstFlowScalar = CST.FlowScalar;
 type CstBlockScalar = CST.BlockScalar;
 type CstCollectionItem = CST.CollectionItem;
+
+/**
+ * The anchor and tag before a node, with the space before, between and after them.
+ */
+interface Properties {
+    before: string;
+    anchor?: Yaml.Anchor;
+    tag?: Yaml.Tag;
+    tagFirst: boolean;
+    between: string;
+    after: string;
+    source: string;
+}
 
 export class YamlParser extends Parser {
 
@@ -71,6 +84,7 @@ export class YamlParser extends Parser {
  */
 class YamlCstReader {
     private readonly cstTokens: CstToken[];
+    private readonly anchors = new Map<string, Yaml.Anchor>();
 
     constructor(source: string) {
         const parser = new YamlCstParser();
@@ -154,39 +168,20 @@ class YamlCstReader {
         // The document prefix is content BEFORE the --- marker
         // Content AFTER --- goes into the block's first entry
         const startTokens = cstDoc.start || [];
-        let prefix = pendingPrefix;  // Content before this document
-        let explicit = false;
-        let afterDocStart = "";      // Content after ---
-        let seenDocStart = false;
+        const docStart = startTokens.findIndex(token => token.type === 'doc-start');
+        const explicit = docStart >= 0;
+        let prefix = pendingPrefix + this.concatenateSources(startTokens.slice(0, Math.max(docStart, 0)));
+        let afterDocStart = startTokens.slice(docStart + 1);
 
-        for (const token of startTokens) {
-            if (token.type === 'doc-start') {
-                explicit = true;
-                seenDocStart = true;
-            } else if (seenDocStart) {
-                // Content after --- goes into block's prefix
-                afterDocStart += token.source;
-            } else {
-                // Content before --- goes into document prefix
-                prefix += token.source;
-            }
+        const properties = this.readProperties(afterDocStart);
+        if (!explicit) {
+            // Without ---, what comes before the root and its properties is the document's
+            const firstProperty = afterDocStart.findIndex(token => token.type === 'anchor' || token.type === 'tag');
+            const before = properties ? afterDocStart.slice(0, firstProperty) : afterDocStart;
+            prefix += this.concatenateSources(before);
+            afterDocStart = afterDocStart.slice(before.length);
         }
-
-        // Convert the document body and get trailing content
-        let block: Yaml.Block;
-        let trailing = "";
-        if (cstDoc.value) {
-            const result = this.convertTokenWithTrailing(cstDoc.value);
-            block = result.node as Yaml.Block;
-            trailing = result.trailing;
-
-            // Prepend the whitespace after --- to the block
-            if (afterDocStart) {
-                block = this.prependWhitespaceToValue(block, afterDocStart);
-            }
-        } else {
-            block = this.createEmptyScalar(afterDocStart);
-        }
+        const {node: block, trailing} = this.convertValue(afterDocStart, cstDoc.value, "", "prefix");
 
         // Convert document end, passing the trailing content from block
         const {end, afterEnd} = this.convertDocumentEnd(cstDoc.end, cstDocEnd, trailing);
@@ -293,10 +288,44 @@ class YamlCstReader {
     }
 
     private convertMappingEntry(item: CstCollectionItem, pendingPrefix: string = ""): {entry: Yaml.MappingEntry, trailingContent: string} {
-        // Prefix comes from start tokens plus any pending prefix from previous entry's trailing content
-        const prefix = pendingPrefix + this.concatenateSources(item.start || []);
+        const {prefix, key, keyTrailing} = this.convertKey(item, pendingPrefix);
 
-        // Convert key and get its trailing content
+        let beforeMappingValueIndicator = keyTrailing;
+        const afterColon: CstSourceToken[] = [];
+        let seenColon = false;
+        for (const token of item.sep || []) {
+            if (token.type === 'map-value-ind') {
+                seenColon = true;
+            } else if (seenColon) {
+                afterColon.push(token);
+            } else {
+                beforeMappingValueIndicator += token.source;
+            }
+        }
+        const {node: value, trailing: valueTrailing} = this.convertValue(afterColon, item.value, "", "trailing");
+
+        return {
+            entry: {
+                kind: Yaml.Kind.MappingEntry,
+                id: randomId(),
+                prefix,
+                markers: emptyMarkers,
+                key,
+                beforeMappingValueIndicator,
+                value
+            },
+            trailingContent: valueTrailing
+        };
+    }
+
+    /**
+     * Converts the key of a mapping entry, with its anchor and tag. The space before them is the entry's prefix.
+     */
+    private convertKey(item: CstCollectionItem, pendingPrefix: string): {prefix: string, key: Yaml.YamlKey, keyTrailing: string} {
+        const startTokens = item.start || [];
+        const properties = item.key ? this.readProperties(startTokens) : undefined;
+        const prefix = pendingPrefix + (properties ? properties.before : this.concatenateSources(startTokens));
+
         let keyTrailing = "";
         let key: Yaml.YamlKey;
         if (item.key) {
@@ -319,97 +348,13 @@ class YamlCstReader {
                 };
             }
             keyTrailing = keyResult.trailing;
+            if (properties) {
+                key = this.withProperties(key, {...properties, before: ""}).node as Yaml.YamlKey;
+            }
         } else {
             key = this.createEmptyScalar();
         }
-
-        // Extract whitespace before ':' and any anchor/tag after it
-        let beforeMappingValueIndicator = keyTrailing;
-        let anchorForValue: Yaml.Anchor | undefined;
-        let tagForValue: Yaml.Tag | undefined;
-        let afterColonWhitespace = "";
-        let seenColon = false;
-
-        if (item.sep) {
-            const sepTokens = item.sep;
-            for (let i = 0; i < sepTokens.length; i++) {
-                const sepToken = sepTokens[i];
-                if (sepToken.type === 'map-value-ind') {
-                    seenColon = true;
-                } else if (!seenColon) {
-                    // Before the ':'
-                    beforeMappingValueIndicator += sepToken.source;
-                } else if (sepToken.type === 'anchor') {
-                    // Collect all remaining tokens after anchor as postfix
-                    let postfix = "";
-                    for (let j = i + 1; j < sepTokens.length; j++) {
-                        const nextToken = sepTokens[j];
-                        if (nextToken.type === 'tag') {
-                            tagForValue = this.parseTagTokenWithSuffix(nextToken.source, postfix, sepTokens, j + 1);
-                            postfix = "";
-                            break; // Tag handler consumed remaining tokens
-                        } else {
-                            postfix += nextToken.source;
-                        }
-                    }
-                    anchorForValue = {
-                        kind: Yaml.Kind.Anchor,
-                        id: randomId(),
-                        prefix: afterColonWhitespace,
-                        markers: emptyMarkers,
-                        postfix,
-                        key: sepToken.source.substring(1) // Remove &
-                    };
-                    afterColonWhitespace = "";
-                    break; // We've consumed all remaining tokens
-                } else if (sepToken.type === 'tag') {
-                    // Parse tag with its suffix (whitespace after the tag)
-                    tagForValue = this.parseTagTokenWithSuffix(sepToken.source, afterColonWhitespace, sepTokens, i + 1);
-                    afterColonWhitespace = ""; // Remaining whitespace is in tag suffix, not value prefix
-                    break; // Tag handler consumed remaining tokens
-                } else {
-                    // After the ':'
-                    afterColonWhitespace += sepToken.source;
-                }
-            }
-        }
-
-        // Convert value
-        let value: Yaml.Block;
-        let valueTrailing = "";
-        if (item.value) {
-            const valueResult = this.convertTokenWithTrailing(item.value);
-            value = valueResult.node as Yaml.Block;
-            valueTrailing = valueResult.trailing;
-
-            // Apply anchor and tag if found in separator
-            if (anchorForValue && 'anchor' in value) {
-                value = {...value, anchor: anchorForValue} as Yaml.Block;
-            }
-            if (tagForValue && 'tag' in value) {
-                value = {...value, tag: tagForValue} as Yaml.Block;
-            }
-
-            // Prepend accumulated whitespace based on value type
-            if (afterColonWhitespace) {
-                value = this.prependWhitespaceToValue(value, afterColonWhitespace);
-            }
-        } else {
-            value = this.createEmptyScalar(afterColonWhitespace);
-        }
-
-        return {
-            entry: {
-                kind: Yaml.Kind.MappingEntry,
-                id: randomId(),
-                prefix,
-                markers: emptyMarkers,
-                key,
-                beforeMappingValueIndicator,
-                value
-            },
-            trailingContent: valueTrailing
-        };
+        return {prefix, key, keyTrailing};
     }
 
     private convertBlockSequenceWithTrailing(cst: CstBlockSequence): {node: Yaml.Sequence, trailing: string} {
@@ -443,79 +388,11 @@ class YamlCstReader {
     }
 
     private convertSequenceEntry(item: CstCollectionItem, dash: boolean, pendingPrefix: string = ""): {entry: Yaml.SequenceEntry, trailingContent: string} {
-        // Build prefix from start tokens, but exclude the dash indicator itself
-        // Also extract anchor and tag if present
-        let prefix = pendingPrefix;
-        let afterDashSpace = "";
-        let seenDash = false;
-        let anchorForValue: Yaml.Anchor | undefined;
-        let tagForValue: Yaml.Tag | undefined;
-
         const startTokens = item.start || [];
-        for (let i = 0; i < startTokens.length; i++) {
-            const token = startTokens[i];
-            if (token.type === 'seq-item-ind') {
-                seenDash = true;
-            } else if (seenDash) {
-                if (token.type === 'anchor') {
-                    // Collect all remaining tokens after anchor as postfix
-                    let postfix = "";
-                    for (let j = i + 1; j < startTokens.length; j++) {
-                        const nextToken = startTokens[j];
-                        if (nextToken.type === 'tag') {
-                            tagForValue = this.parseTagTokenWithSuffix(nextToken.source, postfix, startTokens, j + 1);
-                            postfix = "";
-                            break;
-                        } else {
-                            postfix += nextToken.source;
-                        }
-                    }
-                    anchorForValue = {
-                        kind: Yaml.Kind.Anchor,
-                        id: randomId(),
-                        prefix: afterDashSpace,
-                        markers: emptyMarkers,
-                        postfix,
-                        key: token.source.substring(1) // Remove &
-                    };
-                    afterDashSpace = "";
-                    break; // We've consumed all remaining tokens
-                } else if (token.type === 'tag') {
-                    tagForValue = this.parseTagTokenWithSuffix(token.source, afterDashSpace, startTokens, i + 1);
-                    afterDashSpace = "";
-                    break; // Tag handler consumed remaining tokens
-                } else {
-                    afterDashSpace += token.source;
-                }
-            } else {
-                prefix += token.source;
-            }
-        }
-
-        // Convert value
-        let block: Yaml.Block;
-        let trailing = "";
-        if (item.value) {
-            const valueResult = this.convertTokenWithTrailing(item.value);
-            block = valueResult.node as Yaml.Block;
-            trailing = valueResult.trailing;
-
-            // Apply anchor and tag if found in start tokens
-            if (anchorForValue && 'anchor' in block) {
-                block = {...block, anchor: anchorForValue} as Yaml.Block;
-            }
-            if (tagForValue && 'tag' in block) {
-                block = {...block, tag: tagForValue} as Yaml.Block;
-            }
-
-            // Prepend the space after dash to the block
-            // Use prependWhitespaceToValue to ensure Mapping/Sequence keep empty prefix
-            if (afterDashSpace) {
-                block = this.prependWhitespaceToValue(block, afterDashSpace);
-            }
-        } else {
-            block = this.createEmptyScalar(afterDashSpace);
-        }
+        const dashIndex = startTokens.findIndex(token => token.type === 'seq-item-ind');
+        const prefix = pendingPrefix + this.concatenateSources(dashIndex >= 0 ? startTokens.slice(0, dashIndex) : startTokens);
+        const afterDash = dashIndex >= 0 ? startTokens.slice(dashIndex + 1) : [];
+        const {node: block, trailing} = this.convertValue(afterDash, item.value, "", "trailing");
 
         return {
             entry: {
@@ -635,33 +512,10 @@ class YamlCstReader {
     }
 
     private convertFlowMappingEntry(item: CstCollectionItem, pendingPrefix: string): {entry: Yaml.MappingEntry, trailingContent: string} {
-        const prefix = pendingPrefix + this.concatenateSources(item.start || []);
-
-        let keyTrailing = "";
-        let key: Yaml.YamlKey;
-        if (item.key) {
-            const keyResult = this.convertTokenWithTrailing(item.key);
-            if (isYamlKey(keyResult.node)) {
-                key = keyResult.node;
-            } else {
-                key = {
-                    kind: Yaml.Kind.Scalar,
-                    id: randomId(),
-                    prefix: keyResult.node.prefix,
-                    markers: emptyMarkers,
-                    style: Yaml.ScalarStyle.PLAIN,
-                    anchor: undefined,
-                    tag: undefined,
-                    value: CST.stringify(item.key).trim()
-                };
-            }
-            keyTrailing = keyResult.trailing;
-        } else {
-            key = this.createEmptyScalar();
-        }
+        const {prefix, key, keyTrailing} = this.convertKey(item, pendingPrefix);
 
         let beforeMappingValueIndicator = keyTrailing;
-        let afterColonSpace = "";
+        const afterColon: CstSourceToken[] = [];
         let seenColon = false;
 
         if (item.sep) {
@@ -669,7 +523,7 @@ class YamlCstReader {
                 if (token.type === 'map-value-ind') {
                     seenColon = true;
                 } else if (seenColon) {
-                    afterColonSpace += token.source;
+                    afterColon.push(token);
                 } else if (token.type === 'comma') {
                     // This is the comma after the entry, not before
                     // Skip it as we handle comma separately
@@ -679,18 +533,7 @@ class YamlCstReader {
             }
         }
 
-        let value: Yaml.Block;
-        let valueTrailing = "";
-        if (item.value) {
-            const valueResult = this.convertTokenWithTrailing(item.value);
-            value = valueResult.node as Yaml.Block;
-            valueTrailing = valueResult.trailing;
-            if (afterColonSpace) {
-                value = this.prependWhitespaceToValue(value, afterColonSpace);
-            }
-        } else {
-            value = this.createEmptyScalar(afterColonSpace);
-        }
+        const {node: value, trailing: valueTrailing} = this.convertValue(afterColon, item.value, "", "prefix");
 
         // In flow mappings like { "MV7", "7J04" }, entries may lack explicit colons
         const entryMarkers = seenColon ? emptyMarkers : markers(omitColon());
@@ -729,11 +572,9 @@ class YamlCstReader {
                 tag: undefined
             };
             trailing = entryResult.trailingContent;
-        } else if (item.value) {
-            prefix += this.concatenateSources(startTokens);
-            const valueResult = this.convertTokenWithTrailing(item.value);
-            block = valueResult.node as Yaml.Block;
-            trailing = valueResult.trailing;
+        } else if (item.value || startTokens.some(token => token.type === 'anchor' || token.type === 'tag')) {
+            ({node: block, trailing} = this.convertValue(startTokens, item.value, prefix, "trailing"));
+            prefix = "";
         } else {
             prefix += this.concatenateSources(startTokens);
             block = this.createEmptyScalar();
@@ -839,7 +680,8 @@ class YamlCstReader {
         // Alias source is like "*anchorName"
         const key = cst.source.substring(1); // Remove the *
 
-        const anchor: Yaml.Anchor = {
+        // As in the Java parser, an alias holds the anchor it refers to
+        const anchor: Yaml.Anchor = this.anchors.get(key) ?? {
             kind: Yaml.Kind.Anchor,
             id: randomId(),
             prefix: "",
@@ -867,7 +709,7 @@ class YamlCstReader {
         // Anchor source is like "&anchorName"
         const key = source.substring(1); // Remove the &
 
-        return {
+        const anchor: Yaml.Anchor = {
             kind: Yaml.Kind.Anchor,
             id: randomId(),
             prefix,
@@ -875,13 +717,11 @@ class YamlCstReader {
             postfix: "",
             key
         };
+        this.anchors.set(key, anchor);
+        return anchor;
     }
 
     private parseTagToken(source: string, prefix: string): Yaml.Tag {
-        return this.parseTagTokenWithSuffix(source, prefix, [], 0);
-    }
-
-    private parseTagTokenWithSuffix(source: string, prefix: string, remainingTokens: CstSourceToken[], startIndex: number): Yaml.Tag {
         let name: string;
         let tagKind: Yaml.TagKind;
 
@@ -899,21 +739,135 @@ class YamlCstReader {
             tagKind = Yaml.TagKind.LOCAL;
         }
 
-        // Collect remaining tokens as suffix (whitespace after the tag)
-        let suffix = "";
-        for (let i = startIndex; i < remainingTokens.length; i++) {
-            suffix += remainingTokens[i].source;
-        }
-
         return {
             kind: Yaml.Kind.Tag,
             id: randomId(),
             prefix,
             markers: emptyMarkers,
             name,
-            suffix,
+            suffix: "",
             tagKind
         };
+    }
+
+    /**
+     * Converts the value after an indicator such as `:` or `-`, given the tokens between them. Any anchor and tag
+     * among the tokens go on the value. Without them, the space before an absent value goes in the empty scalar's
+     * prefix or in the trailing content, as `emptySpace` says.
+     */
+    private convertValue(tokens: CstSourceToken[], token: CstToken | undefined, lead: string,
+                         emptySpace: "prefix" | "trailing"): {node: Yaml.Block, trailing: string} {
+        const result = token ? this.convertTokenWithTrailing(token) : undefined;
+        const properties = this.readProperties(tokens);
+        if (properties) {
+            const placed = this.withProperties(result?.node as Yaml.Block | undefined, {...properties, before: lead + properties.before});
+            return {node: placed.node, trailing: placed.trailing + (result?.trailing ?? "")};
+        }
+        const space = lead + this.concatenateSources(tokens);
+        if (result) {
+            const node = result.node as Yaml.Block;
+            return {node: space ? this.prependWhitespaceToValue(node, space) : node, trailing: result.trailing};
+        }
+        return emptySpace === "prefix" ?
+            {node: this.createEmptyScalar(space), trailing: ""} :
+            {node: this.createEmptyScalar(), trailing: space};
+    }
+
+    /**
+     * Reads the anchor and tag among the tokens before a node, or `undefined` if there are none.
+     */
+    private readProperties(tokens: CstSourceToken[]): Properties | undefined {
+        let anchor: Yaml.Anchor | undefined;
+        let tag: Yaml.Tag | undefined;
+        let tagFirst = false;
+        let before = "";
+        let between = "";
+        let after = "";
+        for (const token of tokens) {
+            if (token.type === 'anchor' || token.type === 'tag') {
+                if (anchor === undefined && tag === undefined) {
+                    tagFirst = token.type === 'tag';
+                } else {
+                    between = after;
+                    after = "";
+                }
+                if (token.type === 'anchor') {
+                    anchor = this.parseAnchorToken(token.source, "");
+                } else {
+                    tag = this.parseTagToken(token.source, "");
+                }
+            } else if (anchor === undefined && tag === undefined) {
+                before += token.source;
+            } else {
+                after += token.source;
+            }
+        }
+        return anchor || tag ? {before, anchor, tag, tagFirst, between, after, source: this.concatenateSources(tokens)} : undefined;
+    }
+
+    /**
+     * Gives a node the anchor and tag before it, with the space around them where the Java parser puts it. An absent
+     * node becomes an empty scalar, and the space after its properties is returned as trailing content.
+     */
+    private withProperties(node: Yaml.Block | undefined, properties: Properties): {node: Yaml.Block, trailing: string} {
+        const {before, between, after, tagFirst} = properties;
+        let anchor = properties.anchor;
+        let tag = properties.tag;
+        const nodeMarkers = anchor && tag && tagFirst ? markers(tagBeforeAnchor()) : emptyMarkers;
+
+        if (node === undefined || node.kind === Yaml.Kind.Scalar) {
+            // On a scalar, each property holds the space after it, unless the scalar is empty
+            const empty = node === undefined || ((node as Yaml.Scalar).style === Yaml.ScalarStyle.PLAIN && (node as Yaml.Scalar).value === "");
+            const last = empty ? "" : after;
+            if (anchor && tag) {
+                anchor = {...anchor, postfix: tagFirst ? last : between};
+                tag = {...tag, suffix: tagFirst ? between : last};
+            } else if (anchor) {
+                anchor = {...anchor, postfix: last};
+            } else if (tag) {
+                tag = {...tag, suffix: last};
+            }
+            this.remember(anchor);
+            const scalar = (node ?? this.createEmptyScalar()) as Yaml.Scalar;
+            return {
+                node: {...scalar, prefix: before + scalar.prefix, markers: nodeMarkers, anchor, tag},
+                trailing: empty ? after : ""
+            };
+        }
+
+        if (node.kind === Yaml.Kind.Alias) {
+            // An alias can't have properties
+            return {node: this.prependWhitespaceToValue(node, properties.source), trailing: ""};
+        }
+
+        // A collection has no prefix, so its first property holds the space before it
+        let rest: string;
+        if (anchor && tag && tagFirst) {
+            tag = {...tag, prefix: before, suffix: between};
+            anchor = {...anchor, prefix: "", postfix: ""};
+            rest = after;
+        } else {
+            if (anchor) {
+                anchor = {...anchor, prefix: before, postfix: ""};
+            }
+            if (tag) {
+                // As the Java parser does, a tag holds the space after it up to the end of its line
+                const lineBreak = after.indexOf("\n");
+                tag = {...tag, prefix: anchor ? between : before, suffix: lineBreak >= 0 ? after.slice(0, lineBreak + 1) : after};
+                rest = lineBreak >= 0 ? after.slice(lineBreak + 1) : "";
+            } else {
+                rest = after;
+            }
+        }
+        this.remember(anchor);
+        const collection = {...node, markers: nodeMarkers, anchor, tag} as Yaml.Mapping | Yaml.Sequence;
+        return {node: rest ? this.prependWhitespaceToValue(collection, rest) : collection, trailing: ""};
+    }
+
+    private remember(anchor: Yaml.Anchor | undefined): void {
+        if (anchor) {
+            this.anchors.set(anchor.key, anchor);
+        }
     }
 
     private createEmptyScalar(prefix: string = ""): Yaml.Scalar {

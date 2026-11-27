@@ -209,6 +209,19 @@ class SemanticallyEqualTest {
         assertThat(SemanticallyEqual.areEqual(doc1, doc2)).isFalse();
     }
 
+    @Test
+    void nullIsNotEqualToNonNull() {
+        Toml.Document doc = parseToml("key = \"value\"");
+
+        assertThat(SemanticallyEqual.areEqual(null, doc)).isFalse();
+        assertThat(SemanticallyEqual.areEqual(doc, null)).isFalse();
+    }
+
+    @Test
+    void nullIsEqualToNull() {
+        assertThat(SemanticallyEqual.areEqual(null, null)).isTrue();
+    }
+
     private Toml.Document parseToml(String content) {
         return new TomlParser()
                 .parse(content)

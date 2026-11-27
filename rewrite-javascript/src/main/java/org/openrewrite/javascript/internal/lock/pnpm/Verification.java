@@ -407,8 +407,9 @@ final class Verification {
                                                 orUndefined(specifier) + " don't match package manifest specifier (" +
                                                 Js.string(pkgDeps.get(depName)) + ")");
                 }
-                if (specifier == null || release.underSemver(semver -> NodeSemver.validRange(specifier,
-                        NodeSemver.Options.DEFAULT.release(semver))) == null) {
+                if (specifier == null || !release.checksTheLockedVersionOfAnImporter() ||
+                    release.underSemver(semver -> NodeSemver.validRange(specifier,
+                            NodeSemver.Options.DEFAULT.release(semver))) == null) {
                     continue;
                 }
                 String version = DepPath.removeSuffix(importerDeps.get(depName));

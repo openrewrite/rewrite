@@ -647,6 +647,7 @@ class JavaScriptSender extends JavaScriptRpcVisitor<RpcSendQueue> {
         q.getAndSendList(tag, el => el.children!, child => child.id, child => this.visit(child, q));
         q.getAndSend(tag, el => el.closingName, el => this.visitLeftPadded(el, q));
         q.getAndSend(tag, el => spaceRef(el.afterClosingName), el => this.visitSpace(el, q));
+        q.getAndSend(tag, el => asRef(el.methodType), el => this.visitType(el, q));
 
         return tag;
     }
@@ -1287,7 +1288,8 @@ class JavaScriptReceiver extends JavaScriptRpcVisitor<RpcReceiveQueue> {
                 selfClosing: q.receive(tag.selfClosing, space => this.visitSpace(space, q)),
                 children: q.receiveList(tag.children, child => this.visit(child, q)),
                 closingName: q.receive(tag.closingName, el => this.visitLeftPadded(el, q)),
-                afterClosingName: q.receive(tag.afterClosingName, el => this.visitSpace(el, q))
+                afterClosingName: q.receive(tag.afterClosingName, el => this.visitSpace(el, q)),
+                methodType: q.receive(tag.methodType, el => this.visitType(el, q) as unknown as Type.Method)
             };
             // Type assertion is needed due to `JSX.Tag` being a union type
             return updateIfChanged(tag, updates as any);

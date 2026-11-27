@@ -388,21 +388,33 @@ final class Install {
                 options.getRelease()));
         Double minimumReleaseAge = options.getNumber("minimumReleaseAge");
         List<String> minimumReleaseAgeExclude = options.getStrings("minimumReleaseAgeExclude");
-        if (minimumReleaseAge != null && minimumReleaseAge != 0) {
+        // from 10.16.0 (PnpmRelease#readsMinimumReleaseAge)
+        if (minimumReleaseAge != null && minimumReleaseAge != 0 && options.getRelease().readsMinimumReleaseAge()) {
+            if (options.getRelease().readsAReleaseAgeThePortDoesNot()) {
+                throw new CannotKnow("the versions pnpm resolves under minimumReleaseAge from 10.16.0 to 10.32.x, " +
+                                     "whose rules changed six times in those releases");
+            }
             ctx.setMaximumPublishedBy(now.minusMillis((long) (minimumReleaseAge * 60 * 1000)));
         }
-        if (minimumReleaseAgeExclude != null) {
+        if (minimumReleaseAgeExclude != null && options.getRelease().readsMinimumReleaseAge()) {
             ctx.setPublishedByExclude(PackageVersionPolicy.createPackageVersionPolicyOrThrow(minimumReleaseAgeExclude,
                     "minimumReleaseAgeExclude", options.getRelease()));
         }
-        Object trustPolicy = options.get("trustPolicy");
-        ctx.setTrustPolicy(trustPolicy == null || trustPolicy == Js.UNDEFINED ? null : Js.string(trustPolicy));
-        List<String> trustPolicyExclude = options.getStrings("trustPolicyExclude");
-        if (trustPolicyExclude != null) {
-            ctx.setTrustPolicyExclude(PackageVersionPolicy.createPackageVersionPolicyOrThrow(trustPolicyExclude,
-                    "trustPolicyExclude", options.getRelease()));
+        // from 10.21.0 (PnpmRelease#readsTrustPolicy)
+        if (options.getRelease().readsTrustPolicy()) {
+            Object trustPolicy = options.get("trustPolicy");
+            if ("no-downgrade".equals(trustPolicy) && options.getRelease().readsATrustPolicyThePortDoesNot()) {
+                throw new CannotKnow("the versions pnpm resolves under trustPolicy no-downgrade from 10.21.0 to " +
+                                     "10.32.x, whose rules changed five times in those releases");
+            }
+            ctx.setTrustPolicy(trustPolicy == null || trustPolicy == Js.UNDEFINED ? null : Js.string(trustPolicy));
+            List<String> trustPolicyExclude = options.getStrings("trustPolicyExclude");
+            if (trustPolicyExclude != null) {
+                ctx.setTrustPolicyExclude(PackageVersionPolicy.createPackageVersionPolicyOrThrow(trustPolicyExclude,
+                        "trustPolicyExclude", options.getRelease()));
+            }
+            ctx.setTrustPolicyIgnoreAfter(options.getNumber("trustPolicyIgnoreAfter"));
         }
-        ctx.setTrustPolicyIgnoreAfter(options.getNumber("trustPolicyIgnoreAfter"));
         Object peersSuffixMaxLength = options.get("peersSuffixMaxLength");
         Consumer<List<ResolveDependencies.PolicyViolation>> handler =
                 opts.getOpts().getHandleResolutionPolicyViolations();
@@ -434,7 +446,9 @@ final class Install {
             written = lockFile.writeWantedLockfile(newLockfile, options.getRelease());
         }
         ReportPeerDependencyIssues.reportPeerDependencyIssues(result.getPeerDependencyIssuesByProjects(),
-                options.getPeerDependencyRules(), options.isTrue("strictPeerDependencies"), options.getRelease());
+                options.getPeerDependencyRules(), options.isTrue("strictPeerDependencies"), options.getRelease(),
+                options.getRelease().reportsTheRulesOfTheConfig() ? options.getConfigPeerDependencyRules() :
+                        options.getRootManifestPeerDependencyRules());
         return written;
     }
 

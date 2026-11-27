@@ -905,6 +905,7 @@ export namespace JSX {
         readonly typeArguments?: J.Container<Expression>;
         readonly afterName: J.Space;
         readonly attributes: J.RightPadded<Attribute | SpreadAttribute>[];
+        readonly methodType?: Type.Method;
     }
 
     /**

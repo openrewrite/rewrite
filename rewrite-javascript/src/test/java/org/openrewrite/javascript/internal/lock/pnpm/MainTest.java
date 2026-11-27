@@ -242,12 +242,13 @@ class MainTest {
     }
 
     /**
-     * Recorded with corepack 0.35.0: it starts devEngines' 10.34.6 and refuses a range, where pnpm run directly
-     * installs with 11.2.2; with the environment unknown the host does not say which runs.
+     * Recorded with corepack 0.35.0: it starts devEngines' release and refuses a range, where pnpm run directly
+     * installs with 11.2.2; with the environment unknown the host does not say which runs. 10.34.2 is a release the
+     * engine does not reproduce.
      */
     @ParameterizedTest
     @CsvSource(delimiter = '|', value = {
-      "{\"name\":\"pnpm\",\"version\":\"10.34.6\",\"onFail\":\"ignore\"}|corepack starts pnpm 10.34.6 and pnpm run " +
+      "{\"name\":\"pnpm\",\"version\":\"10.34.2\",\"onFail\":\"ignore\"}|corepack starts pnpm 10.34.2 and pnpm run " +
       "directly installs with 11.2.2",
       "{\"name\":\"pnpm\",\"version\":\">=1.0.0\",\"onFail\":\"error\"}|corepack refuses to start pnpm (Invalid " +
       "package manager specification in package.json (pnpm@>=1.0.0); expected a semver version",

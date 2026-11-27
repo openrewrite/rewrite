@@ -22,7 +22,6 @@ val pluginLocalTestClasspath = configurations.create("pluginLocalTestClasspath")
 
 dependencies {
     constraints {
-        // last version which supports java 8, which testGradle4 runs on
         testImplementation("org.assertj:assertj-core:3.27.4!!")
     }
     implementation(gradleApi())
@@ -65,12 +64,28 @@ java {
     }
 }
 
+tasks.named<Test>("test") {
+    useJUnitPlatform {
+        excludeTags("gradle4")
+    }
+}
+
 val testGradle4 = tasks.register<Test>("testGradle4") {
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform {
+        includeTags("gradle4")
+    }
     systemProperty("org.openrewrite.test.gradleVersion", "4.10")
-    systemProperty("jarLocationForTest", tasks.named<Jar>("jar").get().archiveFile.get().asFile.absolutePath)
-    // Gradle 4 predates support for Java 11
-    javaLauncher.set(javaToolchains.launcherFor {
-        languageVersion.set(JavaLanguageVersion.of(8))
+    jvmArgumentProviders.add(object : CommandLineArgumentProvider {
+        @get:Nested
+        val gradleJavaLauncher: Provider<JavaLauncher> = javaToolchains.launcherFor {
+            languageVersion.set(JavaLanguageVersion.of(8))
+        }
+
+        override fun asArguments() = listOf(
+            "-Dorg.openrewrite.test.gradleJavaHome=${gradleJavaLauncher.get().metadata.installationPath.asFile.absolutePath}"
+        )
     })
 }
 
