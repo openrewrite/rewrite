@@ -1444,7 +1444,8 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         p.append("new");
         JContainer<Expression> arguments = newClass.getPadding().getArguments();
         boolean printArguments = arguments != null &&
-                (!arguments.getElements().isEmpty() || !arguments.getMarkers().findFirst(OmitParentheses.class).isPresent());
+                (!arguments.getMarkers().findFirst(OmitParentheses.class).isPresent() ||
+                 !arguments.getElements().stream().allMatch(J.Empty.class::isInstance));
         if (newClass.getClazz() instanceof J.IntersectionType && printArguments) {
             J.IntersectionType intersectionType = (J.IntersectionType) newClass.getClazz();
             beforeSyntax(intersectionType, Space.Location.INTERSECTION_TYPE_PREFIX, p);

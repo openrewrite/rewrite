@@ -633,6 +633,7 @@ class ScalaTreeVisitor(
           }
           val closeParen = positionOfNext(")", cursor)
           if (closeParen >= 0) cursor = closeParen + 1
+          if (app.args.isEmpty) args.addAll(noArguments(parenInterior(openIdx, closeParen)))
         }
 
         updateCursor(app.span.end)
@@ -686,6 +687,7 @@ class ScalaTreeVisitor(
     }
     val closeParen = positionOfNext(")", cursor)
     if (closeParen >= 0) cursor = closeParen + 1
+    if (app.args.isEmpty) args.addAll(noArguments(parenInterior(openIdx, closeParen)))
     updateCursor(app.span.end)
     val mt = methodTypeAt(app)
     new J.MethodInvocation(Tree.randomId(), prefix, Markers.EMPTY,
@@ -934,7 +936,7 @@ class ScalaTreeVisitor(
           JRightPadded.build(selectExpr),
           null,
           name,
-          JContainer.build(Space.EMPTY, new util.ArrayList[JRightPadded[Expression]](), Markers.EMPTY),
+          JContainer.build(Space.EMPTY, noArguments(Space.EMPTY), Markers.EMPTY),
           postfixMethodType
         )
     }
@@ -1057,6 +1059,7 @@ class ScalaTreeVisitor(
       if (closeParenPos >= 0) {
         cursor = closeParenPos + 1
       }
+      if (app.args.isEmpty) args.addAll(noArguments(parenInterior(parenPos, closeParenPos)))
     }
 
     val (select, methodName) = directCallName match {
@@ -1271,6 +1274,7 @@ class ScalaTreeVisitor(
         }
         val closeParen = positionOfNext(")", cursor)
         if (closeParen >= 0) cursor = closeParen + 1
+        if (app.args.isEmpty) outerArgs.addAll(noArguments(parenInterior(openIdx, closeParen)))
         if (app.span.exists) {
           val end = Math.max(0, app.span.end - offsetAdjustment)
           if (end > cursor && end <= source.length) cursor = end
@@ -1374,6 +1378,16 @@ class ScalaTreeVisitor(
         if (closeParenPos >= 0) {
           cursor = closeParenPos + 1
         }
+      } else {
+        val appEnd = if (app.span.exists) Math.min(source.length, Math.max(0, app.span.end - offsetAdjustment)) else source.length
+        val funEnd = if (app.fun.span.exists) Math.max(0, app.fun.span.end - offsetAdjustment) else cursor
+        val searchStart = Math.max(cursor, funEnd)
+        val (parenIndex, closeIndex) = locateEmptyParentheses(searchStart, appEnd)
+        if (closeIndex >= 0) {
+          argContainerPrefix = ScalaSpace.format(source, searchStart, parenIndex)
+          cursor = closeIndex + 1
+        }
+        args.addAll(noArguments(parenInterior(parenIndex, closeIndex)))
       }
     }
 
@@ -1695,7 +1709,7 @@ class ScalaTreeVisitor(
       select,
       null,
       typedMethodName(name, methodType),
-      JContainer.build(Space.EMPTY, Collections.emptyList[JRightPadded[Expression]](),
+      JContainer.build(Space.EMPTY, noArguments(Space.EMPTY),
         Markers.build(Collections.singletonList(new OmitParentheses(Tree.randomId())))),
       methodType
     )
@@ -2270,8 +2284,14 @@ class ScalaTreeVisitor(
   }
 
   private def omittedNewClassArguments(): JContainer[Expression] =
-    JContainer.build(Space.EMPTY, Collections.emptyList[JRightPadded[Expression]](),
+    JContainer.build(Space.EMPTY, noArguments(Space.EMPTY),
       Markers.build(Collections.singletonList(new OmitParentheses(Tree.randomId()))))
+
+  private def noArguments(interior: Space): util.List[JRightPadded[Expression]] =
+    Collections.singletonList(JRightPadded.build[Expression](new J.Empty(Tree.randomId(), interior, Markers.EMPTY)))
+
+  private def parenInterior(open: Int, close: Int): Space =
+    if (open >= 0 && close > open) ScalaSpace.format(source, open + 1, close) else Space.EMPTY
 
   private def locateEmptyParentheses(from: Int, until: Int): (Int, Int) = {
     if (from < 0 || from >= until || until > source.length) return (-1, -1)
@@ -2281,12 +2301,8 @@ class ScalaTreeVisitor(
     if (close >= 0) (from + open, from + close) else (-1, -1)
   }
 
-  private def emptyNewClassArguments(beforeParen: Space, interior: String): JContainer[Expression] = {
-    val elements =
-      if (interior.isEmpty) Collections.emptyList[JRightPadded[Expression]]()
-      else Collections.singletonList(JRightPadded.build[Expression](new J.Empty(Tree.randomId(), ScalaSpace.format(interior), Markers.EMPTY)))
-    JContainer.build(beforeParen, elements, Markers.EMPTY)
-  }
+  private def emptyNewClassArguments(beforeParen: Space, interior: String): JContainer[Expression] =
+    JContainer.build(beforeParen, noArguments(ScalaSpace.format(interior)), Markers.EMPTY)
 
   private def visitNew(newTree: Trees.New[?]): J = {
     // Anonymous classes in Scala are represented as New nodes with Template bodies
@@ -6255,7 +6271,7 @@ class ScalaTreeVisitor(
         }
         val typeParams = parseTypeApplyArgs(ta)
         val omitParens = Markers.build(Collections.singletonList(new OmitParentheses(Tree.randomId())))
-        val args = JContainer.build(Space.EMPTY, Collections.emptyList[JRightPadded[Expression]](), omitParens)
+        val args = JContainer.build(Space.EMPTY, noArguments(Space.EMPTY), omitParens)
         updateCursor(ta.span.end)
         val mt = methodTypeOfTree(ta)
         return new J.MethodInvocation(
@@ -6325,7 +6341,7 @@ class ScalaTreeVisitor(
 
     // Empty value-argument container with OmitParentheses marker
     val omitParens = Markers.build(Collections.singletonList(new OmitParentheses(Tree.randomId())))
-    val args = JContainer.build(Space.EMPTY, Collections.emptyList[JRightPadded[Expression]](), omitParens)
+    val args = JContainer.build(Space.EMPTY, noArguments(Space.EMPTY), omitParens)
 
     updateCursor(ta.span.end)
     val mt = methodTypeOfTree(ta)

@@ -246,7 +246,7 @@ public class ScalaParenthesizeVisitor<P> extends ScalaVisitor<P> {
 
     private static boolean isInfix(J.MethodInvocation method) {
         return method.getMarkers().findFirst(InfixNotation.class).isPresent() && method.getSelect() != null &&
-               method.getArguments().size() == 1;
+               method.getArguments().size() == 1 && !(method.getArguments().get(0) instanceof J.Empty);
     }
 
     private static boolean isRightAssociative(Expression e) {
