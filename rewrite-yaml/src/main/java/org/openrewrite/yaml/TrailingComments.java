@@ -227,15 +227,19 @@ final class TrailingComments {
     static boolean endsWithBlockScalar(Object node) {
         if (node instanceof Yaml.Mapping.Entry) {
             return endsWithBlockScalar(((Yaml.Mapping.Entry) node).getValue());
-        } else if (node instanceof Yaml.Sequence.Entry) {
+        }
+        if (node instanceof Yaml.Sequence.Entry) {
             return endsWithBlockScalar(((Yaml.Sequence.Entry) node).getBlock());
-        } else if (node instanceof Yaml.Scalar) {
+        }
+        if (node instanceof Yaml.Scalar) {
             Yaml.Scalar.Style style = ((Yaml.Scalar) node).getStyle();
             return style == Yaml.Scalar.Style.FOLDED || style == Yaml.Scalar.Style.LITERAL;
-        } else if (node instanceof Yaml.Mapping) {
+        }
+        if (node instanceof Yaml.Mapping) {
             List<Yaml.Mapping.Entry> entries = ((Yaml.Mapping) node).getEntries();
             return !isFlow(node) && !entries.isEmpty() && endsWithBlockScalar(entries.get(entries.size() - 1));
-        } else if (node instanceof Yaml.Sequence) {
+        }
+        if (node instanceof Yaml.Sequence) {
             List<Yaml.Sequence.Entry> entries = ((Yaml.Sequence) node).getEntries();
             return !isFlow(node) && !entries.isEmpty() && endsWithBlockScalar(entries.get(entries.size() - 1));
         }
