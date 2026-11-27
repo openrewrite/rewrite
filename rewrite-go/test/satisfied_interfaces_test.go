@@ -89,6 +89,65 @@ func TestAGenericTypeNamesNoInterfacesSinceItsMethodSetVariesWithItsArguments(t 
 	assert.Empty(t, interfaceNames(declaredClasses(t, store)["Box"]))
 }
 
+func TestAnInterfaceNamesAnotherWithTheSameMethodsOnlyIfItEmbedsIt(t *testing.T) {
+	declared := declaredClasses(t, `package shop
+
+import "io"
+
+type Runner interface {
+	Run() error
+}
+
+type Simulator interface {
+	Run() error
+}
+
+type Closer interface {
+	io.Closer
+}
+`)
+
+	assert.Empty(t, interfaceNames(declared["Runner"]),
+		"two interfaces with the same methods would inherit from each other, which Java forbids")
+	assert.Equal(t, []string{"io.Closer"}, interfaceNames(declared["Closer"]),
+		"an embedded interface is named even when it adds no methods")
+}
+
+func TestAnInterfaceNamesOneItEmbedsThroughAnotherPackagesInterface(t *testing.T) {
+	files := map[string]string{
+		"store/store.go": `package store
+
+import "io"
+
+type Closer interface {
+	io.Closer
+}
+`,
+		"store/disk/disk.go": `package disk
+
+import "example.com/shop/store"
+
+type Volume interface {
+	store.Closer
+}
+`,
+	}
+	pi := parser.NewProjectImporter("example.com/shop", nil)
+	pi.SetProjectRoot(t.TempDir())
+	for rel, content := range files {
+		pi.AddSource(rel, content)
+	}
+	p := parser.NewGoParser()
+	p.Importer = pi
+	cu, err := p.Parse("store/disk/disk.go", files["store/disk/disk.go"])
+	require.NoError(t, err)
+	v := visitor.Init(&declaredClassCollector{classes: make(map[string]java.JavaType)})
+	v.Visit(cu, nil)
+
+	assert.Equal(t, []string{"example.com/shop/store.Closer", "io.Closer"}, interfaceNames(v.classes["Volume"]),
+		"store.Closer is mapped without the interfaces it embeds, so a walk through it cannot reach io.Closer")
+}
+
 // io reaches the package only through net/http's export data, which names a few of io's interfaces until a package
 // that imports io is parsed. What a type satisfies is the same either way.
 func TestWhatATypeSatisfiesDoesNotDependOnWhatWasParsedBefore(t *testing.T) {
