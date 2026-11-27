@@ -24,6 +24,7 @@ import org.openrewrite.maven.internal.RawPom;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.Pom;
 import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
+import org.openrewrite.maven.tree.Scm;
 
 import java.io.ByteArrayInputStream;
 import java.lang.reflect.Method;
@@ -70,6 +71,78 @@ class RocksdbMavenCacheTest {
         }
     }
 
+
+    @Test
+    void scmSurvivesTheCache(@TempDir Path tempDir) throws Exception {
+        String pathString = tempDir.resolve(".rewrite-cache").toString();
+        try {
+            RocksdbMavenPomCache mavenCache = new RocksdbMavenPomCache(tempDir);
+            Pom pom = parsePomXml(
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.foo</groupId>
+                    <artifactId>test</artifactId>
+                    <version>1.0.3</version>
+                    <scm>
+                        <connection>scm:git:https://github.com/foo/test.git</connection>
+                        <developerConnection>scm:git:git@github.com:foo/test.git</developerConnection>
+                        <url>https://github.com/foo/test</url>
+                        <tag>v1.0.3</tag>
+                    </scm>
+                </project>
+                """);
+            mavenCache.putPom(pom.getGav(), pom);
+            RocksdbMavenPomCache.closeCache(pathString);
+
+            //noinspection OptionalAssignedToNull
+            assertThat(new RocksdbMavenPomCache(tempDir).getPom(pom.getGav()))
+              .isNotNull()
+              .get()
+              .extracting(Pom::getScm)
+              .isEqualTo(new Scm(
+                "scm:git:https://github.com/foo/test.git",
+                "scm:git:git@github.com:foo/test.git",
+                "https://github.com/foo/test",
+                "v1.0.3"));
+        } finally {
+            RocksdbMavenPomCache.closeCache(pathString);
+        }
+    }
+
+    /**
+     * A POM cached before {@code <scm>} was kept has none, and would go on having none for as long as it stayed
+     * in the cache, so the model version that guards the cache has to change with the model.
+     */
+    @Test
+    void pomCachedBeforeScmIsDiscarded(@TempDir Path tempDir) throws Exception {
+        String pathString = tempDir.resolve(".rewrite-cache").toString();
+        try {
+            new RocksdbMavenPomCache(tempDir);
+            Pom pom = parsePomXml(
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.foo</groupId>
+                    <artifactId>test</artifactId>
+                    <version>1.0.4</version>
+                </project>
+                """);
+
+            RocksdbMavenPomCache.RocksCache cache = RocksdbMavenPomCache.getCache(pathString);
+            putRaw(cache,
+                    RocksdbMavenPomCache.serialize("org.openrewrite.maven.internal.Pom.version"),
+                    RocksdbMavenPomCache.serialize(4));
+            putRaw(cache,
+                    RocksdbMavenPomCache.serialize(pom.getGav().toString().getBytes(StandardCharsets.UTF_8)),
+                    RocksdbMavenPomCache.serialize(pom));
+            RocksdbMavenPomCache.closeCache(pathString);
+
+            assertThat(new RocksdbMavenPomCache(tempDir).getPom(pom.getGav())).isNull();
+        } finally {
+            RocksdbMavenPomCache.closeCache(pathString);
+        }
+    }
 
     @Test
     void invalidateCacheWhenReferencedPomTypeSerializationChanges(@TempDir Path tempDir) throws Exception {

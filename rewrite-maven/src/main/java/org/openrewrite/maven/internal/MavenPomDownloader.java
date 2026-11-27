@@ -811,7 +811,7 @@ public class MavenPomDownloader {
     private RawPom rawPomFromGav(GroupArtifactVersion gav) {
         return new RawPom(null, null, gav.getGroupId(), gav.getArtifactId(), gav.getVersion(), null,
                 null, null, null, "jar", null, null, null,
-                null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null);
     }
 
     /**
