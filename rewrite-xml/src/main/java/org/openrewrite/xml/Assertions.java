@@ -51,4 +51,29 @@ public class Assertions {
         spec.accept(xml);
         return xml;
     }
+
+    public static SourceSpecs html(@Language("html") @Nullable String before) {
+        return html(before, s -> {
+        });
+    }
+
+    public static SourceSpecs html(@Language("html") @Nullable String before, Consumer<SourceSpec<Xml.Document>> spec) {
+        return xml(before, s -> {
+            s.path("index.html");
+            spec.accept(s);
+        });
+    }
+
+    public static SourceSpecs html(@Language("html") @Nullable String before, @Language("html") @Nullable String after) {
+        return html(before, after, s -> {
+        });
+    }
+
+    public static SourceSpecs html(@Language("html") @Nullable String before, @Language("html") @Nullable String after,
+                                   Consumer<SourceSpec<Xml.Document>> spec) {
+        return xml(before, after, s -> {
+            s.path("index.html");
+            spec.accept(s);
+        });
+    }
 }

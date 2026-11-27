@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
+import static org.openrewrite.xml.Assertions.html;
 import static org.openrewrite.xml.Assertions.xml;
 
 class ChangeTagAttributeTest implements RewriteTest {
@@ -175,10 +176,9 @@ class ChangeTagAttributeTest implements RewriteTest {
     void htmlBooleanAttributeGetsAValue() {
         rewriteRun(
           spec -> spec.recipe(new ChangeTagAttribute("//input", "disabled", "disabled", null, null)),
-          xml(
+          html(
             "<form><input disabled name=q></form>",
-            "<form><input disabled=\"disabled\" name=q></form>",
-            spec -> spec.path("form.html")
+            "<form><input disabled=\"disabled\" name=q></form>"
           )
         );
     }
@@ -187,10 +187,9 @@ class ChangeTagAttributeTest implements RewriteTest {
     void htmlUnquotedValueStaysUnquotedWhenItCan() {
         rewriteRun(
           spec -> spec.recipe(new ChangeTagAttribute("//div", "class", "sidebar", null, null)),
-          xml(
+          html(
             "<div class=main>text</div>",
-            "<div class=sidebar>text</div>",
-            spec -> spec.path("page.html")
+            "<div class=sidebar>text</div>"
           )
         );
     }
@@ -199,10 +198,9 @@ class ChangeTagAttributeTest implements RewriteTest {
     void htmlUnquotedValueIsQuotedWhenItMustBe() {
         rewriteRun(
           spec -> spec.recipe(new ChangeTagAttribute("//div", "class", "main wide", null, null)),
-          xml(
+          html(
             "<div class=main>text</div>",
-            "<div class=\"main wide\">text</div>",
-            spec -> spec.path("page.html")
+            "<div class=\"main wide\">text</div>"
           )
         );
     }

@@ -391,6 +391,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                         if (ctx.OPEN(1) != null && HtmlXmlLexer.isVirtual(ctx.OPEN(1).getSymbol())) {
                             // HTML allows the end tag to be left off, which the lexer supplied without any width
                             markers = markers.add(new HtmlImpliedClose(randomId()));
+                            content = withoutTrailingWhitespace(content, ctx.OPEN(1).getSymbol().getStartIndex());
                         } else
                         // ANTLR may synthesize missing closing-tag tokens during error recovery
                         // on malformed input; tolerate any combination of null OPEN/Name/CLOSE.
@@ -419,6 +420,30 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                             content, closeTag, beforeTagDelimiterPrefix);
                 }
         );
+    }
+
+    /// Leaves the whitespace at the end of an element whose end tag was left off to be the prefix of whatever follows
+    /// the element, as it is when the end tag is there.
+    private List<Content> withoutTrailingWhitespace(List<Content> content, int end) {
+        if (content.isEmpty() || !(content.get(content.size() - 1) instanceof Xml.CharData)) {
+            return content;
+        }
+        Xml.CharData last = (Xml.CharData) content.get(content.size() - 1);
+        if (last.isCdata()) {
+            return content;
+        }
+        String trailing = last.getText().isEmpty() ? last.getPrefix() + last.getAfterText() : last.getAfterText();
+        if (trailing.isEmpty()) {
+            return content;
+        }
+        int start = end - trailing.length();
+        cursor = source.offsetByCodePoints(cursor, start - codePointCursor);
+        codePointCursor = start;
+        List<Content> withoutTrailing = new ArrayList<>(content.subList(0, content.size() - 1));
+        if (!last.getText().isEmpty()) {
+            withoutTrailing.add(last.withAfterText(""));
+        }
+        return withoutTrailing;
     }
 
     /// Note an element whose closing tag is missing or names another element. The grammar does not compare the
@@ -632,7 +657,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
         }
 
         T t = conversion.apply(ctx, prefix(ctx));
-        if (ctx.getStop() != null) {
+        if (ctx.getStop() != null && !HtmlXmlLexer.isVirtual(ctx.getStop())) {
             advanceCursor(ctx.getStop().getStopIndex() + 1);
         }
 
