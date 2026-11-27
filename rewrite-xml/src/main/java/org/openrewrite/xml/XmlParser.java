@@ -111,7 +111,7 @@ public class XmlParser implements Parser {
             try (EncodingDetectingInputStream is = input.getSource(ctx)) {
                 String sourceStr = is.readFully();
 
-                boolean htmlMode = isHtmlLike(path);
+                boolean htmlMode = isHtml(path);
                 XMLLexer lexer = htmlMode ?
                         new HtmlXmlLexer(CharStreams.fromString(sourceStr)) :
                         new XMLLexer(CharStreams.fromString(sourceStr));
@@ -145,8 +145,9 @@ public class XmlParser implements Parser {
         return parse(new InMemoryExecutionContext(), sources);
     }
 
-    private static boolean isHtmlLike(@Nullable Path path) {
-        return path != null && HTML_FILE_EXTENSIONS.contains(extension(path));
+    /// Whether a source at this path is parsed as HTML, which tolerates what HTML allows and XML does not.
+    public static boolean isHtml(Path sourcePath) {
+        return HTML_FILE_EXTENSIONS.contains(extension(sourcePath));
     }
 
     private static String extension(Path path) {

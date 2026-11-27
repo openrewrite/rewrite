@@ -18,16 +18,14 @@ package org.openrewrite.xml.format;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
+import org.openrewrite.xml.XmlParser;
 import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
-
-import java.util.Locale;
 
 /// Content of elements whose whitespace is part of what they hold, such as the text of an HTML `<pre>` or the
 /// code in a `<script>`, which formatting must leave as it is.
 final class WhitespaceSensitiveContent {
     private static final String[] ELEMENTS = {"pre", "textarea", "script", "style"};
-    private static final String[] HTML_EXTENSIONS = {".html", ".htm", ".xhtml", ".jsp", ".jspf"};
 
     private WhitespaceSensitiveContent() {
     }
@@ -46,16 +44,7 @@ final class WhitespaceSensitiveContent {
     // Outside HTML these names carry no whitespace semantics, such as an Android resource's <style>
     private static boolean isHtml(Cursor cursor) {
         Xml.Document document = cursor.firstEnclosing(Xml.Document.class);
-        if (document == null) {
-            return false;
-        }
-        String path = document.getSourcePath().toString().toLowerCase(Locale.ROOT);
-        for (String extension : HTML_EXTENSIONS) {
-            if (path.endsWith(extension)) {
-                return true;
-            }
-        }
-        return false;
+        return document != null && XmlParser.isHtml(document.getSourcePath());
     }
 
     private static boolean isWhitespaceSensitive(Xml.Tag tag) {
