@@ -21,10 +21,12 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.JavaSourceFile;
-import org.openrewrite.maven.tree.ResolvedDependency;
+import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.tree.Xml;
+
+import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -43,7 +45,7 @@ public class RemoveDependency extends Recipe {
     @Option(displayName = "Scope",
             description = "Only remove dependencies if they are in this scope. If 'runtime', this will" +
                           "also remove dependencies in the 'compile' scope because 'compile' dependencies are part of the runtime dependency set",
-            valid = {"compile", "test", "runtime", "provided"},
+            valid = {"compile", "test", "runtime", "provided", "system"},
             example = "compile",
             required = false)
     @Nullable
@@ -61,19 +63,36 @@ public class RemoveDependency extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
+        Scope checkScope = scope != null ? Scope.fromName(scope) : null;
         MavenIsoVisitor<ExecutionContext> mavenVisitor = new MavenIsoVisitor<ExecutionContext>() {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
-                if (isDependencyTag(groupId, artifactId)) {
-                    Scope checkScope = scope != null ? Scope.fromName(scope) : null;
-                    ResolvedDependency dependency = findDependency(tag, checkScope);
-                    if (dependency != null) {
-                        doAfterVisit(new RemoveContentVisitor<>(tag, true, true));
-                        maybeUpdateModel();
-                    }
+                if ((isDependencyTag(groupId, artifactId) && findDependency(tag, checkScope) != null) ||
+                        ((checkScope == null || checkScope == Scope.System) && isMatchingSystemDependency(tag))) {
+                    doAfterVisit(new RemoveContentVisitor<>(tag, true, true));
+                    maybeUpdateModel();
                 }
 
                 return super.visitTag(tag, ctx);
+            }
+
+            private boolean isMatchingSystemDependency(Xml.Tag tag) {
+                if (!isDependencyTag()) {
+                    return false;
+                }
+                ResolvedPom pom = getResolutionResult().getPom();
+                String declaredGroupId = pom.getValue(tag.getChildValue("groupId").orElse(null));
+                String declaredArtifactId = pom.getValue(tag.getChildValue("artifactId").orElse(null));
+                if (declaredGroupId == null || declaredArtifactId == null ||
+                        !matchesGlob(declaredGroupId, groupId) || !matchesGlob(declaredArtifactId, artifactId)) {
+                    return false;
+                }
+                String declaredScope = pom.getValue(tag.getChildValue("scope").orElse(null));
+                Scope effectiveScope = declaredScope != null ? Scope.fromName(declaredScope) : pom.getManagedScope(
+                        declaredGroupId, declaredArtifactId,
+                        pom.getValue(tag.getChildValue("type").orElse(null)),
+                        pom.getValue(tag.getChildValue("classifier").orElse(null)));
+                return effectiveScope == Scope.System;
             }
         };
 

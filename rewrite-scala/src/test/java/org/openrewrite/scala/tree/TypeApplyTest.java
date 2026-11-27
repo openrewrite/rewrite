@@ -188,7 +188,7 @@ class TypeApplyTest implements RewriteTest {
                   .as("classOf[String] should not be parsed as a single identifier")
                   .isNull();
                 assertThat(classOf.get()).isNotNull();
-                assertThat(classOf.get().getArguments()).isEmpty();
+                assertThat(classOf.get().getArguments()).singleElement().isInstanceOf(J.Empty.class);
                 assertThat(classOf.get().getPadding().getArguments().getMarkers().findFirst(OmitParentheses.class)).isPresent();
                 assertThat(classOf.get().getTypeParameters()).singleElement().satisfies(typeParameter -> {
                     assertThat(typeParameter).isInstanceOf(J.Identifier.class);
@@ -221,7 +221,7 @@ class TypeApplyTest implements RewriteTest {
                 assertThat(summon.get())
                   .as("summon[Foo] should be a method invocation, not crammed into an identifier")
                   .isNotNull();
-                assertThat(summon.get().getArguments()).isEmpty();
+                assertThat(summon.get().getArguments()).singleElement().isInstanceOf(J.Empty.class);
                 assertThat(summon.get().getPadding().getArguments().getMarkers().findFirst(OmitParentheses.class)).isPresent();
                 assertThat(summon.get().getTypeParameters()).singleElement().satisfies(typeParameter ->
                   assertThat(typeParameter).isInstanceOf(J.Identifier.class)
