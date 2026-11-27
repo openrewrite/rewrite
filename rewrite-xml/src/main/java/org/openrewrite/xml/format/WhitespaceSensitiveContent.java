@@ -21,19 +21,41 @@ import org.openrewrite.Tree;
 import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
 
+import java.util.Locale;
+
 /// Content of elements whose whitespace is part of what they hold, such as the text of an HTML `<pre>` or the
 /// code in a `<script>`, which formatting must leave as it is.
 final class WhitespaceSensitiveContent {
     private static final String[] ELEMENTS = {"pre", "textarea", "script", "style"};
+    private static final String[] HTML_EXTENSIONS = {".html", ".htm", ".xhtml", ".jsp", ".jspf"};
 
     private WhitespaceSensitiveContent() {
     }
 
     static boolean contains(@Nullable Tree tree, Cursor parent) {
-        if (!(tree instanceof Content) && !(tree instanceof Xml.Tag.Closing)) {
+        if (!(tree instanceof Content) && !(tree instanceof Xml.Tag.Closing) || !isHtml(parent)) {
             return false;
         }
         return parent.getPathAsStream().anyMatch(t -> t instanceof Xml.Tag && isWhitespaceSensitive((Xml.Tag) t));
+    }
+
+    static boolean isWhitespaceSensitive(Xml.Tag tag, Cursor cursor) {
+        return isWhitespaceSensitive(tag) && isHtml(cursor);
+    }
+
+    // Outside HTML these names carry no whitespace semantics, such as an Android resource's <style>
+    private static boolean isHtml(Cursor cursor) {
+        Xml.Document document = cursor.firstEnclosing(Xml.Document.class);
+        if (document == null) {
+            return false;
+        }
+        String path = document.getSourcePath().toString().toLowerCase(Locale.ROOT);
+        for (String extension : HTML_EXTENSIONS) {
+            if (path.endsWith(extension)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean isWhitespaceSensitive(Xml.Tag tag) {

@@ -64,7 +64,8 @@ public class Assertions {
         });
     }
 
-    public static SourceSpecs html(@Language("html") @Nullable String before, @Language("html") @Nullable String after) {
+    public static SourceSpecs html(@Language("html") @Nullable String before,
+                                   @Language("html") @Nullable String after) {
         return html(before, after, s -> {
         });
     }

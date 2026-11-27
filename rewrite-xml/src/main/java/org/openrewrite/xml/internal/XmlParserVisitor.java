@@ -484,7 +484,8 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
         return convert(ctx, (c, prefix) -> {
             boolean booleanAttribute = htmlMode && isSourceToken(c.Name()) && c.EQUALS() == null && c.STRING() == null;
             requireWellFormedAttribute(isXmlWhitespace(prefix) && isSourceToken(c.Name()) &&
-                                       (booleanAttribute || (isSourceToken(c.EQUALS()) && isSourceToken(c.STRING()))), c);
+                                       (booleanAttribute ||
+                                        (isSourceToken(c.EQUALS()) && isSourceToken(c.STRING()))), c);
 
             Xml.Ident key = convert(c.Name(), (t, p) -> new Xml.Ident(randomId(), p, Markers.EMPTY, t.getText()));
 
@@ -492,8 +493,8 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                 // HTML allows an attribute without a value, such as `disabled`. Its value is an empty placeholder.
                 Xml.Attribute.Value value = new Xml.Attribute.Value(randomId(), "", Markers.EMPTY,
                         Xml.Attribute.Value.Quote.Double, "");
-                return new Xml.Attribute(randomId(), prefix, Markers.build(singletonList(new HtmlBooleanAttribute(randomId()))),
-                        key, "", value);
+                return new Xml.Attribute(randomId(), prefix,
+                        Markers.build(singletonList(new HtmlBooleanAttribute(randomId()))), key, "", value);
             }
 
             String beforeEquals = convert(c.EQUALS(), (e, p) -> p);
@@ -502,7 +503,8 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                 String text = v.getText();
                 if (htmlMode && !text.startsWith("'") && !text.startsWith("\"")) {
                     // HTML allows an attribute value without quotes, such as `class=main`
-                    return new Xml.Attribute.Value(randomId(), p, Markers.build(singletonList(new HtmlUnquotedAttributeValue(randomId()))),
+                    return new Xml.Attribute.Value(randomId(), p,
+                            Markers.build(singletonList(new HtmlUnquotedAttributeValue(randomId()))),
                             Xml.Attribute.Value.Quote.Double, text);
                 }
                 return new Xml.Attribute.Value(

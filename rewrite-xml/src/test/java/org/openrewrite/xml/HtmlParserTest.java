@@ -186,6 +186,17 @@ class HtmlParserTest implements RewriteTest {
     }
 
     @Test
+    void lessThanBeforeCharacterThatCannotBeginMarkup() {
+        rewriteRun(
+          html(
+            """
+              <p>x <- y, a<-b, (1<)</p>
+              """
+          )
+        );
+    }
+
+    @Test
     void loneAmpersand() {
         rewriteRun(
           html(

@@ -316,4 +316,39 @@ class AutoFormatTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void htmlKeepsWhitespaceBeforeEndOfPreformattedElementWithChildren() {
+        rewriteRun(
+          html(
+            """
+              <div>
+                <pre><b>x</b></pre>
+              </div>
+              """
+          )
+        );
+    }
+
+    @Test
+    void xmlElementsSharingHtmlNamesAreFormatted() {
+        rewriteRun(
+          xml(
+            """
+              <resources>
+              <style name="AppTheme">
+              <item name="a">b</item>
+              </style>
+              </resources>
+              """,
+            """
+              <resources>
+                <style name="AppTheme">
+                  <item name="a">b</item>
+                </style>
+              </resources>
+              """
+          )
+        );
+    }
 }

@@ -31,7 +31,7 @@ import java.util.regex.Pattern;
 public class XmlPrinter<P> extends XmlVisitor<PrintOutputCapture<P>> {
 
     // What HtmlXmlLexer reads back as an unquoted attribute value
-    private static final Pattern UNQUOTED_ATTRIBUTE_VALUE = Pattern.compile("[^\"' \\t\\n\\r\\f>][^ \\t\\n\\r\\f>]*");
+    private static final Pattern UNQUOTED_ATTRIBUTE_VALUE = Pattern.compile("[^\"'=< \\t\\n\\r\\f>][^ \\t\\n\\r\\f>]*");
 
     @Override
     public Xml visitDocument(Xml.Document document, PrintOutputCapture<P> p) {

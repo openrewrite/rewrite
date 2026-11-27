@@ -24,7 +24,6 @@ import org.openrewrite.xml.internal.grammar.XMLLexer;
 import org.openrewrite.xml.internal.grammar.XMLParserBase;
 
 import java.util.*;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /// An [XMLLexer] that tolerates the parts of HTML that XML does not allow, so that the XML grammar and
@@ -44,7 +43,8 @@ import java.util.regex.Pattern;
 /// Attributes without a value are admitted by the parser grammar itself.
 public class HtmlXmlLexer extends XMLLexer {
 
-    private static final Set<String> RAW_TEXT_ELEMENTS = new HashSet<>(Arrays.asList("script", "style", "textarea", "title"));
+    private static final Set<String> RAW_TEXT_ELEMENTS = new HashSet<>(Arrays.asList(
+            "script", "style", "textarea", "title"));
 
     /// Elements whose end tag HTML lets an author leave off, when what follows makes it clear where they end.
     private static final Set<String> OPTIONAL_END_TAG = new HashSet<>(Arrays.asList(
@@ -88,6 +88,10 @@ public class HtmlXmlLexer extends XMLLexer {
     private @Nullable String pendingStartName;
     private @Nullable String rawTextElement;
     private int lastStop = -1;
+    private int lastStopLine = 1;
+    private int lastStopColumn;
+    private int virtualLine = 1;
+    private int virtualColumn;
 
     // State of the structure, which supplies the end tags that were left off.
     private final Deque<String> openElements = new ArrayDeque<>();
@@ -107,6 +111,8 @@ public class HtmlXmlLexer extends XMLLexer {
         }
 
         int end = lastStop + 1;
+        virtualLine = lastStopLine;
+        virtualColumn = lastStopColumn;
         Token token = scan();
         switch (token.getType()) {
             case OPEN: {
@@ -214,10 +220,11 @@ public class HtmlXmlLexer extends XMLLexer {
     }
 
     private Token virtual(int type, String text, int position) {
-        CommonToken token = new CommonToken(_tokenFactorySourcePair, type, Token.DEFAULT_CHANNEL, position, position - 1);
+        CommonToken token = new CommonToken(_tokenFactorySourcePair, type, Token.DEFAULT_CHANNEL,
+                position, position - 1);
         token.setText(text);
-        token.setLine(getLine());
-        token.setCharPositionInLine(getCharPositionInLine());
+        token.setLine(virtualLine);
+        token.setCharPositionInLine(virtualColumn);
         return token;
     }
 
@@ -241,6 +248,8 @@ public class HtmlXmlLexer extends XMLLexer {
             return;
         }
         lastStop = token.getStopIndex();
+        lastStopLine = getLine();
+        lastStopColumn = getCharPositionInLine();
         if (type == Name && afterOpen) {
             inStartTag = true;
             pendingStartName = token.getText();
@@ -276,15 +285,28 @@ public class HtmlXmlLexer extends XMLLexer {
     /// The content of an element such as `<script>`, up to its end tag, if what is in it would trip up the XML
     /// lexer. Content that the XML lexer reads just as well, such as a JSP scriptlet, is left to it.
     private @Nullable Token rawText(String element) {
-        int start = _input.index();
-        String rest = _input.getText(Interval.of(start, _input.size() - 1));
-        Matcher endTag = Pattern.compile("</" + Pattern.quote(element) + "(?=[\\s>/]|\\z)", Pattern.CASE_INSENSITIVE).matcher(rest);
-        int end = endTag.find() ? endTag.start() : rest.length();
-        String content = rest.substring(0, end);
-        if (content.isEmpty() || !hasStrayMarkup(content)) {
+        int length = 0;
+        while (_input.LA(length + 1) != Token.EOF && !isEndTagAt(element, length + 1)) {
+            length++;
+        }
+        if (length == 0) {
             return null;
         }
-        return textToken(content.codePointCount(0, content.length()));
+        String content = _input.getText(Interval.of(_input.index(), _input.index() + length - 1));
+        return hasStrayMarkup(content) ? textToken(length) : null;
+    }
+
+    private boolean isEndTagAt(String element, int offset) {
+        if (_input.LA(offset) != '<' || _input.LA(offset + 1) != '/') {
+            return false;
+        }
+        for (int i = 0; i < element.length(); i++) {
+            if (Character.toLowerCase(_input.LA(offset + 2 + i)) != Character.toLowerCase(element.charAt(i))) {
+                return false;
+            }
+        }
+        int after = _input.LA(offset + 2 + element.length());
+        return after == Token.EOF || after == '>' || after == '/' || isWhitespace(after);
     }
 
     private static boolean hasStrayMarkup(String content) {
@@ -309,12 +331,11 @@ public class HtmlXmlLexer extends XMLLexer {
         int c = _input.LA(offset);
         boolean stray;
         if (c == '&') {
-            String ahead = _input.getText(Interval.of(_input.index() + offset - 1, Math.min(_input.size() - 1, _input.index() + offset + 80)));
+            int start = _input.index() + offset - 1;
+            String ahead = _input.getText(Interval.of(start, Math.min(_input.size() - 1, start + 81)));
             stray = !ENTITY_OR_CHAR_REF.matcher(ahead).lookingAt();
         } else if (c == '<') {
-            int next = _input.LA(offset + 1);
-            stray = next == Token.EOF || isWhitespace(next) || next == '=' || next == '<' ||
-                    (next >= '0' && next <= '9');
+            stray = !beginsMarkup(_input.LA(offset + 1));
         } else {
             return null;
         }
@@ -326,6 +347,10 @@ public class HtmlXmlLexer extends XMLLexer {
             length++;
         }
         return textToken(length);
+    }
+
+    private static boolean beginsMarkup(int c) {
+        return Character.isLetter(c) || c == '_' || c == ':' || c == '/' || c == '!' || c == '?' || c == '%';
     }
 
     private Token insideStartTag() {
@@ -353,7 +378,8 @@ public class HtmlXmlLexer extends XMLLexer {
         int length = 1;
         if (previousType == EQUALS) {
             // An unquoted value ends at whitespace or at the end of the tag
-            while (!isWhitespace(_input.LA(length + 1)) && _input.LA(length + 1) != '>' && _input.LA(length + 1) != Token.EOF) {
+            while (!isWhitespace(_input.LA(length + 1)) && _input.LA(length + 1) != '>' &&
+                   _input.LA(length + 1) != Token.EOF) {
                 length++;
             }
             return token(STRING, length);

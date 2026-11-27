@@ -81,7 +81,8 @@ public class LineBreaksVisitor<P> extends XmlIsoVisitor<P> {
                 doc.getRoot().isScope(tag) &&
                         doc.getProlog().getXmlDecl() == null &&
                         doc.getProlog().getMisc().isEmpty() ? 0 : 1), 2);
-        if (t.getClosing() != null && !t.getChildren().isEmpty()) {
+        if (t.getClosing() != null && !t.getChildren().isEmpty() &&
+            !WhitespaceSensitiveContent.isWhitespaceSensitive(t, getCursor())) {
             t = t.withClosing(keepMaximumLines(minimumLines(t.getClosing(), 1), 2));
         }
         return t;
