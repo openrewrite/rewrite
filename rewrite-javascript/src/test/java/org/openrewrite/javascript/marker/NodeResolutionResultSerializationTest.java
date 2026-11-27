@@ -18,18 +18,22 @@ package org.openrewrite.javascript.marker;
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.cfg.ConstructorDetector;
 import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.javascript.internal.LockFileParser;
 import org.openrewrite.javascript.marker.NodeResolutionResult.Dependency;
+import org.openrewrite.javascript.marker.NodeResolutionResult.Repository;
 import org.openrewrite.javascript.marker.NodeResolutionResult.ResolvedDependency;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.UUID;
 
 import static java.util.Collections.singletonList;
@@ -99,5 +103,52 @@ class NodeResolutionResultSerializationTest {
 
         assertThat(a.hashCode()).isEqualTo(a.hashCode());
         assertThat(a).isEqualTo(LockFileParser.parse(CYCLIC_LOCK).getTopLevel().get("a"));
+    }
+
+    @Test
+    void roundTripRepositories() throws Exception {
+        ObjectMapper mapper = mapper();
+        NodeResolutionResult read = mapper.readValue(mapper.writeValueAsString(markerWithRepositories()), NodeResolutionResult.class);
+
+        assertThat(read.getRepository())
+                .isEqualTo(new Repository("git", "https://github.com/acme/mono.git", "packages/app"));
+        assertThat(read.getResolvedDependencies()).extracting(ResolvedDependency::getRepository).containsExactly(
+                new Repository("git", "git+https://github.com/expressjs/express.git", null),
+                new Repository(null, "github:debug-js/debug", null),
+                null);
+    }
+
+    @Test
+    void readsMarkerSerializedBeforeRepository() throws Exception {
+        ObjectMapper mapper = mapper();
+        ObjectNode written = mapper.valueToTree(markerWithRepositories());
+        assertThat(written.findParents("repository")).hasSize(3);
+        for (JsonNode parent : written.findParents("repository")) {
+            ((ObjectNode) parent).remove("repository");
+        }
+
+        NodeResolutionResult read = mapper.treeToValue(written, NodeResolutionResult.class);
+
+        assertThat(read.getRepository()).isNull();
+        assertThat(read.getName()).isEqualTo("my-app");
+        assertThat(read.getResolvedDependencies()).extracting(ResolvedDependency::getName)
+                .containsExactly("express", "debug", "ms");
+        assertThat(read.getResolvedDependencies()).extracting(ResolvedDependency::getRepository)
+                .containsOnlyNulls();
+        assertThat(read.getDependencies().get(0).getResolved()).isSameAs(read.getResolvedDependencies().get(0));
+    }
+
+    private static NodeResolutionResult markerWithRepositories() {
+        ResolvedDependency express = new ResolvedDependency("express", "5.1.0", null, null, null, null, null, "MIT",
+                new Repository("git", "git+https://github.com/expressjs/express.git", null));
+        ResolvedDependency debug = new ResolvedDependency("debug", "4.4.3", null, null, null, null, null, "MIT",
+                new Repository(null, "github:debug-js/debug", null));
+        ResolvedDependency ms = new ResolvedDependency("ms", "2.1.3", null, null, null, null, null, "MIT");
+        return new NodeResolutionResult(UUID.randomUUID(), "my-app", "1.0.0", null, "package.json", null,
+                singletonList(new Dependency("express", "^5.0.0", express)),
+                new ArrayList<>(), new ArrayList<>(), new ArrayList<>(), new ArrayList<>(),
+                new ArrayList<>(Arrays.asList(express, debug, ms)),
+                null, null, null,
+                new Repository("git", "https://github.com/acme/mono.git", "packages/app"));
     }
 }

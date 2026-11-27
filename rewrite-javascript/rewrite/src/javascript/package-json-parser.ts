@@ -84,6 +84,13 @@ export class PackageJsonParser extends Parser {
     private readonly selectedRoots = new Map<string, string>();
     private readonly selectionFailures = new Map<string, string>();
 
+    /**
+     * The `repository` of each installed package.json, by its lock file entry, for each lock root whose lock file
+     * records none, for the parser's lifetime: every member of a workspace shares its root's lock file and the
+     * packages installed for it, so they are read once.
+     */
+    private readonly installedRepositories = new Map<string, Promise<Map<string, unknown>>>();
+
     /** Fields to copy from package.json that contain dependency maps */
     private static readonly DEPENDENCY_FIELDS = [
         'dependencies',
@@ -119,6 +126,9 @@ export class PackageJsonParser extends Parser {
         if (pkgJson.license) {
             // Normalize legacy license formats to string
             entry.license = PackageJsonParser.normalizeLicense(pkgJson.license);
+        }
+        if (pkgJson.repository) {
+            entry.repository = pkgJson.repository;
         }
 
         return entry;
@@ -551,6 +561,10 @@ export class PackageJsonParser extends Parser {
                 // Parse lock file based on package manager
                 const content = await this.parseLockFileContent(config.filename, fileContent, dir);
                 if (content) {
+                    // A lock file read in place of node_modules does not say where each package is installed
+                    if (!config.preferNodeModules) {
+                        await this.readInstalledRepositories(dir, content);
+                    }
                     return { content, packageManager };
                 }
 
@@ -590,6 +604,35 @@ export class PackageJsonParser extends Parser {
                 return this.parseYarnLock(content);
             default:
                 return undefined;
+        }
+    }
+
+    /**
+     * Gives each entry of a lock file the `repository` of its installed package.json, which no lock file records.
+     * The lock file says where each package is installed, so its package.json is read from there and node_modules
+     * is not walked. An entry whose package is not installed, as before an install, gets none.
+     */
+    private async readInstalledRepositories(dir: string, lock: PackageLockContent): Promise<void> {
+        const packages = lock.packages;
+        if (!packages) {
+            return;
+        }
+        let installed = this.installedRepositories.get(dir);
+        if (!installed) {
+            installed = !fs.existsSync(path.join(dir, 'node_modules')) ? Promise.resolve(new Map()) :
+                Promise.all(Object.entries(packages)
+                    .filter(([pkgPath, entry]) => pkgPath !== '' && !entry.link)
+                    .map(([pkgPath]) => fsp.readFile(path.join(dir, pkgPath, 'package.json'), 'utf-8')
+                        .then(content => [pkgPath, JSON.parse(content)?.repository] as const,
+                            () => [pkgPath, undefined] as const)))
+                    .then(read => new Map(read.filter(([, repository]) => repository)));
+            this.installedRepositories.set(dir, installed);
+        }
+        for (const [pkgPath, repository] of await installed) {
+            const entry = packages[pkgPath] as { repository?: unknown } | undefined;
+            if (entry) {
+                entry.repository = repository;
+            }
         }
     }
 
