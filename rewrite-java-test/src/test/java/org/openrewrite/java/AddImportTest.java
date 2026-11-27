@@ -22,8 +22,10 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.Tree;
+import org.openrewrite.java.style.Autodetect;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -37,6 +39,7 @@ import java.util.function.Consumer;
 import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.joining;
+import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.java.Assertions.*;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
@@ -1397,6 +1400,112 @@ class AddImportTest implements RewriteTest {
               """.replace("\n", "\r\n")
           )
         );
+    }
+
+    @Test
+    void crlfFileKeepsCrlfWhenAutodetectedStyleSaysLf() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false)))
+            .parser(JavaParser.fromJavaVersion().styles(autodetectedGeneralFormat(false))),
+          java(
+            """
+              package a;
+
+              import java.util.Set;
+
+              class A {}
+              """.replace("\n", "\r\n"),
+            """
+              package a;
+
+              import java.util.List;
+              import java.util.Set;
+
+              class A {}
+              """.replace("\n", "\r\n")
+          ),
+          java(
+            """
+              package a;
+              class B {}
+              """.replace("\n", "\r\n"),
+            """
+              package a;
+
+              import java.util.List;
+
+              class B {}
+              """.replace("\n", "\r\n")
+          )
+        );
+    }
+
+    @Test
+    void lfFileKeepsLfWhenAutodetectedStyleSaysCrlf() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false)))
+            .parser(JavaParser.fromJavaVersion().styles(autodetectedGeneralFormat(true))),
+          java(
+            """
+              package a;
+
+              import java.util.Set;
+
+              class A {}
+              """,
+            """
+              package a;
+
+              import java.util.List;
+              import java.util.Set;
+
+              class A {}
+              """
+          ),
+          java(
+            """
+              package a;
+              class B {}
+              """,
+            """
+              package a;
+
+              import java.util.List;
+
+              class B {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void configuredStyleWinsOverFileLineEndings() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false)))
+            .parser(JavaParser.fromJavaVersion().styles(singletonList(new NamedStyles(randomId(), "test", "test", "test", emptySet(),
+              singletonList(new GeneralFormatStyle(true)))))),
+          java(
+            """
+              package a;
+
+              import java.util.Set;
+
+              class A {}
+              """,
+            """
+              package a;
+
+              import java.util.List;
+              import java.util.Set;
+
+              class A {}
+              """.replace("\n", "\r\n")
+          )
+        );
+    }
+
+    private static List<NamedStyles> autodetectedGeneralFormat(boolean useCRLF) {
+        return singletonList(new Autodetect(randomId(), singletonList(new GeneralFormatStyle(useCRLF))));
     }
 
     @Test
