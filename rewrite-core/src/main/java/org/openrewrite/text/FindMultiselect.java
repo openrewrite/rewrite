@@ -85,9 +85,9 @@ public class FindMultiselect extends Recipe {
             Set<String> lowerCaseOptions = regexOptions.stream()
                     .map(String::toLowerCase)
                     .collect(toSet());
-            caseSensitive = lowerCaseOptions.contains("Case-sensitive");
-            multiline = lowerCaseOptions.contains("Multiline");
-            dotAll = lowerCaseOptions.contains("Dot all");
+            caseSensitive = lowerCaseOptions.contains("case-sensitive");
+            multiline = lowerCaseOptions.contains("multiline");
+            dotAll = lowerCaseOptions.contains("dot all");
         } else {
             caseSensitive = null;
             multiline = null;
