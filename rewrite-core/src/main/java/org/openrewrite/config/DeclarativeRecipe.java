@@ -26,10 +26,10 @@ import org.openrewrite.internal.ListUtils;
 import java.net.URI;
 import java.time.Duration;
 import java.util.*;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 
-import static java.util.Collections.emptyList;
-import static java.util.Collections.unmodifiableList;
+import static java.util.Collections.*;
 import static org.openrewrite.Validated.invalid;
 
 @RequiredArgsConstructor
@@ -107,6 +107,10 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
     }
 
     public void initialize(Function<String, @Nullable Recipe> availableRecipes) {
+        initialize((name, options) -> availableRecipes.apply(name), new LinkedHashSet<>());
+    }
+
+    public void initialize(BiFunction<String, Map<String, Object>, @Nullable Recipe> availableRecipes) {
         initialize(availableRecipes, new LinkedHashSet<>());
     }
 
@@ -116,7 +120,7 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         this.initialize(availableRecipes);
     }
 
-    private void initialize(Function<String, @Nullable Recipe> availableRecipes, Set<String> initializingRecipes) {
+    private void initialize(BiFunction<String, Map<String, Object>, @Nullable Recipe> availableRecipes, Set<String> initializingRecipes) {
         if (initialized) {
             return;
         }
@@ -131,13 +135,14 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
     }
 
     private List<Recipe> resolve(List<Recipe> uninitialized, String property,
-                                 Function<String, @Nullable Recipe> availableRecipes, Set<String> initializingRecipes) {
+                                 BiFunction<String, Map<String, Object>, @Nullable Recipe> availableRecipes, Set<String> initializingRecipes) {
         List<Recipe> result = new ArrayList<>();
         for (int i = 0; i < uninitialized.size(); i++) {
             Recipe recipe = uninitialized.get(i);
             if (recipe instanceof LazyLoadedRecipe) {
-                String recipeFqn = ((LazyLoadedRecipe) recipe).getRecipeFqn();
-                recipe = availableRecipes.apply(recipeFqn);
+                LazyLoadedRecipe lazy = (LazyLoadedRecipe) recipe;
+                String recipeFqn = lazy.getRecipeFqn();
+                recipe = availableRecipes.apply(recipeFqn, lazy.getOptions());
                 if (recipe == null) {
                     initValidation = initValidation.and(
                             invalid(name + "." + property + "[" + i + "] (in " + source + ")",
@@ -643,7 +648,12 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
     }
 
     public void addUninitialized(String recipeName) {
-        uninitializedRecipes.add(new DeclarativeRecipe.LazyLoadedRecipe(recipeName));
+        addUninitialized(recipeName, emptyMap());
+    }
+
+    public void addUninitialized(String recipeName, Map<String, Object> options) {
+        uninitializedRecipes.add(new DeclarativeRecipe.LazyLoadedRecipe(
+                recipeName, options.isEmpty() ? emptyMap() : unmodifiableMap(new LinkedHashMap<>(options))));
     }
 
     public void addUninitializedPrecondition(Recipe recipe) {
@@ -651,7 +661,12 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
     }
 
     public void addUninitializedPrecondition(String recipeName) {
-        uninitializedPreconditions.add(new DeclarativeRecipe.LazyLoadedRecipe(recipeName));
+        addUninitializedPrecondition(recipeName, emptyMap());
+    }
+
+    public void addUninitializedPrecondition(String recipeName, Map<String, Object> options) {
+        uninitializedPreconditions.add(new DeclarativeRecipe.LazyLoadedRecipe(
+                recipeName, options.isEmpty() ? emptyMap() : unmodifiableMap(new LinkedHashMap<>(options))));
     }
 
     public void addValidation(Validated<Object> validated) {
@@ -694,6 +709,7 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
     @EqualsAndHashCode(callSuper = false)
     private static class LazyLoadedRecipe extends Recipe {
         String recipeFqn;
+        Map<String, Object> options;
 
         String displayName = "Lazy loaded recipe";
 

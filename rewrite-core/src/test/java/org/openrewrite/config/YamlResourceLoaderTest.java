@@ -226,7 +226,7 @@ class YamlResourceLoaderTest implements RewriteTest {
           "org.company.CustomRecipe",
           0,
           RecipeFailingOnFirstLoad.class.getName(),
-          recipe -> {
+          (recipe, options) -> {
           },
           recipe -> {
           },
@@ -246,7 +246,7 @@ class YamlResourceLoaderTest implements RewriteTest {
           "org.company.CustomRecipe",
           0,
           recipeData,
-          recipe -> {
+          (recipe, options) -> {
           },
           recipe -> {
           },
@@ -374,6 +374,135 @@ class YamlResourceLoaderTest implements RewriteTest {
               assertThat(f.getProperty()).startsWith("org.example.Outer.recipeList[0]");
               assertThat(f.getInvalidValue()).isEqualTo("org.example.Missing");
               assertThat(f.getMessage()).isEqualTo("refers to a recipe that doesn't exist.");
+          });
+    }
+
+    @Test
+    void nonJavaRecipeWithOptionsIsResolvedLazilyWithOptions() {
+        String yaml = //language=yml
+          """
+            type: specs.openrewrite.org/v1beta/recipe
+            name: org.openrewrite.react.migrate.upgrade-to-react-19
+            displayName: Upgrade to React 19
+            description: Test.
+            recipeList:
+              - org.openrewrite.react.19.remove-forward-ref
+              - org.openrewrite.javascript.change-import:
+                  oldModule: react-dom/test-utils
+                  oldMember: act
+                  newModule: react
+            """;
+
+        YamlResourceLoader loader = new YamlResourceLoader(new ByteArrayInputStream(yaml.getBytes()),
+          URI.create("rewrite.yml"), null, getClass().getClassLoader());
+        DeclarativeRecipe recipe = (DeclarativeRecipe) loader.listRecipes().iterator().next();
+
+        Map<String, Map<String, Object>> resolvedOptions = new LinkedHashMap<>();
+        recipe.initialize((name, options) -> {
+            resolvedOptions.put(name, options);
+            return Recipe.noop();
+        });
+
+        assertThat(recipe.validate().isValid()).isTrue();
+        assertThat(recipe.getRecipeList()).hasSize(2);
+        assertThat(resolvedOptions)
+          .containsEntry("org.openrewrite.react.19.remove-forward-ref", Map.of())
+          .containsEntry("org.openrewrite.javascript.change-import", Map.of(
+            "oldModule", "react-dom/test-utils",
+            "oldMember", "act",
+            "newModule", "react"));
+
+        // Single-arg Function resolver continues to work for lazy entries with options
+        YamlResourceLoader loaderForFn = new YamlResourceLoader(new ByteArrayInputStream(yaml.getBytes()),
+          URI.create("rewrite.yml"), null, getClass().getClassLoader());
+        DeclarativeRecipe recipeForFn = (DeclarativeRecipe) loaderForFn.listRecipes().iterator().next();
+        recipeForFn.initialize(name -> Recipe.noop());
+        assertThat(recipeForFn.validate().isValid()).isTrue();
+        assertThat(recipeForFn.getRecipeList()).hasSize(2);
+    }
+
+    @Test
+    void nonJavaPreconditionWithOptionsIsResolvedLazilyWithOptions() {
+        YamlResourceLoader loader = new YamlResourceLoader(new ByteArrayInputStream(
+          //language=yml
+          """
+            type: specs.openrewrite.org/v1beta/recipe
+            name: org.openrewrite.react.migrate.with-precondition
+            displayName: With precondition
+            description: Test.
+            preconditions:
+              - org.openrewrite.javascript.find-import:
+                  module: react-dom/test-utils
+            recipeList:
+              - org.openrewrite.react.19.remove-forward-ref
+            """.getBytes()), URI.create("rewrite.yml"), null, getClass().getClassLoader());
+
+        DeclarativeRecipe recipe = (DeclarativeRecipe) loader.listRecipes().iterator().next();
+        Map<String, Map<String, Object>> resolvedOptions = new LinkedHashMap<>();
+        recipe.initialize((name, options) -> {
+            resolvedOptions.put(name, options);
+            return Recipe.noop();
+        });
+
+        assertThat(recipe.validate().isValid()).isTrue();
+        assertThat(recipe.getPreconditions()).hasSize(1);
+        assertThat(resolvedOptions)
+          .containsEntry("org.openrewrite.javascript.find-import", Map.of(
+            "module", "react-dom/test-utils"))
+          .containsEntry("org.openrewrite.react.19.remove-forward-ref", Map.of());
+    }
+
+    @Test
+    void unresolvableNonJavaRecipeWithOptionsIsReportedAsValidationError() {
+        YamlResourceLoader loader = new YamlResourceLoader(new ByteArrayInputStream(
+          //language=yml
+          """
+            type: specs.openrewrite.org/v1beta/recipe
+            name: org.example.MissingConfigured
+            displayName: Missing configured
+            description: Test.
+            recipeList:
+              - org.example.does-not-exist:
+                  foo: bar
+            """.getBytes()), URI.create("rewrite.yml"), null, getClass().getClassLoader());
+
+        DeclarativeRecipe recipe = (DeclarativeRecipe) loader.listRecipes().iterator().next();
+        recipe.initialize((name, options) -> null);
+
+        assertThat(recipe.validate().failures())
+          .singleElement()
+          .satisfies(failure -> {
+              assertThat(failure.getProperty()).startsWith("org.example.MissingConfigured.recipeList[0]");
+              assertThat(failure.getInvalidValue()).isEqualTo("org.example.does-not-exist");
+              assertThat(failure.getMessage()).isEqualTo("refers to a recipe that doesn't exist.");
+          });
+    }
+
+    @Test
+    void existingJavaRecipeWithInvalidOptionValueIsNotDeferredAsLazy() {
+        YamlResourceLoader loader = new YamlResourceLoader(new ByteArrayInputStream(
+          //language=yml
+          """
+            type: specs.openrewrite.org/v1beta/recipe
+            name: org.example.InvalidEnumOption
+            displayName: Invalid enum option
+            description: Test.
+            recipeList:
+              - org.openrewrite.text.AppendToTextFile:
+                  relativeFileName: "file.txt"
+                  content: "hello"
+                  existingFileStrategy: "NOT_A_VALID_STRATEGY"
+            """.getBytes()), URI.create("rewrite.yml"), null, getClass().getClassLoader());
+
+        DeclarativeRecipe recipe = (DeclarativeRecipe) loader.listRecipes().iterator().next();
+        recipe.initialize((name, options) -> {
+            throw new AssertionError("Existing Java recipe should not be resolved lazily: " + name);
+        });
+
+        assertThat(recipe.validate().failures())
+          .anySatisfy(failure -> {
+              assertThat(failure.getProperty()).isEqualTo("org.openrewrite.text.AppendToTextFile");
+              assertThat(failure.getMessage()).startsWith("Unable to load Recipe:");
           });
     }
 
