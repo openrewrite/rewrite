@@ -113,7 +113,21 @@ type Closer interface {
 		"an embedded interface is named even when it adds no methods")
 }
 
-func TestAnInterfaceNamesOneItEmbedsThroughAnotherPackagesInterface(t *testing.T) {
+func TestAnInterfaceNamesNoTypeItEmbedsAsATermOfItsTypeSet(t *testing.T) {
+	declared := declaredClasses(t, `package shop
+
+type Celsius float64
+
+type Temperature interface {
+	Celsius
+	String() string
+}
+`)
+
+	assert.Empty(t, interfaceNames(declared["Temperature"]))
+}
+
+func TestAnotherPackagesInterfaceNamesTheInterfacesItEmbeds(t *testing.T) {
 	files := map[string]string{
 		"store/store.go": `package store
 
@@ -144,8 +158,10 @@ type Volume interface {
 	v := visitor.Init(&declaredClassCollector{classes: make(map[string]java.JavaType)})
 	v.Visit(cu, nil)
 
-	assert.Equal(t, []string{"example.com/shop/store.Closer", "io.Closer"}, interfaceNames(v.classes["Volume"]),
-		"store.Closer is mapped without the interfaces it embeds, so a walk through it cannot reach io.Closer")
+	volume := v.classes["Volume"].(*java.JavaTypeClass)
+	require.Equal(t, []string{"example.com/shop/store.Closer"}, interfaceNames(volume))
+	assert.Equal(t, []string{"io.Closer"}, interfaceNames(volume.Interfaces[0]),
+		"what an interface embeds does not depend on the package under parse")
 }
 
 // io reaches the package only through net/http's export data, which names a few of io's interfaces until a package

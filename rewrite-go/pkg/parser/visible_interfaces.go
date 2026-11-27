@@ -94,9 +94,8 @@ func (m *typeMapper) interfacesDeclaredIn(p *types.Package, unexported bool) []*
 }
 
 // satisfiedBy lists, in name order, the interfaces named satisfies, or a pointer to it does when named is no
-// interface itself. An interface names one with the same methods only if it embeds it, so that no interface inherits
-// from itself, as Java requires. Embedding cannot form a cycle, since Go rejects one. An embedding counts through every
-// level, because another package's interface is mapped without the interfaces it embeds.
+// interface itself. For an interface it lists only those with fewer methods, so that no interface inherits from
+// itself, as Java requires. The interfaces it embeds, which mapNamed records, cannot form a cycle, since Go rejects one.
 func (v *visibleInterfaces) satisfiedBy(named *types.Named) (satisfied []*types.Named) {
 	// A type the checker left broken can trip its assertions. It then names no interfaces rather than losing its type.
 	defer func() {
@@ -119,7 +118,7 @@ func (v *visibleInterfaces) satisfiedBy(named *types.Named) (satisfied []*types.
 			}
 			seen[candidate] = true
 			iface := candidate.Underlying().(*types.Interface)
-			if isInterface && iface.NumMethods() == own.NumMethods() && !embeds(own, candidate) {
+			if isInterface && iface.NumMethods() == own.NumMethods() {
 				continue
 			}
 			if types.Implements(named, iface) || pointer != nil && types.Implements(pointer, iface) {
@@ -131,17 +130,4 @@ func (v *visibleInterfaces) satisfiedBy(named *types.Named) (satisfied []*types.
 		return fullyQualifiedName(satisfied[i].Obj()) < fullyQualifiedName(satisfied[j].Obj())
 	})
 	return satisfied
-}
-
-func embeds(iface *types.Interface, named *types.Named) bool {
-	for i := 0; i < iface.NumEmbeddeds(); i++ {
-		embedded := iface.EmbeddedType(i)
-		if types.Identical(embedded, named) {
-			return true
-		}
-		if inner, ok := embedded.Underlying().(*types.Interface); ok && embeds(inner, named) {
-			return true
-		}
-	}
-	return false
 }
