@@ -306,6 +306,55 @@ function slotConstraints(parent: J, childId: string): SlotConstraints | undefine
     }
 }
 
+/** Types that bind looser than an array element, an intersection member or a `keyof` operand. */
+const looseTypes = new Set<string>([JS.Kind.Union, JS.Kind.Intersection, JS.Kind.FunctionType, JS.Kind.ConditionalType,
+    JS.Kind.TypeOperator, JS.Kind.InferType]);
+
+/**
+ * Parenthesizes a type where the type slot of `parent` holding `childId` binds tighter, as the parser
+ * builds it: a `J.ParenthesizedTypeTree`. An optional tuple element (`[X?]`) binds tighter too.
+ * A union in a union is left for {@link JavaScriptVisitor.visitUnion} to join.
+ */
+export function maybeParenthesizeType(parent: J | undefined, childId: string, type: J): J {
+    if (!looseTypes.has(type.kind)) {
+        return type;
+    }
+    const optional = type.markers.markers.some(m => m.kind === JS.Markers.Optional);
+    if (!optional && !typeSlotBindsTighter(parent, childId, type)) {
+        return type;
+    }
+    return {
+        kind: J.Kind.ParenthesizedTypeTree,
+        id: randomId(),
+        prefix: type.prefix,
+        markers: type.markers,
+        annotations: [],
+        parenthesizedType: {
+            kind: J.Kind.Parentheses,
+            id: randomId(),
+            prefix: emptySpace,
+            markers: emptyMarkers,
+            tree: {kind: J.Kind.RightPadded, element: {...type, prefix: emptySpace, markers: emptyMarkers}, after: emptySpace, markers: emptyMarkers}
+        }
+    } as J.ParenthesizedTypeTree;
+}
+
+function typeSlotBindsTighter(parent: J | undefined, childId: string, type: J): boolean {
+    switch (parent?.kind) {
+        case J.Kind.ArrayType:
+        case JS.Kind.TypeOperator:
+            return true;
+        case JS.Kind.Intersection:
+            return type.kind !== JS.Kind.Intersection;
+        case JS.Kind.IndexedAccessType:
+            return (parent as JS.IndexedAccessType).objectType.id === childId;
+        case JS.Kind.Union:
+            return type.kind === JS.Kind.FunctionType || type.kind === JS.Kind.ConditionalType || type.kind === JS.Kind.InferType;
+        default:
+            return false;
+    }
+}
+
 /** The precedence of the slot of `parent` holding `childId`; see {@link slotConstraints} for the rest. */
 export function requiredPrecedence(parent: J, childId: string): number | undefined {
     return slotConstraints(parent, childId)?.precedence;
@@ -314,9 +363,14 @@ export function requiredPrecedence(parent: J, childId: string): number | undefin
 /**
  * Parenthesizes `expression` if the slot of `parent` holding `childId` would otherwise reparse it.
  * `slotMarkers` are the markers the slot contributed; {@link parenthesize} says what they decide.
+ * A union, a function type and the other loose types only sit in type slots, so
+ * {@link maybeParenthesizeType} decides for them.
  */
 export function maybeParenthesize(parent: J | undefined, childId: string, expression: J,
                                   slotMarkers?: Markers): J {
+    if (looseTypes.has(expression.kind)) {
+        return maybeParenthesizeType(parent, childId, expression);
+    }
     const constraints = parent && slotConstraints(parent, childId);
     if (!constraints) {
         return followsTrailingMarker(expression, slotMarkers) ? parenthesize(expression, slotMarkers) : expression;
