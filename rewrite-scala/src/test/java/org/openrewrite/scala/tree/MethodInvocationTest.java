@@ -17,9 +17,14 @@ package org.openrewrite.scala.tree;
 
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.scala.Assertions.scala;
+import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @SuppressWarnings("ZeroIndexToHead")
 class MethodInvocationTest implements RewriteTest {
@@ -33,6 +38,74 @@ class MethodInvocationTest implements RewriteTest {
                 println("Hello")
               }
               """
+          )
+        );
+    }
+
+    @Test
+    void noArgumentCallsHaveSingleEmptyArgument() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                  return SearchResult.found(m, m.getArguments().get(0).getClass().getSimpleName());
+              }
+          })),
+          scala(
+            """
+            import scala.language.postfixOps
+            object A {
+              def foo(): Int = 1
+              def bar: Int = 2
+              def baz[T](): Int = 3
+              val a = foo()
+              val b = bar
+              val c = "x".length
+              val d = baz[Int]()
+              val e = List.empty[Int]
+              val f = classOf[String]
+              val g = (() => 1)()
+              val h = Seq(1) toList
+              val i = foo(1)
+            }
+            """,
+            """
+            import scala.language.postfixOps
+            object A {
+              def foo(): Int = 1
+              def bar: Int = 2
+              def baz[T](): Int = 3
+              val a = /*~~(Empty)~~>*/foo()
+              val b = /*~~(Empty)~~>*/bar
+              val c = /*~~(Empty)~~>*/"x".length
+              val d = /*~~(Empty)~~>*/baz[Int]()
+              val e = /*~~(Empty)~~>*/List.empty[Int]
+              val f = /*~~(Empty)~~>*/classOf[String]
+              val g = /*~~(Empty)~~>*/(() => 1)()
+              val h = /*~~(Empty)~~>*//*~~(Literal)~~>*/Seq(1) toList
+              val i = /*~~(Literal)~~>*/foo(1)
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void whitespaceInsideEmptyArgumentList() {
+        rewriteRun(
+          scala(
+            """
+            object A {
+              def foo(): Int = 1
+              def baz[T](): Int = 3
+              val a = foo( )
+              val b = foo ( /* x */ )
+              val c = "x".length( )
+              val d = A.baz[Int]( )
+              val e = (() => 1)( )
+            }
+            """
           )
         );
     }

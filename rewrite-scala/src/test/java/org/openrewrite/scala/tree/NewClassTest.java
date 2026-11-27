@@ -429,13 +429,13 @@ class NewClassTest implements RewriteTest {
             """
             trait Logger
             class A {
-              val r = /*~~(0)~~>*/new Runnable { def run(): Unit = () }
-              val p = /*~~(0)~~>*/new Object
-              val q = /*~~(0)~~>*/new Object()
-              val b = /*~~(0)~~>*/new java.util.ArrayList[java.lang.Boolean] { }
-              val l = /*~~(0)~~>*/new Object with Logger { }
+              val r = /*~~(1)~~>*/new Runnable { def run(): Unit = () }
+              val p = /*~~(1)~~>*/new Object
+              val q = /*~~(1)~~>*/new Object()
+              val b = /*~~(1)~~>*/new java.util.ArrayList[java.lang.Boolean] { }
+              val l = /*~~(1)~~>*/new Object with Logger { }
               val s = /*~~(1)~~>*/new StringBuilder("x") { }
-              val e = /*~~(0)~~>*/new {}
+              val e = /*~~(1)~~>*/new {}
             }
             """
           )
@@ -468,7 +468,7 @@ class NewClassTest implements RewriteTest {
               @Override
               public J.NewClass visitNewClass(J.NewClass newClass, ExecutionContext ctx) {
                   J.NewClass nc = super.visitNewClass(newClass, ctx);
-                  if (!nc.getArguments().isEmpty()) {
+                  if (!(nc.getArguments().get(0) instanceof J.Empty)) {
                       return nc;
                   }
                   return nc.withArguments(List.of(
@@ -484,6 +484,39 @@ class NewClassTest implements RewriteTest {
             """
             class A {
               val p = new java.util.ArrayList[String](16)
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void noArgumentConstructorCallsHaveSingleEmptyArgument() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.NewClass visitNewClass(J.NewClass newClass, ExecutionContext ctx) {
+                  J.NewClass nc = super.visitNewClass(newClass, ctx);
+                  return SearchResult.found(nc, nc.getArguments().get(0).getClass().getSimpleName());
+              }
+          })),
+          scala(
+            """
+            class A {
+              val a = new java.lang.StringBuilder
+              val b = new java.lang.StringBuffer()
+              val c = new Object { }
+              val d = new Object ( )
+              val e = new StringBuilder("x")
+            }
+            """,
+            """
+            class A {
+              val a = /*~~(Empty)~~>*/new java.lang.StringBuilder
+              val b = /*~~(Empty)~~>*/new java.lang.StringBuffer()
+              val c = /*~~(Empty)~~>*/new Object { }
+              val d = /*~~(Empty)~~>*/new Object ( )
+              val e = /*~~(Literal)~~>*/new StringBuilder("x")
             }
             """
           )

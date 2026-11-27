@@ -572,7 +572,7 @@ class ScalaTypeAttributionTest implements RewriteTest {
                 assertThat(collect(cu, J.FieldAccess.class, f -> true)).isEmpty();
 
                 J.MethodInvocation reverse = find(cu, J.MethodInvocation.class, m -> m.getSimpleName().equals("reverse"));
-                assertThat(reverse.getArguments()).isEmpty();
+                assertThat(reverse.getArguments()).singleElement().isInstanceOf(J.Empty.class);
                 assertThat(reverse.getMethodType()).isNotNull();
                 assertThat(reverse.getName().getType()).isSameAs(reverse.getMethodType());
                 assertThat(TypeUtils.asFullyQualified(reverse.getType()).getFullyQualifiedName())
@@ -607,7 +607,7 @@ class ScalaTypeAttributionTest implements RewriteTest {
             spec -> spec.afterRecipe(cu -> {
                 J.MethodInvocation count = find(cu, J.MethodInvocation.class, m -> m.getSimpleName().equals("count"));
                 assertThat(count.getSelect()).isNull();
-                assertThat(count.getArguments()).isEmpty();
+                assertThat(count.getArguments()).singleElement().isInstanceOf(J.Empty.class);
                 assertThat(count.getType()).isEqualTo(JavaType.Primitive.Int);
                 assertThat(new MethodMatcher("A count()").matches(count)).isTrue();
                 assertThat(new MethodMatcher("A answer()").matches(
