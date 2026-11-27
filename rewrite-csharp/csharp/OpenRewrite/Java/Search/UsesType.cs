@@ -112,6 +112,7 @@ public class UsesType : JavaVisitor<ExecutionContext>
 
     private static bool MatchTypeGlob(string pattern, string fqn)
     {
+        if (!pattern.Contains('`')) fqn = OpenRewrite.CSharp.TypeUtils.WithoutArity(fqn);
         if (pattern == fqn) return true;
         if (pattern == "*..*") return true;
 

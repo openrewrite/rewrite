@@ -67,18 +67,10 @@ internal static class AssemblyTypeEnumerator
             }
         }
 
-        // The Java type model keys types by FQN and doesn't encode generic arity, so a
-        // non-generic type and a same-named generic (e.g. JsonConverter and JsonConverter<T>)
-        // collapse to one FQN. Keep one per FQN — the lowest-arity (the base) — deterministically,
-        // matching JVM class-uniqueness and the writer's first-wins FQN dedup.
         var byFqn = new Dictionary<string, INamedTypeSymbol>(ownTypes.Count, StringComparer.Ordinal);
         foreach (var type in ownTypes)
         {
-            var fqn = CSharpTypeMapping.GetFullyQualifiedName(type);
-            if (!byFqn.TryGetValue(fqn, out var existing) || type.Arity < existing.Arity)
-            {
-                byFqn[fqn] = type;
-            }
+            byFqn.TryAdd(CSharpTypeMapping.GetFullyQualifiedName(type), type);
         }
 
         var ownFqns = new HashSet<string>(byFqn.Keys, StringComparer.Ordinal);

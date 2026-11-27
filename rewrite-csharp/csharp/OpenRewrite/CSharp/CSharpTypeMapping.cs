@@ -481,19 +481,24 @@ internal class CSharpTypeMapping
         };
     }
 
+    /// <summary>
+    /// A generic type's name ends in its arity, as in .NET metadata (<c>List`1</c>), so that
+    /// <c>ResultBase</c> and <c>ResultBase&lt;T&gt;</c> in one namespace are distinct types.
+    /// </summary>
     internal static string GetFullyQualifiedName(INamedTypeSymbol symbol)
     {
+        var name = symbol.Arity > 0 ? symbol.Name + "`" + symbol.Arity : symbol.Name;
         if (symbol.ContainingType != null)
         {
-            return GetFullyQualifiedName(symbol.ContainingType) + "$" + symbol.Name;
+            return GetFullyQualifiedName(symbol.ContainingType) + "$" + name;
         }
 
         var ns = symbol.ContainingNamespace;
         if (ns == null || ns.IsGlobalNamespace)
         {
-            return symbol.Name;
+            return name;
         }
 
-        return ns.ToDisplayString() + "." + symbol.Name;
+        return ns.ToDisplayString() + "." + name;
     }
 }

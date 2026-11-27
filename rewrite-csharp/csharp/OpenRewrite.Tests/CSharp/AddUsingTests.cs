@@ -72,6 +72,54 @@ public class AddUsingTests : RewriteTest
     }
 
     [Fact]
+    public void GenericTypeNamedWithItsArity()
+    {
+        var after = ApplyAddUsing(
+            """
+            using System;
+
+            public class C
+            {
+                private List<int> field;
+            }
+            """,
+            "System.Collections.Generic.List`1");
+
+        Assert.Equal(
+            """
+            using System;
+            using System.Collections.Generic;
+
+            public class C
+            {
+                private List<int> field;
+            }
+            """, after);
+    }
+
+    [Fact]
+    public void NonGenericNamesakeDoesNotHideTheGenericType()
+    {
+        var cu = Parse(
+            """
+            using Other;
+
+            namespace Other
+            {
+                public class Box { }
+            }
+
+            public class C
+            {
+                private Box plain;
+            }
+            """);
+
+        Assert.False(AddUsing.IsShadowedInFile(cu, "Box", "N.Box`1"));
+        Assert.True(AddUsing.IsShadowedInFile(cu, "Box", "N.Box"));
+    }
+
+    [Fact]
     public void SortedFileStaysSorted()
     {
         var after = ApplyAddUsing(

@@ -57,7 +57,7 @@ public class AddUsing<P> : CSharpVisitor<P>, IEquatable<AddUsing<P>>
         _fullyQualifiedTypeName = fullyQualifiedTypeName;
         var lastDot = fullyQualifiedTypeName.LastIndexOf('.');
         _namespace = lastDot > 0 ? fullyQualifiedTypeName[..lastDot] : null;
-        _typeName = lastDot > 0 ? fullyQualifiedTypeName[(lastDot + 1)..] : fullyQualifiedTypeName;
+        _typeName = TypeUtils.WithoutArity(lastDot > 0 ? fullyQualifiedTypeName[(lastDot + 1)..] : fullyQualifiedTypeName);
         _onlyIfReferenced = onlyIfReferenced;
     }
 
@@ -459,7 +459,7 @@ public class AddUsing<P> : CSharpVisitor<P>, IEquatable<AddUsing<P>>
             if (string.Equals(identifier.SimpleName, simpleName, StringComparison.Ordinal)
                 && !(Cursor.ParentTree.Value is FieldAccess parent && ReferenceEquals(parent.Name.Element, identifier))
                 && (TypeUtils.GetFullyQualifiedName(identifier.Type) is not { Length: > 0 } resolved
-                    || string.Equals(resolved, fullyQualifiedName, StringComparison.Ordinal))
+                    || TypeUtils.FullyQualifiedNameMatches(resolved, fullyQualifiedName))
                 && _seen.Add(_enclosing.Count > 0 ? _enclosing[^1].Id : null))
             {
                 Scopes.Add(_enclosing.ToList());
@@ -579,10 +579,20 @@ public static class AddUsing
             if (!Shadowed
                 && string.Equals(name, simpleName, StringComparison.Ordinal)
                 && TypeUtils.GetFullyQualifiedName(type) is { Length: > 0 } resolved
-                && !string.Equals(resolved, fullyQualifiedName, StringComparison.Ordinal))
+                && !TypeUtils.FullyQualifiedNameMatches(resolved, fullyQualifiedName)
+                && (!HasArity(fullyQualifiedName) || Arity(resolved) == Arity(fullyQualifiedName)))
             {
                 Shadowed = true;
             }
+        }
+
+        // C# tells Box and Box<T> apart, so a type of another arity leaves the name free.
+        private static bool HasArity(string fullyQualifiedName) => Arity(fullyQualifiedName).Length > 0;
+
+        private static string Arity(string fullyQualifiedName)
+        {
+            var tick = fullyQualifiedName.LastIndexOf('`');
+            return tick > fullyQualifiedName.LastIndexOfAny(['.', '$']) ? fullyQualifiedName[tick..] : "";
         }
     }
 }

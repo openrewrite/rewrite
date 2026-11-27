@@ -21,27 +21,41 @@ namespace OpenRewrite.CSharp;
 /// Utility methods for working with <see cref="JavaType"/> instances.
 /// C# equivalent of Java's <c>org.openrewrite.java.tree.TypeUtils</c>.
 /// </summary>
-public static class TypeUtils
+public static partial class TypeUtils
 {
     /// <summary>
-    /// Check if a type is a specific fully-qualified class type (exact match, no inheritance).
+    /// Check if a type is a specific fully-qualified class type, without inheritance.
     /// </summary>
-    public static bool IsOfClassType(JavaType? type, string fullyQualifiedName)
+    public static bool IsOfClassType(JavaType? type, string fullyQualifiedName) =>
+        FullyQualifiedNameMatches(GetFullyQualifiedName(type), fullyQualifiedName);
+
+    /// <summary>
+    /// Whether a type's fully-qualified name matches <paramref name="name"/>, as a recipe writes it.
+    /// A name without arity matches every arity, so <c>System.Collections.Generic.List</c> matches
+    /// <c>System.Collections.Generic.List`1</c>. That is how recipes name generic types.
+    /// </summary>
+    public static bool FullyQualifiedNameMatches(string? typeName, string? name)
     {
-        var fqn = GetFullyQualifiedName(type);
-        return fqn != null && string.Equals(fqn, fullyQualifiedName, StringComparison.Ordinal);
+        if (typeName == null || name == null) return false;
+        return string.Equals(typeName, name, StringComparison.Ordinal)
+            || string.Equals(WithoutArity(typeName), name, StringComparison.Ordinal);
     }
+
+    /// <summary>
+    /// Removes every arity suffix, so <c>N.Outer`1$Inner`2</c> becomes <c>N.Outer$Inner</c>.
+    /// </summary>
+    internal static string WithoutArity(string fullyQualifiedName) =>
+        fullyQualifiedName.Contains('`') ? AritySuffix().Replace(fullyQualifiedName, "") : fullyQualifiedName;
+
+    [System.Text.RegularExpressions.GeneratedRegex(@"`\d+")]
+    private static partial System.Text.RegularExpressions.Regex AritySuffix();
 
     /// <summary>
     /// Check if a type is assignable to the target type — i.e., the type IS the target,
     /// extends it, or implements it. Walks the supertype and interface chains.
     /// </summary>
-    public static bool IsAssignableTo(JavaType? type, string fullyQualifiedName)
-    {
-        if (type == null) return false;
-
-        return IsAssignableToName(type, fullyQualifiedName);
-    }
+    public static bool IsAssignableTo(JavaType? type, string fullyQualifiedName) =>
+        type != null && IsAssignableToName(type, fullyQualifiedName, exact: false);
 
     /// <summary>
     /// Check if a type is assignable to the target type, where the target is specified
@@ -65,11 +79,11 @@ public static class TypeUtils
 
         // Nullable<T>: both Nullable<T> and T are assignable to Nullable<T>
         if (targetType is JavaType.Parameterized { TypeParameters: [var innerType] } nullableParam
-            && GetFullyQualifiedName(nullableParam.Type) == "System.Nullable")
+            && IsOfClassType(nullableParam.Type, "System.Nullable"))
         {
             // Nullable<T> → Nullable<T>
             if (type is JavaType.Parameterized { TypeParameters: [var sourceInner] } sourceParam
-                && GetFullyQualifiedName(sourceParam.Type) == "System.Nullable")
+                && IsOfClassType(sourceParam.Type, "System.Nullable"))
                 return IsAssignableTo(sourceInner, innerType);
 
             // T → Nullable<T>
@@ -90,7 +104,8 @@ public static class TypeUtils
         var targetFqn = GetFullyQualifiedName(targetType);
         if (targetFqn == null) return false;
 
-        return IsAssignableTo(type, targetFqn);
+        // The target is a type, so only that type matches.
+        return IsAssignableToName(type, targetFqn, exact: true);
     }
 
     /// <summary>
@@ -102,7 +117,7 @@ public static class TypeUtils
 
         foreach (var fqn in fullyQualifiedNames)
         {
-            if (IsAssignableToName(type, fqn))
+            if (IsAssignableToName(type, fqn, exact: false))
                 return true;
         }
         return false;
@@ -134,7 +149,7 @@ public static class TypeUtils
             if (!seen.Add(current.FullyQualifiedName))
                 break; // Cycle protection
 
-            if (string.Equals(current.FullyQualifiedName, baseClassFqn, StringComparison.Ordinal))
+            if (FullyQualifiedNameMatches(current.FullyQualifiedName, baseClassFqn))
                 return true;
 
             current = AsClass(current.Supertype);
@@ -211,7 +226,7 @@ public static class TypeUtils
         };
     }
 
-    private static bool IsAssignableToName(JavaType type, string fullyQualifiedName)
+    private static bool IsAssignableToName(JavaType type, string fullyQualifiedName, bool exact)
     {
         // Primitives (int, bool, string, etc.) have no Class representation —
         // map to their .NET FQN and compare directly
@@ -228,20 +243,22 @@ public static class TypeUtils
         var cls = AsClass(type);
         if (cls == null) return false;
 
-        return IsAssignableToInternal(cls, fullyQualifiedName, new HashSet<string>());
+        return IsAssignableToInternal(cls, fullyQualifiedName, exact, new HashSet<string>());
     }
 
-    private static bool IsAssignableToInternal(JavaType.Class cls, string fqn, HashSet<string> seen)
+    private static bool IsAssignableToInternal(JavaType.Class cls, string fqn, bool exact, HashSet<string> seen)
     {
         if (!seen.Add(cls.FullyQualifiedName))
             return false; // Cycle protection
 
-        if (string.Equals(cls.FullyQualifiedName, fqn, StringComparison.Ordinal))
+        if (exact
+                ? string.Equals(cls.FullyQualifiedName, fqn, StringComparison.Ordinal)
+                : FullyQualifiedNameMatches(cls.FullyQualifiedName, fqn))
             return true;
 
         // Check supertype
         var super = AsClass(cls.Supertype);
-        if (super != null && IsAssignableToInternal(super, fqn, seen))
+        if (super != null && IsAssignableToInternal(super, fqn, exact, seen))
             return true;
 
         // Check interfaces
@@ -250,7 +267,7 @@ public static class TypeUtils
             foreach (var iface in cls.Interfaces)
             {
                 var ifaceCls = AsClass(iface);
-                if (ifaceCls != null && IsAssignableToInternal(ifaceCls, fqn, seen))
+                if (ifaceCls != null && IsAssignableToInternal(ifaceCls, fqn, exact, seen))
                     return true;
             }
         }
@@ -270,7 +287,7 @@ public static class TypeUtils
                 var ifaceCls = AsClass(iface);
                 if (ifaceCls == null) continue;
 
-                if (string.Equals(ifaceCls.FullyQualifiedName, interfaceFqn, StringComparison.Ordinal))
+                if (FullyQualifiedNameMatches(ifaceCls.FullyQualifiedName, interfaceFqn))
                     return true;
 
                 // Check super-interfaces
@@ -499,7 +516,7 @@ public static class TypeUtils
                 foreach (var bound in gtv.Bounds)
                 {
                     var boundFqn = GetFullyQualifiedName(bound);
-                    if (boundFqn != null && !IsAssignableTo(candidate, boundFqn))
+                    if (boundFqn != null && !IsAssignableToName(candidate, boundFqn, exact: true))
                         return false;
                 }
                 return true;
@@ -563,11 +580,11 @@ public static class TypeUtils
     /// </summary>
     private static readonly string[] ArrayGenericInterfaceFqns =
     [
-        "System.Collections.Generic.IEnumerable",
-        "System.Collections.Generic.ICollection",
-        "System.Collections.Generic.IList",
-        "System.Collections.Generic.IReadOnlyCollection",
-        "System.Collections.Generic.IReadOnlyList"
+        "System.Collections.Generic.IEnumerable`1",
+        "System.Collections.Generic.ICollection`1",
+        "System.Collections.Generic.IList`1",
+        "System.Collections.Generic.IReadOnlyCollection`1",
+        "System.Collections.Generic.IReadOnlyList`1"
     ];
 
     /// <summary>
@@ -646,7 +663,7 @@ public static class TypeUtils
                 if (cls.ClassKind is JavaType.FullyQualified.FullyQualifiedKind.Value
                     or JavaType.FullyQualified.FullyQualifiedKind.Enum)
                     return false;
-                if (ValueTypeFqns.Contains(cls.FullyQualifiedName)) return false;
+                if (ValueTypeFqns.Contains(WithoutArity(cls.FullyQualifiedName))) return false;
                 return !InheritsFrom(cls, "System.ValueType");
             default:
                 return false;
@@ -684,7 +701,7 @@ public static class TypeUtils
     {
         foreach (var ifaceFqn in ArrayGenericInterfaceFqns)
         {
-            if (string.Equals(ifaceFqn, targetFqn, StringComparison.Ordinal))
+            if (FullyQualifiedNameMatches(ifaceFqn, targetFqn))
             {
                 // Synthesize Parameterized(IFoo<elemType>)
                 var rawClass = new JavaType.Class { FullyQualifiedName = ifaceFqn };
