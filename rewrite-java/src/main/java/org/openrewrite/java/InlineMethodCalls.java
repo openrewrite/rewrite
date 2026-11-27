@@ -22,6 +22,7 @@ import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.marker.SearchResult;
 
 import java.util.*;
 import java.util.regex.Matcher;
@@ -84,7 +85,7 @@ public class InlineMethodCalls extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         MethodMatcher matcher = new MethodMatcher(methodPattern, true);
-        return Preconditions.check(new UsesMethod<>(methodPattern), new JavaVisitor<ExecutionContext>() {
+        return Preconditions.check(Preconditions.and(new IsJavaSource(),new UsesMethod<>(methodPattern)), new JavaVisitor<ExecutionContext>() {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 if (matcher.matches(method)) {
@@ -291,6 +292,15 @@ public class InlineMethodCalls extends Recipe {
                 return replacement;
             }
         });
+    }
+
+    /// The replacement is Java source applied with a [JavaTemplate], so other languages sharing the Java LST are out
+    /// of scope.
+    private static class IsJavaSource extends TreeVisitor<Tree, ExecutionContext> {
+        @Override
+        public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+            return tree instanceof J.CompilationUnit ? SearchResult.found(tree) : tree;
+        }
     }
 
     private static String substituteParameters(String template, List<String> parameterNames) {

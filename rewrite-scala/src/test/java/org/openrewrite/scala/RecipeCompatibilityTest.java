@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.ChangeMethodName;
 import org.openrewrite.java.ChangeType;
+import org.openrewrite.java.InlineMethodCalls;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.RemoveAnnotation;
 import org.openrewrite.java.RemoveImport;
@@ -391,6 +392,31 @@ class RecipeCompatibilityTest implements RewriteTest {
               class MyClass {
                 val list = new LinkedList[String](emptyList[String]())
                 val pi = Pi
+              }
+              """
+          )
+        );
+    }
+
+    // ---- InlineMethodCalls ----
+
+    @Test
+    void inlineMethodCallsLeavesScalaUnchanged() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new InlineMethodCalls(
+              "com.google.common.primitives.Longs compare(long, long)",
+              "Long.compare(a, b)",
+              null,
+              null,
+              null))
+            .parser(ScalaParser.builder().classpath("guava")),
+          scala(
+            """
+              import com.google.common.primitives.Longs
+
+              class A {
+                def c(a: Long, b: Long): Int = Longs.compare(a, b)
               }
               """
           )
