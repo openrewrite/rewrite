@@ -170,4 +170,40 @@ class ChangeTagAttributeTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void htmlBooleanAttributeGetsAValue() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeTagAttribute("//input", "disabled", "disabled", null, null)),
+          xml(
+            "<form><input disabled name=q></form>",
+            "<form><input disabled=\"disabled\" name=q></form>",
+            spec -> spec.path("form.html")
+          )
+        );
+    }
+
+    @Test
+    void htmlUnquotedValueStaysUnquotedWhenItCan() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeTagAttribute("//div", "class", "sidebar", null, null)),
+          xml(
+            "<div class=main>text</div>",
+            "<div class=sidebar>text</div>",
+            spec -> spec.path("page.html")
+          )
+        );
+    }
+
+    @Test
+    void htmlUnquotedValueIsQuotedWhenItMustBe() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeTagAttribute("//div", "class", "main wide", null, null)),
+          xml(
+            "<div class=main>text</div>",
+            "<div class=\"main wide\">text</div>",
+            spec -> spec.path("page.html")
+          )
+        );
+    }
 }

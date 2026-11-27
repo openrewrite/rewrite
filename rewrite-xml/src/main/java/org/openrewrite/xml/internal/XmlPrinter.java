@@ -26,8 +26,12 @@ import org.openrewrite.xml.marker.HtmlVoidElement;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.function.UnaryOperator;
+import java.util.regex.Pattern;
 
 public class XmlPrinter<P> extends XmlVisitor<PrintOutputCapture<P>> {
+
+    // What HtmlXmlLexer reads back as an unquoted attribute value
+    private static final Pattern UNQUOTED_ATTRIBUTE_VALUE = Pattern.compile("[^\"' \\t\\n\\r\\f>][^ \\t\\n\\r\\f>]*");
 
     @Override
     public Xml visitDocument(Xml.Document document, PrintOutputCapture<P> p) {
@@ -106,7 +110,7 @@ public class XmlPrinter<P> extends XmlVisitor<PrintOutputCapture<P>> {
         beforeSyntax(attribute, p);
         p.append(attribute.getKey().getPrefix())
                 .append(attribute.getKeyAsString());
-        if (!attribute.getMarkers().findFirst(HtmlBooleanAttribute.class).isPresent()) {
+        if (!isPrintedWithoutValue(attribute)) {
             p.append(attribute.getBeforeEquals())
                     .append('=');
             visit(attribute.getValue(), p);
@@ -115,10 +119,21 @@ public class XmlPrinter<P> extends XmlVisitor<PrintOutputCapture<P>> {
         return attribute;
     }
 
+    private static boolean isPrintedWithoutValue(Xml.Attribute attribute) {
+        return attribute.getMarkers().findFirst(HtmlBooleanAttribute.class).isPresent() &&
+               attribute.getValueAsString().isEmpty();
+    }
+
+    // A recipe may change a value so that it no longer fits HTML's unquoted form, which is then quoted again
+    private static boolean isPrintedUnquoted(Xml.Attribute.Value value) {
+        return value.getMarkers().findFirst(HtmlUnquotedAttributeValue.class).isPresent() &&
+               UNQUOTED_ATTRIBUTE_VALUE.matcher(value.getValue()).matches();
+    }
+
     @Override
     public Xml visitAttributeValue(Xml.Attribute.Value value, PrintOutputCapture<P> p) {
         beforeSyntax(value, p);
-        if (value.getMarkers().findFirst(HtmlUnquotedAttributeValue.class).isPresent()) {
+        if (isPrintedUnquoted(value)) {
             p.append(value.getValue());
             afterSyntax(value, p);
             return value;
