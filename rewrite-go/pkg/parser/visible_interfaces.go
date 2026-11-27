@@ -94,7 +94,8 @@ func (m *typeMapper) interfacesDeclaredIn(p *types.Package, unexported bool) []*
 }
 
 // satisfiedBy lists, in name order, the interfaces named satisfies, or a pointer to it does when named is no
-// interface itself.
+// interface itself. For an interface it lists only those with fewer methods, so that no interface inherits from
+// itself, as Java requires. The interfaces it embeds, which mapNamed records, cannot form a cycle, since Go rejects one.
 func (v *visibleInterfaces) satisfiedBy(named *types.Named) (satisfied []*types.Named) {
 	// A type the checker left broken can trip its assertions. It then names no interfaces rather than losing its type.
 	defer func() {
@@ -102,7 +103,7 @@ func (v *visibleInterfaces) satisfiedBy(named *types.Named) (satisfied []*types.
 			satisfied = nil
 		}
 	}()
-	_, isInterface := named.Underlying().(*types.Interface)
+	own, isInterface := named.Underlying().(*types.Interface)
 	var pointer types.Type
 	methods := types.NewMethodSet(named)
 	if !isInterface {
@@ -117,6 +118,9 @@ func (v *visibleInterfaces) satisfiedBy(named *types.Named) (satisfied []*types.
 			}
 			seen[candidate] = true
 			iface := candidate.Underlying().(*types.Interface)
+			if isInterface && iface.NumMethods() == own.NumMethods() {
+				continue
+			}
 			if types.Implements(named, iface) || pointer != nil && types.Implements(pointer, iface) {
 				satisfied = append(satisfied, candidate)
 			}
