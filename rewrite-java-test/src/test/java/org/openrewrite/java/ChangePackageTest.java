@@ -2646,6 +2646,43 @@ class ChangePackageTest implements RewriteTest {
     }
 
     @Test
+    void recursiveRenameToPackageNameThatIsAStringPrefix() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("com.acme.boot3", "com.acme.boot", true)),
+          java(
+            """
+              package com.acme.boot3.retry;
+              public class Retry {
+              }
+              """,
+            """
+              package com.acme.boot.retry;
+              public class Retry {
+              }
+              """
+          ),
+          java(
+            """
+              import com.acme.boot3.retry.Retry;
+              class A {
+                  Retry retry;
+              }
+              """,
+            """
+              import com.acme.boot.retry.Retry;
+              class A {
+                  Retry retry;
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> assertThat(cu.getTypesInUse().getTypesInUse())
+              .extracting(JavaType::toString)
+              .contains("com.acme.boot.retry.Retry")
+              .doesNotContain("com.acme.boot3.retry.Retry"))
+          )
+        );
+    }
+
+    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4142")
     void singleElementPackageNameToSubpackage() {
         rewriteRun(

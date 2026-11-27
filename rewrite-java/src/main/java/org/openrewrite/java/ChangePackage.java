@@ -536,7 +536,9 @@ public class ChangePackage extends Recipe implements RenamingRecipe {
         private boolean isTargetRecursivePackageName(String packageName) {
             return isRecursive() &&
                    packageName.startsWith(oldPackageName + ".") &&
-                   !packageName.startsWith(newPackageName);
+                   !newPackageName.isEmpty() &&
+                   !packageName.equals(newPackageName) &&
+                   !packageName.startsWith(newPackageName + ".");
         }
 
     }
