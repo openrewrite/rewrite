@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.test.RecipeQualityValidation;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -325,4 +326,79 @@ class RemoveMethodThrowsTest implements RewriteTest {
         );
     }
 
+    @Test
+    void keepExceptionTheBodyCanThrow() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveMethodThrows("lib.Base init()", true, "java.io.IOException", true))
+            .parser(JavaParser.fromJavaVersion().dependsOn(BASE, FILES)),
+          //language=java
+          java(
+            """
+              import lib.Base;
+              import lib.Files;
+
+              import java.io.IOException;
+
+              class Caches extends Base {
+                  @Override
+                  public void init() throws IOException {
+                      Files.read();
+                      super.init();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeExceptionThrownOnlyByMatchingCalls() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveMethodThrows("lib.Base init()", true, "java.io.IOException", true))
+            .parser(JavaParser.fromJavaVersion().dependsOn(BASE))
+            // the call of the overridden method no longer throws the exception, as in the library's new version
+            .recipeQualityValidation(RecipeQualityValidation.builder().parserTypedTrees(RecipeQualityValidation.ParserTypes.Erasure).build()),
+          //language=java
+          java(
+            """
+              import lib.Base;
+
+              import java.io.IOException;
+
+              class Caches extends Base {
+                  @Override
+                  public void init() throws IOException {
+                      super.init();
+                  }
+              }
+              """,
+            """
+              import lib.Base;
+
+              class Caches extends Base {
+                  @Override
+                  public void init() {
+                      super.init();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    private static final String BASE = """
+      package lib;
+      public class Base {
+          public void init() throws java.io.IOException {
+          }
+      }
+      """;
+
+    private static final String FILES = """
+      package lib;
+      public class Files {
+          public static void read() throws java.io.IOException {
+          }
+      }
+      """;
 }

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
@@ -57,6 +58,28 @@ public class RemoveMethodThrows extends Recipe {
             description = "A type pattern that is used to find matching exception to remove. Use `*` to match all.",
             example = "java.io.IOException")
     String exceptionTypePattern;
+
+    @Option(displayName = "Keep exceptions the body can throw",
+            description = "When enabled, an exception stays declared where the method body can still throw it: from a `throw`, " +
+                          "a call of a method outside the method pattern that declares it, the `close()` of a try-with-resources " +
+                          "resource, or a call without type information. Calls of methods matching the method pattern are taken " +
+                          "not to throw it. Default is false.",
+            required = false)
+    @Nullable
+    Boolean keepIfThrownByBody;
+
+    public RemoveMethodThrows(String methodPattern, @Nullable Boolean matchOverrides, String exceptionTypePattern) {
+        this(methodPattern, matchOverrides, exceptionTypePattern, null);
+    }
+
+    @JsonCreator
+    public RemoveMethodThrows(String methodPattern, @Nullable Boolean matchOverrides, String exceptionTypePattern,
+                              @Nullable Boolean keepIfThrownByBody) {
+        this.methodPattern = methodPattern;
+        this.matchOverrides = matchOverrides;
+        this.exceptionTypePattern = exceptionTypePattern;
+        this.keepIfThrownByBody = keepIfThrownByBody;
+    }
 
     String displayName = "Remove elements from a method declaration `throws` clause";
 
@@ -104,13 +127,30 @@ public class RemoveMethodThrows extends Recipe {
                         if (!matches || m.getThrows() == null) {
                             return m;
                         }
-                        return m.withThrows(ListUtils.map(m.getThrows(), nt -> {
-                            if (typeMatcher.matches(nt.getType())) {
-                                maybeRemoveImport(nt.getType().toString());
-                                return null;
+                        J.Block body = m.getBody();
+                        List<JavaType> kept = new ArrayList<>();
+                        J.MethodDeclaration withoutThrows = m.withThrows(ListUtils.map(m.getThrows(), nt -> {
+                            if (!typeMatcher.matches(nt.getType())) {
+                                return nt;
                             }
-                            return nt;
+                            if (Boolean.TRUE.equals(keepIfThrownByBody) && body != null &&
+                                (!(nt.getType() instanceof JavaType.FullyQualified) ||
+                                 ExceptionSources.of(body, methodMatcher, (JavaType.FullyQualified) nt.getType()).others)) {
+                                kept.add(nt.getType());
+                                return nt;
+                            }
+                            maybeRemoveImport(nt.getType().toString());
+                            return null;
                         }));
+                        if (kept.isEmpty() || method.getMethodType() == null) {
+                            return withoutThrows;
+                        }
+                        if (kept.size() == ListUtils.filter(m.getThrows(), nt -> typeMatcher.matches(nt.getType())).size()) {
+                            return method;
+                        }
+                        JavaType.Method methodType = method.getMethodType().withThrownExceptions(ListUtils.filter(
+                                method.getMethodType().getThrownExceptions(), te -> !typeMatcher.matches(te) || kept.stream().anyMatch(k -> TypeUtils.isOfType(k, te))));
+                        return withoutThrows.withMethodType(methodType).withName(withoutThrows.getName().withType(methodType));
                     }
 
                     @Override
