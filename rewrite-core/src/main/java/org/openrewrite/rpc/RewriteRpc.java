@@ -538,12 +538,16 @@ public class RewriteRpc {
         if (r.getDelegatesTo() != null) {
             PrepareRecipeResponse.DelegatesTo d = r.getDelegatesTo();
             RecipeListing listing = marketplace.findRecipe(d.getRecipeName());
-            if (listing == null) {
+            if (listing != null) {
+                return listing.prepare(resolvers, d.getOptions());
+            }
+            try {
+                return new RecipeLoader(null).load(d.getRecipeName(), d.getOptions());
+            } catch (RuntimeException e) {
                 throw new IllegalStateException(
                         "Remote declared delegatesTo " + d.getRecipeName() +
-                        " but no recipe found in marketplace.");
+                        " but no recipe was found in the marketplace or on the classpath.", e);
             }
-            return listing.prepare(resolvers, d.getOptions());
         }
         return new RpcRecipe(this, r.getId(), r.getDescriptor(), r.getEditVisitor(),
                 matchAll(r.getEditPreconditions()), r.getScanVisitor(), matchAll(r.getScanPreconditions()),
