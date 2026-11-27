@@ -29,6 +29,7 @@ import org.openrewrite.java.search.FindMethods;
 import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.style.IntelliJ;
+import org.openrewrite.java.trait.Scope;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.style.GeneralFormatStyle;
@@ -37,6 +38,7 @@ import org.openrewrite.style.Style;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Collections.emptyList;
@@ -166,6 +168,19 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
                 }
             }
 
+            if (member == null && !explicitOnly && typeReference.isPresent() && typeReference.get() instanceof JavaType.FullyQualified) {
+                JavaType.FullyQualified referencedType = (JavaType.FullyQualified) typeReference.get();
+                // no import reaches a reference where a type parameter or class of the same name is in scope
+                cu = (JavaSourceFile) new QualifyHiddenReferences(referencedType).visitNonNull(cu, p);
+                // an import would change what the file's other references of the same simple name mean
+                if (importWouldRebindOtherReferences(cu)) {
+                    return new FullyQualifyTypeReference<P>(referencedType).visit(cu, p);
+                }
+                if (!findTypeReference(cu).isPresent() && onlyIfReferenced) {
+                    return cu;
+                }
+            }
+
             J.Import importToAdd = new J.Import(randomId(),
                     Space.EMPTY,
                     Markers.EMPTY,
@@ -230,6 +245,8 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
     }
 
     private ImportStatus checkImportsForType(List<J.Import> imports) {
+        String dottedName = dottedName();
+        String simpleName = simpleName();
         for (J.Import imp : imports) {
             String ending = imp.getQualid().getSimpleName();
             if (imp.isStatic() ^ member != null) {
@@ -248,15 +265,15 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
                 }
             } else {
                 String impTypeName = imp.getTypeName().replace('$', '.');
-                if (fullyQualifiedName.equals(impTypeName)) {
+                if (dottedName.equals(impTypeName)) {
                     return ImportStatus.EXPLICITLY_IMPORTED;
                 } else if ("*".equals(ending)) {
                     String prefix = impTypeName.substring(0, impTypeName.length() - 1);
-                    if (fullyQualifiedName.startsWith(prefix) && !fullyQualifiedName.substring(prefix.length()).contains(".")) {
+                    if (dottedName.startsWith(prefix) && !dottedName.substring(prefix.length()).contains(".")) {
                         return ImportStatus.IMPLICITLY_IMPORTED;
                     }
                 }
-                if (!"*".equals(ending) && ending.equals(typeName)) {
+                if (!"*".equals(ending) && ending.equals(simpleName)) {
                     return ImportStatus.IMPORT_AMBIGUITY;
                 }
             }
@@ -367,6 +384,87 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
                 fieldAccess.set(identifier.getFieldType());
             }
             return identifier;
+        }
+    }
+
+    private boolean isReferenceToThisType(@Nullable JavaType type) {
+        JavaType.FullyQualified fq = TypeUtils.asFullyQualified(type);
+        return fq != null && TypeUtils.fullyQualifiedNamesAreEqual(fq.getFullyQualifiedName(), fullyQualifiedName);
+    }
+
+    // a nested type may arrive as a.Outer$Inner, while imports read a.Outer.Inner
+    private String dottedName() {
+        return TypeUtils.toFullyQualifiedName(fullyQualifiedName);
+    }
+
+    private String simpleName() {
+        String dottedName = dottedName();
+        return dottedName.substring(dottedName.lastIndexOf('.') + 1);
+    }
+
+    private boolean importWouldRebindOtherReferences(JavaSourceFile cu) {
+        String simpleName = simpleName();
+        for (J.ClassDeclaration classDecl : cu.getClasses()) {
+            if (simpleName.equals(classDecl.getSimpleName()) && !isReferenceToThisType(classDecl.getType())) {
+                return true;
+            }
+        }
+        AtomicBoolean rebinds = new AtomicBoolean();
+        new JavaIsoVisitor<AtomicBoolean>() {
+            @Override
+            public J.Import visitImport(J.Import import_, AtomicBoolean r) {
+                return import_;
+            }
+
+            @Override
+            public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, AtomicBoolean r) {
+                // the name of a qualified reference means the same whatever is imported
+                visit(fieldAccess.getTarget(), r);
+                return fieldAccess;
+            }
+
+            @Override
+            public J.Identifier visitIdentifier(J.Identifier identifier, AtomicBoolean r) {
+                // a name Scope does not bind resolves through this package, an on-demand import or java.lang,
+                // all of which a single-type import outranks
+                if (identifier.getFieldType() == null && simpleName.equals(identifier.getSimpleName()) &&
+                        TypeUtils.asFullyQualified(identifier.getType()) != null &&
+                        !(identifier.getType() instanceof JavaType.Unknown) && !isReferenceToThisType(identifier.getType()) &&
+                        !Scope.at(getCursor()).lookup(simpleName, Scope.Namespace.TYPE).isPresent()) {
+                    r.set(true);
+                }
+                return identifier;
+            }
+        }.visit(cu, rebinds);
+        return rebinds.get();
+    }
+
+    @AllArgsConstructor
+    private class QualifyHiddenReferences extends JavaVisitor<P> {
+        private final JavaType.FullyQualified type;
+
+        @Override
+        public J visitImport(J.Import import_, P p) {
+            return import_;
+        }
+
+        @Override
+        public J visitFieldAccess(J.FieldAccess fieldAccess, P p) {
+            if (fieldAccess.getName().getFieldType() == null && isReferenceToThisType(fieldAccess.getType())) {
+                return fieldAccess;
+            }
+            return super.visitFieldAccess(fieldAccess, p);
+        }
+
+        @Override
+        public J visitIdentifier(J.Identifier identifier, P p) {
+            JavaType.FullyQualified referenced = TypeUtils.asFullyQualified(identifier.getType());
+            if (identifier.getFieldType() == null && referenced != null && isReferenceToThisType(referenced) &&
+                    identifier.getSimpleName().equals(simpleName()) &&
+                    !isTypeReferenceSafeToShorten(getCursor(), identifier.getSimpleName(), type)) {
+                return FullyQualifyTypeReference.qualifiedName(referenced, identifier.getPrefix(), identifier.getAnnotations());
+            }
+            return super.visitIdentifier(identifier, p);
         }
     }
 
