@@ -20,7 +20,6 @@ import lombok.Value;
 import lombok.With;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.java.JavaStyle;
-import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.style.Style;
 import org.openrewrite.style.StyleHelper;
 
@@ -34,6 +33,6 @@ public class OmitParenthesesStyle implements JavaStyle {
 
     @Override
     public Style applyDefaults() {
-        return StyleHelper.merge(IntelliJ.tabsAndIndents(), this);
+        return StyleHelper.merge(DEFAULT, this);
     }
 }

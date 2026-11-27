@@ -18,6 +18,7 @@ package org.openrewrite.maven.search;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.maven.MavenIsoVisitor;
@@ -29,7 +30,8 @@ import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.List;
-import java.util.Map;
+
+import static java.util.Collections.emptyList;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -65,12 +67,9 @@ public class EffectiveDependencies extends Recipe {
                 String javaSourceSet = getCursor().firstEnclosingOrThrow(Xml.Document.class).getMarkers()
                         .findFirst(JavaSourceSet.class).map(JavaSourceSet::getName).orElse("main");
 
-                for (Map.Entry<Scope, List<ResolvedDependency>> scopedDependencies : mrr.getDependencies().entrySet()) {
-                    if (!scopedDependencies.getKey().isInClasspathOf(aScope)) {
-                        continue;
-                    }
-                    emitDependency(mrr.getPom().getGav(), scopedDependencies.getValue(), ctx, javaProject, javaSourceSet);
-                }
+                List<ResolvedDependency> directDependencies = ListUtils.filter(
+                        mrr.getDependencies().getOrDefault(aScope, emptyList()), ResolvedDependency::isDirect);
+                emitDependency(mrr.getPom().getGav(), directDependencies, ctx, javaProject, javaSourceSet);
                 return document;
             }
         };
