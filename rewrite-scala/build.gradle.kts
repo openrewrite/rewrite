@@ -28,6 +28,7 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter-params")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
     testRuntimeOnly(project(":rewrite-java-25"))
+    testRuntimeOnly("com.google.guava:guava:latest.release")
     testRuntimeOnly("org.antlr:antlr4-runtime:4.13.2")
     // Pinned for ScalaTypeAttributionTest.compilerCrashAfterTypingKeepsTypes
     testRuntimeOnly("org.scalatest:scalatest_2.13:3.0.9")
