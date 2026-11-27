@@ -17,6 +17,7 @@ export * from "./assertions";
 export * from "./markers";
 export * from "./parser";
 export * from "./tree";
+export * from "./edit";
 export * from "./visitor";
 
 import "./print";
