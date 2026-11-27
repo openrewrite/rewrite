@@ -39,6 +39,15 @@ public sealed class SearchResult(Guid id, string? description) : Marker, IRpcCod
         if (tree.Markers.MarkerList.Any(m => m is SearchResult found && found.Description == description))
             return tree;
 
+        return Added(tree, description);
+    }
+
+    /// <summary>
+    /// The tree with one more search result, also when it has one already. A precondition matches by changing the
+    /// tree, which <see cref="Found"/> doesn't when an earlier search marked it.
+    /// </summary>
+    internal static T Added<T>(T tree, string? description = null) where T : Tree
+    {
         var newMarkers = tree.Markers.Add(new SearchResult(Tree.RandomId(), description));
         if (tree is J j)
             return (T)J.SetMarkers(j, newMarkers);

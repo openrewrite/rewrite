@@ -13,6 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using OpenRewrite.CSharp;
+
 namespace OpenRewrite.Core;
 
 /// <summary>
@@ -111,7 +113,7 @@ public static class RecipeScheduler
                 return s;
             }
 
-            var after = visitor.Visit(s, state.Ctx);
+            var after = GeneratedCode.Gate(r, visitor).Visit(s, state.Ctx);
             return after == null ? null : after as SourceFile ?? s;
         });
     }

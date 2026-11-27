@@ -218,6 +218,8 @@ public class RewriteRpcServer
             "org.openrewrite.csharp.marker.CSharpLanguageVersion$TargetFrameworkVersion");
         RpcSendQueue.RegisterJavaTypeName(typeof(CSharpLanguageVersion),
             "org.openrewrite.csharp.marker.CSharpLanguageVersion");
+        RpcSendQueue.RegisterJavaTypeName(typeof(GeneratedCodeOption),
+            "org.openrewrite.csharp.marker.GeneratedCodeOption");
 
         // DotNetProject marker
         RpcSendQueue.RegisterJavaTypeName(typeof(DotNetProject),
@@ -1846,7 +1848,11 @@ public class RewriteRpcServer
         {
             visitor = recipe.GetVisitor();
         }
-        return visitor is Check check && _hoistedVisitors.ContainsKey(visitorName) ? check.Visitor : visitor;
+        if (visitor is Check check && _hoistedVisitors.ContainsKey(visitorName))
+        {
+            visitor = check.Visitor;
+        }
+        return phase == "edit" ? GeneratedCode.Gate(recipe, visitor) : visitor;
     }
 
     [JsonRpcMethod("BatchVisit", UseSingleObjectParameterDeserialization = true)]

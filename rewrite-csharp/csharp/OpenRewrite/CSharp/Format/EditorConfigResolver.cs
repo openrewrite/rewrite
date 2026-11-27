@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using Microsoft.CodeAnalysis;
 using OpenRewrite.Core;
 
 namespace OpenRewrite.CSharp.Format;
@@ -27,6 +28,7 @@ public class EditorConfigResolver
 {
     private readonly string _projectRoot;
     private readonly Dictionary<string, Resolved> _cache = new();
+    private readonly Dictionary<string, AnalyzerConfigSet?> _analyzerConfigs = new();
     private readonly Dictionary<(string Dir, bool UseTabs, int IndentSize, int TabSize), CSharpFormatStyle> _detected =
         new();
 
@@ -71,6 +73,51 @@ public class EditorConfigResolver
         if (!_detected.TryGetValue(key, out var shared))
             _detected[key] = shared = style;
         return shared;
+    }
+
+    /// <summary>
+    /// <paramref name="cu"/> with its <see cref="CSharpFormatStyle"/> and, where one is set, its
+    /// <see cref="GeneratedCodeOption"/>.
+    /// </summary>
+    public CompilationUnit Mark(CompilationUnit cu, string absoluteFilePath)
+    {
+        var markers = cu.Markers.Add(Resolve(absoluteFilePath, cu));
+        if (GeneratedCode(absoluteFilePath) is { } generated)
+            markers = markers.Add(new GeneratedCodeOption(Tree.RandomId(), generated));
+        return cu.WithMarkers(markers);
+    }
+
+    /// <summary>
+    /// The <c>generated_code</c> option of <paramref name="absoluteFilePath"/>, or null where its .editorconfig
+    /// files don't set it to <c>true</c> or <c>false</c>.
+    /// </summary>
+    public bool? GeneratedCode(string absoluteFilePath)
+    {
+        var path = Path.GetFullPath(absoluteFilePath);
+        var dir = Path.GetDirectoryName(path)!;
+        if (!_analyzerConfigs.TryGetValue(dir, out var configs))
+        {
+            var parsed = EditorConfigFiles(dir)
+                .Select(file => AnalyzerConfig.Parse(File.ReadAllText(file), file))
+                .ToList();
+            _analyzerConfigs[dir] = configs = parsed.Count == 0 ? null : AnalyzerConfigSet.Create(parsed);
+        }
+
+        return configs != null &&
+               configs.GetOptionsForSourcePath(path).AnalyzerOptions.TryGetValue("generated_code", out var value) &&
+               bool.TryParse(value, out var generated)
+            ? generated
+            : null;
+    }
+
+    private IEnumerable<string> EditorConfigFiles(string startDir)
+    {
+        for (var dir = startDir; dir != null && IsWithinProjectRoot(dir); dir = Path.GetDirectoryName(dir))
+        {
+            var file = Path.Combine(dir, ".editorconfig");
+            if (File.Exists(file))
+                yield return file;
+        }
     }
 
     private Resolved ResolveForDirectory(string dir)

@@ -25,7 +25,7 @@ namespace OpenRewrite.Core;
 /// Extends TreeVisitor (not JavaVisitor) so it works with any language tree,
 /// matching how Java's Preconditions.Check works in rewrite-core.
 /// </summary>
-public class Check : TreeVisitor<Tree, ExecutionContext>
+public class Check : TreeVisitor<Tree, ExecutionContext>, ITreeVisitor<ExecutionContext>
 {
     public ITreeVisitor<ExecutionContext> Precondition { get; }
     public ITreeVisitor<ExecutionContext> Visitor { get; }
@@ -36,14 +36,14 @@ public class Check : TreeVisitor<Tree, ExecutionContext>
         Visitor = visitor;
     }
 
-    public override Tree? Visit(Tree? tree, ExecutionContext ctx)
-    {
-        if (tree is not SourceFile || Precondition.Visit(tree, ctx) != tree)
-        {
-            return Visitor.Visit(tree, ctx);
-        }
-        return tree;
-    }
+    public override Tree? Visit(Tree? tree, ExecutionContext ctx) =>
+        Applies(tree, ctx) ? Visitor.Visit(tree, ctx) : tree;
+
+    Tree? ITreeVisitor<ExecutionContext>.Visit(Tree? tree, ExecutionContext ctx, Cursor parent) =>
+        Applies(tree, ctx) ? Visitor.Visit(tree, ctx, parent) : tree;
+
+    private bool Applies(Tree? tree, ExecutionContext ctx) =>
+        tree is not SourceFile || Precondition.Visit(tree, ctx) != tree;
 }
 
 /// <summary>
@@ -96,7 +96,7 @@ public class NotVisitor : TreeVisitor<Tree, ExecutionContext>, IComposite
         var t2 = _visitor.Visit(tree, ctx);
         if (tree == t2 && tree != null)
         {
-            return SearchResult.Found(tree);
+            return SearchResult.Added(tree);
         }
         return tree;
     }
