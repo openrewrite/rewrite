@@ -325,7 +325,19 @@ class HtmlParserTest implements RewriteTest {
               <%@ page pageEncoding="UTF-8" %>
               <nav class=main><a href="/">Home</a><br><input disabled></nav>
               """,
-            spec -> spec.path("WEB-INF/jspf/header.jspf")
+            spec -> spec.path("WEB-INF/jspf/header.jspf").afterRecipe(doc -> {
+                assertThat(doc.getProlog().getJspDirectives()).singleElement().satisfies(directive -> {
+                    assertThat(directive.getType()).isEqualTo("page");
+                    assertThat(directive.getBeforeTypePrefix()).isEqualTo(" ");
+                    assertThat(directive.getAttributes()).singleElement().satisfies(attribute -> {
+                        assertThat(attribute.getKeyAsString()).isEqualTo("pageEncoding");
+                        assertThat(attribute.getValueAsString()).isEqualTo("UTF-8");
+                    });
+                    assertThat(directive.getBeforeDirectiveEndPrefix()).isEqualTo(" ");
+                });
+                assertThat(doc.getRoot().getName()).isEqualTo("nav");
+                assertThat(doc.getRoot().getPrefix()).isEqualTo("\n");
+            })
           )
         );
     }
