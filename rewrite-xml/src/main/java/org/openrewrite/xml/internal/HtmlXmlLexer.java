@@ -31,8 +31,8 @@ import java.util.regex.Pattern;
 /// [XmlParserVisitor] can parse HTML without a second grammar. The strict [XMLLexer] remains in use for
 /// everything else. It differs from it in that it:
 ///
-/// - reads the content of `<script>`, `<style>` and `<textarea>` as text, since a `<` or `&` in it does not
-///   begin markup;
+/// - reads the content of `<script>`, `<style>`, `<textarea>` and `<title>` as text, since a `<` or `&` in it
+///   does not begin markup;
 /// - reads `<` and `&` that cannot begin a tag or an entity as text;
 /// - reads `<` in a quoted attribute value, and unquoted attribute values;
 /// - reads any name that does not contain whitespace or one of `"'>/=` as an attribute name, which covers
@@ -44,7 +44,7 @@ import java.util.regex.Pattern;
 /// Attributes without a value are admitted by the parser grammar itself.
 public class HtmlXmlLexer extends XMLLexer {
 
-    private static final Set<String> RAW_TEXT_ELEMENTS = new HashSet<>(Arrays.asList("script", "style", "textarea"));
+    private static final Set<String> RAW_TEXT_ELEMENTS = new HashSet<>(Arrays.asList("script", "style", "textarea", "title"));
 
     /// Elements whose end tag HTML lets an author leave off, when what follows makes it clear where they end.
     private static final Set<String> OPTIONAL_END_TAG = new HashSet<>(Arrays.asList(

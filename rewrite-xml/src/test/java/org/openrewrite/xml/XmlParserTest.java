@@ -623,6 +623,19 @@ class XmlParserTest implements RewriteTest {
     }
 
     @Test
+    void htmlLessThanInTitle() {
+        rewriteRun(
+          xml(
+            //language=html
+            """
+              <html><head><title>Find functions returning `CompletableFuture<T>`</title></head></html>
+              """,
+            spec -> spec.path("title.html")
+          )
+        );
+    }
+
+    @Test
     void htmlLoneAmpersand() {
         rewriteRun(
           xml(
@@ -768,6 +781,19 @@ class XmlParserTest implements RewriteTest {
           xml(
             "<TABLE><TR><TD>cell</td></tr></table>",
             spec -> spec.path("legacy.jsp")
+          )
+        );
+    }
+
+    @Test
+    void jspFragmentIsParsedAsHtml() {
+        rewriteRun(
+          xml(
+            """
+              <%@ page pageEncoding="UTF-8" %>
+              <nav class=main><a href="/">Home</a><br><input disabled></nav>
+              """,
+            spec -> spec.path("WEB-INF/jspf/header.jspf")
           )
         );
     }
@@ -1255,6 +1281,10 @@ class XmlParserTest implements RewriteTest {
       "proj.Csproj",
       "/foo/bar/baz.jsp",
       "/foo/bar/baz.jspx",
+      "WEB-INF/jspf/header.jspf",
+      "index.html",
+      "index.HTML",
+      "legacy/page.htm",
       "WEB-INF/tags/greeting.tagx",
       "ejbModule/META-INF/Map.mapxmi",
       "ejbModule/META-INF/Schema/CUSTOMER.tblxmi",
@@ -1298,7 +1328,9 @@ class XmlParserTest implements RewriteTest {
       "appsettings.config",
       "webhook.config",
       "build.proj",
-      "docker-compose.dcproj"
+      "docker-compose.dcproj",
+      "index.html.txt",
+      "notes.shtml"
     })
     void acceptWithInvalidPaths(String path) {
         assertThat(new XmlParser().accept(Path.of(path))).isFalse();
