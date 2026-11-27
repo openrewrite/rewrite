@@ -27,11 +27,13 @@ import org.openrewrite.java.internal.PackageNameUtils;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.search.FindMethods;
 import org.openrewrite.java.search.FindTypes;
+import org.openrewrite.java.style.Autodetect;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.style.GeneralFormatStyle;
+import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
 
 import java.util.ArrayList;
@@ -213,7 +215,8 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
                 cu = (JavaSourceFile) new ShortenFullyQualifiedTypeReferences((JavaType.FullyQualified) typeReference.get()).visit(cu, p);
             }
 
-            // ImportLayoutStyle::addImport adds always `\n` as newlines. Checking if we need to fix them
+            // ImportLayoutStyle::addImport always adds `\n`. An auto-detected GeneralFormatStyle describes the whole project,
+            // so a file whose line endings differ from it keeps its own unless a style was explicitly configured
             newImports = checkCRLF(cu, newImports);
 
             cu = cu.getPadding().withImports(newImports);
@@ -265,8 +268,11 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
     }
 
     private List<JRightPadded<J.Import>> checkCRLF(JavaSourceFile cu, List<JRightPadded<J.Import>> newImports) {
-        GeneralFormatStyle generalFormatStyle = Optional.ofNullable(Style.from(GeneralFormatStyle.class, ((SourceFile) cu)))
-                .orElse(autodetectGeneralFormatStyle(cu));
+        GeneralFormatStyle generalFormatStyle = NamedStyles.merge(GeneralFormatStyle.class, ListUtils.map(
+                cu.getMarkers().findAll(NamedStyles.class), styles -> styles instanceof Autodetect ? null : styles));
+        if (generalFormatStyle == null) {
+            generalFormatStyle = autodetectGeneralFormatStyle(cu);
+        }
         if (generalFormatStyle.isUseCRLFNewLines()) {
             return ListUtils.map(newImports, rp -> rp.map(
                     i -> i.withPrefix(i.getPrefix().withWhitespace(i.getPrefix().getWhitespace()
