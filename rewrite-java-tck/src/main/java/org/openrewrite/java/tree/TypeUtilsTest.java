@@ -1687,8 +1687,7 @@ class TypeUtilsTest implements RewriteTest {
                 J.MethodDeclaration test = (J.MethodDeclaration) box.getBody().getStatements().get(0);
                 JavaType other = test.getMethodType().getParameterTypes().get(0);
 
-                TypeUtils.isAssignableTo(comparable, other);
-
+                assertThat(TypeUtils.isAssignableTo(comparable, other)).isFalse();
                 assertThat(comparable).hasToString("java.lang.Comparable<java.util.List<Generic{? extends Generic{T}}>>");
                 assertThat(other).hasToString("Box<Generic{? extends Generic{T}}>");
             })
