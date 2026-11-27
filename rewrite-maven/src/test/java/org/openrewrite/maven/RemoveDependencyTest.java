@@ -219,6 +219,76 @@ class RemoveDependencyTest implements RewriteTest {
     }
 
     @Test
+    void keepSystemDependencyWhenScopeDiffers() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveDependency("com.example.legacy", "local-lib", "compile")),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.example</groupId>
+                <artifactId>app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>com.example.legacy</groupId>
+                    <artifactId>local-lib</artifactId>
+                    <version>1.0</version>
+                    <scope>system</scope>
+                    <systemPath>${project.basedir}/lib/local-lib.jar</systemPath>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeSystemDependencyFromProfile() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveDependency("com.example.legacy", "local-lib", null)),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.example</groupId>
+                <artifactId>app</artifactId>
+                <version>1</version>
+                <profiles>
+                  <profile>
+                    <id>legacy</id>
+                    <dependencies>
+                      <dependency>
+                        <groupId>com.example.legacy</groupId>
+                        <artifactId>local-lib</artifactId>
+                        <version>1.0</version>
+                        <scope>system</scope>
+                        <systemPath>${project.basedir}/lib/local-lib.jar</systemPath>
+                      </dependency>
+                    </dependencies>
+                  </profile>
+                </profiles>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.example</groupId>
+                <artifactId>app</artifactId>
+                <version>1</version>
+                <profiles>
+                  <profile>
+                    <id>legacy</id>
+                  </profile>
+                </profiles>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
     void shouldRemoveScopedDependency() {
         rewriteRun(
           spec -> spec.recipe(new RemoveDependency("org.junit.jupiter", "junit-jupiter", "compile")),
