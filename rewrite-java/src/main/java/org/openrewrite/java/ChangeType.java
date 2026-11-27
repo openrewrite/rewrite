@@ -25,7 +25,6 @@ import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.service.ImportService;
-import org.openrewrite.java.trait.Scope;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.SearchResult;
@@ -846,12 +845,10 @@ public class ChangeType extends Recipe implements RenamingRecipe {
         /**
          * Whether a member type inherited around a reference to the original may take the simple name the target is
          * written by. Such a member type takes precedence over an import. Only the classes this file declares are
-         * known to {@link ShortenFullyQualifiedTypeReferencesSafely#inheritedNameIsProven}. Where a reference sits in
-         * the scope of a name equal to the head of the target's package, as of an inherited field {@code org}, a
-         * qualified name fails too, and the name is shortened.
+         * known to {@link ShortenFullyQualifiedTypeReferencesSafely#inheritedNameIsProven}.
          */
         private boolean inheritedNameMayBind(JavaSourceFile sf, JavaType.FullyQualified newType) {
-            if (!(sf instanceof J.CompilationUnit) || newType.getPackageName().isEmpty()) {
+            if (!(sf instanceof J.CompilationUnit)) {
                 return false;
             }
             // like otherTypeNames, this describes the file as it was first seen
@@ -860,8 +857,6 @@ public class ChangeType extends Recipe implements RenamingRecipe {
             }
             inheritedNameMayBindOf = sf.getId();
             JavaType.FullyQualified outermost = getTopLevelClassName(newType);
-            String packageName = newType.getPackageName();
-            String packageHead = packageName.indexOf('.') < 0 ? packageName : packageName.substring(0, packageName.indexOf('.'));
             Map<JavaType.FullyQualified, ShortenFullyQualifiedTypeReferencesSafely.DeclaredMembers> declared = new IdentityHashMap<>();
             new JavaIsoVisitor<Integer>() {
                 @Override
@@ -873,7 +868,6 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                 }
             }.visit(sf, 0);
             AtomicBoolean unproven = new AtomicBoolean();
-            AtomicBoolean packageHeadBound = new AtomicBoolean();
             new JavaIsoVisitor<Integer>() {
                 @Override
                 public J.Import visitImport(J.Import anImport, Integer p) {
@@ -901,19 +895,13 @@ public class ChangeType extends Recipe implements RenamingRecipe {
                 }
 
                 private void check() {
-                    Cursor cursor = getCursor();
-                    if (!ShortenFullyQualifiedTypeReferencesSafely.inheritedNameIsProven(cursor, outermost.getClassName(),
+                    if (!ShortenFullyQualifiedTypeReferencesSafely.inheritedNameIsProven(getCursor(), outermost.getClassName(),
                             outermost.getFullyQualifiedName(), declared)) {
                         unproven.set(true);
                     }
-                    Scope scope = Scope.at(cursor);
-                    if (scope.lookup(packageHead, Scope.Namespace.TYPE).isPresent() ||
-                        ShortenFullyQualifiedTypeReferences.isTypeQualifierInExpression(cursor) && scope.lookup(packageHead).isPresent()) {
-                        packageHeadBound.set(true);
-                    }
                 }
             }.visit(sf, 0);
-            inheritedNameMayBind = unproven.get() && !packageHeadBound.get();
+            inheritedNameMayBind = unproven.get();
             return inheritedNameMayBind;
         }
 

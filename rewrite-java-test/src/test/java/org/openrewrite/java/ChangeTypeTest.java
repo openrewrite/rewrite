@@ -4411,34 +4411,6 @@ class ChangeTypeTest implements RewriteTest {
     }
 
     @Test
-    void shortenWhereInheritedFieldTakesTargetPackageHead() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangeType("a.Old", "org.b.New", true)),
-          java("package a; public class Old { public static void run() {} }", SourceSpec::skip),
-          java("package org.b; public class New { public static void run() {} }", SourceSpec::skip),
-          java("package lib; public class Parent { protected Object org; }", SourceSpec::skip),
-          java(
-            """
-              class C extends lib.Parent {
-                  void m() {
-                      a.Old.run();
-                  }
-              }
-              """,
-            """
-              import org.b.New;
-
-              class C extends lib.Parent {
-                  void m() {
-                      New.run();
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @Test
     void shortenWhenFileOnlyQualifiesAnotherTypeOfTheSameName() {
         rewriteRun(
           spec -> spec.recipe(new ChangeType("a.A1", "b.Bar", true)),
