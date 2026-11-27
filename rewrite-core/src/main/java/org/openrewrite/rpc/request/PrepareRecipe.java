@@ -22,11 +22,17 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Recipe;
 import org.openrewrite.ScanningRecipe;
+import org.openrewrite.config.OptionDescriptor;
+import org.openrewrite.config.RecipeDescriptor;
+import org.openrewrite.internal.lang.NullUtils;
 import org.openrewrite.rpc.internal.PreparedRecipeCache;
 
+import java.lang.reflect.Field;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static java.util.Collections.emptyList;
 
@@ -65,9 +71,27 @@ public class PrepareRecipe implements RpcRequest {
             for (Recipe child : recipe.getRecipeList()) {
                 children.add(prepareTree(child, preparedRecipes, acceptsCausesAnotherCycle));
             }
+            RecipeDescriptor descriptor = recipe.getDescriptor();
+
+            // Names come from the descriptor, required-ness from where Recipe#validate() gets it.
+            // The two disagree: `@Option.required()` defaults to true and the descriptor copies it
+            // verbatim, while NullUtils skips a @Nullable field before looking at @Option at all.
+            // The descriptor alone would also reject an option declared on a getter or constructor
+            // parameter outright, since it hardcodes a null value for those.
+            Set<String> requiredFields = new HashSet<>();
+            for (Field field : NullUtils.findNonNullFields(recipe.getClass())) {
+                requiredFields.add(field.getName());
+            }
+            List<PrepareRecipeResponse.OptionValidation> validations = new ArrayList<>();
+            for (OptionDescriptor option : descriptor.getOptions()) {
+                if (option.getValue() == null && requiredFields.contains(option.getName())) {
+                    validations.add(new PrepareRecipeResponse.OptionValidation(option.getName(), "is required"));
+                }
+            }
+
             return new PrepareRecipeResponse(
                     instanceId,
-                    recipe.getDescriptor(),
+                    descriptor,
                     "edit:" + instanceId,
                     // Making this non-empty would only be valuable if a non-Java process was controlling
                     // recipe execution and there would then be some benefit to it preempting the execution
@@ -77,7 +101,8 @@ public class PrepareRecipe implements RpcRequest {
                     emptyList(),
                     null,
                     children,
-                    acceptsCausesAnotherCycle && recipe.causesAnotherCycle() ? true : null);
+                    acceptsCausesAnotherCycle && recipe.causesAnotherCycle() ? true : null,
+                    validations.isEmpty() ? null : validations);
         }
     }
 }

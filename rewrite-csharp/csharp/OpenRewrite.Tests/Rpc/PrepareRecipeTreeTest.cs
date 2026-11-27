@@ -63,17 +63,38 @@ public class PrepareRecipeTreeTest
     }
 
     [Fact]
-    public async Task PrepareRecipe_ThrowsWhenAChildIsMissingARequiredOption()
+    public async Task PrepareRecipe_EmitsChildValidationForMissingRequiredOption()
     {
         var marketplace = new global::OpenRewrite.Core.RecipeMarketplace();
         marketplace.Install(new ParentMissingChildOption(), new global::OpenRewrite.Core.CategoryDescriptor("Test"));
         var server = new RewriteRpcServer(marketplace);
 
-        var ex = await Assert.ThrowsAnyAsync<Exception>(() =>
-            server.PrepareRecipe(new PrepareRecipeRequest { Id = typeof(ParentMissingChildOption).FullName! }));
+        var parent = await server.PrepareRecipe(new PrepareRecipeRequest
+        {
+            Id = typeof(ParentMissingChildOption).FullName!
+        });
 
-        Assert.Contains("RequiredThing", ex.Message);
-        Assert.Contains("Missing required option", ex.Message);
+        Assert.Null(parent.Validations);
+        var child = Assert.Single(parent.RecipeList);
+        var validation = Assert.Single(child.Validations!);
+        Assert.Equal("RequiredThing", validation.Option);
+        Assert.Equal("is required", validation.Message);
+    }
+
+    [Fact]
+    public async Task PrepareRecipe_SuppliedOptionEmitsNoValidations()
+    {
+        var marketplace = new global::OpenRewrite.Core.RecipeMarketplace();
+        marketplace.Install(new ChildWithRequiredOption(), new global::OpenRewrite.Core.CategoryDescriptor("Test"));
+        var server = new RewriteRpcServer(marketplace);
+
+        var prepared = await server.PrepareRecipe(new PrepareRecipeRequest
+        {
+            Id = typeof(ChildWithRequiredOption).FullName!,
+            Options = new Dictionary<string, object?> { ["requiredThing"] = "set" }
+        });
+
+        Assert.Null(prepared.Validations);
     }
 
     private sealed class SetsText : global::OpenRewrite.Core.Recipe

@@ -145,6 +145,17 @@ class PreparedJavaRecipe:
     descriptor: Dict[str, Any]
 
 
+def _rejected_options(response: Dict[str, Any]) -> List[str]:
+    """Every option the peer rejected anywhere in a prepared tree, as "`option` message" phrases.
+
+    Each node carries its own, so a composite's child is reported too.
+    """
+    rejected = [f"`{v['option']}` {v['message']}" for v in (response.get('validations') or [])]
+    for child in (response.get('recipeList') or []):
+        rejected.extend(_rejected_options(child))
+    return rejected
+
+
 def prepare_java_recipe(recipe_name: str, options: Optional[Dict[str, Any]] = None) -> PreparedJavaRecipe:
     """Prepare a Java recipe for execution via RPC.
 
@@ -179,6 +190,12 @@ def prepare_java_recipe(recipe_name: str, options: Optional[Dict[str, Any]] = No
 
     if result is None:
         raise RuntimeError(f"Failed to prepare Java recipe: {recipe_name}")
+
+    # The peer reports rejected options rather than failing the request, and this side has no
+    # validate stage to defer them to, so refusing here is what stops a half-configured run.
+    rejected = _rejected_options(result)
+    if rejected:
+        raise ValueError(f"Invalid options for recipe `{recipe_name}`: {', '.join(rejected)}")
 
     return PreparedJavaRecipe(
         id=result.get('id'),

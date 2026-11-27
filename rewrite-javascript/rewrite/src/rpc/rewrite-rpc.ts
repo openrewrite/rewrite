@@ -360,6 +360,12 @@ export class RewriteRpc {
             new rpc.RequestType<PrepareRecipe, PrepareRecipeResponse, Error>("PrepareRecipe"),
             new PrepareRecipe(id, options)
         );
+        // The peer reports rejected options rather than failing the request, and this side has no
+        // validate stage to defer them to, so refusing here is what stops a half-configured run.
+        const rejected = rejectedOptions(response);
+        if (rejected.length > 0) {
+            throw new Error(`Invalid options for recipe \`${id}\`: ${rejected.join(", ")}`);
+        }
         return new RpcRecipe(this, response.id, response.descriptor, response.editVisitor,
             response.scanVisitor);
     }
@@ -460,4 +466,16 @@ class IdentityMap {
         this.objectMap = new WeakMap<any, string>();
         this.primitiveMap.clear();
     }
+}
+
+/**
+ * Every option the peer rejected anywhere in a prepared tree. Each node carries its own, so a
+ * composite's child is reported too.
+ */
+function rejectedOptions(response: PrepareRecipeResponse): string[] {
+    const rejected = (response.validations ?? []).map(v => `\`${v.option}\` ${v.message}`);
+    for (const child of response.recipeList ?? []) {
+        rejected.push(...rejectedOptions(child));
+    }
+    return rejected;
 }
