@@ -39,14 +39,23 @@ public final class RegistryTransport {
     private final @Nullable String httpsProxy;
     private final @Nullable String noProxy;
     private final boolean requiresCustomTls;
+    /**
+     * Whether the route for each scheme, and the bypass list it is checked against, came only from the host's own
+     * proxy variables ({@code http_proxy}, {@code https_proxy}, {@code proxy}, {@code no_proxy}) rather than from a
+     * manager's configuration.
+     */
+    private final boolean httpFromHost;
+    private final boolean httpsFromHost;
 
     public RegistryTransport(@Nullable String httpProxy, @Nullable String httpsProxy, @Nullable String noProxy) {
-        this(httpProxy, httpsProxy, noProxy, false);
+        this(httpProxy, httpsProxy, noProxy, false, false, false);
     }
 
     private RegistryTransport(@Nullable String httpProxy, @Nullable String httpsProxy, @Nullable String noProxy,
-                              boolean requiresCustomTls) {
+                              boolean requiresCustomTls, boolean httpFromHost, boolean httpsFromHost) {
         this.requiresCustomTls = requiresCustomTls;
+        this.httpFromHost = httpFromHost;
+        this.httpsFromHost = httpsFromHost;
         this.httpProxy = emptyToNull(httpProxy);
         this.httpsProxy = emptyToNull(httpsProxy);
         this.noProxy = noProxy;
@@ -84,12 +93,14 @@ public final class RegistryTransport {
             proxy = npmSetting(config, env, "proxy");
         }
         String bypass = npmSetting(config, env, "noproxy");
-        if (bypass == null || bypass.isEmpty()) {
+        boolean bypassFromHost = bypass == null || bypass.isEmpty();
+        if (bypassFromHost) {
             bypass = env(env, "no_proxy");
         }
+        boolean fromHost = proxy == null && bypassFromHost;
         return new RegistryTransport(proxy != null ? proxy : first(env(env, "https_proxy"),
                 first(env(env, "http_proxy"), env(env, "proxy"))),
-                proxy != null ? proxy : env(env, "https_proxy"), bypass, customTls);
+                proxy != null ? proxy : env(env, "https_proxy"), bypass, customTls, fromHost, fromHost);
     }
 
     /** Do not turn an offline install or an explicit deadline into an ordinary live request. */
@@ -116,20 +127,26 @@ public final class RegistryTransport {
         }
         boolean customTls = requireCapabilities(config, true);
         String https = text(config.get("httpsProxy"));
+        boolean httpsFromHost = false;
         if (https == null) {
             // pnpm's nullish fallback preserves an explicit false proxy.
             Object fallback = config.get("proxy");
-            https = fallback == null ? env(env, "https_proxy") : text(fallback);
+            httpsFromHost = fallback == null;
+            https = httpsFromHost ? env(env, "https_proxy") : text(fallback);
         }
         String http = text(config.get("httpProxy"));
+        boolean httpFromHost = false;
         if (http == null) {
+            httpFromHost = https == null || https.isEmpty() || httpsFromHost;
             http = first(https, first(env(env, "http_proxy"), env(env, "proxy")));
         }
         String bypass = text(config.get("noProxy"));
+        boolean bypassFromHost = bypass == null && config.get("noproxy") == null;
         if (bypass == null) {
             bypass = config.get("noproxy") != null ? text(config.get("noproxy")) : env(env, "no_proxy");
         }
-        return new RegistryTransport(http, https, bypass, customTls);
+        return new RegistryTransport(http, https, bypass, customTls,
+                httpFromHost && bypassFromHost, httpsFromHost && bypassFromHost);
     }
 
     /** pnpm's package-manager download uses trusted npmrc network settings with null/false disabling fallback. */
@@ -147,7 +164,11 @@ public final class RegistryTransport {
         String http = bootstrapProxy(trusted.get("http-proxy"),
                 first(https, first(env(env, "http_proxy"), env(env, "proxy"))), trusted.containsKey("http-proxy"));
         Object bypass = trusted.get("no-proxy") != null ? trusted.get("no-proxy") : trusted.get("noproxy");
-        return new RegistryTransport(http, https, bypass == null ? env(env, "no_proxy") : text(bypass), customTls);
+        boolean httpsFromHost = trusted.get("https-proxy") == null && !trusted.containsKey("proxy");
+        boolean httpFromHost = !trusted.containsKey("http-proxy") && (https == null || httpsFromHost);
+        boolean bypassFromHost = bypass == null;
+        return new RegistryTransport(http, https, bypass == null ? env(env, "no_proxy") : text(bypass), customTls,
+                httpFromHost && bypassFromHost, httpsFromHost && bypassFromHost);
     }
 
     private static @Nullable String bootstrapProxy(@Nullable Object value, @Nullable String fallback, boolean present) {
@@ -217,7 +238,7 @@ public final class RegistryTransport {
 
     public HttpSender sender(HttpSender sender, String url) {
         // Preserve the existing host contract: a custom injected sender supplies TLS configuration itself.
-        if (requiresCustomTls && sender.getClass() == HttpUrlConnectionSender.class) {
+        if (requiresCustomTls && !isHostSender(sender)) {
             throw new CannotKnow("the configured registry transport requires custom TLS (cafile/strict-ssl), " +
                                  "but no TLS-capable HttpSender was injected");
         }
@@ -227,40 +248,58 @@ public final class RegistryTransport {
         } catch (IllegalArgumentException e) {
             throw new CannotKnow("the registry request URL is invalid");
         }
-        String configured = "https".equalsIgnoreCase(target.getScheme()) ? httpsProxy : httpProxy;
+        boolean https = "https".equalsIgnoreCase(target.getScheme());
+        String configured = https ? httpsProxy : httpProxy;
         if (configured == null) {
             return sender;
         }
-        Proxy route;
-        if (bypasses(target.getHost())) {
-            route = Proxy.NO_PROXY;
-        } else {
-            URI proxy;
+        if ((https ? httpsFromHost : httpFromHost) && isHostSender(sender)) {
+            // As with TLS above: a custom injected sender is the host's own client, and the host's proxy variables
+            // describe the host's network, which that sender already routes. It takes the route when it can bind
+            // one; only a route that a manager's configuration sets must be bound or refused.
             try {
-                proxy = URI.create(configured);
-            } catch (IllegalArgumentException e) {
-                throw new CannotKnow("the configured registry proxy URL is invalid");
+                return sender.withProxy(route(target, configured));
+            } catch (CannotKnow | UnsupportedOperationException e) {
+                return sender;
             }
-            if (!"http".equalsIgnoreCase(proxy.getScheme()) || proxy.getHost() == null ||
-                proxy.getPort() == 0 || proxy.getPort() > 65535 || proxy.getRawQuery() != null ||
-                proxy.getRawFragment() != null ||
-                proxy.getRawPath() != null && !proxy.getRawPath().isEmpty() && !"/".equals(proxy.getRawPath())) {
-                throw new CannotKnow("the configured registry proxy requires an unsupported scheme or URL capability; " +
-                                     "only an HTTP proxy is supported");
-            }
-            if (proxy.getRawUserInfo() != null) {
-                throw new CannotKnow("the configured registry proxy requires authentication; " +
-                                     "proxy credentials cannot be safely supplied by this transport");
-            }
-            route = new Proxy(Proxy.Type.HTTP, new InetSocketAddress(proxy.getHost(),
-                    proxy.getPort() < 0 ? 80 : proxy.getPort()));
         }
+        Proxy route = route(target, configured);
         try {
             return sender.withProxy(route);
         } catch (UnsupportedOperationException e) {
             throw new CannotKnow("the injected HttpSender cannot honor the configured registry proxy route; " +
                                  "it must implement withProxy");
         }
+    }
+
+    /** Whether {@code sender} is a host's own client rather than the default URL sender. */
+    public static boolean isHostSender(HttpSender sender) {
+        return sender.getClass() != HttpUrlConnectionSender.class;
+    }
+
+    private Proxy route(URI target, String configured) {
+        if (bypasses(target.getHost())) {
+            return Proxy.NO_PROXY;
+        }
+        URI proxy;
+        try {
+            proxy = URI.create(configured);
+        } catch (IllegalArgumentException e) {
+            throw new CannotKnow("the configured registry proxy URL is invalid");
+        }
+        if (!"http".equalsIgnoreCase(proxy.getScheme()) || proxy.getHost() == null ||
+            proxy.getPort() == 0 || proxy.getPort() > 65535 || proxy.getRawQuery() != null ||
+            proxy.getRawFragment() != null ||
+            proxy.getRawPath() != null && !proxy.getRawPath().isEmpty() && !"/".equals(proxy.getRawPath())) {
+            throw new CannotKnow("the configured registry proxy requires an unsupported scheme or URL capability; " +
+                                 "only an HTTP proxy is supported");
+        }
+        if (proxy.getRawUserInfo() != null) {
+            throw new CannotKnow("the configured registry proxy requires authentication; " +
+                                 "proxy credentials cannot be safely supplied by this transport");
+        }
+        return new Proxy(Proxy.Type.HTTP, new InetSocketAddress(proxy.getHost(),
+                proxy.getPort() < 0 ? 80 : proxy.getPort()));
     }
 
     // npm 11.19.1 @npmcli/agent and pnpm 11.10.0 checkNoProxy match hostname suffix segments.
