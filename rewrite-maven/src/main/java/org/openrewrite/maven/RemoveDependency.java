@@ -77,7 +77,7 @@ public class RemoveDependency extends Recipe {
             }
 
             private boolean isMatchingSystemDependency(Xml.Tag tag) {
-                if (!isDependencyTag() && !(isTag("dependency") && PROFILE_DEPENDENCY_MATCHER.matches(getCursor()))) {
+                if (!isDependencyTag()) {
                     return false;
                 }
                 ResolvedPom pom = getResolutionResult().getPom();
