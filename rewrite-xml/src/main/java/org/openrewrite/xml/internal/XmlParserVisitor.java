@@ -103,7 +103,48 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
         if (unbalancedTag != null && (unclosedElement || !htmlMode)) {
             throw unbalancedTag;
         }
+        requireNothingAfterRoot(document.getEof());
         return document;
+    }
+
+    /// The grammar stops at the end of the root element and leaves the rest of the source to `eof`, which a
+    /// recipe never sees. Markup there is a second top-level element or end tags left over from misnesting, and
+    /// would be silently invisible.
+    private void requireNothingAfterRoot(String eof) {
+        int i = 0;
+        while (i < eof.length()) {
+            int end;
+            if (Character.isWhitespace(eof.charAt(i))) {
+                end = i + 1;
+            } else if (eof.startsWith("<!--", i)) {
+                end = endOf(eof, i, "-->");
+            } else if (eof.startsWith("<%--", i)) {
+                end = endOf(eof, i, "--%>");
+            } else if (eof.startsWith("<%", i)) {
+                end = endOf(eof, i, "%>");
+            } else if (eof.startsWith("<?", i)) {
+                end = endOf(eof, i, "?>");
+            } else {
+                end = -1;
+            }
+            if (end < 0) {
+                int offset = source.length() - eof.length() + i;
+                String before = source.substring(0, offset);
+                int line = (int) before.chars().filter(c -> c == '\n').count() + 1;
+                int column = offset - before.lastIndexOf('\n');
+                throw new IllegalStateException(String.format(
+                        "Content after the root element in %s at line %d, column %d. A document has a single " +
+                        "root element; this is likely an end tag that closes no open element, or a second " +
+                        "top-level element as in an HTML fragment or a page that leaves out <html>.",
+                        path, line, column));
+            }
+            i = end;
+        }
+    }
+
+    private static int endOf(String text, int start, String terminator) {
+        int end = text.indexOf(terminator, start);
+        return end < 0 ? -1 : end + terminator.length();
     }
 
     @Override
@@ -114,7 +155,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                 Markers.EMPTY,
                 visitXmldecl(ctx.xmldecl()),
                 ctx.misc().stream().map(this::visit).map(Misc.class::cast).collect(toList()),
-                ctx.jspdirective().stream().map(this::visit).map(Xml.JspDirective.class::cast).collect(toList()))
+                emptyList())
         );
     }
 

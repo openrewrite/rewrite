@@ -50,7 +50,8 @@ class XmlRpcRoundTripTest {
 
         // then
         assertThat(received.getRoot().getContent()).hasSize(2);
-        assertThat(received.getProlog().getJspDirectives().get(0).getType()).isEqualTo("page");
+        assertThat(received.getProlog().getMisc().get(0))
+          .isInstanceOfSatisfying(Xml.JspDirective.class, directive -> assertThat(directive.getType()).isEqualTo("page"));
         assertThat(received.printAll()).isEqualTo(jsp);
     }
 

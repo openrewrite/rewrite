@@ -201,8 +201,10 @@ class HtmlParserTest implements RewriteTest {
         rewriteRun(
           html(
             """
-              <p>Tom & Jerry &amp; friends &#169; &copy 2024, a < b, 1 <2 & more</p>
-              <p>AT&T</p>
+              <div>
+                <p>Tom & Jerry &amp; friends &#169; &copy 2024, a < b, 1 <2 & more</p>
+                <p>AT&T</p>
+              </div>
               """
           )
         );
@@ -337,7 +339,7 @@ class HtmlParserTest implements RewriteTest {
               <nav class=main><a href="/">Home</a><br><input disabled></nav>
               """,
             spec -> spec.path("WEB-INF/jspf/header.jspf").afterRecipe(doc -> {
-                assertThat(doc.getProlog().getJspDirectives()).singleElement().satisfies(directive -> {
+                assertThat(doc.getProlog().getMisc()).singleElement().isInstanceOfSatisfying(Xml.JspDirective.class, directive -> {
                     assertThat(directive.getType()).isEqualTo("page");
                     assertThat(directive.getBeforeTypePrefix()).isEqualTo(" ");
                     assertThat(directive.getAttributes()).singleElement().satisfies(attribute -> {
@@ -349,6 +351,29 @@ class HtmlParserTest implements RewriteTest {
                 assertThat(doc.getRoot().getName()).isEqualTo("nav");
                 assertThat(doc.getRoot().getPrefix()).isEqualTo("\n");
             })
+          )
+        );
+    }
+
+    @Test
+    void secondTopLevelElementIsReported() {
+        assertThat(parse("a.html", "<ul><li>one</ul>\n<p>hidden").getMarkers().findFirst(ParseExceptionResult.class))
+          .hasValueSatisfying(e -> assertThat(e.getMessage()).contains("Content after the root element in a.html at line 2, column 1"));
+    }
+
+    @Test
+    void endTagLeftOverFromMisnestingIsReported() {
+        assertThat(parse("a.html", "<html><body><a href=x /></a></body></html>")).isInstanceOf(ParseError.class);
+    }
+
+    @Test
+    void commentsAndWhitespaceAfterTheRootAreAllowed() {
+        rewriteRun(
+          html(
+            """
+              <html></html>
+              <!-- trailing -->
+              """
           )
         );
     }

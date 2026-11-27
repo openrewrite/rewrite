@@ -41,7 +41,7 @@ document
     ;
 
 prolog
-    :   xmldecl? misc* jspdirective*
+    :   xmldecl? misc*
     ;
 
 xmldecl
@@ -49,7 +49,8 @@ xmldecl
     ;
 
 misc
-    :   (COMMENT | doctypedecl | processinginstruction | jspdeclaration | jspcomment)
+    :   (COMMENT | doctypedecl | processinginstruction | jspdirective | jspscriptlet | jspexpression | jspdeclaration |
+         jspcomment)
     ;
 
 doctypedecl
@@ -79,7 +80,7 @@ processinginstruction
 
 content
     :   (element | reference | processinginstruction | CDATA | COMMENT |
-         jspscriptlet | jspexpression | jspdeclaration | jspcomment | chardata) ;
+         jspdirective | jspscriptlet | jspexpression | jspdeclaration | jspcomment | chardata) ;
 
 element
     :   OPEN name=Name attribute*

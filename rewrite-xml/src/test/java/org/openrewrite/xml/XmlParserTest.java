@@ -40,7 +40,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.stream.Stream;
 
-import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.xml.Assertions.xml;
@@ -267,7 +267,41 @@ class XmlParserTest implements RewriteTest {
               <% String test = "hello"; %>
               <html></html>
               """,
-            spec -> spec.path("scripletBeforeHtml.jsp")
+            spec -> spec.path("scripletBeforeHtml.jsp").afterRecipe(doc -> {
+                assertThat(doc.getProlog().getMisc()).hasExactlyElementsOfTypes(Xml.JspComment.class, Xml.JspScriptlet.class);
+                assertThat(doc.getRoot().getName()).isEqualTo("html");
+            })
+          )
+        );
+    }
+
+    @Test
+    void jspPrologInterleavesDirectivesWithOtherMarkup() {
+        rewriteRun(
+          xml(
+            //language=html
+            """
+              <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+              <%-- Page layout --%>
+              <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
+              <% String title = "Home"; %>
+              <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "https://www.w3.org/TR/html4/loose.dtd">
+              <html>
+              <body>
+                <%@ include file="header.jspf" %>
+                <h1><%= title %></h1>
+              </body>
+              </html>
+              """,
+            spec -> spec.path("home.jsp").afterRecipe(doc -> {
+                assertThat(doc.getProlog().getMisc()).hasExactlyElementsOfTypes(
+                  Xml.JspDirective.class, Xml.JspComment.class, Xml.JspDirective.class, Xml.JspScriptlet.class,
+                  Xml.DocTypeDecl.class);
+                assertThat(doc.getProlog().getJspDirectives()).isEmpty();
+                Xml.Tag body = doc.getRoot().getChildren().get(0);
+                assertThat(body.getContent()).filteredOn(Xml.JspDirective.class::isInstance).singleElement()
+                  .isInstanceOfSatisfying(Xml.JspDirective.class, include -> assertThat(include.getType()).isEqualTo("include"));
+            })
           )
         );
     }

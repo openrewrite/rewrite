@@ -213,6 +213,48 @@ describe("XML parsing", () => {
         }
     ));
 
+    test("a JSP prolog keeps directives in order with the rest of the prolog", async () => {
+        // given
+        const source = [
+            `<%@ page contentType="text/html" %>`,
+            `<%-- Page layout --%>`,
+            `<%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>`,
+            `<% String title = "Home"; %>`,
+            `<!DOCTYPE html>`,
+            `<html><body><%@ include file="header.jspf" %><h1><%= title %></h1></body></html>`,
+            ``
+        ].join("\n");
+
+        // when
+        const jsp = await parseDocument(source, "home.jsp");
+
+        // then
+        expect(jsp.prolog.misc.map(m => m.kind)).toEqual([
+            Xml.Kind.JspDirective, Xml.Kind.JspComment, Xml.Kind.JspDirective, Xml.Kind.JspScriptlet,
+            Xml.Kind.DocTypeDecl
+        ]);
+        expect(jsp.prolog.jspDirectives).toEqual([]);
+        const body = getChildren(jsp.root!)[0];
+        expect(body.content!.map(c => c.kind)).toContain(Xml.Kind.JspDirective);
+        expect(await TreePrinters.print(jsp)).toEqual(source);
+    });
+
+    test("content after the root element is a parse error", async () => {
+        // when
+        const sourceFile = await parse(`<a/>\n<b/>`);
+
+        // then
+        expect(sourceFile.kind).toEqual(ParseErrorKind);
+    });
+
+    test("comments after the root element are allowed", async () => {
+        // when
+        const document = await parseDocument(`<a/>\n<!-- trailing -->\n`);
+
+        // then
+        expect(document.eof).toEqual(`\n<!-- trailing -->\n`);
+    });
+
     test("a realistic UI5 view", () => spec.rewriteRun(
         {
             ...xml(
