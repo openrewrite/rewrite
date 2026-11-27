@@ -939,4 +939,34 @@ class DeletePropertyKeyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void deletesTheFirstEntryOfAFlowMapping() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("a.x", null, null, null)),
+          yaml(
+            """
+              a: { x: 1, y: 2 }
+              """,
+            """
+              a: { y: 2 }
+              """
+          )
+        );
+    }
+
+    @Test
+    void deletesAMiddleEntryOfAFlowMapping() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("a.y", null, null, null)),
+          yaml(
+            """
+              a: { x: 1, y: 2, z: 3 }
+              """,
+            """
+              a: { x: 1, z: 3 }
+              """
+          )
+        );
+    }
 }

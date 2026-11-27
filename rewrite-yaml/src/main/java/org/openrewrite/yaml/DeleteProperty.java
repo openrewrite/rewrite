@@ -222,6 +222,13 @@ public class DeleteProperty extends Recipe {
                         }
                         changed = true;
                         previousWasDeleted = true;
+                    } else if (m.getOpeningBracePrefix() != null) {
+                        // in a flow mapping the prefix of an entry after the first starts with its comma
+                        if (entries.isEmpty() && firstDeletedPrefix != null) {
+                            entry = entry.withPrefix(firstDeletedPrefix);
+                        }
+                        entries.add(entry);
+                        previousWasDeleted = false;
                     } else {
                         if (entries.isEmpty() && firstDeletedPrefix != null &&
                             containsOnlyWhitespace(TrailingComments.withoutInlineComment(entry.getPrefix()))) {
