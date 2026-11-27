@@ -212,8 +212,10 @@ export class WorkerPageChannel {
             }
             let ended = false;
             serve(m.params, page => {
-                ended = endsTransfer(page);
-                this.handOver("result", page, ended);
+                const last = endsTransfer(page);
+                this.handOver("result", page, last);
+                // a last page that failed to hand over leaves the remote's request for it to the error
+                ended = last;
             })
                 .catch(e => {
                     // No request follows the last page, so an error after it has nothing to answer

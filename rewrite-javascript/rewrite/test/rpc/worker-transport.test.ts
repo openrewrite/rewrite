@@ -242,6 +242,15 @@ describe.skipIf(!fs.existsSync(transport))("the worker transport", () => {
         expect(await response).toMatchObject({result: [{value: "whole"}]});
     });
 
+    test("a last page that cannot be handed over answers with the error", async () => {
+        const remote = start(`async (params, sink) => {
+            sink([{state: "END_OF_OBJECT", value: {toJSON() { throw new Error("cannot write the last page"); }}}]);
+        }`);
+
+        expect(await remote.request("GetObject", {id: "tree"}))
+            .toMatchObject({error: {message: "cannot write the last page"}});
+    });
+
     test("a serve that fails after its last page lets the next transfer start", async () => {
         const remote = start(`async (params, sink) => {
             sink([{state: "END_OF_OBJECT"}]);
