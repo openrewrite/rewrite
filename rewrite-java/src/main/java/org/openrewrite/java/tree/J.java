@@ -6265,6 +6265,7 @@ public interface J extends Tree {
         @With
         @Nullable
         @Getter
+        @Deprecated
         Space varargs;
 
         List<JRightPadded<NamedVariable>> variables;

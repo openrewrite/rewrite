@@ -165,7 +165,6 @@ class ArrayTypeTest implements RewriteTest {
         assertThat(migratedArrayType.toString()).isEqualTo("String");
     }
 
-    @Disabled("Fails print idempotency test")
     @Test
     void annotatedVarargsParameter() {
         rewriteRun(

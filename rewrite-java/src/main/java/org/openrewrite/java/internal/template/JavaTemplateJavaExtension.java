@@ -23,6 +23,7 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.internal.LineStart;
+import org.openrewrite.java.marker.Varargs;
 import org.openrewrite.java.service.SourceFileStatementService;
 import org.openrewrite.java.trait.Scope;
 import org.openrewrite.java.tree.*;
@@ -545,7 +546,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                                 Statement last = parameters.isEmpty() ? null : parameters.get(parameters.size() - 1);
                                 Set<Flag> flags = EnumSet.noneOf(Flag.class);
                                 flags.addAll(type.getFlags());
-                                if (last instanceof J.VariableDeclarations && ((J.VariableDeclarations) last).getVarargs() != null) {
+                                if (last instanceof J.VariableDeclarations && isVarargs((J.VariableDeclarations) last)) {
                                     flags.add(Flag.Varargs);
                                 } else {
                                     flags.remove(Flag.Varargs);
@@ -905,6 +906,23 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
             }
         }
         return true;
+    }
+
+    private static boolean isVarargs(J.VariableDeclarations parameter) {
+        if (parameter.getVarargs() != null) {
+            return true;
+        }
+        TypeTree typeTree = parameter.getTypeExpression();
+        while (typeTree instanceof J.AnnotatedType || typeTree instanceof J.ArrayType) {
+            if (typeTree instanceof J.AnnotatedType) {
+                typeTree = ((J.AnnotatedType) typeTree).getTypeExpression();
+            } else if (typeTree.getMarkers().findFirst(Varargs.class).isPresent()) {
+                return true;
+            } else {
+                typeTree = ((J.ArrayType) typeTree).getElementType();
+            }
+        }
+        return false;
     }
 
     private static boolean isPrimitive(@Nullable JavaType type) {

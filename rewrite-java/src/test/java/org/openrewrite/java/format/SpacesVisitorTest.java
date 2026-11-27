@@ -373,7 +373,7 @@ class SpacesVisitorTest implements RewriteTest {
             """,
             """
             class Test {
-                void method(String first, int... values) {}
+                void method(String first, int ... values) {}
             }
             """
           )

@@ -29,6 +29,7 @@ import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.marker.Varargs;
 import org.openrewrite.java.trait.Scope;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Marker;
@@ -878,7 +879,7 @@ public class BlockStatementTemplateGenerator {
                     // `var` would take the placeholder value's type, so the stub declares the variable's type
                     varBuilder.append(Substitutions.getTypeName(nv.getType()));
                 } else if (typeExpression != null) {
-                    varBuilder.append(typeExpression.withPrefix(Space.EMPTY).printTrimmed(cursor));
+                    varBuilder.append(withoutVarargs(typeExpression).withPrefix(Space.EMPTY).printTrimmed(cursor));
                 }
                 if (variable.getVarargs() != null) {
                     varBuilder.append("[]");
@@ -950,6 +951,20 @@ public class BlockStatementTemplateGenerator {
             return null;
         }
         return fq.getMethods().stream().filter(method -> method.hasFlags(Flag.Abstract)).findAny().orElse(null);
+    }
+
+    private static TypeTree withoutVarargs(TypeTree typeTree) {
+        if (typeTree instanceof J.AnnotatedType) {
+            J.AnnotatedType annotatedType = (J.AnnotatedType) typeTree;
+            return annotatedType.withTypeExpression(withoutVarargs(annotatedType.getTypeExpression()));
+        }
+        if (typeTree instanceof J.ArrayType) {
+            J.ArrayType arrayType = (J.ArrayType) typeTree;
+            return arrayType
+                    .withMarkers(arrayType.getMarkers().removeByType(Varargs.class))
+                    .withElementType(withoutVarargs(arrayType.getElementType()));
+        }
+        return typeTree;
     }
 
     // Visitor for removing any trees having or following the `STOP_COMMENT`

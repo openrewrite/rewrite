@@ -28,8 +28,8 @@ import java.util.UUID;
  * Marks a {@link org.openrewrite.java.tree.J.ArrayType} that was written using varargs syntax
  * ({@code ...}) rather than array brackets ({@code []}). The element type and dimension space are
  * modeled like any other array type; this marker only records that the type should be printed with
- * {@code ...}. Currently produced by the Javadoc parser for references such as
- * {@code {@link String#format(String, Object...)}}.
+ * {@code ...}. Produced by the Java parsers for varargs parameters such as {@code String @A ... args},
+ * and by the Javadoc parser for references such as {@code {@link String#format(String, Object...)}}.
  */
 @Value
 @With
