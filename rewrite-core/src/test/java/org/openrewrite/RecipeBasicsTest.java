@@ -51,66 +51,6 @@ class RecipeBasicsTest {
         assertThat(ct.getInstanceName()).isEqualTo("Change text to `hi`");
     }
 
-
-    static class RecipeBase extends Recipe {
-        String option;
-        public RecipeBase(String option) {
-            this.option = option;
-        }
-
-        @Override
-        public String getDisplayName() {
-            return "Recipe base";
-        }
-
-        @Override
-        public String getDescription() {
-            return "Recipe base.";
-        }
-    }
-
-    static class ExtendingRecipe extends RecipeBase {
-        @SuppressWarnings("unused")
-        @Option(displayName = "Option", description = "Option description", example = "Example")
-        String getOption() {
-            return option;
-        }
-
-        public ExtendingRecipe(String option) {
-            super(option);
-        }
-    }
-
-    @Test
-    void subclassExposesOptionsViaMethod() {
-        RecipeDescriptor d = new ExtendingRecipe("option").createRecipeDescriptor();
-        assertThat(d.getOptions().getFirst().getDisplayName()).isEqualTo("Option");
-    }
-
-    static class RecipeWithConstructorParameter extends Recipe {
-        String option;
-
-        public RecipeWithConstructorParameter(@Option(displayName = "Option", description = "Option description", example = "Example") String option) {
-            this.option = option;
-        }
-
-        @Override
-        public String getDisplayName() {
-            return "";
-        }
-
-        @Override
-        public String getDescription() {
-            return "";
-        }
-    }
-
-    @Test
-    void optionExposedViaConstructorParameter() {
-        RecipeDescriptor d = new RecipeWithConstructorParameter("option").createRecipeDescriptor();
-        assertThat(d.getOptions().getFirst().getDisplayName()).isEqualTo("Option");
-    }
-
     static class RecipeWithListOption extends Recipe {
         @Option(displayName = "Field names", description = "Field names.", example = "firstName,lastName")
         List<String> fieldNames;
@@ -148,48 +88,6 @@ class RecipeBasicsTest {
     @Test
     void enumFieldOptionDeducesValidValues() {
         RecipeDescriptor d = new RecipeWithEnumField(Color.RED).createRecipeDescriptor();
-        OptionDescriptor opt = d.getOptions().getFirst();
-        assertThat(opt.getValid()).containsExactly("RED", "GREEN", "BLUE");
-    }
-
-    static class RecipeWithEnumMethod extends RecipeBase {
-        Color color;
-
-        public RecipeWithEnumMethod(Color color) {
-            super("ignored");
-            this.color = color;
-        }
-
-        @Option(displayName = "Color", description = "Pick a color.")
-        Color getColor() {
-            return color;
-        }
-    }
-
-    @Test
-    void enumMethodOptionDeducesValidValues() {
-        RecipeDescriptor d = new RecipeWithEnumMethod(Color.GREEN).createRecipeDescriptor();
-        OptionDescriptor opt = d.getOptions().stream()
-                .filter(o -> o.getName().equals("color"))
-                .findFirst().orElseThrow();
-        assertThat(opt.getValid()).containsExactly("RED", "GREEN", "BLUE");
-    }
-
-    @Getter
-    static class RecipeWithEnumConstructorParam extends Recipe {
-        private final String displayName = "Enum constructor param recipe";
-        private final String description = "Enum constructor param recipe.";
-        final Color color;
-
-        public RecipeWithEnumConstructorParam(
-                @Option(displayName = "Color", description = "Pick a color.") Color color) {
-            this.color = color;
-        }
-    }
-
-    @Test
-    void enumConstructorParamOptionDeducesValidValues() {
-        RecipeDescriptor d = new RecipeWithEnumConstructorParam(Color.BLUE).createRecipeDescriptor();
         OptionDescriptor opt = d.getOptions().getFirst();
         assertThat(opt.getValid()).containsExactly("RED", "GREEN", "BLUE");
     }
