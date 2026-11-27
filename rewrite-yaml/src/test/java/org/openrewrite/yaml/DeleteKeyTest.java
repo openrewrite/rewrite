@@ -591,4 +591,99 @@ class DeleteKeyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void deletesTheLastItemOfAFlowSequence() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteKey("$.a[?(@ == 'z')]", null)),
+          yaml(
+            """
+              a: [x, y, z]
+              """,
+            """
+              a: [x, y]
+              """
+          )
+        );
+    }
+
+    @Test
+    void deletesTheLastItemOfAFlowSequenceWithSpaces() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteKey("$.a[?(@ == 'z')]", null)),
+          yaml(
+            """
+              a: [ x , y , z ]
+              """,
+            """
+              a: [ x , y ]
+              """
+          )
+        );
+    }
+
+    @Test
+    void deletesTheLastItemOfAFlowSequenceOverSeveralLines() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteKey("$.a[?(@ == 'y')]", null)),
+          yaml(
+            """
+              a: [
+                x,
+                y
+              ]
+              """,
+            """
+              a: [
+                x
+              ]
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepsATrailingCommaOfAFlowSequence() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteKey("$.a[?(@ == 'y')]", null)),
+          yaml(
+            """
+              a: [x, y, ]
+              """,
+            """
+              a: [x, ]
+              """
+          )
+        );
+    }
+
+    @Test
+    void deletesTheFirstItemOfAFlowSequence() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteKey("$.a[?(@ == 'x')]", null)),
+          yaml(
+            """
+              a: [x, y, z]
+              """,
+            """
+              a: [y, z]
+              """
+          )
+        );
+    }
+
+    @Test
+    void deletesTheFirstEntryOfAFlowMapping() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteKey("$.a.x", null)),
+          yaml(
+            """
+              a: { x: 1, y: 2 }
+              """,
+            """
+              a: { y: 2 }
+              """
+          )
+        );
+    }
 }

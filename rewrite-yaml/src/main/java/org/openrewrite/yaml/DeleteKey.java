@@ -23,7 +23,6 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.List;
-import java.util.concurrent.atomic.AtomicReference;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -73,24 +72,22 @@ public class DeleteKey extends Recipe {
                     removeUnused(getCursor());
                     return s.withEntries(kept);
                 }
-                AtomicReference<@Nullable String> copyFirstPrefix = new AtomicReference<>();
-                s = s.withEntries(ListUtils.map(s.getEntries(), (i, e) -> {
-                    if (matcher.matches(new Cursor(getCursor(), e)) || matcher.matches(new Cursor(getCursor(), e.getBlock()))) {
-                        if (i == 0) {
-                            copyFirstPrefix.set(e.getPrefix());
-                        }
-                        removeUnused(getCursor());
-                        return null;
-                    }
-                    return e;
-                }));
-
-                if (!s.getEntries().isEmpty() && copyFirstPrefix.get() != null) {
-                    //noinspection DataFlowIssue
-                    s = s.withEntries(ListUtils.mapFirst(s.getEntries(), e -> e.withPrefix(copyFirstPrefix.get())));
+                List<Yaml.Sequence.Entry> entries = s.getEntries();
+                List<Yaml.Sequence.Entry> kept = ListUtils.filter(entries, e ->
+                        !matcher.matches(new Cursor(getCursor(), e)) && !matcher.matches(new Cursor(getCursor(), e.getBlock())));
+                if (kept.size() == entries.size()) {
+                    return s;
                 }
-
-                return s;
+                removeUnused(getCursor());
+                if (!kept.isEmpty()) {
+                    Yaml.Sequence.Entry first = entries.get(0);
+                    Yaml.Sequence.Entry last = entries.get(entries.size() - 1);
+                    // the item now first takes the space after the opening bracket, and the one now last the comma
+                    // the last had, if any
+                    kept = ListUtils.mapFirst(kept, e -> e == first ? e : withLead(e, leadOf(first)));
+                    kept = ListUtils.mapLast(kept, e -> e == last ? e : e.withTrailingCommaPrefix(last.getTrailingCommaPrefix()));
+                }
+                return s.withEntries(kept);
             }
 
             @Override
@@ -105,25 +102,42 @@ public class DeleteKey extends Recipe {
                     removeUnused(getCursor().getParent());
                     return m.withEntries(kept);
                 }
-                AtomicReference<String> copyFirstPrefix = new AtomicReference<>();
-                m = m.withEntries(ListUtils.map(m.getEntries(), (i, e) -> {
-                    if (matcher.matches(new Cursor(getCursor(), e))) {
-                        if (i == 0 && getCursor().getParentOrThrow().getValue() instanceof Yaml.Sequence.Entry) {
-                            copyFirstPrefix.set(e.getPrefix());
-                        }
-                        removeUnused(getCursor().getParent());
-                        return null;
-                    }
-                    return e;
-                }));
-
-                if (!m.getEntries().isEmpty() && copyFirstPrefix.get() != null) {
-                    m = m.withEntries(ListUtils.mapFirst(m.getEntries(), e -> e.withPrefix(copyFirstPrefix.get())));
+                List<Yaml.Mapping.Entry> entries = m.getEntries();
+                List<Yaml.Mapping.Entry> kept = ListUtils.filter(entries, e -> !matcher.matches(new Cursor(getCursor(), e)));
+                if (kept.size() == entries.size()) {
+                    return m;
                 }
-
-                return m;
+                removeUnused(getCursor().getParent());
+                Yaml.Mapping.Entry first = entries.get(0);
+                // the entry now first takes the first's prefix, as the one it had starts with a comma
+                return m.withEntries(ListUtils.mapFirst(kept, e -> e == first ? e : e.withPrefix(first.getPrefix())));
             }
         });
+    }
+
+    /**
+     * The space before a flow sequence item. The parser keeps it on the item, or on the opening bracket of a nested
+     * collection, and a tree from an older parser on the entry.
+     */
+    private static String leadOf(Yaml.Sequence.Entry entry) {
+        Yaml.Block block = entry.getBlock();
+        String lead = block instanceof Yaml.Sequence ? ((Yaml.Sequence) block).getOpeningBracketPrefix() :
+                block instanceof Yaml.Mapping ? ((Yaml.Mapping) block).getOpeningBracePrefix() : block.getPrefix();
+        return entry.getPrefix() + (lead == null ? "" : lead);
+    }
+
+    private static Yaml.Sequence.Entry withLead(Yaml.Sequence.Entry entry, String lead) {
+        Yaml.Block block = entry.getBlock();
+        if (block instanceof Yaml.Sequence && ((Yaml.Sequence) block).getOpeningBracketPrefix() != null) {
+            block = ((Yaml.Sequence) block).withOpeningBracketPrefix(lead);
+        } else if (block instanceof Yaml.Mapping && ((Yaml.Mapping) block).getOpeningBracePrefix() != null) {
+            block = ((Yaml.Mapping) block).withOpeningBracePrefix(lead);
+        } else if (block instanceof Yaml.Mapping) {
+            block = ((Yaml.Mapping) block).withEntries(ListUtils.mapFirst(((Yaml.Mapping) block).getEntries(), e -> e.withPrefix(lead)));
+        } else {
+            block = block.withPrefix(lead);
+        }
+        return entry.withPrefix("").withBlock(block);
     }
 
     // Removed here rather than by RemoveUnusedVisitor, which would drop the comments its prefix holds. The parser

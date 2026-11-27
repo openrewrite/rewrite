@@ -939,4 +939,92 @@ class DeletePropertyKeyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void deletesTheFirstEntryOfAFlowMapping() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("a.x", null, null, null)),
+          yaml(
+            """
+              a: { x: 1, y: 2 }
+              """,
+            """
+              a: { y: 2 }
+              """
+          )
+        );
+    }
+
+    @Test
+    void deletesAMiddleEntryOfAFlowMapping() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("a.y", null, null, null)),
+          yaml(
+            """
+              a: { x: 1, y: 2, z: 3 }
+              """,
+            """
+              a: { x: 1, z: 3 }
+              """
+          )
+        );
+    }
+
+    @Test
+    void deletesTheCommentsAboveADeletedFirstNestedEntry() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("p.x", null, null, null)),
+          yaml(
+            """
+              p:
+                # about x
+                x: 1
+                y: 2
+              """,
+            """
+              p:
+                y: 2
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepsTheCommentOfTheKeyLineWhenTheFirstNestedEntryGoes() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("p.x", null, null, null)),
+          yaml(
+            """
+              p: # about p
+                # about x
+                x: 1
+                y: 2
+              """,
+            """
+              p: # about p
+                y: 2
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepsTheCommentsThatStartTheFile() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("a", null, null, null)),
+          yaml(
+            """
+              # header
+
+              a: 1
+              b: 2
+              """,
+            """
+              # header
+
+              b: 2
+              """
+          )
+        );
+    }
 }
