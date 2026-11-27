@@ -91,6 +91,12 @@ export interface UpgradeDependencyVersionsOptions {
     versions: Record<string, string>;
     /** Verify the upgraded manifest before recovering from stale npm lock peer conflicts. Defaults to false. */
     reconcileNpmPeerDependencies?: boolean;
+    /**
+     * Leave a `package.json` as it is when it declares a package one of these `name@range` entries holds for, the
+     * name a glob, e.g. `ag-grid-*@<23`: by the version its lock resolves, else when the declared constraint admits
+     * a version in the range.
+     */
+    unlessResolving?: string[];
 }
 
 /**
