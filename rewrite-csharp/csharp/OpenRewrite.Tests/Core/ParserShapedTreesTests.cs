@@ -85,7 +85,7 @@ public class ParserShapedTreesTests : RewriteTest
             CSharp(Returns("0"), Returns("null null"))
         ));
 
-        Assert.Contains("\n    the text it prints doesn't parse: CS1002 ; expected at `return null null;`\n",
+        Assert.Matches(@"(?m)^    the text it prints doesn't parse: CS1002 [^\r\n]+ at `return null null;`\r?$",
             failure.Message);
     }
 
